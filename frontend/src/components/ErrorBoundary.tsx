@@ -1,0 +1,38 @@
+import { Component, type ReactNode } from 'react'
+
+interface Props {
+  children: ReactNode
+  label?: string
+}
+
+interface State {
+  error: Error | null
+}
+
+export class ErrorBoundary extends Component<Props, State> {
+  state: State = { error: null }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { error }
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="rounded-lg bg-red-50 border border-red-200 px-5 py-4 space-y-1">
+          <p className="text-sm font-medium text-red-800">
+            {this.props.label ?? 'Something went wrong'}
+          </p>
+          <p className="text-xs text-red-600 font-mono">{this.state.error.message}</p>
+          <button
+            onClick={() => this.setState({ error: null })}
+            className="text-xs text-red-500 underline hover:text-red-700"
+          >
+            Try again
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}

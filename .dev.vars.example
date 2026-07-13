@@ -1,0 +1,6 @@
+# Copy to .dev.vars for local development (gitignored)
+# See docs/google-calendar-setup.md for how to get these values
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REFRESH_TOKEN=
+GOOGLE_CALENDAR_ID=primary
