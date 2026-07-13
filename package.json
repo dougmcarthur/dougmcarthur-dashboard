@@ -9,6 +9,11 @@
     "build:ui": "vite build",
     "build": "npm run build:ui && wrangler deploy",
     "deploy": "wrangler deploy",
+    "typecheck": "npm run typecheck:api && npm run typecheck:ui",
+    "typecheck:api": "tsc --noEmit -p tsconfig.json",
+    "typecheck:ui": "tsc -p tsconfig.frontend.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply dougmcarthur-music-hq --local",
     "db:migrate:remote": "wrangler d1 migrations apply dougmcarthur-music-hq --remote"
@@ -34,6 +39,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
+    "vitest": "^4.1.10",
     "wrangler": "^4.0.0"
   }
 }

@@ -49,7 +49,7 @@ interface GmailMessageDetail {
   internalDate: string
 }
 
-function decodeBase64(str: string): string {
+export function decodeBase64(str: string): string {
   // Gmail uses URL-safe base64
   const standard = str.replace(/-/g, '+').replace(/_/g, '/')
   try {
@@ -64,7 +64,7 @@ function decodeBase64(str: string): string {
   }
 }
 
-function extractPlainText(payload: GmailMessageDetail['payload']): string {
+export function extractPlainText(payload: GmailMessageDetail['payload']): string {
   // Simple single-part message
   if (payload.body?.data) return decodeBase64(payload.body.data)
 
