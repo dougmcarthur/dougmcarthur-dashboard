@@ -19,13 +19,15 @@ app.use('/api/*', cors())
 
 app.route('/api/overview', overview)
 app.route('/api/gigs', gigs)
+// NOTE: must be registered before '/api/sync' — otherwise the sync router's
+// GET '/:id' route matches '/reconcile' first and swallows this endpoint.
+app.route('/api/sync/reconcile', syncReconcile)
 app.route('/api/sync', sync)
 app.route('/api/promo', promo)
 app.route('/api/reference-docs', reference)
 app.route('/api/task-runs', taskRuns)
 app.route('/api/reminders', reminders)
 app.route('/api/health', health)
-app.route('/api/sync/reconcile', syncReconcile)
 
 app.notFound((c) => c.json({ error: 'not found' }, 404))
 
