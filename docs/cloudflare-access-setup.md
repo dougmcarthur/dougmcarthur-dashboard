@@ -107,3 +107,49 @@ dashboard.dougmcarthur.net
 If you still land on `dash.cloudflare.com`, you almost certainly clicked the
 **Cloudflare** button again instead of the new **One-time PIN** option — that
 button is the account-credentials login and is the source of the misredirect.
+
+## Switching to Google Workspace SSO (preferred long-term login)
+
+The intended primary login is **Google Workspace** as `doug@dougmcarthur.net`
+(the Workspace identity used for all music-related things). This is more secure
+than OTP — it enforces Workspace MFA and follows account lifecycle — but the
+switch has one real trap: **the Access policy matches your Workspace email, not
+the consumer gmail**, so do it additively and verify before removing anything.
+
+### Do it in this order (never lock yourself out)
+
+1. **Add the Google Workspace IdP.**
+   Zero Trust → **Integrations → Identity providers → Add new identity provider
+   → Google Workspace**. It needs:
+   - **Client ID + Client Secret** from a Google Cloud OAuth 2.0 client (add
+     Cloudflare's callback URL as the authorized redirect URI).
+   - A Workspace **admin email** and the **Admin SDK API** enabled in that GCP
+     project (used to read directory/groups).
+   - **Domain-wide delegation** is only required if you want *group-based*
+     policies; a plain email/domain policy does not need it.
+
+2. **Enable it on the app** — Access → Applications → dashboard →
+   **Authentication**. Leave **One-time PIN** (and the Cloudflare button) enabled
+   for now as a fallback.
+
+3. **Add `doug@dougmcarthur.net` to the Allow policy** — same app → **Policies**.
+   *Add* it; do not remove `dougmcarthur0@gmail.com` yet.
+   - Note: **Emails ending in `@dougmcarthur.net`** would let *every* Workspace
+     user in — pin to the specific email (or a group) unless that's intended.
+
+4. **Verify** in the `doug@dougmcarthur.net` Chrome profile (or incognito): go to
+   `https://dashboard.dougmcarthur.net/`, sign in with Google, confirm you land
+   on the app.
+
+5. **Only after step 4 succeeds**, tighten:
+   - Remove `dougmcarthur0@gmail.com` from the policy.
+   - Optionally disable **One-time PIN** and the **Cloudflare** IdP on the app so
+     Google Workspace is the only door. (Keep OTP if you ever need guest access —
+     Workspace login only works for users in your domain.)
+
+### Why the gmail address must go last, not first
+
+Google **Workspace** login presents `doug@dougmcarthur.net`. If you remove the
+gmail from the policy (or flip OTP off) *before* the Google IdP is proven, a
+misconfiguration leaves no identity that matches the policy — you authenticate
+and get denied, with no way back in.
