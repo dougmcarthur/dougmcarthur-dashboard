@@ -37,27 +37,48 @@ rather than passing you through a proper Access identity provider — the accoun
 login flow has no knowledge of Access's `redirect_url`, so on success it just
 drops you at the account home.
 
-## Fix checklist (in the Zero Trust dashboard)
+## Root cause (confirmed)
 
-All of this lives at **`one.dash.cloudflare.com`** → **Zero Trust**. (Managing
-Zero Trust necessarily starts from the Cloudflare dashboard — that's expected;
-the goal is for the *app login* flow to stop ending there.)
+The `Log in to dashboard` screen at `solitary-fire-f486.cloudflareaccess.com`
+offers exactly **one** option under "Sign in with:" — a **Cloudflare** button.
+That button is the **Cloudflare identity provider**: it authenticates you with
+your existing **Cloudflare account credentials**.
 
-1. **Check the identity providers.**
-   Zero Trust → **Settings → Authentication → Login methods**.
-   - Prefer a real IdP: **One-time PIN** (email code) is the simplest and needs
-     no external setup, or a social IdP (Google/GitHub).
-   - For each configured IdP, use the **Test** button and confirm it returns
-     "Your connection works."
-   - If the only "login method" in play is effectively your Cloudflare account,
-     add One-time PIN and use that instead.
+This is now the *default and only* login method for the org because of a
+platform change: as of **June 2026**, newly created Zero Trust organizations get
+the Cloudflare identity provider added automatically and **One-time PIN is no
+longer added by default** (previously new orgs started with OTP). So this org
+was left with the Cloudflare-account login as its sole IdP, and that login is
+what round-trips you to `dash.cloudflare.com`.
 
-2. **Confirm the app's login options.**
-   Zero Trust → **Access → Applications → (the dashboard app) → Authentication**.
-   - Make sure the IdP(s) you fixed in step 1 are **enabled for this app**.
-   - If **Instant Auth** is on with a single IdP, it skips the Access chooser and
-     jumps straight to that IdP — fine once the IdP itself is healthy, but turn
-     it off temporarily while debugging so you can see the Access login screen.
+The fix is to add a login method that reliably returns to the app — **One-time
+PIN** is the simplest (zero external configuration).
+
+## The fix (in the Zero Trust dashboard)
+
+Everything below is at **`dash.cloudflare.com`** → **Zero Trust**. (Managing Zero
+Trust necessarily starts from the Cloudflare dashboard — that's expected; the
+goal is for the *app login* flow to stop ending there.)
+
+1. **Add One-time PIN as a login method.** *(the actual fix)*
+   Zero Trust → **Integrations → Identity providers** → **Add new identity
+   provider** → **One-time PIN** → **Save**. No configuration is required — OTP
+   emails a login code to any email allowed by policy.
+   - Menu note: it is **Integrations → Identity providers** in the current UI.
+     Older guides say "Settings → Authentication → Login methods"; that path no
+     longer exists.
+   - If a third-party email scanner (Mimecast, Barracuda, etc.) is in play,
+     allowlist `noreply@notify.cloudflare.com`.
+
+2. **Enable OTP for the app.**
+   Zero Trust → **Access → Applications → (the dashboard app) → Authentication**
+   (Edit).
+   - Either turn on **"Accept all available identity providers"**, or explicitly
+     check **One-time PIN**.
+   - You can leave the **Cloudflare** IdP enabled as a secondary option; OTP is
+     what gives the dependable return-to-app path. If **Instant Auth** is on it
+     skips the chooser and jumps to a single IdP — turn it off while debugging so
+     the login screen shows the new OTP option.
 
 3. **Confirm an Allow policy matches you.**
    Same app → **Policies**.
@@ -79,9 +100,10 @@ directly to `https://dashboard.dougmcarthur.net/`. A correct flow is:
 
 ```
 dashboard.dougmcarthur.net
-  → solitary-fire-f486.cloudflareaccess.com  (pick IdP / enter PIN)
+  → solitary-fire-f486.cloudflareaccess.com  (choose "One-time PIN", enter code)
   → back to dashboard.dougmcarthur.net/       (the app loads)
 ```
 
-If you still land on `dash.cloudflare.com`, note **which IdP button you clicked**
-before it went wrong — that identifies the misconfigured login method.
+If you still land on `dash.cloudflare.com`, you almost certainly clicked the
+**Cloudflare** button again instead of the new **One-time PIN** option — that
+button is the account-credentials login and is the source of the misredirect.
