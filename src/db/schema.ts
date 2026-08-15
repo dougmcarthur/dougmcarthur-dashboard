@@ -18,7 +18,40 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   url: text('url'),
   status: text('status').default('pending_review'),
   googleEventId: text('google_event_id'),
+  // Submission window
+  submissionOpensAt: text('submission_opens_at'),
+  submissionClosesAt: text('submission_closes_at'),
+  windowNote: text('window_note'),
+  applicationUrl: text('application_url'),
+  loginRequired: integer('login_required').default(0),
+  // Application prep
+  prepStatus: text('prep_status').default('none'), // none|queued|ready|blocked|failed
+  prepError: text('prep_error'),
+  prepUpdatedAt: text('prep_updated_at'),
+  formTitle: text('form_title'),
   discoveredAt: text('discovered_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+export const applicationFields = sqliteTable('application_fields', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  gigId: integer('gig_id').notNull(),
+  fieldKey: text('field_key').notNull(),
+  label: text('label').notNull(),
+  fieldType: text('field_type').notNull().default('text'),
+  options: text('options'), // JSON array
+  required: integer('required').default(0),
+  maxLength: integer('max_length'),
+  helpText: text('help_text'),
+  position: integer('position').default(0),
+  draftAnswer: text('draft_answer'),
+  answer: text('answer'),
+  answerSource: text('answer_source'), // llm | profile | manual
+  confidence: text('confidence'), // high | medium | low
+  needsInput: integer('needs_input').default(0),
+  note: text('note'),
+  approved: integer('approved').default(0),
+  createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 })
 
@@ -67,13 +100,20 @@ export const reminders = sqliteTable('reminders', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   entityType: text('entity_type').notNull(), // 'gig' | 'sync'
   entityId: integer('entity_id').notNull(),
-  reminderType: text('reminder_type').notNull(), // 'pre_deadline' | 'follow_up'
+  // 'pre_deadline' | 'follow_up' | 'window_opens' | 'window_soon'
+  reminderType: text('reminder_type').notNull(),
   scheduledFor: text('scheduled_for').notNull(),
   status: text('status').default('pending'), // 'pending' | 'sent' | 'dismissed'
+  channel: text('channel').default('email'),
+  subject: text('subject'),
+  body: text('body'),
+  sentAt: text('sent_at'),
+  error: text('error'),
   createdAt: text('created_at').notNull(),
 })
 
 export type GigOpportunity = typeof gigOpportunities.$inferSelect
+export type ApplicationField = typeof applicationFields.$inferSelect
 export type SyncTarget = typeof syncTargets.$inferSelect
 export type PromoDraft = typeof promoDrafts.$inferSelect
 export type ReferenceDoc = typeof referenceDocs.$inferSelect

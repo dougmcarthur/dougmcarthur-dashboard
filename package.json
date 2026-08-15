@@ -20,6 +20,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply dougmcarthur-music-hq --remote"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "@hono/zod-validator": "^0.4.3",
     "drizzle-orm": "^0.44.1",
     "hono": "^4.7.11",

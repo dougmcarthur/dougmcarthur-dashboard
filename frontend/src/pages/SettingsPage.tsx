@@ -72,6 +72,47 @@ function IntegrationCards() {
           </div>
         )}
       </div>
+
+      {/* Reminder emails */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-gray-900">Reminder emails</h3>
+          <StatusPill ok={!!data?.emailConfigured} />
+        </div>
+        {data?.emailConfigured ? (
+          <p className="text-xs text-gray-500">
+            Submission-window and deadline reminders are emailed by the daily cron.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            <p className="text-xs text-gray-500">
+              Reminders stay pending in the dashboard. Missing secrets:
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {data?.emailMissingSecrets?.map((s) => (
+                <code key={s} className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-mono">{s}</code>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400">
+              Needs the <code className="bg-gray-100 px-1 rounded">gmail.send</code> scope — see{' '}
+              <code className="bg-gray-100 px-1 rounded">docs/gmail-setup.md</code>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Answer drafting */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-gray-900">Application answers</h3>
+          <StatusPill ok={!!data?.answerDraftingConfigured} />
+        </div>
+        <p className="text-xs text-gray-500">
+          {data?.answerDraftingConfigured
+            ? 'Application forms are read and answered from your reference docs before the window opens.'
+            : 'Without ANTHROPIC_API_KEY, forms are still read but only name, email, links, genre and bio get filled in.'}
+        </p>
+      </div>
     </div>
   )
 }

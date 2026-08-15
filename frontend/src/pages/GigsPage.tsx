@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   useReactTable,
@@ -14,9 +14,39 @@ import { api, type GigOpportunity, type GigStatus } from '../api'
 import { StatusBadge } from '../components/StatusBadge'
 import { Chevron } from '../components/Chevron'
 import { SkeletonTable } from '../components/Skeleton'
+import { ApplicationPrep } from '../components/ApplicationPrep'
 
-const GIG_STATUSES: GigStatus[] = ['pending_review', 'approved', 'submitted', 'rejected', 'archived']
+const GIG_STATUSES: GigStatus[] = [
+  'pending_review',
+  'approved',
+  'awaiting_window',
+  'submitted',
+  'rejected',
+  'archived',
+]
 const SUBMISSION_METHODS = ['email', 'portal', 'form'] as const
+const PREP_TRACKED: GigStatus[] = ['approved', 'awaiting_window', 'submitted']
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/** Mirrors the server's windowState() so the table reads the same way. */
+function windowStateOf(gig: GigOpportunity): 'open' | 'upcoming' | 'closed' | 'unknown' {
+  const today = todayStr()
+  const opens = gig.submissionOpensAt?.slice(0, 10) || null
+  const closes = (gig.submissionClosesAt || gig.deadline)?.slice(0, 10) || null
+  if (closes && closes < today) return 'closed'
+  if (opens && opens > today) return 'upcoming'
+  if (opens || closes) return 'open'
+  return 'unknown'
+}
+
+function daysUntil(date: string): number {
+  const a = Date.parse(`${todayStr()}T00:00:00Z`)
+  const b = Date.parse(`${date.slice(0, 10)}T00:00:00Z`)
+  return Math.round((b - a) / 86_400_000)
+}
 
 const col = createColumnHelper<GigOpportunity>()
 
@@ -59,6 +89,8 @@ type GigDraft = {
   feeAmount: string; feeCurrency: string; paid: boolean
   submissionMethod: string; audienceSize: string; genreFitScore: string
   fitRationale: string; url: string; status: GigStatus
+  submissionOpensAt: string; submissionClosesAt: string
+  applicationUrl: string; loginRequired: boolean; windowNote: string
 }
 
 const EMPTY_DRAFT: GigDraft = {
@@ -66,6 +98,8 @@ const EMPTY_DRAFT: GigDraft = {
   feeAmount: '', feeCurrency: 'USD', paid: false,
   submissionMethod: '', audienceSize: '', genreFitScore: '',
   fitRationale: '', url: '', status: 'pending_review',
+  submissionOpensAt: '', submissionClosesAt: '',
+  applicationUrl: '', loginRequired: false, windowNote: '',
 }
 
 function CreateGigForm({ onDone }: { onDone: () => void }) {
@@ -88,11 +122,13 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
         audienceSize: draft.audienceSize ? parseInt(draft.audienceSize) : null,
         genreFitScore: draft.genreFitScore ? parseInt(draft.genreFitScore) : null,
         fitRationale: draft.fitRationale || null,
-        fitNotes: null,
         url: draft.url || null,
         status: draft.status,
-        fee: null,
-        googleEventId: null,
+        submissionOpensAt: draft.submissionOpensAt || null,
+        submissionClosesAt: draft.submissionClosesAt || null,
+        applicationUrl: draft.applicationUrl || null,
+        windowNote: draft.windowNote || null,
+        loginRequired: draft.loginRequired ? 1 : 0,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['gigs'] })
@@ -125,6 +161,21 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Deadline</label>
           <input type="date" value={draft.deadline} onChange={(e) => set('deadline', e.target.value)} className={INPUT} />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Submissions open</label>
+          <input type="date" value={draft.submissionOpensAt} onChange={(e) => set('submissionOpensAt', e.target.value)} className={INPUT} />
+          <p className="text-[11px] text-gray-400 mt-1">Leave blank if the window is already open.</p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Submissions close</label>
+          <input type="date" value={draft.submissionClosesAt} onChange={(e) => set('submissionClosesAt', e.target.value)} className={INPUT} />
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Application form URL</label>
+          <input type="url" value={draft.applicationUrl} onChange={(e) => set('applicationUrl', e.target.value)} placeholder="Direct link to the form (if different from the main URL)" className={INPUT} />
         </div>
 
         <div>
@@ -173,10 +224,16 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-        <input type="checkbox" checked={draft.paid} onChange={(e) => set('paid', e.target.checked)} className="rounded border-gray-300" />
-        Paid gig
-      </label>
+      <div className="flex gap-6">
+        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input type="checkbox" checked={draft.paid} onChange={(e) => set('paid', e.target.checked)} className="rounded border-gray-300" />
+          Paid gig
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input type="checkbox" checked={draft.loginRequired} onChange={(e) => set('loginRequired', e.target.checked)} className="rounded border-gray-300" />
+          Application is behind a login
+        </label>
+      </div>
 
       <div className="flex gap-2 pt-1">
         <button
@@ -220,6 +277,11 @@ function EditGigPanel({
     genreFitScore: gig.genreFitScore?.toString() ?? '',
     fitRationale: gig.fitRationale ?? gig.fitNotes ?? '',
     url: gig.url ?? '',
+    submissionOpensAt: gig.submissionOpensAt ?? '',
+    submissionClosesAt: gig.submissionClosesAt ?? '',
+    applicationUrl: gig.applicationUrl ?? '',
+    windowNote: gig.windowNote ?? '',
+    loginRequired: Boolean(gig.loginRequired),
   })
   const set = (k: keyof typeof draft, v: string | boolean) =>
     setDraft((d) => ({ ...d, [k]: v }))
@@ -238,6 +300,11 @@ function EditGigPanel({
       genreFitScore: draft.genreFitScore ? parseInt(draft.genreFitScore) : null,
       fitRationale: draft.fitRationale || null,
       url: draft.url || null,
+      submissionOpensAt: draft.submissionOpensAt || null,
+      submissionClosesAt: draft.submissionClosesAt || null,
+      applicationUrl: draft.applicationUrl || null,
+      windowNote: draft.windowNote || null,
+      loginRequired: draft.loginRequired ? 1 : 0,
     })
   }
 
@@ -295,11 +362,37 @@ function EditGigPanel({
           <label className="block text-xs font-medium text-gray-400 mb-1">URL</label>
           <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} className={INPUT} />
         </div>
+
+        <div className="col-span-2 pt-1 border-t border-gray-200">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-2 mb-2">Submission window</p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1">Opens</label>
+          <input type="date" value={draft.submissionOpensAt} onChange={(e) => set('submissionOpensAt', e.target.value)} className={INPUT} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1">Closes</label>
+          <input type="date" value={draft.submissionClosesAt} onChange={(e) => set('submissionClosesAt', e.target.value)} className={INPUT} />
+        </div>
+        <div className="col-span-2">
+          <label className="block text-xs font-medium text-gray-400 mb-1">Application form URL</label>
+          <input type="url" value={draft.applicationUrl} onChange={(e) => set('applicationUrl', e.target.value)} placeholder="Direct link to the form" className={INPUT} />
+        </div>
+        <div className="col-span-2">
+          <label className="block text-xs font-medium text-gray-400 mb-1">Window note</label>
+          <input value={draft.windowNote} onChange={(e) => set('windowNote', e.target.value)} placeholder="e.g. early bird until Aug 1, applications usually open in March" className={INPUT} />
+        </div>
       </div>
-      <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-        <input type="checkbox" checked={draft.paid} onChange={(e) => set('paid', e.target.checked)} className="rounded border-gray-300" />
-        Paid gig
-      </label>
+      <div className="flex gap-6">
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+          <input type="checkbox" checked={draft.paid} onChange={(e) => set('paid', e.target.checked)} className="rounded border-gray-300" />
+          Paid gig
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+          <input type="checkbox" checked={draft.loginRequired} onChange={(e) => set('loginRequired', e.target.checked)} className="rounded border-gray-300" />
+          Behind a login
+        </label>
+      </div>
       <div className="flex gap-2 pt-1">
         <button onClick={handleSave} disabled={isSaving} className="text-xs px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition-colors">
           {isSaving ? 'Saving…' : 'Save'}
@@ -314,17 +407,48 @@ function EditGigPanel({
 
 // ── Read-only expand panel ────────────────────────────────────────────────────
 
+function WindowChip({ gig }: { gig: GigOpportunity }) {
+  const state = windowStateOf(gig)
+  if (state === 'upcoming') {
+    const days = daysUntil(gig.submissionOpensAt!)
+    return (
+      <span className="bg-white px-2.5 py-1 rounded-md border border-indigo-200 text-indigo-700">
+        ⏳ Opens {gig.submissionOpensAt} ({days === 0 ? 'today' : `in ${days}d`})
+      </span>
+    )
+  }
+  if (state === 'closed') {
+    return (
+      <span className="bg-white px-2.5 py-1 rounded-md border border-gray-200 text-gray-500">
+        Window closed
+      </span>
+    )
+  }
+  if (state === 'open') {
+    return (
+      <span className="bg-white px-2.5 py-1 rounded-md border border-green-200 text-green-700">
+        Window open
+      </span>
+    )
+  }
+  return null
+}
+
 function GigDetail({
   gig,
   onEdit,
-  onStatusChange,
+  onPatch,
   isPatching,
 }: {
   gig: GigOpportunity
   onEdit: () => void
-  onStatusChange: (status: GigStatus) => void
+  onPatch: (body: Partial<GigOpportunity>) => void
   isPatching: boolean
 }) {
+  const [scheduleDate, setScheduleDate] = useState(gig.submissionOpensAt ?? '')
+  const state = windowStateOf(gig)
+  const active = gig.status === 'approved' || gig.status === 'awaiting_window'
+
   return (
     <div className="space-y-4 max-w-3xl">
       {(gig.fitRationale || gig.fitNotes) && (
@@ -334,11 +458,15 @@ function GigDetail({
         </div>
       )}
       <div className="flex flex-wrap gap-2 text-xs">
+        <WindowChip gig={gig} />
         {gig.submissionMethod && (
           <span className="bg-white px-2.5 py-1 rounded-md border border-gray-200 text-gray-600">Submit via {gig.submissionMethod}</span>
         )}
         {gig.audienceSize && (
           <span className="bg-white px-2.5 py-1 rounded-md border border-gray-200 text-gray-600">~{gig.audienceSize.toLocaleString()} audience</span>
+        )}
+        {Boolean(gig.loginRequired) && (
+          <span className="bg-white px-2.5 py-1 rounded-md border border-amber-200 text-amber-700">🔒 Login required</span>
         )}
         {gig.googleEventId && (
           <span className="bg-white px-2.5 py-1 rounded-md border border-green-200 text-green-700">📅 Calendar synced</span>
@@ -349,15 +477,50 @@ function GigDetail({
           </a>
         )}
       </div>
+
+      {gig.windowNote && <p className="text-xs text-gray-500">{gig.windowNote}</p>}
+
+      {/* Approving something that isn't open yet needs a date to wait on. */}
+      {gig.status === 'pending_review' && (
+        <div className="flex flex-wrap items-end gap-2 bg-white border border-gray-200 rounded-lg p-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Submissions open on</label>
+            <input
+              type="date"
+              value={scheduleDate}
+              onChange={(e) => setScheduleDate(e.target.value)}
+              className={`${INPUT} w-44`}
+            />
+          </div>
+          <button
+            disabled={!scheduleDate || isPatching}
+            onClick={() => onPatch({ submissionOpensAt: scheduleDate, status: 'approved' })}
+            className="text-xs px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+          >
+            Approve for later
+          </button>
+          <p className="text-xs text-gray-400 basis-full">
+            Files this gig under “awaiting window”, schedules the reminder email, and prepares your
+            answers ahead of the date.
+          </p>
+        </div>
+      )}
+
       <div className="flex gap-2 flex-wrap pt-1">
-        {gig.status === 'approved' && (
-          <button disabled={isPatching} onClick={() => onStatusChange('submitted')}
+        {gig.status === 'awaiting_window' && (
+          <button disabled={isPatching} onClick={() => onPatch({ status: 'approved' })}
+            className="text-xs px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-40 transition-colors">
+            {state === 'upcoming' ? 'Open it early' : 'Mark window open'}
+          </button>
+        )}
+        {active && (
+          <button disabled={isPatching} onClick={() => onPatch({ status: 'submitted' })}
             className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors">
             Mark Submitted
           </button>
         )}
-        {gig.status === 'approved' && (
-          <button disabled={isPatching} onClick={() => onStatusChange('archived')}
+        {active && (
+          <button disabled={isPatching} onClick={() => onPatch({ status: 'archived' })}
             className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors">
             Archive
           </button>
@@ -381,6 +544,14 @@ export function GigsPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [statusFilter, setStatusFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+
+  // Reminder emails link straight to a gig: #gigs/42 opens it expanded.
+  useEffect(() => {
+    const deepLinked = Number(window.location.hash.split('/')[1])
+    if (Number.isFinite(deepLinked) && deepLinked > 0) {
+      setExpanded((prev) => new Set(prev).add(deepLinked))
+    }
+  }, [])
 
   const { data = [], isLoading, error } = useQuery({
     queryKey: ['gigs', statusFilter],
@@ -453,6 +624,46 @@ export function GigsPage() {
         )
       },
     }),
+    col.display({
+      id: 'window',
+      header: 'Window',
+      cell: (info) => {
+        const gig = info.row.original
+        const state = windowStateOf(gig)
+        if (state === 'upcoming') {
+          const days = daysUntil(gig.submissionOpensAt!)
+          return (
+            <span className="text-indigo-600 whitespace-nowrap">
+              {gig.submissionOpensAt}
+              <span className="ml-1 text-xs text-indigo-400">({days}d)</span>
+            </span>
+          )
+        }
+        if (state === 'open') return <span className="text-green-600 text-xs">open</span>
+        if (state === 'closed') return <span className="text-gray-400 text-xs">closed</span>
+        return <span className="text-gray-300">—</span>
+      },
+    }),
+    col.display({
+      id: 'prep',
+      header: 'Answers',
+      cell: (info) => {
+        const gig = info.row.original
+        if (!PREP_TRACKED.includes(gig.status)) return <span className="text-gray-300">—</span>
+        switch (gig.prepStatus) {
+          case 'ready':
+            return <span className="text-xs text-green-700">prepared</span>
+          case 'queued':
+            return <span className="text-xs text-blue-600">queued</span>
+          case 'blocked':
+            return <span className="text-xs text-amber-700">needs you</span>
+          case 'failed':
+            return <span className="text-xs text-red-600">failed</span>
+          default:
+            return <span className="text-gray-300">—</span>
+        }
+      },
+    }),
     col.accessor('feeAmount', {
       header: 'Fee',
       cell: (info) => {
@@ -498,7 +709,7 @@ export function GigsPage() {
                 </button>
               </>
             )}
-            {row.status === 'approved' && (
+            {(row.status === 'approved' || row.status === 'awaiting_window') && (
               <button disabled={isPatching}
                 onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'submitted' } })}
                 className="text-xs px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-40 transition-colors">
@@ -606,12 +817,22 @@ export function GigsPage() {
                             isSaving={isPatching}
                           />
                         ) : (
-                          <GigDetail
-                            gig={row.original}
-                            onEdit={() => setEditingId(row.original.id)}
-                            onStatusChange={(status) => patchMutation.mutate({ id: row.original.id, body: { status } })}
-                            isPatching={isPatching}
-                          />
+                          <>
+                            <GigDetail
+                              gig={row.original}
+                              onEdit={() => setEditingId(row.original.id)}
+                              onPatch={(body) => patchMutation.mutate({ id: row.original.id, body })}
+                              isPatching={isPatching}
+                            />
+                            {PREP_TRACKED.includes(row.original.status) && (
+                              <div className="mt-5 pt-4 border-t border-blue-100">
+                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                                  Application answers
+                                </p>
+                                <ApplicationPrep gigId={row.original.id} />
+                              </div>
+                            )}
+                          </>
                         )}
                       </td>
                     </tr>

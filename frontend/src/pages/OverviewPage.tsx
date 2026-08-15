@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, type Overview } from '../api'
+import { api, type Overview, type GigWithPrep } from '../api'
 import { StatusBadge } from '../components/StatusBadge'
 
 function StatCard({ label, value }: { label: string; value: number }) {
@@ -72,20 +72,120 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
     )
   }
 
-  const { stats, recentRuns, pendingReview, upcomingDeadlines, dueReminders } = data
+  const {
+    stats,
+    recentRuns,
+    pendingReview,
+    upcomingDeadlines,
+    dueReminders,
+    awaitingWindow = [],
+    applicationsReady = [],
+    applicationsBlocked = [],
+  } = data
   const totalPending = pendingReview.gigs.length + pendingReview.sync.length + pendingReview.promo.length
+
+  const openGig = (id: number) => {
+    window.location.hash = `gigs/${id}`
+  }
 
   return (
     <div className="space-y-8">
       {/* Stats */}
       <div>
         <h1 className="text-xl font-semibold text-gray-900 mb-4">Overview</h1>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-5 gap-4">
           <StatCard label="Gig Opportunities" value={stats.totalGigs} />
+          <StatCard label="Awaiting window" value={stats.awaitingWindow ?? 0} />
+          <StatCard label="Answers to review" value={stats.applicationsReady ?? 0} />
           <StatCard label="Sync Targets" value={stats.totalSync} />
           <StatCard label="Promo Drafts" value={stats.totalPromo} />
         </div>
       </div>
+
+      {/* Answers prepared and waiting on a read-through */}
+      {applicationsReady.length > 0 && (
+        <div>
+          <SectionHeader title="Prepared answers to review" count={applicationsReady.length} />
+          <div className="bg-white border border-green-200 rounded-lg divide-y divide-green-50">
+            {applicationsReady.map((g: GigWithPrep) => (
+              <div
+                key={g.id}
+                onClick={() => openGig(g.id)}
+                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-green-50/50 transition-colors"
+              >
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{g.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {g.prep.approved}/{g.prep.total} approved
+                    {g.prep.needsInput > 0 ? ` · ${g.prep.needsInput} need your input` : ''}
+                    {g.submissionOpensAt ? ` · opens ${g.submissionOpensAt}` : ''}
+                  </p>
+                </div>
+                <span className="text-xs text-gray-400">Review →</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filed for later */}
+      {awaitingWindow.length > 0 && (
+        <div>
+          <SectionHeader title="Waiting on the submission window" count={awaitingWindow.length} />
+          <div className="bg-white border border-indigo-200 rounded-lg divide-y divide-indigo-50">
+            {awaitingWindow.map((g: GigWithPrep) => {
+              const days = g.submissionOpensAt ? daysUntil(g.submissionOpensAt) : null
+              return (
+                <div
+                  key={g.id}
+                  onClick={() => openGig(g.id)}
+                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-indigo-50/50 transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{g.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {g.type}
+                      {g.prep.total > 0
+                        ? ` · ${g.prep.total} answers prepared`
+                        : g.prepStatus === 'queued'
+                          ? ' · answers queued'
+                          : ' · answers not prepared yet'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs font-semibold text-indigo-600 tabular-nums">
+                      {days === null ? '' : days <= 0 ? 'Opens today' : `${days}d`}
+                    </span>
+                    <span className="text-xs text-gray-400">{g.submissionOpensAt}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Forms that couldn't be read automatically */}
+      {applicationsBlocked.length > 0 && (
+        <div>
+          <SectionHeader title="Applications needing manual setup" count={applicationsBlocked.length} />
+          <div className="bg-white border border-amber-200 rounded-lg divide-y divide-amber-50">
+            {applicationsBlocked.map((g: GigWithPrep) => (
+              <div
+                key={g.id}
+                onClick={() => openGig(g.id)}
+                className="flex items-start justify-between px-4 py-3 cursor-pointer hover:bg-amber-50/50 transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{g.name}</p>
+                  <p className="text-xs text-amber-700 mt-0.5">{g.prepError ?? 'Prep did not complete.'}</p>
+                </div>
+                <span className="text-xs text-gray-400 shrink-0 ml-4">Open →</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Due reminders */}
       {dueReminders.length > 0 && (
@@ -119,7 +219,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
                     </p>
                   </div>
                   <div className="flex gap-2 shrink-0 ml-4">
-                    {r.gigStatus === 'approved' && (
+                    {(r.gigStatus === 'approved' || r.gigStatus === 'awaiting_window') && (
                       <button
                         onClick={() => {
                           patchGig.mutate({ id: r.entityId, body: { status: 'submitted' } })
@@ -257,7 +357,13 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
         </div>
       )}
 
-      {totalPending === 0 && upcomingDeadlines.length === 0 && dueReminders.length === 0 && recentRuns.length === 0 && (
+      {totalPending === 0 &&
+        upcomingDeadlines.length === 0 &&
+        dueReminders.length === 0 &&
+        awaitingWindow.length === 0 &&
+        applicationsReady.length === 0 &&
+        applicationsBlocked.length === 0 &&
+        recentRuns.length === 0 && (
         <p className="text-gray-400 text-sm">All clear — nothing needs attention right now.</p>
       )}
     </div>

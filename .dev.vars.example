@@ -4,3 +4,16 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REFRESH_TOKEN=
 GOOGLE_CALENDAR_ID=primary
+
+# Gmail — reading sent mail (pitch reconciliation). docs/gmail-setup.md
+GMAIL_REFRESH_TOKEN=
+
+# Gmail — sending reminder emails. Leave blank if GMAIL_REFRESH_TOKEN was
+# granted the gmail.send scope too; otherwise set a separate token.
+GMAIL_SEND_REFRESH_TOKEN=
+# Where reminder emails are delivered
+NOTIFY_EMAIL=
+
+# Anthropic API key — drafts application answers from the reference docs.
+# Without it, prep falls back to profile matching (names, links, bio only).
+ANTHROPIC_API_KEY=

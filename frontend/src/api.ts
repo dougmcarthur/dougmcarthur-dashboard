@@ -1,5 +1,13 @@
-export type GigStatus = 'pending_review' | 'approved' | 'rejected' | 'submitted' | 'archived'
+export type GigStatus =
+  | 'pending_review'
+  | 'approved'
+  | 'awaiting_window'
+  | 'rejected'
+  | 'submitted'
+  | 'archived'
 export type SyncStatus = 'draft_ready' | 'pitched' | 'confirmed' | 'declined' | 'archived'
+export type WindowState = 'open' | 'upcoming' | 'closed' | 'unknown'
+export type PrepStatus = 'none' | 'queued' | 'ready' | 'blocked' | 'failed'
 
 export interface GigOpportunity {
   id: number
@@ -19,9 +27,76 @@ export interface GigOpportunity {
   url: string | null
   status: GigStatus
   googleEventId: string | null
+  // Submission window
+  submissionOpensAt: string | null
+  submissionClosesAt: string | null
+  windowNote: string | null
+  applicationUrl: string | null
+  loginRequired: number
+  // Application prep
+  prepStatus: PrepStatus | null
+  prepError: string | null
+  prepUpdatedAt: string | null
+  formTitle: string | null
   discoveredAt: string
   updatedAt: string
 }
+
+export interface ApplicationField {
+  id: number
+  gigId: number
+  fieldKey: string
+  label: string
+  fieldType: string
+  options: string | null // JSON array
+  required: number
+  maxLength: number | null
+  helpText: string | null
+  position: number
+  draftAnswer: string | null
+  answer: string | null
+  answerSource: 'llm' | 'profile' | 'manual' | null
+  confidence: 'high' | 'medium' | 'low' | null
+  needsInput: number
+  note: string | null
+  approved: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ApplicationPrep {
+  gigId: number
+  gigName: string
+  formTitle: string | null
+  applicationUrl: string | null
+  loginRequired: boolean
+  prepStatus: PrepStatus
+  prepError: string | null
+  prepUpdatedAt: string | null
+  windowState: WindowState
+  submissionOpensAt: string | null
+  submissionClosesAt: string | null
+  stats: { total: number; answered: number; needsInput: number; approved: number }
+  fields: ApplicationField[]
+}
+
+export interface PrepResult {
+  gigId: number
+  status: 'ready' | 'blocked' | 'failed'
+  fieldCount: number
+  usedLlm: boolean
+  formTitle: string | null
+  loginRequired: boolean
+  error?: string
+}
+
+export interface GigPrepCounts {
+  total: number
+  needsInput: number
+  approved: number
+}
+
+export type GigWithPrep = GigOpportunity & { prep: GigPrepCounts }
 
 export interface SyncTarget {
   id: number
@@ -86,7 +161,13 @@ export interface DueReminder {
 }
 
 export interface Overview {
-  stats: { totalGigs: number; totalSync: number; totalPromo: number }
+  stats: {
+    totalGigs: number
+    totalSync: number
+    totalPromo: number
+    awaitingWindow: number
+    applicationsReady: number
+  }
   recentRuns: TaskRun[]
   pendingReview: {
     gigs: GigOpportunity[]
@@ -95,6 +176,18 @@ export interface Overview {
   }
   upcomingDeadlines: GigOpportunity[]
   dueReminders: DueReminder[]
+  awaitingWindow: GigWithPrep[]
+  applicationsReady: GigWithPrep[]
+  applicationsBlocked: GigWithPrep[]
+}
+
+export interface ScheduledSummary {
+  windowsOpened: number
+  prepared: number
+  prepFailed: number
+  remindersSent: number
+  remindersFailed: number
+  notes: string[]
 }
 
 export interface ReferenceDoc {
@@ -109,6 +202,9 @@ export interface HealthStatus {
   calendarMissingSecrets: string[]
   gmailConfigured: boolean
   gmailMissingSecrets: string[]
+  emailConfigured: boolean
+  emailMissingSecrets: string[]
+  answerDraftingConfigured: boolean
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -133,8 +229,38 @@ export const api = {
     patch: (id: number, body: Partial<GigOpportunity>) =>
       apiFetch<GigOpportunity>(`/gigs/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (id: number) => apiFetch<{ ok: boolean }>(`/gigs/${id}`, { method: 'DELETE' }),
-    create: (body: Omit<GigOpportunity, 'id' | 'discoveredAt' | 'updatedAt'>) =>
+    create: (body: Partial<Omit<GigOpportunity, 'id' | 'discoveredAt' | 'updatedAt'>>) =>
       apiFetch<{ id: number }>('/gigs', { method: 'POST', body: JSON.stringify(body) }),
+  },
+  applications: {
+    get: (gigId: number) => apiFetch<ApplicationPrep>(`/gigs/${gigId}/application`),
+    prepare: (gigId: number) =>
+      apiFetch<PrepResult>(`/gigs/${gigId}/application/prepare`, { method: 'POST' }),
+    exportText: (gigId: number) =>
+      apiFetch<{ text: string }>(`/gigs/${gigId}/application/export`),
+    addField: (gigId: number, body: { label: string; fieldType?: string; answer?: string }) =>
+      apiFetch<ApplicationField>(`/gigs/${gigId}/application/fields`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    patchField: (
+      id: number,
+      body: { answer?: string | null; approved?: boolean; needsInput?: boolean; label?: string },
+    ) =>
+      apiFetch<ApplicationField>(`/application-fields/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    deleteField: (id: number) =>
+      apiFetch<{ ok: boolean }>(`/application-fields/${id}`, { method: 'DELETE' }),
+    approveAll: (gigId: number) =>
+      apiFetch<{ ok: boolean }>('/application-fields/approve-all', {
+        method: 'POST',
+        body: JSON.stringify({ gigId }),
+      }),
+  },
+  tasks: {
+    run: () => apiFetch<ScheduledSummary>('/tasks/run', { method: 'POST' }),
   },
   sync: {
     list: (params?: Record<string, string>) => {

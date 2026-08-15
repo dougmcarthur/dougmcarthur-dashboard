@@ -17,10 +17,25 @@ same Worker. The live site sits behind Cloudflare Access.
 - **Frontend** — React 19 + Vite, TanStack Query & Table, Tailwind. Hash-based
   routing (`frontend/src/`). Built to `dist/` and served via the Worker's
   `ASSETS` binding.
-- **Integrations** — Google Calendar (gig deadlines synced on approval) and
-  Gmail (`readonly`, used to reconcile sent pitches against sync targets).
-  Both degrade gracefully when their secrets aren't set — see
-  `GET /api/health` to check what's configured.
+- **Integrations** — Google Calendar (gig deadlines synced on approval), Gmail
+  (`readonly` to reconcile sent pitches; `send` for reminder emails), and the
+  Anthropic API (drafts application answers from the reference docs). All
+  degrade gracefully when their secrets aren't set — see `GET /api/health` to
+  check what's configured.
+- **Cron** — a daily Worker cron (13:00 UTC) opens submission windows that have
+  arrived, prepares upcoming applications, and sends due reminders. See
+  `docs/application-prep.md`.
+
+## Submission windows & application prep
+
+Approving a festival whose submission window hasn't opened yet files it as
+`awaiting_window` rather than dropping it into the active queue. That schedules
+the reminder emails (heads-up, opening day, pre-deadline) and queues the
+application form to be read ahead of time: the form is fetched, split into its
+real fields, and each one gets a drafted answer sourced from the reference docs,
+ready to review and edit in the dashboard. Full write-up, including what happens
+with login-gated and JavaScript-rendered forms:
+[`docs/application-prep.md`](docs/application-prep.md).
 
 ## Project layout
 
@@ -29,8 +44,12 @@ src/
   index.ts            Worker entry — mounts all API routes, falls through to ASSETS
   types.ts            Env bindings (DB, ASSETS, Google/Gmail secrets)
   db/                 Drizzle client + schema
-  routes/             One Hono router per resource (gigs, sync, promo, …)
-  lib/                googleCalendar.ts, gmail.ts (OAuth refresh-token helpers)
+  scheduled.ts        Daily cron work (open windows, prep applications, send reminders)
+  routes/             One Hono router per resource (gigs, sync, promo, applications, …)
+  lib/                googleCalendar.ts, gmail.ts (OAuth helpers),
+                      submissionWindow.ts (window/reminder logic), formParser.ts
+                      (form → fields), answerEngine.ts (fields → drafted answers),
+                      applicationPrep.ts (orchestration), notifications.ts (emails)
 frontend/             React + Vite app (its own tsconfig.frontend.json)
 migrations/           D1 migrations (applied via wrangler)
 scripts/              One-off maintenance scripts (e.g. column backfill)
@@ -44,8 +63,11 @@ All routes are under `/api`; anything else falls through to static assets.
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/overview` | Dashboard rollup: counts, pending-review items, upcoming deadlines, due reminders |
-| `/api/gigs` | Gig opportunities (CRUD). Approving with a deadline creates a Calendar event + pre-deadline reminder |
+| `GET /api/overview` | Dashboard rollup: counts, pending-review items, upcoming deadlines, due reminders, gigs awaiting their window, prepared answers |
+| `/api/gigs` | Gig opportunities (CRUD). Approving creates a Calendar event, schedules reminders, and queues application prep — landing on `awaiting_window` if the window hasn't opened |
+| `/api/gigs/:id/application` | Prepared application fields; `POST /prepare` to (re-)read the form, `GET /export` for a copy-paste bundle, `POST /fields` to add a question by hand |
+| `/api/application-fields/:id` | Edit or approve one prepared answer; `POST /approve-all` for a whole gig |
+| `POST /api/tasks/run` | Run the daily cron work on demand |
 | `/api/sync` | Sync-licensing targets (CRUD) |
 | `/api/sync/reconcile` | `GET` preview of sent-pitch matches from Gmail; `POST /apply` to write status/pitch updates |
 | `/api/promo` | Monthly promo drafts (CRUD) |
@@ -55,8 +77,8 @@ All routes are under `/api`; anything else falls through to static assets.
 | `/api/health` | Which Google/Gmail secrets are configured |
 
 > Route order matters: `/api/sync/reconcile` is registered **before**
-> `/api/sync` in `src/index.ts`, so the sync router's `/:id` handler doesn't
-> swallow it. Keep it that way when adding sub-routes.
+> `/api/sync`, and the application router **before** `/api/gigs`, so the `/:id`
+> handlers don't swallow their sub-routes. Keep it that way when adding more.
 
 ## Local development
 
@@ -104,7 +126,10 @@ npm run deploy               # wrangler deploy (publishes Worker + assets)
 
 Set production secrets once with `wrangler secret put`:
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`,
-`GOOGLE_CALENDAR_ID`, and `GMAIL_REFRESH_TOKEN`.
+`GOOGLE_CALENDAR_ID`, and `GMAIL_REFRESH_TOKEN`, plus — for reminder emails and
+application prep — `GMAIL_SEND_REFRESH_TOKEN` (or a `GMAIL_REFRESH_TOKEN`
+granted the `gmail.send` scope), `NOTIFY_EMAIL`, and `ANTHROPIC_API_KEY`.
+See `docs/gmail-setup.md` and `docs/application-prep.md`.
 
 ### Before you deploy
 

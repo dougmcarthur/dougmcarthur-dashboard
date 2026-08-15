@@ -14,5 +14,10 @@ migrations_dir = "migrations"
 directory = "./dist"
 binding = "ASSETS"
 
+# Daily at 13:00 UTC (~08:00 Winnipeg CDT): opens arrived submission windows,
+# prepares upcoming applications, and sends due reminder emails.
+[triggers]
+crons = ["0 13 * * *"]
+
 # NOTE: compatibility_date is a best-effort guess (matches Worker's created_on).
 # Verify against the real deployed Worker settings before relying on it.

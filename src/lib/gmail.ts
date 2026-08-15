@@ -13,14 +13,23 @@ export interface GmailEnv {
   GMAIL_REFRESH_TOKEN: string
 }
 
-async function getAccessToken(env: GmailEnv): Promise<string> {
+export interface GmailSendEnv {
+  GOOGLE_CLIENT_ID: string
+  GOOGLE_CLIENT_SECRET: string
+  // Either a dedicated send-scoped token, or one token granted both scopes.
+  GMAIL_SEND_REFRESH_TOKEN?: string
+  GMAIL_REFRESH_TOKEN?: string
+  NOTIFY_EMAIL?: string
+}
+
+async function getAccessToken(env: GmailEnv, refreshToken?: string): Promise<string> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       client_id: env.GOOGLE_CLIENT_ID,
       client_secret: env.GOOGLE_CLIENT_SECRET,
-      refresh_token: env.GMAIL_REFRESH_TOKEN,
+      refresh_token: refreshToken ?? env.GMAIL_REFRESH_TOKEN,
       grant_type: 'refresh_token',
     }),
   })
@@ -156,4 +165,65 @@ export async function getSentEmailsForAddresses(
 
 export function gmailConfigured(env: Partial<GmailEnv>): env is GmailEnv {
   return !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GMAIL_REFRESH_TOKEN)
+}
+
+// ── Sending ───────────────────────────────────────────────────────────────────
+
+/** URL-safe base64 of a UTF-8 string, as the Gmail send endpoint expects. */
+function encodeMessage(raw: string): string {
+  const bytes = new TextEncoder().encode(raw)
+  let binary = ''
+  for (const b of bytes) binary += String.fromCharCode(b)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function encodeHeader(value: string): string {
+  // RFC 2047 for non-ASCII subjects (em dashes show up in these a lot).
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x00-\x7F]*$/.test(value)) return value
+  return `=?UTF-8?B?${encodeMessage(value).replace(/-/g, '+').replace(/_/g, '/')}?=`
+}
+
+export interface OutgoingEmail {
+  to: string
+  subject: string
+  body: string
+}
+
+export async function sendEmail(env: GmailSendEnv, email: OutgoingEmail): Promise<string> {
+  const refreshToken = env.GMAIL_SEND_REFRESH_TOKEN ?? env.GMAIL_REFRESH_TOKEN
+  if (!refreshToken) throw new Error('Gmail send not configured')
+
+  const token = await getAccessToken(env as GmailEnv, refreshToken)
+
+  const raw = [
+    `To: ${email.to}`,
+    `Subject: ${encodeHeader(email.subject)}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset="UTF-8"',
+    '',
+    email.body,
+  ].join('\r\n')
+
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ raw: encodeMessage(raw) }),
+  })
+
+  if (!res.ok) throw new Error(`Gmail send failed: ${await res.text()}`)
+  const json = await res.json<{ id: string }>()
+  return json.id
+}
+
+export function gmailSendConfigured(env: Partial<GmailSendEnv>): env is GmailSendEnv {
+  return !!(
+    env.GOOGLE_CLIENT_ID &&
+    env.GOOGLE_CLIENT_SECRET &&
+    (env.GMAIL_SEND_REFRESH_TOKEN || env.GMAIL_REFRESH_TOKEN) &&
+    env.NOTIFY_EMAIL
+  )
 }
