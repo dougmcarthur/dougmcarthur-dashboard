@@ -1,6 +1,6 @@
 // Fetches an application form, splits it into fields, drafts an answer for each
-// one, and stores the result so it can be reviewed and edited long before the
-// submission window opens.
+// one, and stores the result for review. Runs once the submission window is
+// open — see submissionWindow.ts for why waiting is the right call.
 
 import { eq, and, inArray, sql } from 'drizzle-orm'
 import { getDb, type DB } from '../db'
@@ -18,6 +18,8 @@ export interface PrepResult {
   usedLlm: boolean
   /** Fields answered outright from the answer library. */
   libraryHits: number
+  /** How many times prep has been attempted for the current window. */
+  attempts: number
   formTitle: string | null
   loginRequired: boolean
   error?: string
@@ -160,7 +162,8 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
 
   if (!gig) throw new Error(`Gig ${gigId} not found`)
 
-  const base: Omit<PrepResult, 'status' | 'fieldCount' | 'usedLlm' | 'libraryHits'> = {
+  const priorAttempts = gig.prepAttempts ?? 0
+  const base: Omit<PrepResult, 'status' | 'fieldCount' | 'usedLlm' | 'libraryHits' | 'attempts'> = {
     gigId,
     formTitle: gig.formTitle ?? null,
     loginRequired: Boolean(gig.loginRequired),
@@ -170,13 +173,29 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
   if (!url) {
     const error = 'No application URL on this gig — add one and prep will run.'
     await markGig(db, gigId, { prepStatus: 'blocked', prepError: error })
-    return { ...base, status: 'blocked', fieldCount: 0, usedLlm: false, libraryHits: 0, error }
+    return {
+      ...base,
+      status: 'blocked',
+      fieldCount: 0,
+      usedLlm: false,
+      libraryHits: 0,
+      attempts: priorAttempts,
+      error,
+    }
   }
 
   if (gig.loginRequired) {
     const error = 'Marked as login-gated — the form can’t be read automatically.'
     await markGig(db, gigId, { prepStatus: 'blocked', prepError: error })
-    return { ...base, status: 'blocked', fieldCount: 0, usedLlm: false, libraryHits: 0, error }
+    return {
+      ...base,
+      status: 'blocked',
+      fieldCount: 0,
+      usedLlm: false,
+      libraryHits: 0,
+      attempts: priorAttempts,
+      error,
+    }
   }
 
   let html: string
@@ -185,9 +204,11 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
   } catch (err) {
     const gated = typeof err === 'object' && err !== null && 'gated' in err
     const error = err instanceof Error ? err.message : String(err)
+    const attempts = priorAttempts + 1
     await markGig(db, gigId, {
       prepStatus: gated ? 'blocked' : 'failed',
       prepError: error,
+      prepAttempts: attempts,
       ...(gated ? { loginRequired: 1 } : {}),
     })
     return {
@@ -196,6 +217,7 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
       fieldCount: 0,
       usedLlm: false,
       libraryHits: 0,
+      attempts,
       loginRequired: gated ? true : base.loginRequired,
       error,
     }
@@ -209,6 +231,7 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
       prepStatus: 'blocked',
       prepError: error,
       formTitle: form.title ?? null,
+      prepAttempts: priorAttempts + 1,
       loginRequired: form.loginRequired ? 1 : (gig.loginRequired ?? 0),
     })
     return {
@@ -217,6 +240,7 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
       fieldCount: 0,
       usedLlm: false,
       libraryHits: 0,
+      attempts: priorAttempts + 1,
       formTitle: form.title ?? null,
       loginRequired: form.loginRequired || base.loginRequired,
       error,
@@ -256,6 +280,7 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
     prepStatus: 'ready',
     prepError: llmError ? `Drafted from the profile only — Claude call failed: ${llmError}` : null,
     formTitle: form.title ?? null,
+    prepAttempts: priorAttempts + 1,
     applicationUrl: gig.applicationUrl ?? url,
   })
 
@@ -265,6 +290,7 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
     fieldCount: form.fields.length,
     usedLlm,
     libraryHits,
+    attempts: priorAttempts + 1,
     formTitle: form.title ?? null,
     error: llmError,
   }

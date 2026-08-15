@@ -215,7 +215,10 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
     }
   }
 
-  // Newly active gigs get their answers queued for preparation.
+  // Newly active gigs get their answers queued — but only if the window is
+  // actually open. A festival that opens in March publishes its form in March;
+  // reading the page today would just parse a "check back later" notice, so
+  // prep waits and the cron picks it up the day the window opens.
   if (statusChanging && nowActive && !wasActive) {
     const canPrep = shouldPrepareNow(
       {
@@ -226,7 +229,11 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
       todayStr,
     )
     const hasUrl = (updates.applicationUrl as string | null) ?? before.applicationUrl ?? before.url
-    if (canPrep && hasUrl) updates.prepStatus = 'queued'
+    if (canPrep && hasUrl) {
+      updates.prepStatus = 'queued'
+      updates.prepAttempts = 0
+      updates.answersNotifiedAt = null
+    }
   }
 
   await db.update(gigOpportunities).set(updates).where(eq(gigOpportunities.id, id))

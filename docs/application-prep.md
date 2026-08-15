@@ -5,30 +5,33 @@ waiting" — and what the system does on its own along the way.
 
 ## The flow
 
+**The form doesn't exist until the window opens.** Festivals publish the
+application when submissions open — read the page in advance and you get "check
+back in March", not the questions. So prep waits for the window, and the
+notification waits for prep.
+
 1. **Approve.** If the gig has a **submissions open** date in the future, the
-   approval lands on status `awaiting_window` instead of `approved`. The gig is
-   filed for submission later rather than sitting in the active queue.
-   If the window is already open (or unknown), it behaves exactly as before.
+   approval lands on status `awaiting_window` instead of `approved`: filed for
+   submission later, out of the active queue, and nothing is fetched yet. If the
+   window is already open (or no opening date is tracked), prep is queued
+   immediately.
 
-2. **Reminders are scheduled** at approval time (`src/lib/submissionWindow.ts`):
+2. **A deadline nudge is scheduled** at approval time — 7 days before the
+   deadline, or on the day if that's closer. That's the only reminder booked up
+   front; the window email is raised later, by prep. Marking a gig submitted,
+   rejected, or archived dismisses whatever is still pending.
 
-   | Reminder | When |
-   | --- | --- |
-   | `window_soon` | 7 days before the window opens |
-   | `window_opens` | the day the window opens |
-   | `pre_deadline` | 7 days before the deadline (or on the day, if closer) |
+3. **On the day the window opens**, one cron run does the whole chain:
+   the gig flips `awaiting_window` → `approved`, its form is fetched and split
+   into fields, each field gets a drafted answer, and — only once that has
+   finished — the notification is raised and sent.
 
-   Dates already in the past are dropped. Marking a gig submitted, rejected, or
-   archived dismisses whatever is still pending.
-
-3. **Answers are prepared ahead of the reminder.** Up to 21 days before the
-   window opens, the daily cron fetches the application form, splits it into its
-   real fields, and drafts an answer for each one. Nothing is submitted — the
-   drafts sit in the dashboard for review.
-
-4. **The reminder email lands** with the prep status in the body ("12 fields
-   drafted, 10 ready to review, 2 still need you") and a link straight to the
-   gig: `https://dashboard.dougmcarthur.net/#gigs/<id>`.
+4. **The email lands with answers behind it**: *"Ready to review (2 need you) —
+   Sawdust City Music Festival"*, saying how many fields were prepared, how many
+   need you, and linking straight to the gig at
+   `https://dashboard.dougmcarthur.net/#gigs/<id>`. If the form couldn't be read,
+   you still get told the window opened, with the reason and what to do instead.
+   One email per gig — `answers_notified_at` is the guard.
 
 5. **Review and edit** each field in the gig's expanded row. Edited answers
    always win over the drafted ones and are never overwritten by a re-run.
@@ -37,8 +40,15 @@ waiting" — and what the system does on its own along the way.
    Approving an answer files it in the answer library, so the next application
    that asks the same question starts from reviewed text — see below.
 
-6. **When the window opens**, the cron flips `awaiting_window` → `approved`, and
-   the gig shows up in the normal deadline views.
+**Retries.** A transient fetch failure (timeout, 5xx, DNS) is retried the next
+day, up to 3 attempts; only then does it count as finished and trigger the
+email. A form that is read but unusable — login-gated, JavaScript-rendered, no
+fields — is terminal immediately, since retrying changes nothing.
+
+**Overriding.** The gig's panel keeps a **Try reading the form now** button for
+when you know the form went up early. That's a manual read; the cron still
+re-reads on the day the window opens, because a form fetched early is usually a
+different page.
 
 ## Reading the form
 
@@ -127,9 +137,14 @@ that rather than losing the parsed form.
 
 `wrangler.toml` runs `src/scheduled.ts` at 13:00 UTC (~08:00 Winnipeg):
 
-1. Open windows that have arrived.
-2. Prepare up to 3 upcoming applications (retrying failures after 3 days).
-3. Send every due reminder email once, recording `sent_at` so it never repeats.
+1. Open the windows that have arrived, and queue their forms.
+2. Read up to 5 forms and prepare answers — gigs you haven't been told about yet
+   go first, then by deadline. Failed fetches are retried the next day, 3 times.
+3. Raise the answers-ready email for anything that finished this run.
+4. Send every due reminder once, recording `sent_at` so it never repeats.
+
+The order is what makes the "open → prepare → notify" chain complete inside a
+single run: a window that opens today is read, answered, and emailed today.
 
 Each phase writes a `task_runs` row, visible on the Log page. `POST /api/tasks/run`
 runs the same work on demand.

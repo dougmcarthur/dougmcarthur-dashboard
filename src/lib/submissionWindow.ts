@@ -10,12 +10,12 @@ export interface WindowInput {
   deadline?: string | null
 }
 
-/** Days the prep run tries to get ahead of the window opening. */
-export const PREP_LEAD_DAYS = 21
-/** Heads-up email this many days before the window opens. */
-export const WINDOW_SOON_LEAD_DAYS = 7
 /** Nudge this many days before a deadline if nothing has been submitted. */
 export const PRE_DEADLINE_LEAD_DAYS = 7
+/** Give up re-fetching a form after this many failed attempts, and say so. */
+export const PREP_MAX_ATTEMPTS = 3
+/** Wait a day before retrying a prep run that errored. */
+export const PREP_RETRY_DAYS = 1
 
 export function today(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10)
@@ -60,27 +60,23 @@ export function resolveApprovalStatus(
 }
 
 export interface PlannedReminder {
-  reminderType: 'window_soon' | 'window_opens' | 'pre_deadline'
+  reminderType: 'pre_deadline'
   scheduledFor: string
 }
 
 /**
- * Reminders an approval should schedule. Dates already in the past are dropped —
- * a reminder that fires the moment it's created is noise, not a reminder.
+ * Reminders an approval should schedule. The window-opening email isn't one of
+ * them: the form usually isn't published until submissions open, so that email
+ * is raised by the prep run once there are actually answers to review (see
+ * `answers_ready` in scheduled.ts). Dates already past are dropped — a reminder
+ * that fires the moment it's created is noise, not a reminder.
  */
 export function plannedReminders(
   gig: WindowInput,
   todayStr: string = today(),
 ): PlannedReminder[] {
   const planned: PlannedReminder[] = []
-  const opens = gig.submissionOpensAt?.slice(0, 10) || null
   const deadline = gig.deadline?.slice(0, 10) || null
-
-  if (opens && opens > todayStr) {
-    const soon = shiftDays(opens, -WINDOW_SOON_LEAD_DAYS)
-    if (soon > todayStr) planned.push({ reminderType: 'window_soon', scheduledFor: soon })
-    planned.push({ reminderType: 'window_opens', scheduledFor: opens })
-  }
 
   if (deadline) {
     const nudge = shiftDays(deadline, -PRE_DEADLINE_LEAD_DAYS)
@@ -92,9 +88,11 @@ export function plannedReminders(
 }
 
 /**
- * Should the prep run pick this gig up now? Prep runs ahead of the window so the
- * answers are ready to review before the reminder lands — but not so far ahead
- * that we burn a form fetch on something a year out.
+ * Should the prep run pick this gig up now?
+ *
+ * Only once the window is actually open. Festival application forms are
+ * typically published when submissions open — fetching earlier reads a
+ * "check back in March" page and prepares answers to the wrong questions.
  */
 export function shouldPrepareNow(
   gig: WindowInput & { loginRequired?: number | null; prepStatus?: string | null },
@@ -104,9 +102,30 @@ export function shouldPrepareNow(
   if (gig.prepStatus === 'ready' || gig.prepStatus === 'blocked') return false
 
   const state = windowState(gig, todayStr)
-  if (state === 'closed') return false
-  if (state === 'open' || state === 'unknown') return true
+  return state === 'open' || state === 'unknown'
+}
 
-  const opens = gig.submissionOpensAt!.slice(0, 10)
-  return daysBetween(todayStr, opens) <= PREP_LEAD_DAYS
+/**
+ * Has prep finished for this gig, one way or another? Terminal means there's
+ * something worth emailing about — answers to review, or a form that needs
+ * doing by hand.
+ */
+export function isPrepTerminal(
+  prepStatus: string | null | undefined,
+  attempts: number | null | undefined,
+): boolean {
+  if (prepStatus === 'ready' || prepStatus === 'blocked') return true
+  if (prepStatus === 'failed') return (attempts ?? 0) >= PREP_MAX_ATTEMPTS
+  return false
+}
+
+/** Is a failed prep due for another attempt? */
+export function isPrepRetryDue(
+  gig: { prepStatus?: string | null; prepUpdatedAt?: string | null; prepAttempts?: number | null },
+  todayStr: string = today(),
+): boolean {
+  if (gig.prepStatus !== 'failed') return false
+  if ((gig.prepAttempts ?? 0) >= PREP_MAX_ATTEMPTS) return false
+  if (!gig.prepUpdatedAt) return true
+  return daysBetween(gig.prepUpdatedAt.slice(0, 10), todayStr) >= PREP_RETRY_DAYS
 }

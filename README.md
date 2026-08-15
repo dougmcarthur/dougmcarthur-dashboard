@@ -23,17 +23,19 @@ same Worker. The live site sits behind Cloudflare Access.
   degrade gracefully when their secrets aren't set — see `GET /api/health` to
   check what's configured.
 - **Cron** — a daily Worker cron (13:00 UTC) opens submission windows that have
-  arrived, prepares upcoming applications, and sends due reminders. See
-  `docs/application-prep.md`.
+  arrived, reads and answers their application forms, and emails what's ready.
+  See `docs/application-prep.md`.
 
 ## Submission windows & application prep
 
 Approving a festival whose submission window hasn't opened yet files it as
-`awaiting_window` rather than dropping it into the active queue. That schedules
-the reminder emails (heads-up, opening day, pre-deadline) and queues the
-application form to be read ahead of time: the form is fetched, split into its
-real fields, and each one gets a drafted answer sourced from the reference docs,
-ready to review and edit in the dashboard.
+`awaiting_window` rather than dropping it into the active queue. On the day the
+window opens, one cron run does the whole chain: the gig becomes active, its
+application form is fetched and split into its real fields, each field gets a
+drafted answer from the reference docs, and only then does the email go out —
+so the notification arrives with answers ready to review behind it. Prep waits
+for the window because that's when festivals publish the form; reading the page
+earlier just parses a "check back later" notice.
 
 Answers you approve are filed in an **answer library** keyed by canonical question
 kind, so the next form asking "Name of the act" or "Tell us about your act" is

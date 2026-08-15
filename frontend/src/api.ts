@@ -37,6 +37,8 @@ export interface GigOpportunity {
   prepStatus: PrepStatus | null
   prepError: string | null
   prepUpdatedAt: string | null
+  prepAttempts: number | null
+  answersNotifiedAt: string | null
   formTitle: string | null
   discoveredAt: string
   updatedAt: string
@@ -236,6 +238,7 @@ export interface ScheduledSummary {
   windowsOpened: number
   prepared: number
   prepFailed: number
+  answersReady: number
   remindersSent: number
   remindersFailed: number
   notes: string[]

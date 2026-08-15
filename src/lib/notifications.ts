@@ -75,30 +75,45 @@ export function composeReminderEmail(
     .filter((l) => l !== null)
     .join('\n')
 
-  if (reminderType === 'window_opens') {
-    return {
-      subject: `Submissions open today — ${gig.name}`,
-      body: [
-        `The submission window for ${gig.name} opens today${gig.submissionOpensAt ? ` (${gig.submissionOpensAt})` : ''}.`,
-        '',
-        prepLine(gig, prep),
-        gig.deadline ? `\nDeadline: ${gig.deadline}.` : '',
-        tail,
-      ].join('\n'),
-    }
-  }
+  // The email that matters: submissions are open AND the answers exist.
+  if (reminderType === 'answers_ready') {
+    const opened = gig.submissionOpensAt
+      ? `Submissions for ${gig.name} opened ${gig.submissionOpensAt === todayStr ? 'today' : `on ${gig.submissionOpensAt}`}.`
+      : `${gig.name} is open for submissions.`
 
-  if (reminderType === 'window_soon') {
-    const days = gig.submissionOpensAt ? daysBetween(todayStr, gig.submissionOpensAt) : null
-    const when = days === null ? 'soon' : days <= 0 ? 'today' : `in ${days} day${days === 1 ? '' : 's'}`
+    if (gig.prepStatus === 'ready' && prep.total > 0) {
+      const ready = prep.total - prep.needsInput
+      return {
+        subject:
+          prep.needsInput > 0
+            ? `Ready to review (${prep.needsInput} need you) — ${gig.name}`
+            : `Answers ready — ${gig.name}`,
+        body: [
+          opened,
+          '',
+          `I read the form and prepared your answers: ${prep.total} fields, ${ready} drafted${
+            prep.needsInput > 0
+              ? `, ${prep.needsInput} that need you (uploads, fees, dates — things the reference docs can't answer)`
+              : ''
+          }.`,
+          '',
+          'Review and edit them, then it’s a paste-and-send job.',
+          gig.deadline ? `\nDeadline: ${gig.deadline}.` : '',
+          tail,
+        ].join('\n'),
+      }
+    }
+
+    // Open, but the form couldn't be read — still worth telling you, with why.
     return {
-      subject: `Submissions open ${when} — ${gig.name}`,
+      subject: `Submissions open — ${gig.name} (needs doing by hand)`,
       body: [
-        `${gig.name} opens for submissions ${when}${gig.submissionOpensAt ? ` (${gig.submissionOpensAt})` : ''}.`,
+        opened,
         '',
         prepLine(gig, prep),
         '',
-        'Reviewing now means submitting is a paste-and-send job on the day.',
+        'Add the questions in the dashboard and the answers will be drafted the same way, or fill the form in directly.',
+        gig.deadline ? `\nDeadline: ${gig.deadline}.` : '',
         tail,
       ].join('\n'),
     }

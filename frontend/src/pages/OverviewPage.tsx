@@ -147,9 +147,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
                       {g.type}
                       {g.prep.total > 0
                         ? ` · ${g.prep.total} answers prepared`
-                        : g.prepStatus === 'queued'
-                          ? ' · answers queued'
-                          : ' · answers not prepared yet'}
+                        : ' · form read and answered the day it opens'}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">

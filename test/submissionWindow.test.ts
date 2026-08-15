@@ -4,6 +4,8 @@ import {
   resolveApprovalStatus,
   plannedReminders,
   shouldPrepareNow,
+  isPrepTerminal,
+  isPrepRetryDue,
   shiftDays,
   daysBetween,
 } from '../src/lib/submissionWindow'
@@ -53,21 +55,18 @@ describe('resolveApprovalStatus', () => {
 })
 
 describe('plannedReminders', () => {
-  it('schedules a heads-up, an opening-day email, and a deadline nudge', () => {
+  // The window-opening email is raised by the prep run once there are answers
+  // to review, not scheduled up front for a date when nothing exists yet.
+  it('schedules only the deadline nudge at approval time', () => {
     const planned = plannedReminders(
       { submissionOpensAt: '2026-10-01', deadline: '2026-12-01' },
       TODAY,
     )
-    expect(planned).toEqual([
-      { reminderType: 'window_soon', scheduledFor: '2026-09-24' },
-      { reminderType: 'window_opens', scheduledFor: '2026-10-01' },
-      { reminderType: 'pre_deadline', scheduledFor: '2026-11-24' },
-    ])
+    expect(planned).toEqual([{ reminderType: 'pre_deadline', scheduledFor: '2026-11-24' }])
   })
 
-  it('drops the heads-up when the window opens within the lead time', () => {
-    const planned = plannedReminders({ submissionOpensAt: '2026-08-18' }, TODAY)
-    expect(planned).toEqual([{ reminderType: 'window_opens', scheduledFor: '2026-08-18' }])
+  it('schedules nothing for a future window with no deadline yet', () => {
+    expect(plannedReminders({ submissionOpensAt: '2026-08-18' }, TODAY)).toEqual([])
   })
 
   it('nudges on the deadline itself when it is closer than the lead time', () => {
@@ -81,9 +80,19 @@ describe('plannedReminders', () => {
 })
 
 describe('shouldPrepareNow', () => {
-  it('waits until the window is within the lead time', () => {
+  // Forms are published when submissions open — reading one earlier parses a
+  // placeholder page and prepares answers to questions that aren't asked.
+  it('waits for the window to actually open', () => {
     expect(shouldPrepareNow({ submissionOpensAt: '2027-03-01' }, TODAY)).toBe(false)
-    expect(shouldPrepareNow({ submissionOpensAt: '2026-09-01' }, TODAY)).toBe(true)
+    expect(shouldPrepareNow({ submissionOpensAt: '2026-09-01' }, TODAY)).toBe(false)
+    expect(shouldPrepareNow({ submissionOpensAt: '2026-08-16' }, TODAY)).toBe(false)
+    expect(shouldPrepareNow({ submissionOpensAt: '2026-08-15' }, TODAY)).toBe(true)
+    expect(shouldPrepareNow({ submissionOpensAt: '2026-08-01' }, TODAY)).toBe(true)
+  })
+
+  it('prepares straight away when no opening date is tracked', () => {
+    expect(shouldPrepareNow({}, TODAY)).toBe(true)
+    expect(shouldPrepareNow({ deadline: '2026-10-01' }, TODAY)).toBe(true)
   })
 
   it('skips login-gated forms and anything already resolved', () => {
@@ -94,6 +103,32 @@ describe('shouldPrepareNow', () => {
 
   it('skips windows that have already closed', () => {
     expect(shouldPrepareNow({ deadline: '2026-08-01' }, TODAY)).toBe(false)
+  })
+})
+
+describe('prep completion', () => {
+  it('is terminal once there are answers, or a form that needs doing by hand', () => {
+    expect(isPrepTerminal('ready', 1)).toBe(true)
+    expect(isPrepTerminal('blocked', 1)).toBe(true)
+    expect(isPrepTerminal('queued', 0)).toBe(false)
+    expect(isPrepTerminal('none', 0)).toBe(false)
+  })
+
+  it('keeps retrying a transient failure, then gives up and reports it', () => {
+    expect(isPrepTerminal('failed', 1)).toBe(false)
+    expect(isPrepTerminal('failed', 2)).toBe(false)
+    expect(isPrepTerminal('failed', 3)).toBe(true)
+  })
+
+  it('retries a failed run the next day, not the same one', () => {
+    expect(isPrepRetryDue({ prepStatus: 'failed', prepUpdatedAt: TODAY, prepAttempts: 1 }, TODAY)).toBe(false)
+    expect(
+      isPrepRetryDue({ prepStatus: 'failed', prepUpdatedAt: '2026-08-14', prepAttempts: 1 }, TODAY),
+    ).toBe(true)
+    expect(
+      isPrepRetryDue({ prepStatus: 'failed', prepUpdatedAt: '2026-08-01', prepAttempts: 3 }, TODAY),
+    ).toBe(false)
+    expect(isPrepRetryDue({ prepStatus: 'ready', prepAttempts: 1 }, TODAY)).toBe(false)
   })
 })
 

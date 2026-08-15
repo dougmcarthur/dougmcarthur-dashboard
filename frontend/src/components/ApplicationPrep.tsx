@@ -353,6 +353,7 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
 
   const { stats, fields, prepStatus } = data
   const readyCount = stats.total - stats.needsInput
+  const waitingForWindow = data.windowState === 'upcoming'
 
   return (
     <div className="space-y-3">
@@ -360,10 +361,14 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              PREP_COLOR[prepStatus] ?? PREP_COLOR.none
+              waitingForWindow && prepStatus === 'none'
+                ? 'bg-indigo-50 text-indigo-700'
+                : (PREP_COLOR[prepStatus] ?? PREP_COLOR.none)
             }`}
           >
-            {PREP_LABEL[prepStatus] ?? prepStatus}
+            {waitingForWindow && prepStatus === 'none'
+              ? 'Waiting for the window'
+              : (PREP_LABEL[prepStatus] ?? prepStatus)}
           </span>
           {stats.total > 0 && (
             <span className="text-xs text-gray-500">
@@ -407,16 +412,30 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
           <button
             disabled={prepare.isPending}
             onClick={() => prepare.mutate()}
-            className="text-xs px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+            className={`text-xs px-3 py-1.5 rounded-md disabled:opacity-40 transition-colors ${
+              waitingForWindow
+                ? 'border border-gray-300 text-gray-600 hover:bg-gray-50'
+                : 'bg-gray-900 text-white hover:bg-gray-700'
+            }`}
           >
             {prepare.isPending
               ? 'Reading the form…'
-              : stats.total > 0
-                ? 'Re-run prep'
-                : 'Prepare answers now'}
+              : waitingForWindow
+                ? 'Try reading the form now'
+                : stats.total > 0
+                  ? 'Re-run prep'
+                  : 'Prepare answers now'}
           </button>
         </div>
       </div>
+
+      {waitingForWindow && (
+        <div className="rounded-md bg-indigo-50 border border-indigo-200 px-3 py-2 text-xs text-indigo-900">
+          Submissions open {data.submissionOpensAt ?? 'later'}. The form usually isn’t published
+          until then, so your answers are prepared that morning — you’ll get an email once they’re
+          ready to review. If you know the form is already live, read it now.
+        </div>
+      )}
 
       {data.prepError && (
         <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">

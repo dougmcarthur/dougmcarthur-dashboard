@@ -28,6 +28,8 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   prepStatus: text('prep_status').default('none'), // none|queued|ready|blocked|failed
   prepError: text('prep_error'),
   prepUpdatedAt: text('prep_updated_at'),
+  prepAttempts: integer('prep_attempts').default(0),
+  answersNotifiedAt: text('answers_notified_at'),
   formTitle: text('form_title'),
   discoveredAt: text('discovered_at').notNull(),
   updatedAt: text('updated_at').notNull(),
@@ -118,7 +120,8 @@ export const reminders = sqliteTable('reminders', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   entityType: text('entity_type').notNull(), // 'gig' | 'sync'
   entityId: integer('entity_id').notNull(),
-  // 'pre_deadline' | 'follow_up' | 'window_opens' | 'window_soon'
+  // 'answers_ready' | 'pre_deadline' | 'follow_up'
+  // ('window_opens' / 'window_soon' are retired — see migration 0005)
   reminderType: text('reminder_type').notNull(),
   scheduledFor: text('scheduled_for').notNull(),
   status: text('status').default('pending'), // 'pending' | 'sent' | 'dismissed'

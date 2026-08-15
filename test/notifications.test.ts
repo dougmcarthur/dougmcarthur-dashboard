@@ -18,41 +18,47 @@ const gig: ReminderGig = {
 }
 
 describe('composeReminderEmail', () => {
-  it('says how many answers are waiting when the window opens', () => {
+  // One email per gig, once the window is open *and* the answers exist.
+  it('leads with the answers being ready, not just the window opening', () => {
     const email = composeReminderEmail(
-      'window_opens',
-      gig,
-      { total: 12, needsInput: 2, approved: 3 },
+      'answers_ready',
+      { ...gig, submissionOpensAt: TODAY },
+      { total: 12, needsInput: 2, approved: 0 },
       'https://dashboard.dougmcarthur.net',
       TODAY,
     )
-    expect(email.subject).toBe('Submissions open today — Sawdust City Music Festival 2027')
-    expect(email.body).toContain('12 fields drafted')
-    expect(email.body).toContain('2 still need you')
+    expect(email.subject).toBe('Ready to review (2 need you) — Sawdust City Music Festival 2027')
+    expect(email.body).toContain('opened today')
+    expect(email.body).toContain('12 fields, 10 drafted')
+    expect(email.body).toContain('2 that need you')
     expect(email.body).toContain('https://dashboard.dougmcarthur.net/#gigs/42')
     expect(email.body).toContain('https://www.sawdustcitymusicfestival.com/apply')
   })
 
-  it('counts down in the heads-up email', () => {
+  it('says so plainly when nothing needs you', () => {
     const email = composeReminderEmail(
-      'window_soon',
+      'answers_ready',
       gig,
-      { total: 12, needsInput: 0, approved: 0 },
+      { total: 8, needsInput: 0, approved: 0 },
       undefined,
       TODAY,
     )
-    expect(email.subject).toContain('in 17 days')
+    expect(email.subject).toBe('Answers ready — Sawdust City Music Festival 2027')
+    expect(email.body).toContain('8 fields, 8 drafted')
+    expect(email.body).not.toContain('need you')
   })
 
-  it('explains a blocked form instead of promising answers', () => {
+  it('still reports an open window when the form could not be read', () => {
     const email = composeReminderEmail(
-      'window_opens',
+      'answers_ready',
       { ...gig, prepStatus: 'blocked', prepError: 'The form is behind a login.' },
       { total: 0, needsInput: 0, approved: 0 },
       undefined,
       TODAY,
     )
+    expect(email.subject).toContain('needs doing by hand')
     expect(email.body).toContain('behind a login')
+    expect(email.body).toContain('opened on 2026-09-01')
   })
 
   it('nudges before a deadline and reports how overdue it is', () => {

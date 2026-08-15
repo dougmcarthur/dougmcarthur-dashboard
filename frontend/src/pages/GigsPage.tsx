@@ -658,9 +658,14 @@ export function GigsPage() {
           case 'blocked':
             return <span className="text-xs text-amber-700">needs you</span>
           case 'failed':
-            return <span className="text-xs text-red-600">failed</span>
+            return <span className="text-xs text-red-600">retrying</span>
           default:
-            return <span className="text-gray-300">—</span>
+            // Forms go up when submissions open, so prep waits for the window.
+            return windowStateOf(gig) === 'upcoming' ? (
+              <span className="text-xs text-indigo-500">on open</span>
+            ) : (
+              <span className="text-gray-300">—</span>
+            )
         }
       },
     }),
