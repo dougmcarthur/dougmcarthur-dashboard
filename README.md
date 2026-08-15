@@ -33,7 +33,13 @@ Approving a festival whose submission window hasn't opened yet files it as
 the reminder emails (heads-up, opening day, pre-deadline) and queues the
 application form to be read ahead of time: the form is fetched, split into its
 real fields, and each one gets a drafted answer sourced from the reference docs,
-ready to review and edit in the dashboard. Full write-up, including what happens
+ready to review and edit in the dashboard.
+
+Answers you approve are filed in an **answer library** keyed by canonical question
+kind, so the next form asking "Name of the act" or "Tell us about your act" is
+filled from text that's already been through review — the more applications you
+do, the less each one takes. Event-specific answers ("why this festival") are
+retargeted rather than pasted. Full write-up, including what happens
 with login-gated and JavaScript-rendered forms:
 [`docs/application-prep.md`](docs/application-prep.md).
 
@@ -67,6 +73,7 @@ All routes are under `/api`; anything else falls through to static assets.
 | `/api/gigs` | Gig opportunities (CRUD). Approving creates a Calendar event, schedules reminders, and queues application prep — landing on `awaiting_window` if the window hasn't opened |
 | `/api/gigs/:id/application` | Prepared application fields; `POST /prepare` to (re-)read the form, `GET /export` for a copy-paste bundle, `POST /fields` to add a question by hand |
 | `/api/application-fields/:id` | Edit or approve one prepared answer; `POST /approve-all` for a whole gig |
+| `/api/answer-library` | Reusable approved answers (CRUD). `POST /seed` bootstraps from the reference docs; `POST /from-field` files a prepared answer |
 | `POST /api/tasks/run` | Run the daily cron work on demand |
 | `/api/sync` | Sync-licensing targets (CRUD) |
 | `/api/sync/reconcile` | `GET` preview of sent-pitch matches from Gmail; `POST /apply` to write status/pitch updates |

@@ -3,6 +3,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { useHashRoute } from './hooks/useHashRoute'
 import { OverviewPage } from './pages/OverviewPage'
 import { GigsPage } from './pages/GigsPage'
+import { LibraryPage } from './pages/LibraryPage'
 import { SyncPage } from './pages/SyncPage'
 import { PromoDraftsPage } from './pages/PromoDraftsPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -16,6 +17,7 @@ export default function App() {
       <ErrorBoundary label="Page error">
         {page === 'overview' && <OverviewPage onNav={navigate} />}
         {page === 'gigs' && <GigsPage />}
+        {page === 'library' && <LibraryPage />}
         {page === 'sync' && <SyncPage />}
         {page === 'promo' && <PromoDraftsPage />}
         {page === 'runs' && <TaskRunsPage />}

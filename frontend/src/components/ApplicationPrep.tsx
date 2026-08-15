@@ -44,13 +44,23 @@ function FieldCard({
   onSave,
   onToggleApprove,
   onDelete,
+  onSaveToLibrary,
+  onUpdateLibrary,
+  onDismissConflict,
   isSaving,
+  libraryBusy,
+  conflict,
 }: {
   field: ApplicationField
   onSave: (answer: string) => void
   onToggleApprove: (approved: boolean) => void
   onDelete: () => void
+  onSaveToLibrary: () => void
+  onUpdateLibrary: () => void
+  onDismissConflict: () => void
   isSaving: boolean
+  libraryBusy: boolean
+  conflict: boolean
 }) {
   const stored = field.answer ?? field.draftAnswer ?? ''
   const [value, setValue] = useState(stored)
@@ -87,7 +97,9 @@ function FieldCard({
           <p className="text-xs text-gray-400 mt-0.5">
             {field.fieldType}
             {field.maxLength ? ` · max ${field.maxLength}` : ''}
-            {field.confidence && !field.answer ? (
+            {field.answerSource === 'library' && !edited ? (
+              <span className="ml-2 text-violet-700">↺ from your library</span>
+            ) : field.confidence && !field.answer ? (
               <span className={`ml-2 ${CONFIDENCE_COLOR[field.confidence]}`}>
                 {field.confidence} confidence
               </span>
@@ -166,6 +178,57 @@ function FieldCard({
         )}
       </div>
 
+      {/* The stored answer and this one have diverged — one of them should win. */}
+      {field.libraryDrift && !dirty && (
+        <div className="mt-2 flex items-center justify-between gap-3 rounded-md bg-violet-50 border border-violet-200 px-2.5 py-1.5">
+          <p className="text-xs text-violet-800">
+            This differs from your stored “{field.libraryLabel}” answer.
+          </p>
+          <button
+            disabled={libraryBusy}
+            onClick={onUpdateLibrary}
+            className="text-xs px-2.5 py-1 rounded-md bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors whitespace-nowrap"
+          >
+            Update library
+          </button>
+        </div>
+      )}
+
+      {conflict && (
+        <div className="mt-2 flex items-center justify-between gap-3 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5">
+          <p className="text-xs text-amber-800">
+            A different answer is already stored for this question.
+          </p>
+          <div className="flex gap-2 shrink-0">
+            <button
+              disabled={libraryBusy}
+              onClick={onUpdateLibrary}
+              className="text-xs px-2.5 py-1 rounded-md bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors"
+            >
+              Replace it
+            </button>
+            <button
+              onClick={onDismissConflict}
+              className="text-xs px-2.5 py-1 rounded-md border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors"
+            >
+              Keep this one here
+            </button>
+          </div>
+        </div>
+      )}
+
+      {field.harvestable && !field.libraryDrift && !conflict && !dirty && (
+        <div className="mt-2 flex items-center justify-end">
+          <button
+            disabled={libraryBusy}
+            onClick={onSaveToLibrary}
+            className="text-xs px-2.5 py-1 rounded-md border border-violet-200 text-violet-700 hover:bg-violet-50 disabled:opacity-40 transition-colors"
+          >
+            Save to library
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mt-1.5">
         <p className="text-xs text-gray-400">
           {field.note ? <span className="text-amber-700">{field.note}</span> : null}
@@ -207,6 +270,7 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
   const qc = useQueryClient()
   const [copied, setCopied] = useState(false)
   const [savingId, setSavingId] = useState<number | null>(null)
+  const [conflictId, setConflictId] = useState<number | null>(null)
 
   const { data, isLoading, error } = useQuery<Prep>({
     queryKey: ['application', gigId],
@@ -250,7 +314,23 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
 
   const approveAll = useMutation({
     mutationFn: () => api.applications.approveAll(gigId),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate()
+      qc.invalidateQueries({ queryKey: ['library'] })
+    },
+  })
+
+  // A stored answer is never replaced silently — a clash comes back here for a
+  // decision: keep the library's version, or promote this one.
+  const toLibrary = useMutation({
+    mutationFn: ({ fieldId, overwrite }: { fieldId: number; overwrite?: boolean }) =>
+      api.applications.saveToLibrary(fieldId, overwrite),
+    onSuccess: (_data, variables) => {
+      setConflictId((id) => (id === variables.fieldId ? null : id))
+      invalidate()
+      qc.invalidateQueries({ queryKey: ['library'] })
+    },
+    onError: (_err, variables) => setConflictId(variables.fieldId),
   })
 
   async function copyAll() {
@@ -288,6 +368,7 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
           {stats.total > 0 && (
             <span className="text-xs text-gray-500">
               {stats.approved}/{stats.total} approved · {readyCount} drafted
+              {stats.fromLibrary > 0 ? ` · ${stats.fromLibrary} reused` : ''}
               {stats.needsInput > 0 ? ` · ${stats.needsInput} need you` : ''}
             </span>
           )}
@@ -348,6 +429,16 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
         </div>
       )}
 
+      {prepare.isSuccess && prepare.data.status === 'ready' && (
+        <p className="text-xs text-gray-500">
+          {prepare.data.fieldCount} field{prepare.data.fieldCount === 1 ? '' : 's'} read
+          {prepare.data.libraryHits > 0
+            ? ` · ${prepare.data.libraryHits} answered from your library`
+            : ''}
+          {prepare.data.usedLlm ? ' · the rest drafted from your reference docs' : ''}
+        </p>
+      )}
+
       {prepare.isError && (
         <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
           {(prepare.error as Error).message}
@@ -365,6 +456,7 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
               key={field.id}
               field={field}
               isSaving={savingId === field.id && patchField.isPending}
+              libraryBusy={toLibrary.isPending}
               onSave={(answer) => {
                 setSavingId(field.id)
                 patchField.mutate({ id: field.id, body: { answer } })
@@ -373,6 +465,10 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
                 patchField.mutate({ id: field.id, body: { approved } })
               }
               onDelete={() => deleteField.mutate(field.id)}
+              onSaveToLibrary={() => toLibrary.mutate({ fieldId: field.id })}
+              onUpdateLibrary={() => toLibrary.mutate({ fieldId: field.id, overwrite: true })}
+              onDismissConflict={() => setConflictId(null)}
+              conflict={conflictId === field.id}
             />
           ))}
         </div>

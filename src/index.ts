@@ -13,6 +13,7 @@ import health from './routes/health'
 import syncReconcile from './routes/syncReconcile'
 import tasks from './routes/tasks'
 import { gigApplications, applicationFieldRoutes } from './routes/applications'
+import answerLibrary from './routes/answerLibrary'
 import { runScheduledTasks } from './scheduled'
 
 const app = new Hono<{ Bindings: Env }>()
@@ -26,6 +27,7 @@ app.route('/api/overview', overview)
 app.route('/api/gigs', gigApplications)
 app.route('/api/gigs', gigs)
 app.route('/api/application-fields', applicationFieldRoutes)
+app.route('/api/answer-library', answerLibrary)
 // NOTE: must be registered before '/api/sync' — otherwise the sync router's
 // GET '/:id' route matches '/reconcile' first and swallows this endpoint.
 app.route('/api/sync/reconcile', syncReconcile)

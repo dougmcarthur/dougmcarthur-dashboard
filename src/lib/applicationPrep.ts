@@ -2,11 +2,11 @@
 // one, and stores the result so it can be reviewed and edited long before the
 // submission window opens.
 
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 import { getDb, type DB } from '../db'
-import { gigOpportunities, applicationFields, referenceDocs } from '../db/schema'
+import { gigOpportunities, applicationFields, referenceDocs, answerLibrary } from '../db/schema'
 import { parseApplicationForm, type ParsedField } from './formParser'
-import { buildProfile, draftAnswers } from './answerEngine'
+import { buildProfile, draftAnswers, type DraftedAnswer } from './answerEngine'
 import type { Env } from '../types'
 
 export type PrepStatus = 'ready' | 'blocked' | 'failed'
@@ -16,6 +16,8 @@ export interface PrepResult {
   status: PrepStatus
   fieldCount: number
   usedLlm: boolean
+  /** Fields answered outright from the answer library. */
+  libraryHits: number
   formTitle: string | null
   loginRequired: boolean
   error?: string
@@ -69,7 +71,7 @@ async function storeFields(
   db: DB,
   gigId: number,
   fields: ParsedField[],
-  drafts: Map<string, { answer: string; confidence: string; needsInput: boolean; note?: string; source: string }>,
+  drafts: Map<string, DraftedAnswer>,
 ): Promise<void> {
   const ts = new Date().toISOString()
   const existing = await db
@@ -78,9 +80,18 @@ async function storeFields(
     .where(eq(applicationFields.gigId, gigId))
   const byKey = new Map(existing.map((f) => [f.fieldKey, f]))
 
+  // Library entries used on this gig for the first time — counted once per gig,
+  // so re-running prep doesn't inflate the usage figures.
+  const newlyUsed = new Set<number>()
+
   for (const field of fields) {
     const draft = drafts.get(field.fieldKey)
     const prior = byKey.get(field.fieldKey)
+
+    if (draft?.libraryId && prior?.libraryId !== draft.libraryId) {
+      newlyUsed.add(draft.libraryId)
+    }
+
     const values = {
       label: field.label,
       fieldType: field.fieldType,
@@ -94,6 +105,8 @@ async function storeFields(
       confidence: draft?.confidence ?? null,
       needsInput: draft?.needsInput ? 1 : 0,
       note: draft?.note ?? null,
+      questionKind: draft?.questionKind ?? null,
+      libraryId: draft?.libraryId ?? null,
       updatedAt: ts,
     }
 
@@ -127,6 +140,13 @@ async function storeFields(
       ),
     )
   }
+
+  if (newlyUsed.size > 0) {
+    await db
+      .update(answerLibrary)
+      .set({ usageCount: sql`usage_count + 1`, lastUsedAt: ts })
+      .where(inArray(answerLibrary.id, [...newlyUsed]))
+  }
 }
 
 export async function prepareApplication(env: Env, gigId: number): Promise<PrepResult> {
@@ -140,7 +160,7 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
 
   if (!gig) throw new Error(`Gig ${gigId} not found`)
 
-  const base: Omit<PrepResult, 'status' | 'fieldCount' | 'usedLlm'> = {
+  const base: Omit<PrepResult, 'status' | 'fieldCount' | 'usedLlm' | 'libraryHits'> = {
     gigId,
     formTitle: gig.formTitle ?? null,
     loginRequired: Boolean(gig.loginRequired),
@@ -150,13 +170,13 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
   if (!url) {
     const error = 'No application URL on this gig — add one and prep will run.'
     await markGig(db, gigId, { prepStatus: 'blocked', prepError: error })
-    return { ...base, status: 'blocked', fieldCount: 0, usedLlm: false, error }
+    return { ...base, status: 'blocked', fieldCount: 0, usedLlm: false, libraryHits: 0, error }
   }
 
   if (gig.loginRequired) {
     const error = 'Marked as login-gated — the form can’t be read automatically.'
     await markGig(db, gigId, { prepStatus: 'blocked', prepError: error })
-    return { ...base, status: 'blocked', fieldCount: 0, usedLlm: false, error }
+    return { ...base, status: 'blocked', fieldCount: 0, usedLlm: false, libraryHits: 0, error }
   }
 
   let html: string
@@ -175,6 +195,7 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
       status: gated ? 'blocked' : 'failed',
       fieldCount: 0,
       usedLlm: false,
+      libraryHits: 0,
       loginRequired: gated ? true : base.loginRequired,
       error,
     }
@@ -195,16 +216,20 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
       status: 'blocked',
       fieldCount: 0,
       usedLlm: false,
+      libraryHits: 0,
       formTitle: form.title ?? null,
       loginRequired: form.loginRequired || base.loginRequired,
       error,
     }
   }
 
-  const docs = await db.select().from(referenceDocs)
+  const [docs, library] = await Promise.all([
+    db.select().from(referenceDocs),
+    db.select().from(answerLibrary),
+  ])
   const profile = buildProfile(docs)
 
-  const { answers, usedLlm, llmError } = await draftAnswers(
+  const { answers, usedLlm, libraryHits, llmError } = await draftAnswers(
     env.ANTHROPIC_API_KEY,
     {
       name: gig.name,
@@ -217,6 +242,7 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
     form.title,
     form.fields,
     profile,
+    library,
   )
 
   await storeFields(
@@ -238,6 +264,7 @@ export async function prepareApplication(env: Env, gigId: number): Promise<PrepR
     status: 'ready',
     fieldCount: form.fields.length,
     usedLlm,
+    libraryHits,
     formTitle: form.title ?? null,
     error: llmError,
   }

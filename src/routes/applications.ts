@@ -1,11 +1,12 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { eq, and, asc, max } from 'drizzle-orm'
-import { getDb } from '../db'
-import { gigOpportunities, applicationFields } from '../db/schema'
+import { eq, and, asc, max, inArray, isNull } from 'drizzle-orm'
+import { getDb, type DB } from '../db'
+import { gigOpportunities, applicationFields, answerLibrary } from '../db/schema'
 import { prepareApplication } from '../lib/applicationPrep'
 import { windowState, today } from '../lib/submissionWindow'
+import { harvestApprovedField } from '../lib/libraryStore'
 import type { Env } from '../types'
 
 // Mounted at /api/gigs — the per-gig view of a prepared application.
@@ -33,6 +34,26 @@ gigApplications.get('/:id/application', async (c) => {
 
   const answered = fields.filter((f) => (f.answer ?? f.draftAnswer ?? '').trim().length > 0)
 
+  // Annotate each field with its library entry, and flag where the text here has
+  // drifted from the stored answer — that's the prompt to update one or the other.
+  const libraryIds = [...new Set(fields.map((f) => f.libraryId).filter((v): v is number => !!v))]
+  const entries = libraryIds.length
+    ? await db.select().from(answerLibrary).where(inArray(answerLibrary.id, libraryIds))
+    : []
+  const entryById = new Map(entries.map((e) => [e.id, e]))
+
+  const annotated = fields.map((f) => {
+    const entry = f.libraryId ? entryById.get(f.libraryId) : undefined
+    const current = (f.answer ?? f.draftAnswer ?? '').trim()
+    return {
+      ...f,
+      libraryLabel: entry?.label ?? null,
+      libraryDrift: entry ? entry.content.trim() !== current && current.length > 0 : false,
+      /** True when this answer could be filed in the library but isn't yet. */
+      harvestable: !f.libraryId && !!f.questionKind && current.length > 0,
+    }
+  })
+
   return c.json({
     gigId: id,
     gigName: gig.name,
@@ -50,8 +71,10 @@ gigApplications.get('/:id/application', async (c) => {
       answered: answered.length,
       needsInput: fields.filter((f) => f.needsInput && !f.answer).length,
       approved: fields.filter((f) => f.approved).length,
+      fromLibrary: fields.filter((f) => f.libraryId).length,
+      drifted: annotated.filter((f) => f.libraryDrift).length,
     },
-    fields,
+    fields: annotated,
   })
 })
 
@@ -192,12 +215,28 @@ applicationFieldRoutes.patch('/:id', zValidator('json', FieldPatchSchema), async
 
   await db.update(applicationFields).set(updates).where(eq(applicationFields.id, id))
 
-  const row = await db
+  let row = await db
     .select()
     .from(applicationFields)
     .where(eq(applicationFields.id, id))
     .get()
-  return c.json(row)
+
+  // Approving an answer files it in the library, so the next application that
+  // asks the same question starts from reviewed text. Never overwrites an
+  // existing entry — a difference comes back as a conflict to resolve.
+  let library: Awaited<ReturnType<typeof harvestApprovedField>> | undefined
+  if (b.approved === true && row) {
+    library = await harvestApprovedField(db, row)
+    if (library.action === 'created' || library.action === 'linked') {
+      row = await db
+        .select()
+        .from(applicationFields)
+        .where(eq(applicationFields.id, id))
+        .get()
+    }
+  }
+
+  return c.json({ ...row, library: library ?? null })
 })
 
 applicationFieldRoutes.delete('/:id', async (c) => {
@@ -206,7 +245,8 @@ applicationFieldRoutes.delete('/:id', async (c) => {
   return c.json({ ok: true })
 })
 
-// Bulk approve — "these all look right" in one click.
+// Bulk approve — "these all look right" in one click. Each newly approved
+// answer is offered to the library the same way a single approval is.
 applicationFieldRoutes.post(
   '/approve-all',
   zValidator('json', z.object({ gigId: z.number().int() })),
@@ -219,6 +259,19 @@ applicationFieldRoutes.post(
       .set({ approved: 1, updatedAt: new Date().toISOString() })
       .where(and(eq(applicationFields.gigId, gigId), eq(applicationFields.needsInput, 0)))
 
-    return c.json({ ok: true })
+    const approved = await db
+      .select()
+      .from(applicationFields)
+      .where(and(eq(applicationFields.gigId, gigId), eq(applicationFields.approved, 1)))
+
+    let added = 0
+    let conflicts = 0
+    for (const field of approved) {
+      const result = await harvestApprovedField(db, field)
+      if (result.action === 'created') added += 1
+      if (result.action === 'conflict') conflicts += 1
+    }
+
+    return c.json({ ok: true, libraryAdded: added, libraryConflicts: conflicts })
   },
 )

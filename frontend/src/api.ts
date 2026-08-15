@@ -55,13 +55,56 @@ export interface ApplicationField {
   position: number
   draftAnswer: string | null
   answer: string | null
-  answerSource: 'llm' | 'profile' | 'manual' | null
+  answerSource: 'llm' | 'profile' | 'manual' | 'library' | null
   confidence: 'high' | 'medium' | 'low' | null
   needsInput: number
   note: string | null
   approved: number
+  questionKind: string | null
+  libraryId: number | null
+  // Annotations added by the API when reading an application
+  libraryLabel?: string | null
+  libraryDrift?: boolean
+  harvestable?: boolean
   createdAt: string
   updatedAt: string
+}
+
+export type LibraryCategory = 'identity' | 'links' | 'story' | 'pitch' | 'logistics'
+
+export interface LibraryEntry {
+  id: number
+  questionKey: string
+  label: string
+  category: LibraryCategory | string
+  content: string
+  maxLength: number | null
+  notes: string | null
+  pinned: number
+  usageCount: number
+  lastUsedAt: string | null
+  sourceGigId: number | null
+  createdAt: string
+  updatedAt: string
+  usedBy: Array<{ gigId: number; gigName: string | null }>
+}
+
+export interface QuestionKindOption {
+  key: string
+  label: string
+  category: LibraryCategory | string
+  lengthSensitive: boolean
+}
+
+export interface LibraryResponse {
+  entries: LibraryEntry[]
+  kinds: QuestionKindOption[]
+}
+
+export interface HarvestResult {
+  entry?: LibraryEntry
+  action: 'created' | 'updated' | 'linked' | 'unchanged' | 'conflict' | 'skipped'
+  error?: string
 }
 
 export interface ApplicationPrep {
@@ -76,7 +119,14 @@ export interface ApplicationPrep {
   windowState: WindowState
   submissionOpensAt: string | null
   submissionClosesAt: string | null
-  stats: { total: number; answered: number; needsInput: number; approved: number }
+  stats: {
+    total: number
+    answered: number
+    needsInput: number
+    approved: number
+    fromLibrary: number
+    drifted: number
+  }
   fields: ApplicationField[]
 }
 
@@ -85,6 +135,7 @@ export interface PrepResult {
   status: 'ready' | 'blocked' | 'failed'
   fieldCount: number
   usedLlm: boolean
+  libraryHits: number
   formTitle: string | null
   loginRequired: boolean
   error?: string
@@ -253,10 +304,43 @@ export const api = {
       }),
     deleteField: (id: number) =>
       apiFetch<{ ok: boolean }>(`/application-fields/${id}`, { method: 'DELETE' }),
-    approveAll: (gigId: number) =>
-      apiFetch<{ ok: boolean }>('/application-fields/approve-all', {
+    saveToLibrary: (fieldId: number, overwrite?: boolean) =>
+      apiFetch<HarvestResult>('/answer-library/from-field', {
         method: 'POST',
-        body: JSON.stringify({ gigId }),
+        body: JSON.stringify({ fieldId, overwrite }),
+      }),
+    approveAll: (gigId: number) =>
+      apiFetch<{ ok: boolean; libraryAdded: number; libraryConflicts: number }>(
+        '/application-fields/approve-all',
+        { method: 'POST', body: JSON.stringify({ gigId }) },
+      ),
+  },
+  library: {
+    list: () => apiFetch<LibraryResponse>('/answer-library'),
+    create: (body: {
+      questionKey: string
+      content: string
+      label?: string
+      category?: string
+      maxLength?: number | null
+      notes?: string | null
+    }) => apiFetch<LibraryEntry>('/answer-library', { method: 'POST', body: JSON.stringify(body) }),
+    patch: (
+      id: number,
+      body: { content?: string; label?: string; notes?: string | null; pinned?: boolean },
+    ) =>
+      apiFetch<LibraryEntry>(`/answer-library/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    delete: (id: number) =>
+      apiFetch<{ ok: boolean }>(`/answer-library/${id}`, { method: 'DELETE' }),
+    seed: () =>
+      apiFetch<{ created: number; skipped: string[] }>('/answer-library/seed', { method: 'POST' }),
+    fromField: (fieldId: number, opts?: { questionKey?: string; overwrite?: boolean }) =>
+      apiFetch<HarvestResult>('/answer-library/from-field', {
+        method: 'POST',
+        body: JSON.stringify({ fieldId, ...opts }),
       }),
   },
   tasks: {

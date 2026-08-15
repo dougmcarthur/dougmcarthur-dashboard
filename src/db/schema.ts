@@ -51,6 +51,24 @@ export const applicationFields = sqliteTable('application_fields', {
   needsInput: integer('needs_input').default(0),
   note: text('note'),
   approved: integer('approved').default(0),
+  questionKind: text('question_kind'),
+  libraryId: integer('library_id'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+export const answerLibrary = sqliteTable('answer_library', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  questionKey: text('question_key').notNull(),
+  label: text('label').notNull(),
+  category: text('category').notNull(),
+  content: text('content').notNull(),
+  maxLength: integer('max_length'),
+  notes: text('notes'),
+  pinned: integer('pinned').default(0),
+  usageCount: integer('usage_count').default(0),
+  lastUsedAt: text('last_used_at'),
+  sourceGigId: integer('source_gig_id'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 })
@@ -114,6 +132,7 @@ export const reminders = sqliteTable('reminders', {
 
 export type GigOpportunity = typeof gigOpportunities.$inferSelect
 export type ApplicationField = typeof applicationFields.$inferSelect
+export type AnswerLibraryEntry = typeof answerLibrary.$inferSelect
 export type SyncTarget = typeof syncTargets.$inferSelect
 export type PromoDraft = typeof promoDrafts.$inferSelect
 export type ReferenceDoc = typeof referenceDocs.$inferSelect

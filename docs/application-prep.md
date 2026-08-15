@@ -34,6 +34,8 @@ waiting" — and what the system does on its own along the way.
    always win over the drafted ones and are never overwritten by a re-run.
    Approve fields individually or with **Approve all drafted**; **Copy all**
    puts every question and answer on the clipboard for pasting into a portal.
+   Approving an answer files it in the answer library, so the next application
+   that asks the same question starts from reviewed text — see below.
 
 6. **When the window opens**, the cron flips `awaiting_window` → `approved`, and
    the gig shows up in the normal deadline views.
@@ -61,6 +63,47 @@ Three cases are reported rather than guessed at, and show up in the dashboard as
 
 In all three cases you can add the questions by hand ("Add a field") and they're
 treated like any other field from then on.
+
+## The answer library
+
+Every form asks the same two dozen questions in different words. The library
+(`#library` in the dashboard) stores answers by **canonical question kind**, so
+an answer approved on one application is reused on the next.
+
+**How answers get in there:**
+
+- **Seeding** — "Seed from reference docs" creates entries for the facts already
+  in the artist brief and EPK: name, email, hometown, genre, links, press quote,
+  and both a full and a short bio.
+- **Approving** — approving a field files that answer under its question kind
+  automatically. An existing entry is *never* overwritten silently; a difference
+  comes back as a conflict on the field, with "Replace it" / "Keep this one here".
+- **By hand** — add an entry on the library page, choosing the question it answers.
+
+**How they come back out.** At prep time, before anything is drafted:
+
+1. Each parsed field is classified (`src/lib/questionKinds.ts`) — "Name of the
+   act", "Artist or band name", and "Band name" all resolve to `artist_name`.
+2. The library is checked for that kind, picking the **fullest variant that fits**
+   the field's character limit. Bios are stored per length, so a 250-character
+   box gets the short version and an unlimited textarea gets the full one.
+3. Fields answered from the library are marked "↺ from your library" and skipped
+   by the drafting step entirely — that text has already been through review.
+4. Everything else is drafted as usual, with the library included in the prompt so
+   new answers match the established voice.
+
+**Event-specific answers are adapted, never pasted.** Kinds marked
+`reuse: 'adapt'` — "why this event", "what sets you apart" — name the festival
+they were written for. Those are handed to the drafting step as source material
+to retarget rather than reused verbatim; without an API key they're offered with
+a "retarget the specifics before submitting" flag and counted as needing input.
+Genuinely per-application answers ("how did you hear about us", availability) are
+never stored at all.
+
+**Drift.** If you edit an answer that came from the library, the field shows that
+it differs from the stored version with an "Update library" action. Editing a
+library entry changes future applications; answers already prepared keep their
+text, and the entry lists which applications it's currently filling.
 
 ## Drafting the answers
 
@@ -102,6 +145,12 @@ runs the same work on demand.
 | `PATCH /api/application-fields/:id` | Edit an answer / approve a field |
 | `DELETE /api/application-fields/:id` | Remove a manually added field |
 | `POST /api/application-fields/approve-all` | Approve everything that's drafted |
+| `GET /api/answer-library` | Stored answers, plus the question kinds the classifier knows |
+| `POST /api/answer-library` | Add an answer by hand |
+| `PATCH /api/answer-library/:id` | Edit a stored answer |
+| `DELETE /api/answer-library/:id` | Remove one (prepared fields keep their text) |
+| `POST /api/answer-library/seed` | Bootstrap from the reference docs |
+| `POST /api/answer-library/from-field` | File a prepared answer in the library (`overwrite` to replace) |
 | `POST /api/tasks/run` | Run the cron work on demand |
 
 ## Configuration

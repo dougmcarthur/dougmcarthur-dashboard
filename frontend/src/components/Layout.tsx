@@ -3,6 +3,7 @@ import { type ReactNode } from 'react'
 const NAV_LINKS = [
   { id: 'overview', label: 'Overview' },
   { id: 'gigs', label: 'Gigs' },
+  { id: 'library', label: 'Answers' },
   { id: 'sync', label: 'Sync' },
   { id: 'promo', label: 'Promo' },
   { id: 'runs', label: 'Log' },

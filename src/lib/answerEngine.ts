@@ -7,6 +7,8 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import type { ParsedField } from './formParser'
+import { fieldKind, selectLibraryAnswer, type LibraryEntryLike } from './answerLibrary'
+import { kindByKey, type QuestionKind } from './questionKinds'
 
 export interface ReferenceDocInput {
   id: string
@@ -41,7 +43,11 @@ export interface DraftedAnswer {
   confidence: 'high' | 'medium' | 'low'
   needsInput: boolean
   note?: string
-  source: 'llm' | 'profile'
+  source: 'llm' | 'profile' | 'library'
+  /** Canonical question kind, when the field was recognised. */
+  questionKind?: string | null
+  /** The library entry this answer came from or was adapted from. */
+  libraryId?: number | null
 }
 
 export interface GigContext {
@@ -235,6 +241,104 @@ export function heuristicAnswers(fields: ParsedField[], profile: ArtistProfile):
   })
 }
 
+// ── Library-first resolution ──────────────────────────────────────────────────
+
+export interface LibraryPass {
+  /** Fields answered outright from the library, keyed by field key. */
+  resolved: Map<string, DraftedAnswer>
+  /** Fields still needing a draft. */
+  pending: ParsedField[]
+  /** Fields whose stored answer is too long for the space — adapt, don't retype. */
+  adapt: Map<string, { entry: LibraryEntryLike; limit: number | null }>
+  /** Canonical kind per field, whether or not the library had an answer. */
+  kinds: Map<string, string>
+}
+
+/**
+ * Reuses approved answers before drafting anything. A stored answer that fits is
+ * used verbatim — it has already been through review, so re-drafting it would
+ * only introduce drift.
+ */
+export function applyLibrary(fields: ParsedField[], library: LibraryEntryLike[]): LibraryPass {
+  const resolved = new Map<string, DraftedAnswer>()
+  const adapt = new Map<string, { entry: LibraryEntryLike; limit: number | null }>()
+  const kinds = new Map<string, string>()
+  const pending: ParsedField[] = []
+
+  for (const field of fields) {
+    const kind = fieldKind(field)
+    if (kind) kinds.set(field.fieldKey, kind.key)
+
+    if (!kind || library.length === 0) {
+      pending.push(field)
+      continue
+    }
+
+    const match = selectLibraryAnswer(field, kind.key, library)
+    if (!match) {
+      pending.push(field)
+      continue
+    }
+
+    // A "why this festival" answer names the festival it was written for.
+    // Reuse it as source material, never as the submitted text.
+    if (kind.reuse === 'adapt') {
+      adapt.set(field.fieldKey, { entry: match.entry, limit: match.limit })
+      pending.push(field)
+      continue
+    }
+
+    if (match.fits) {
+      resolved.set(field.fieldKey, {
+        fieldKey: field.fieldKey,
+        answer: match.entry.content,
+        confidence: 'high',
+        needsInput: false,
+        source: 'library',
+        questionKind: kind.key,
+        libraryId: match.entry.id,
+        note: undefined,
+      })
+      continue
+    }
+
+    // Too long for this form: let the drafting step condense it.
+    adapt.set(field.fieldKey, { entry: match.entry, limit: match.limit })
+    pending.push(field)
+  }
+
+  return { resolved, pending, adapt, kinds }
+}
+
+/**
+ * Fallback when there's no API key and a stored answer can't be dropped in as-is:
+ * offer the text, but say plainly what still needs doing to it.
+ */
+function useUnadaptedEntry(
+  field: ParsedField,
+  entry: LibraryEntryLike,
+  limit: number | null,
+  kind?: QuestionKind,
+): DraftedAnswer {
+  const needsRetarget = kind?.reuse === 'adapt'
+  const tooLong = limit != null && entry.content.length > limit
+
+  const note = needsRetarget
+    ? 'Written for a different event — retarget the specifics before submitting.'
+    : `Your stored answer is ${entry.content.length} characters and this field allows ${limit} — trim it before submitting.`
+
+  return {
+    fieldKey: field.fieldKey,
+    answer: entry.content,
+    confidence: 'low',
+    needsInput: needsRetarget || tooLong,
+    source: 'library',
+    questionKind: kind?.key ?? null,
+    libraryId: entry.id,
+    note,
+  }
+}
+
 // ── Claude-drafted answers ────────────────────────────────────────────────────
 
 const ANSWER_SCHEMA = {
@@ -266,13 +370,21 @@ Everything factual comes from the reference docs below. They are the only source
 
 Write in the artist's own voice as the style guide describes it, in first person, and answer the question that was actually asked rather than pasting the bio into every box. Respect the field: a short-answer box gets a phrase, a paragraph box gets prose, a select or radio field gets one of its listed options copied verbatim. When a character limit is given, stay under it.
 
+Some answers have already been approved on earlier applications and are listed as the answer library. They are the established wording — match their voice, and never contradict them. Where a field carries an approved answer to adapt, work from that text rather than writing something new: keep its facts and phrasing, cut it to fit a tighter limit, and replace anything specific to the event it was written for with what's true of this one. An answer that names the wrong festival is worse than no answer.
+
 Set confidence to high when the docs answer the field directly, medium when you shaped or condensed them to fit, low when you're extrapolating. Use the note only when the reviewer needs to know something — what you assumed, what's missing, what to verify — and leave it as an empty string otherwise.
 
 Reference docs:
 
 `
 
-function buildUserPrompt(gig: GigContext, formTitle: string | null, fields: ParsedField[]): string {
+function buildUserPrompt(
+  gig: GigContext,
+  formTitle: string | null,
+  fields: ParsedField[],
+  library: LibraryEntryLike[] = [],
+  adapt: Map<string, { entry: LibraryEntryLike; limit: number | null }> = new Map(),
+): string {
   const context = [
     `Opportunity: ${gig.name}`,
     `Type: ${gig.type}`,
@@ -285,19 +397,40 @@ function buildUserPrompt(gig: GigContext, formTitle: string | null, fields: Pars
     .filter(Boolean)
     .join('\n')
 
-  const fieldList = fields.map((f) => ({
-    field_key: f.fieldKey,
-    label: f.label,
-    type: f.fieldType,
-    required: f.required,
-    max_length: f.maxLength ?? null,
-    options: f.options ?? null,
-    help_text: f.helpText ?? null,
-  }))
+  const fieldList = fields.map((f) => {
+    const adapted = adapt.get(f.fieldKey)
+    return {
+      field_key: f.fieldKey,
+      label: f.label,
+      type: f.fieldType,
+      required: f.required,
+      max_length: f.maxLength ?? null,
+      options: f.options ?? null,
+      help_text: f.helpText ?? null,
+      ...(adapted
+        ? {
+            approved_answer_to_adapt: adapted.entry.content,
+            adapt_to_length: adapted.limit,
+          }
+        : {}),
+    }
+  })
+
+  const librarySection = library.length
+    ? `\nAnswer library — already approved on earlier applications:\n\n${JSON.stringify(
+        library.map((e) => ({
+          question: e.label,
+          written_for_length: e.maxLength ?? null,
+          content: e.content,
+        })),
+        null,
+        2,
+      )}\n`
+    : ''
 
   return `${context}
-
-These are the fields on the application form. Return one answer per field, using the exact field_key given.
+${librarySection}
+These are the fields still needing an answer. Return one answer per field, using the exact field_key given.
 
 ${JSON.stringify(fieldList, null, 2)}`
 }
@@ -308,6 +441,8 @@ export async function llmAnswers(
   formTitle: string | null,
   fields: ParsedField[],
   profile: ArtistProfile,
+  library: LibraryEntryLike[] = [],
+  adapt: Map<string, { entry: LibraryEntryLike; limit: number | null }> = new Map(),
 ): Promise<DraftedAnswer[]> {
   const client = new Anthropic({ apiKey })
 
@@ -319,7 +454,9 @@ export async function llmAnswers(
       effort: 'medium',
       format: { type: 'json_schema', schema: ANSWER_SCHEMA as unknown as Record<string, unknown> },
     },
-    messages: [{ role: 'user', content: buildUserPrompt(gig, formTitle, fields) }],
+    messages: [
+      { role: 'user', content: buildUserPrompt(gig, formTitle, fields, library, adapt) },
+    ],
   })
 
   if (response.stop_reason === 'refusal') {
@@ -345,6 +482,7 @@ export async function llmAnswers(
 
   // Anchor on the parsed fields so a field the model skipped still gets a row.
   return fields.map((field) => {
+    const adapted = adapt.get(field.fieldKey)
     const a = byKey.get(field.fieldKey)
     if (!a) {
       return {
@@ -361,31 +499,84 @@ export async function llmAnswers(
       answer: a.answer ?? '',
       confidence: a.confidence ?? 'medium',
       needsInput: Boolean(a.needs_input) || !a.answer,
-      note: a.note || undefined,
+      note:
+        a.note ||
+        (adapted ? `Adapted from your stored “${adapted.entry.label}” answer.` : undefined),
       source: 'llm' as const,
+      libraryId: adapted?.entry.id ?? null,
     }
   })
 }
 
+export interface DraftRun {
+  answers: DraftedAnswer[]
+  usedLlm: boolean
+  /** How many fields were answered outright from the library. */
+  libraryHits: number
+  llmError?: string
+}
+
+/**
+ * Resolves every field: approved answers from the library first, a draft for
+ * whatever is left. Answers come back in the order the fields were parsed.
+ */
 export async function draftAnswers(
   apiKey: string | undefined,
   gig: GigContext,
   formTitle: string | null,
   fields: ParsedField[],
   profile: ArtistProfile,
-): Promise<{ answers: DraftedAnswer[]; usedLlm: boolean; llmError?: string }> {
+  library: LibraryEntryLike[] = [],
+): Promise<DraftRun> {
+  const { resolved, pending, adapt, kinds } = applyLibrary(fields, library)
+
+  const withKinds = (answers: DraftedAnswer[]): DraftedAnswer[] =>
+    answers.map((a) => ({ ...a, questionKind: a.questionKind ?? kinds.get(a.fieldKey) ?? null }))
+
+  const collect = (drafted: DraftedAnswer[]): DraftedAnswer[] => {
+    const byKey = new Map(withKinds(drafted).map((a) => [a.fieldKey, a]))
+    return fields.map((f) => resolved.get(f.fieldKey) ?? byKey.get(f.fieldKey)!).filter(Boolean)
+  }
+
+  if (pending.length === 0) {
+    return {
+      answers: withKinds([...resolved.values()]),
+      usedLlm: false,
+      libraryHits: resolved.size,
+    }
+  }
+
   if (apiKey) {
     try {
-      return { answers: await llmAnswers(apiKey, gig, formTitle, fields, profile), usedLlm: true }
+      const drafted = await llmAnswers(apiKey, gig, formTitle, pending, profile, library, adapt)
+      return { answers: collect(drafted), usedLlm: true, libraryHits: resolved.size }
     } catch (err) {
       // A drafting failure shouldn't lose the parsed form — fall back so the
-      // boilerplate fields are still filled in and the rest is flagged.
+      // library answers and boilerplate fields still land, and the rest is flagged.
+      const fallback = heuristicAnswers(pending, profile).map((a) => {
+        const adapted = adapt.get(a.fieldKey)
+        const field = pending.find((f) => f.fieldKey === a.fieldKey)!
+        const kind = kinds.get(a.fieldKey)
+        return adapted
+          ? useUnadaptedEntry(field, adapted.entry, adapted.limit, kind ? kindByKey(kind) : undefined)
+          : a
+      })
       return {
-        answers: heuristicAnswers(fields, profile),
+        answers: collect(fallback),
         usedLlm: false,
+        libraryHits: resolved.size,
         llmError: err instanceof Error ? err.message : String(err),
       }
     }
   }
-  return { answers: heuristicAnswers(fields, profile), usedLlm: false }
+
+  const fallback = heuristicAnswers(pending, profile).map((a) => {
+    const adapted = adapt.get(a.fieldKey)
+    const field = pending.find((f) => f.fieldKey === a.fieldKey)!
+    const kind = kinds.get(a.fieldKey)
+    return adapted
+      ? useUnadaptedEntry(field, adapted.entry, adapted.limit, kind ? kindByKey(kind) : undefined)
+      : a
+  })
+  return { answers: collect(fallback), usedLlm: false, libraryHits: resolved.size }
 }

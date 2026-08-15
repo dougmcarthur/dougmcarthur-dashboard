@@ -46,6 +46,19 @@ describe('API route registration', () => {
     expect(body.emailConfigured).toBe(true)
   })
 
+  it('GET /api/answer-library is registered', async () => {
+    const res = await app.request('/api/answer-library', {}, {
+      DB: {
+        prepare() {
+          throw new Error('reached the answer-library router')
+        },
+      },
+    } as unknown as Record<string, unknown>)
+    expect(res.status).toBe(500)
+    const body = (await res.json()) as { error: string }
+    expect(body.error).toBe('reached the answer-library router')
+  })
+
   // Regression guard mirroring the /api/sync/reconcile bug: the application
   // routes are nested under a gig id, so the gig router's GET '/:id' must not
   // claim '/:id/application' first.
