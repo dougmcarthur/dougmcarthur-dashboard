@@ -4,7 +4,8 @@
 //   2. Read those forms and prepare answers — application forms are usually
 //      only published once submissions open, so this is the first moment the
 //      real questions exist.
-//   3. Email what's now ready to review, plus any deadline nudges that are due.
+//   3. Sweep the web for new opportunities (weekly, not daily).
+//   4. Send one digest covering everything the run produced.
 //
 // Because the phases run in that order within a single invocation, a window
 // that opens today is read and answered today, and the notification that goes
@@ -14,7 +15,8 @@ import { eq, and, inArray } from 'drizzle-orm'
 import { getDb, type DB } from './db'
 import { gigOpportunities, reminders, taskRuns } from './db/schema'
 import { prepareApplication } from './lib/applicationPrep'
-import { sendDueReminders } from './lib/notifications'
+import { sendDigest } from './lib/notifications'
+import { runDiscovery, discoveryDue, type DiscoveredItem } from './lib/discoveryRun'
 import {
   shouldPrepareNow,
   isPrepTerminal,
@@ -31,8 +33,8 @@ export interface ScheduledSummary {
   prepared: number
   prepFailed: number
   answersReady: number
-  remindersSent: number
-  remindersFailed: number
+  discovered: number
+  digestSent: boolean
   notes: string[]
 }
 
@@ -154,10 +156,11 @@ export async function runScheduledTasks(
     prepared: 0,
     prepFailed: 0,
     answersReady: 0,
-    remindersSent: 0,
-    remindersFailed: 0,
+    discovered: 0,
+    digestSent: false,
     notes: [],
   }
+  const discovered: DiscoveredItem[] = []
 
   // 1. Windows that have arrived
   try {
@@ -216,24 +219,45 @@ export async function runScheduledTasks(
     await logRun(env, 'applications.prepare', 'error', String(err))
   }
 
-  // 4. Send what's due — including the answers-ready emails just raised
+  // 4. Sweep for new opportunities — weekly, gated on the last successful run
   try {
-    const reminderResult = await sendDueReminders(env, db, todayStr)
-    summary.remindersSent = reminderResult.sent
-    summary.remindersFailed = reminderResult.failed
-    summary.notes.push(...reminderResult.notes)
-    if (reminderResult.sent + reminderResult.failed + reminderResult.skipped > 0) {
-      await logRun(
-        env,
-        'reminders.send',
-        reminderResult.failed > 0 ? 'error' : 'ok',
-        `sent ${reminderResult.sent}, failed ${reminderResult.failed}, skipped ${reminderResult.skipped}`,
-        reminderResult.sent,
+    for (const kind of ['gigs', 'sync'] as const) {
+      if (!(await discoveryDue(db, kind, todayStr))) continue
+      const outcome = await runDiscovery(env, kind)
+      if (outcome.error) {
+        summary.notes.push(`discovery (${kind}): ${outcome.error}`)
+        continue
+      }
+      discovered.push(...outcome.added)
+      summary.discovered += outcome.added.length
+      summary.notes.push(
+        `discovery (${kind}): ${outcome.added.length} added, ${outcome.rejected.length} filtered, ${outcome.searchCount} searches`,
       )
     }
   } catch (err) {
-    summary.notes.push(`reminders failed: ${err instanceof Error ? err.message : String(err)}`)
-    await logRun(env, 'reminders.send', 'error', String(err))
+    summary.notes.push(`discovery failed: ${err instanceof Error ? err.message : String(err)}`)
+    await logRun(env, 'discovery', 'error', String(err))
+  }
+
+  // 5. One digest covering everything above
+  try {
+    const digest = await sendDigest(env, db, discovered, todayStr)
+    summary.digestSent = digest.sent
+    summary.notes.push(...digest.notes)
+    if (digest.sent || digest.skipped > 0) {
+      await logRun(
+        env,
+        'digest.send',
+        'ok',
+        digest.sent
+          ? `digest sent covering ${digest.reminderIds.length} item(s) and ${discovered.length} new find(s)`
+          : `nothing sent, ${digest.skipped} item(s) left pending`,
+        digest.sent ? 1 : 0,
+      )
+    }
+  } catch (err) {
+    summary.notes.push(`digest failed: ${err instanceof Error ? err.message : String(err)}`)
+    await logRun(env, 'digest.send', 'error', String(err))
   }
 
   return summary

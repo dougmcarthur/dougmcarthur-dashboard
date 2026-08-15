@@ -140,11 +140,13 @@ that rather than losing the parsed form.
 1. Open the windows that have arrived, and queue their forms.
 2. Read up to 5 forms and prepare answers — gigs you haven't been told about yet
    go first, then by deadline. Failed fetches are retried the next day, 3 times.
-3. Raise the answers-ready email for anything that finished this run.
-4. Send every due reminder once, recording `sent_at` so it never repeats.
+3. Raise the answers-ready item for anything that finished this run.
+4. Sweep the web for new opportunities (weekly — see `docs/discovery.md`).
+5. Send one digest covering all of it, recording `sent_at` so nothing repeats.
 
 The order is what makes the "open → prepare → notify" chain complete inside a
-single run: a window that opens today is read, answered, and emailed today.
+single run: a window that opens today is read, answered, and emailed today —
+in the same digest as anything the discovery sweep turned up.
 
 Each phase writes a `task_runs` row, visible on the Log page. `POST /api/tasks/run`
 runs the same work on demand.
@@ -167,6 +169,7 @@ runs the same work on demand.
 | `POST /api/answer-library/seed` | Bootstrap from the reference docs |
 | `POST /api/answer-library/from-field` | File a prepared answer in the library (`overwrite` to replace) |
 | `POST /api/tasks/run` | Run the cron work on demand |
+| `POST /api/tasks/discover?kind=gigs\|sync` | Force a discovery sweep now |
 
 ## Configuration
 

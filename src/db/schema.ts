@@ -30,6 +30,8 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   prepUpdatedAt: text('prep_updated_at'),
   prepAttempts: integer('prep_attempts').default(0),
   answersNotifiedAt: text('answers_notified_at'),
+  discoveredBy: text('discovered_by').default('manual'), // manual | discovery
+  sourceNote: text('source_note'),
   formTitle: text('form_title'),
   discoveredAt: text('discovered_at').notNull(),
   updatedAt: text('updated_at').notNull(),
@@ -86,6 +88,9 @@ export const syncTargets = sqliteTable('sync_targets', {
   pitchDraft: text('pitch_draft'),
   pitchSent: text('pitch_sent'),
   status: text('status').default('draft_ready'),
+  url: text('url'),
+  discoveredBy: text('discovered_by').default('manual'),
+  sourceNote: text('source_note'),
   discoveredAt: text('discovered_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   reconciledAt: text('reconciled_at'),

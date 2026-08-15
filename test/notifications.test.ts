@@ -1,83 +1,104 @@
 import { describe, it, expect } from 'vitest'
-import { composeReminderEmail, type ReminderGig } from '../src/lib/notifications'
+import { buildDigest, type DigestGig } from '../src/lib/notifications'
 
 const TODAY = '2026-08-15'
 
-const gig: ReminderGig = {
+const gig: DigestGig = {
   id: 42,
   name: 'Sawdust City Music Festival 2027',
   type: 'festival',
   organizer: 'Sawdust City',
-  status: 'awaiting_window',
+  status: 'approved',
   deadline: '2026-10-15',
-  submissionOpensAt: '2026-09-01',
+  submissionOpensAt: '2026-08-15',
   applicationUrl: 'https://www.sawdustcitymusicfestival.com/apply',
   url: null,
   prepStatus: 'ready',
   prepError: null,
 }
 
-describe('composeReminderEmail', () => {
-  // One email per gig, once the window is open *and* the answers exist.
-  it('leads with the answers being ready, not just the window opening', () => {
-    const email = composeReminderEmail(
-      'answers_ready',
-      { ...gig, submissionOpensAt: TODAY },
-      { total: 12, needsInput: 2, approved: 0 },
-      'https://dashboard.dougmcarthur.net',
-      TODAY,
-    )
-    expect(email.subject).toBe('Ready to review (2 need you) — Sawdust City Music Festival 2027')
-    expect(email.body).toContain('opened today')
-    expect(email.body).toContain('12 fields, 10 drafted')
-    expect(email.body).toContain('2 that need you')
-    expect(email.body).toContain('https://dashboard.dougmcarthur.net/#gigs/42')
-    expect(email.body).toContain('https://www.sawdustcitymusicfestival.com/apply')
+const empty = { discovered: [], answersReady: [], needsAttention: [], deadlines: [] }
+
+describe('buildDigest', () => {
+  // The digest exists to pull you in when something changed. Silence otherwise.
+  it('sends nothing when nothing happened', () => {
+    expect(buildDigest({ ...empty, todayStr: TODAY })).toBeNull()
   })
 
-  it('says so plainly when nothing needs you', () => {
-    const email = composeReminderEmail(
-      'answers_ready',
-      gig,
-      { total: 8, needsInput: 0, approved: 0 },
-      undefined,
-      TODAY,
-    )
-    expect(email.subject).toBe('Answers ready — Sawdust City Music Festival 2027')
-    expect(email.body).toContain('8 fields, 8 drafted')
-    expect(email.body).not.toContain('need you')
+  it('leads with applications ready to review', () => {
+    const digest = buildDigest({
+      ...empty,
+      answersReady: [{ gig, prep: { total: 12, needsInput: 2, approved: 0 } }],
+      todayStr: TODAY,
+    })!
+    expect(digest.subject).toBe('Music HQ — 1 application ready')
+    expect(digest.body).toContain('READY TO REVIEW')
+    expect(digest.body).toContain('12 fields, 10 drafted, 2 need you')
+    expect(digest.body).toContain('/#gigs/42')
   })
 
-  it('still reports an open window when the form could not be read', () => {
-    const email = composeReminderEmail(
-      'answers_ready',
-      { ...gig, prepStatus: 'blocked', prepError: 'The form is behind a login.' },
-      { total: 0, needsInput: 0, approved: 0 },
-      undefined,
-      TODAY,
-    )
-    expect(email.subject).toContain('needs doing by hand')
-    expect(email.body).toContain('behind a login')
-    expect(email.body).toContain('opened on 2026-09-01')
+  it('lists new finds with their fit and a review link', () => {
+    const digest = buildDigest({
+      ...empty,
+      discovered: [
+        {
+          id: 7,
+          name: 'Northern Lights Festival',
+          kind: 'gigs',
+          detail: 'festival · opens 2026-11-01',
+          url: 'https://northernlights.ca',
+          fitScore: 4,
+        },
+      ],
+      todayStr: TODAY,
+    })!
+    expect(digest.subject).toBe('Music HQ — 1 new opportunity')
+    expect(digest.body).toContain('NEW OPPORTUNITIES')
+    expect(digest.body).toContain('Northern Lights Festival  (fit 4/5)')
+    expect(digest.body).toContain('opens 2026-11-01')
+    expect(digest.body).toContain('/#gigs/7')
   })
 
-  it('nudges before a deadline and reports how overdue it is', () => {
-    const soon = composeReminderEmail(
-      'pre_deadline',
-      { ...gig, status: 'approved', deadline: '2026-08-22' },
-      { total: 5, needsInput: 0, approved: 5 },
-      undefined,
-      TODAY,
-    )
-    expect(soon.subject).toBe('Deadline in 7 days — Sawdust City Music Festival 2027')
+  it('combines everything from one run into a single email', () => {
+    const digest = buildDigest({
+      discovered: [
+        { id: 7, name: 'Northern Lights', kind: 'gigs', detail: 'festival', url: 'https://nl.ca', fitScore: 4 },
+        { id: 8, name: 'Sync Co', kind: 'sync', detail: 'library', url: 'https://sync.co', fitScore: 3 },
+      ],
+      answersReady: [{ gig, prep: { total: 8, needsInput: 0, approved: 0 } }],
+      needsAttention: [
+        { ...gig, id: 43, name: 'Locked Fest', prepStatus: 'blocked', prepError: 'The form is behind a login.' },
+      ],
+      deadlines: [{ gig: { ...gig, id: 44, name: 'Closing Soon', deadline: '2026-08-22' }, days: 7 }],
+      todayStr: TODAY,
+    })!
 
-    const late = composeReminderEmail(
-      'pre_deadline',
-      { ...gig, status: 'approved', deadline: '2026-08-10' },
-      { total: 5, needsInput: 0, approved: 5 },
-      undefined,
-      TODAY,
-    )
-    expect(late.subject).toContain('Deadline passed 5 days ago')
+    expect(digest.subject).toBe('Music HQ — 1 application ready, 2 new opportunities, 1 deadline')
+    for (const section of ['READY TO REVIEW', 'NEW OPPORTUNITIES', 'NEEDS DOING BY HAND', 'DEADLINES']) {
+      expect(digest.body).toContain(section)
+    }
+    expect(digest.body).toContain('behind a login')
+    expect(digest.body).toContain('due in 7 days')
+  })
+
+  it('reports an overdue deadline as overdue', () => {
+    const digest = buildDigest({
+      ...empty,
+      deadlines: [{ gig: { ...gig, deadline: '2026-08-10' }, days: -5 }],
+      todayStr: TODAY,
+    })!
+    expect(digest.body).toContain('due 5 days ago')
+  })
+
+  it('does not leave sync finds pointing at a gig page', () => {
+    const digest = buildDigest({
+      ...empty,
+      discovered: [
+        { id: 8, name: 'Sync Co', kind: 'sync', detail: 'library', url: 'https://sync.co', fitScore: 5 },
+      ],
+      todayStr: TODAY,
+    })!
+    expect(digest.body).not.toContain('#gigs/8')
+    expect(digest.body).toContain('https://sync.co')
   })
 })

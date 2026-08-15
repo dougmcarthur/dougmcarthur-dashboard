@@ -1,20 +1,24 @@
-// Composes and sends the reminder emails: window opening soon, window open
-// today, and the pre-deadline nudge. Composition is pure so the wording can be
-// tested and previewed without sending anything.
+// One email a day, or none at all.
+//
+// Everything the run produced — new finds, answers ready to review, forms that
+// need doing by hand, deadlines coming up — goes into a single digest. If
+// nothing happened, nothing is sent: an email that says "no news" trains you to
+// ignore the ones that don't.
 
 import { eq, and, lte, inArray } from 'drizzle-orm'
 import type { DB } from '../db'
 import { reminders, gigOpportunities, applicationFields } from '../db/schema'
 import { sendEmail, gmailSendConfigured } from './gmail'
 import { daysBetween, today } from './submissionWindow'
+import type { DiscoveredItem } from './discoveryRun'
 import type { Env } from '../types'
 
 export const DEFAULT_DASHBOARD_URL = 'https://dashboard.dougmcarthur.net'
 
-export interface ReminderGig {
+export interface DigestGig {
   id: number
   name: string
-  type: string
+  type?: string | null
   organizer?: string | null
   status?: string | null
   deadline?: string | null
@@ -31,148 +35,166 @@ export interface PrepSummary {
   approved: number
 }
 
+export interface DigestInput {
+  discovered: DiscoveredItem[]
+  answersReady: Array<{ gig: DigestGig; prep: PrepSummary }>
+  needsAttention: DigestGig[]
+  deadlines: Array<{ gig: DigestGig; days: number | null }>
+  dashboardUrl?: string
+  todayStr?: string
+}
+
 export interface ComposedEmail {
   subject: string
   body: string
 }
 
-function prepLine(gig: ReminderGig, prep: PrepSummary): string {
-  switch (gig.prepStatus) {
-    case 'ready': {
-      const ready = prep.total - prep.needsInput
-      const parts = [`${prep.total} fields drafted`, `${ready} ready to review`]
-      if (prep.needsInput > 0) parts.push(`${prep.needsInput} still need you`)
-      if (prep.approved > 0) parts.push(`${prep.approved} already approved`)
-      return `Your answers are prepared — ${parts.join(', ')}.`
-    }
-    case 'blocked':
-      return `Answers aren't prepared: ${gig.prepError ?? 'the form could not be read automatically.'}`
-    case 'failed':
-      return `Prep failed last time: ${gig.prepError ?? 'unknown error'}. You can re-run it from the dashboard.`
-    case 'queued':
-      return 'Answers are queued to be prepared and should be ready shortly.'
-    default:
-      return 'No answers have been prepared for this one yet.'
-  }
+function gigLink(dashboardUrl: string, id: number): string {
+  return `${dashboardUrl.replace(/\/$/, '')}/#gigs/${id}`
 }
 
-export function composeReminderEmail(
-  reminderType: string,
-  gig: ReminderGig,
-  prep: PrepSummary,
-  dashboardUrl: string = DEFAULT_DASHBOARD_URL,
-  todayStr: string = today(),
-): ComposedEmail {
-  const link = `${dashboardUrl.replace(/\/$/, '')}/#gigs/${gig.id}`
-  const formLink = gig.applicationUrl || gig.url
-  const tail = [
-    '',
-    `Review and edit the answers: ${link}`,
-    formLink ? `Application form: ${formLink}` : '',
-    '',
-    '— Music HQ',
-  ]
-    .filter((l) => l !== null)
-    .join('\n')
+function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`
+}
 
-  // The email that matters: submissions are open AND the answers exist.
-  if (reminderType === 'answers_ready') {
-    const opened = gig.submissionOpensAt
-      ? `Submissions for ${gig.name} opened ${gig.submissionOpensAt === todayStr ? 'today' : `on ${gig.submissionOpensAt}`}.`
-      : `${gig.name} is open for submissions.`
+/**
+ * Builds the digest, or returns null when there's nothing worth your attention.
+ * The subject leads with the thing most likely to make you open it.
+ */
+export function buildDigest(input: DigestInput): ComposedEmail | null {
+  const {
+    discovered,
+    answersReady,
+    needsAttention,
+    deadlines,
+    dashboardUrl = DEFAULT_DASHBOARD_URL,
+    todayStr = today(),
+  } = input
 
-    if (gig.prepStatus === 'ready' && prep.total > 0) {
-      const ready = prep.total - prep.needsInput
-      return {
-        subject:
-          prep.needsInput > 0
-            ? `Ready to review (${prep.needsInput} need you) — ${gig.name}`
-            : `Answers ready — ${gig.name}`,
-        body: [
-          opened,
-          '',
-          `I read the form and prepared your answers: ${prep.total} fields, ${ready} drafted${
-            prep.needsInput > 0
-              ? `, ${prep.needsInput} that need you (uploads, fees, dates — things the reference docs can't answer)`
-              : ''
-          }.`,
-          '',
-          'Review and edit them, then it’s a paste-and-send job.',
-          gig.deadline ? `\nDeadline: ${gig.deadline}.` : '',
-          tail,
-        ].join('\n'),
-      }
-    }
+  if (
+    discovered.length === 0 &&
+    answersReady.length === 0 &&
+    needsAttention.length === 0 &&
+    deadlines.length === 0
+  ) {
+    return null
+  }
 
-    // Open, but the form couldn't be read — still worth telling you, with why.
-    return {
-      subject: `Submissions open — ${gig.name} (needs doing by hand)`,
-      body: [
-        opened,
+  const headline: string[] = []
+  if (answersReady.length) headline.push(`${plural(answersReady.length, 'application')} ready`)
+  if (discovered.length) headline.push(`${plural(discovered.length, 'new opportunity', 'new opportunities')}`)
+  if (deadlines.length) headline.push(`${plural(deadlines.length, 'deadline')}`)
+  if (!headline.length && needsAttention.length) {
+    headline.push(`${plural(needsAttention.length, 'application')} needs you`)
+  }
+
+  const sections: string[] = []
+
+  // Ready to review first — it's the actionable one.
+  if (answersReady.length) {
+    sections.push('READY TO REVIEW')
+    for (const { gig, prep } of answersReady) {
+      const drafted = prep.total - prep.needsInput
+      sections.push(
+        `• ${gig.name}`,
+        `  Submissions are open and the form is answered: ${prep.total} fields, ${drafted} drafted${
+          prep.needsInput > 0 ? `, ${prep.needsInput} need you` : ''
+        }.`,
+        gig.deadline ? `  Deadline ${gig.deadline}.` : '',
+        `  ${gigLink(dashboardUrl, gig.id)}`,
         '',
-        prepLine(gig, prep),
-        '',
-        'Add the questions in the dashboard and the answers will be drafted the same way, or fill the form in directly.',
-        gig.deadline ? `\nDeadline: ${gig.deadline}.` : '',
-        tail,
-      ].join('\n'),
+      )
     }
   }
 
-  // pre_deadline
-  const days = gig.deadline ? daysBetween(todayStr, gig.deadline) : null
-  const when =
-    days === null
-      ? 'soon'
-      : days < 0
-        ? `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago`
-        : days === 0
-          ? 'today'
-          : `in ${days} day${days === 1 ? '' : 's'}`
-
-  return {
-    subject:
-      days !== null && days < 0
-        ? `Deadline passed ${when} — ${gig.name}`
-        : `Deadline ${when} — ${gig.name}`,
-    body: [
-      `${gig.name}${gig.organizer ? ` (${gig.organizer})` : ''} is due ${when}${gig.deadline ? ` — ${gig.deadline}` : ''}, and it's still marked ${(gig.status ?? 'approved').replace(/_/g, ' ')}.`,
+  if (discovered.length) {
+    sections.push('NEW OPPORTUNITIES')
+    for (const item of discovered) {
+      sections.push(
+        `• ${item.name}  (fit ${item.fitScore}/5)`,
+        item.detail ? `  ${item.detail}` : '',
+        `  ${item.url}`,
+        item.kind === 'gigs' ? `  Review: ${gigLink(dashboardUrl, item.id)}` : '',
+        '',
+      )
+    }
+    sections.push(
+      'These are waiting in the review queue — approve the ones worth doing and their answers get prepared when the window opens.',
       '',
-      prepLine(gig, prep),
-      tail,
-    ].join('\n'),
+    )
   }
+
+  if (needsAttention.length) {
+    sections.push('NEEDS DOING BY HAND')
+    for (const gig of needsAttention) {
+      sections.push(
+        `• ${gig.name}`,
+        `  ${gig.prepError ?? 'The form could not be read automatically.'}`,
+        `  ${gigLink(dashboardUrl, gig.id)}`,
+        '',
+      )
+    }
+  }
+
+  if (deadlines.length) {
+    sections.push('DEADLINES')
+    for (const { gig, days } of deadlines) {
+      const when =
+        days === null
+          ? 'soon'
+          : days < 0
+            ? `${plural(Math.abs(days), 'day')} ago`
+            : days === 0
+              ? 'today'
+              : `in ${plural(days, 'day')}`
+      sections.push(
+        `• ${gig.name} — due ${when}${gig.deadline ? ` (${gig.deadline})` : ''}, still ${(gig.status ?? 'approved').replace(/_/g, ' ')}`,
+        `  ${gigLink(dashboardUrl, gig.id)}`,
+        '',
+      )
+    }
+  }
+
+  const body = [
+    `Music HQ — ${todayStr}`,
+    '',
+    ...sections,
+    '—',
+    dashboardUrl,
+  ]
+    .filter((line) => line !== null)
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+
+  return { subject: `Music HQ — ${headline.join(', ')}`, body }
 }
 
-export interface ReminderRunResult {
-  sent: number
-  failed: number
+export interface DigestResult {
+  sent: boolean
+  reminderIds: number[]
   skipped: number
   notes: string[]
 }
 
-/** Sends every pending reminder whose date has arrived, once. */
-export async function sendDueReminders(
+/**
+ * Collects everything due, sends one email, and marks the reminders it covered
+ * as sent. A reminder whose gig has moved on (submitted, rejected, archived) is
+ * dismissed rather than reported.
+ */
+export async function sendDigest(
   env: Env,
   db: DB,
+  discovered: DiscoveredItem[] = [],
   todayStr: string = today(),
-): Promise<ReminderRunResult> {
-  const result: ReminderRunResult = { sent: 0, failed: 0, skipped: 0, notes: [] }
+): Promise<DigestResult> {
+  const result: DigestResult = { sent: false, reminderIds: [], skipped: 0, notes: [] }
 
   const due = await db
     .select()
     .from(reminders)
     .where(and(eq(reminders.status, 'pending'), lte(reminders.scheduledFor, todayStr)))
     .orderBy(reminders.scheduledFor)
-    .limit(25)
-
-  if (due.length === 0) return result
-
-  if (!gmailSendConfigured(env)) {
-    result.skipped = due.length
-    result.notes.push('Gmail send not configured — reminders left pending')
-    return result
-  }
+    .limit(50)
 
   const gigIds = Array.from(
     new Set(due.filter((r) => r.entityType === 'gig').map((r) => r.entityId)),
@@ -185,7 +207,6 @@ export async function sendDueReminders(
   const fields = gigIds.length
     ? await db.select().from(applicationFields).where(inArray(applicationFields.gigId, gigIds))
     : []
-
   const prepByGig = new Map<number, PrepSummary>()
   for (const f of fields) {
     const summary = prepByGig.get(f.gigId) ?? { total: 0, needsInput: 0, approved: 0 }
@@ -195,51 +216,79 @@ export async function sendDueReminders(
     prepByGig.set(f.gigId, summary)
   }
 
-  const dashboardUrl = DEFAULT_DASHBOARD_URL
+  const answersReady: DigestInput['answersReady'] = []
+  const needsAttention: DigestGig[] = []
+  const deadlines: DigestInput['deadlines'] = []
+  const covered: number[] = []
+  const stale: number[] = []
 
   for (const reminder of due) {
     const gig = gigById.get(reminder.entityId)
 
-    // A gig that's been submitted, rejected, or archived doesn't need chasing.
+    // Moved on — nothing to chase.
     if (
       reminder.entityType === 'gig' &&
       (!gig || ['submitted', 'rejected', 'archived'].includes(gig.status ?? ''))
     ) {
-      await db
-        .update(reminders)
-        .set({ status: 'dismissed' })
-        .where(eq(reminders.id, reminder.id))
-      result.skipped += 1
+      stale.push(reminder.id)
       continue
     }
 
     const prep = prepByGig.get(reminder.entityId) ?? { total: 0, needsInput: 0, approved: 0 }
-    const email = composeReminderEmail(
-      reminder.reminderType,
-      gig as ReminderGig,
-      prep,
-      dashboardUrl,
-      todayStr,
-    )
 
-    try {
-      await sendEmail(env, { to: env.NOTIFY_EMAIL!, ...email })
+    if (reminder.reminderType === 'answers_ready') {
+      if (gig!.prepStatus === 'ready' && prep.total > 0) {
+        answersReady.push({ gig: gig as DigestGig, prep })
+      } else {
+        needsAttention.push(gig as DigestGig)
+      }
+    } else {
+      deadlines.push({
+        gig: gig as DigestGig,
+        days: gig!.deadline ? daysBetween(todayStr, gig!.deadline) : null,
+      })
+    }
+    covered.push(reminder.id)
+  }
+
+  if (stale.length) {
+    await db
+      .update(reminders)
+      .set({ status: 'dismissed' })
+      .where(inArray(reminders.id, stale))
+    result.skipped += stale.length
+  }
+
+  const digest = buildDigest({ discovered, answersReady, needsAttention, deadlines, todayStr })
+  if (!digest) return result
+
+  if (!gmailSendConfigured(env)) {
+    result.notes.push('Gmail send not configured — digest not sent, items left pending')
+    result.skipped += covered.length
+    return result
+  }
+
+  try {
+    await sendEmail(env, { to: env.NOTIFY_EMAIL!, ...digest })
+    if (covered.length) {
       await db
         .update(reminders)
         .set({
           status: 'sent',
           sentAt: new Date().toISOString(),
-          subject: email.subject,
-          body: email.body,
+          subject: digest.subject,
+          body: digest.body,
           error: null,
         })
-        .where(eq(reminders.id, reminder.id))
-      result.sent += 1
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      await db.update(reminders).set({ error: message }).where(eq(reminders.id, reminder.id))
-      result.failed += 1
-      result.notes.push(`${gig?.name ?? reminder.entityId}: ${message}`)
+        .where(inArray(reminders.id, covered))
+    }
+    result.sent = true
+    result.reminderIds = covered
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    result.notes.push(`digest send failed: ${message}`)
+    if (covered.length) {
+      await db.update(reminders).set({ error: message }).where(inArray(reminders.id, covered))
     }
   }
 

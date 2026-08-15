@@ -239,9 +239,17 @@ export interface ScheduledSummary {
   prepared: number
   prepFailed: number
   answersReady: number
-  remindersSent: number
-  remindersFailed: number
+  discovered: number
+  digestSent: boolean
   notes: string[]
+}
+
+export interface DiscoveryOutcome {
+  kind: 'gigs' | 'sync'
+  added: Array<{ id: number; name: string; kind: string; detail: string; url: string; fitScore: number }>
+  rejected: Array<{ name: string; reason: string }>
+  searchCount: number
+  error?: string
 }
 
 export interface ReferenceDoc {
@@ -348,6 +356,8 @@ export const api = {
   },
   tasks: {
     run: () => apiFetch<ScheduledSummary>('/tasks/run', { method: 'POST' }),
+    discover: (kind: 'gigs' | 'sync' = 'gigs') =>
+      apiFetch<DiscoveryOutcome>(`/tasks/discover?kind=${kind}`, { method: 'POST' }),
   },
   sync: {
     list: (params?: Record<string, string>) => {

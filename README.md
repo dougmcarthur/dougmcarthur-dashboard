@@ -23,8 +23,10 @@ same Worker. The live site sits behind Cloudflare Access.
   degrade gracefully when their secrets aren't set — see `GET /api/health` to
   check what's configured.
 - **Cron** — a daily Worker cron (13:00 UTC) opens submission windows that have
-  arrived, reads and answers their application forms, and emails what's ready.
-  See `docs/application-prep.md`.
+  arrived, reads and answers their application forms, sweeps the web for new
+  opportunities (weekly), and sends one digest email covering the lot. Nothing
+  depends on a local machine. See `docs/application-prep.md` and
+  `docs/discovery.md`.
 
 ## Submission windows & application prep
 
@@ -52,16 +54,18 @@ src/
   index.ts            Worker entry — mounts all API routes, falls through to ASSETS
   types.ts            Env bindings (DB, ASSETS, Google/Gmail secrets)
   db/                 Drizzle client + schema
-  scheduled.ts        Daily cron work (open windows, prep applications, send reminders)
+  scheduled.ts        Daily cron work (open windows, prep applications, discover, digest)
   routes/             One Hono router per resource (gigs, sync, promo, applications, …)
   lib/                googleCalendar.ts, gmail.ts (OAuth helpers),
                       submissionWindow.ts (window/reminder logic), formParser.ts
                       (form → fields), answerEngine.ts (fields → drafted answers),
-                      applicationPrep.ts (orchestration), notifications.ts (emails)
+                      applicationPrep.ts (orchestration), discovery.ts +
+                      discoveryRun.ts (web sweep for new opportunities),
+                      notifications.ts (the daily digest)
 frontend/             React + Vite app (its own tsconfig.frontend.json)
 migrations/           D1 migrations (applied via wrangler)
 scripts/              One-off maintenance scripts (e.g. column backfill)
-docs/                 Google Calendar & Gmail setup guides
+docs/                 Setup guides, application prep, and discovery
 schema.sql            Snapshot of the original production schema (pre-migrations)
 ```
 
@@ -77,13 +81,14 @@ All routes are under `/api`; anything else falls through to static assets.
 | `/api/application-fields/:id` | Edit or approve one prepared answer; `POST /approve-all` for a whole gig |
 | `/api/answer-library` | Reusable approved answers (CRUD). `POST /seed` bootstraps from the reference docs; `POST /from-field` files a prepared answer |
 | `POST /api/tasks/run` | Run the daily cron work on demand |
+| `POST /api/tasks/discover` | Force a discovery sweep (`?kind=gigs\|sync`) |
 | `/api/sync` | Sync-licensing targets (CRUD) |
 | `/api/sync/reconcile` | `GET` preview of sent-pitch matches from Gmail; `POST /apply` to write status/pitch updates |
 | `/api/promo` | Monthly promo drafts (CRUD) |
 | `/api/reference-docs` | Reference documents (CRUD) |
 | `/api/reminders` | List/patch reminders; `POST /dismiss` to clear an entity's pending reminders |
 | `/api/task-runs` | Log + list automated task runs |
-| `/api/health` | Which Google/Gmail secrets are configured |
+| `/api/health` | Which Google/Gmail/Anthropic secrets are configured |
 
 > Route order matters: `/api/sync/reconcile` is registered **before**
 > `/api/sync`, and the application router **before** `/api/gigs`, so the `/:id`
