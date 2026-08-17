@@ -16,7 +16,8 @@ same Worker. The live site sits behind Cloudflare Access.
   `src/db/schema.ts`; migrations in `migrations/`.
 - **Frontend** — React 19 + Vite, TanStack Query & Table, Tailwind. Hash-based
   routing (`frontend/src/`). Built to `dist/` and served via the Worker's
-  `ASSETS` binding.
+  `ASSETS` binding. Screens: Overview, **Review**, Gigs, Sync, Promo, Log,
+  Settings.
 - **Integrations** — Google Calendar (gig deadlines synced on approval) and
   Gmail (`readonly`, used to reconcile sent pitches against sync targets).
   Both degrade gracefully when their secrets aren't set — see
@@ -34,7 +35,7 @@ src/
 frontend/             React + Vite app (its own tsconfig.frontend.json)
 migrations/           D1 migrations (applied via wrangler)
 scripts/              One-off maintenance scripts (e.g. column backfill)
-docs/                 Google Calendar & Gmail setup guides
+docs/                 Setup guides + the notes-field audit
 schema.sql            Snapshot of the original production schema (pre-migrations)
 ```
 
@@ -57,6 +58,30 @@ All routes are under `/api`; anything else falls through to static assets.
 > Route order matters: `/api/sync/reconcile` is registered **before**
 > `/api/sync` in `src/index.ts`, so the sync router's `/:id` handler doesn't
 > swallow it. Keep it that way when adding sub-routes.
+
+## The Review screen
+
+`#review` is the triage queue: one prioritised list of everything waiting on a
+decision, with the full context for the selected item beside it. It adds no
+API routes — it reads `/api/gigs`, `/api/sync` and `/api/promo` and does the
+work client-side.
+
+Two things about it are worth knowing before changing it:
+
+- **It does not build its queue from `status`.** No production row carries
+  `pending_review` / `draft_ready` / `draft`, so a status-driven queue would
+  be empty. What actually records "waiting on Doug" is prose in the note
+  columns, so `frontend/src/lib/reviewQueue.ts` combines the parsed note with
+  the workflow status — and surfaces the cases where the two contradict each
+  other as the highest-priority flag.
+- **`frontend/src/lib/reviewParse.ts` is a stopgap.** It pulls entry-fee
+  warnings, drafted application values, outreach copy, requirements, deal
+  terms, blockers and window dates back out of `gig_opportunities.fit_notes`
+  and `sync_targets.notes` at read time, because the structured columns added
+  in migration 0001 were never backfilled (all NULL in production). Read
+  [`docs/notes-field-audit.md`](docs/notes-field-audit.md) for the inventory,
+  the proposed columns, and the data-integrity issues found along the way; the
+  parser should be deleted once the backfill lands.
 
 ## Local development
 

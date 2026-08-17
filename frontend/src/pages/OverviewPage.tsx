@@ -182,7 +182,12 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
       {/* Needs review */}
       {totalPending > 0 && (
         <div>
-          <SectionHeader title="Needs review" count={totalPending} />
+          <div className="flex items-center justify-between mb-3">
+            <SectionHeader title="Needs review" count={totalPending} />
+            <button onClick={() => onNav('review')} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              Open review queue →
+            </button>
+          </div>
           <div className="space-y-2">
             {pendingReview.gigs.map((g) => (
               <div key={g.id} className="flex items-center justify-between bg-white border border-yellow-200 rounded-lg px-4 py-3">
@@ -207,7 +212,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
                   >
                     Reject
                   </button>
-                  <button onClick={() => onNav('gigs')} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                  <button onClick={() => onNav('review')} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                     Details →
                   </button>
                 </div>
@@ -216,7 +221,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
             {pendingReview.sync.map((s) => (
               <div
                 key={s.id}
-                onClick={() => onNav('sync')}
+                onClick={() => onNav('review')}
                 className="flex items-center justify-between bg-white border border-purple-200 rounded-lg px-4 py-3 cursor-pointer hover:border-purple-300 transition-colors"
               >
                 <div>
