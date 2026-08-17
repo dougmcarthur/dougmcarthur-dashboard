@@ -51,19 +51,19 @@ function daysUntil(date: string): number {
 const col = createColumnHelper<GigOpportunity>()
 
 const TYPE_COLORS: Record<string, string> = {
-  festival: 'bg-violet-50 text-violet-700',
-  showcase: 'bg-sky-50 text-sky-700',
-  competition: 'bg-amber-50 text-amber-700',
-  residency: 'bg-teal-50 text-teal-700',
-  venue: 'bg-orange-50 text-orange-700',
-  conference: 'bg-rose-50 text-rose-700',
+  festival: 'bg-library-soft text-library',
+  showcase: 'bg-submitted-soft text-submitted',
+  competition: 'bg-pending-soft text-pending',
+  residency: 'bg-ready-soft text-ready',
+  venue: 'bg-pending-soft text-pending',
+  conference: 'bg-danger-soft text-danger',
 }
 
-const INPUT = 'w-full text-sm border border-gray-300 rounded-md px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition'
-const FILTER_INPUT = 'text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition'
+const INPUT = 'w-full text-sm border border-line-strong rounded-md px-2.5 py-1.5 bg-surface focus:outline-none focus:border-brand transition'
+const FILTER_INPUT = 'text-sm border border-line-strong rounded-md px-3 py-1.5 bg-surface focus:outline-none focus:border-brand transition'
 
 function TypeChip({ type }: { type: string }) {
-  const color = TYPE_COLORS[type.toLowerCase()] ?? 'bg-gray-100 text-gray-600'
+  const color = TYPE_COLORS[type.toLowerCase()] ?? 'bg-surface-muted text-ink-muted'
   return (
     <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium capitalize ${color}`}>
       {type}
@@ -72,11 +72,11 @@ function TypeChip({ type }: { type: string }) {
 }
 
 function FitScore({ score }: { score: number | null }) {
-  if (!score) return <span className="text-gray-300">—</span>
+  if (!score) return <span className="text-ink-subtle">—</span>
   return (
     <span className="flex gap-0.5 items-center">
       {[1, 2, 3, 4, 5].map((i) => (
-        <span key={i} className={`w-2 h-2 rounded-full ${i <= score ? 'bg-green-500' : 'bg-gray-200'}`} />
+        <span key={i} className={`w-2 h-2 rounded-full ${i <= score ? 'bg-ready' : 'bg-surface-muted'}`} />
       ))}
     </span>
   )
@@ -139,47 +139,47 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
   })
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5 space-y-4">
-      <h2 className="text-sm font-semibold text-gray-900">New Gig Opportunity</h2>
+    <div className="bg-surface border border-line rounded-lg p-5 space-y-4">
+      <h2 className="text-sm font-semibold text-ink">New Gig Opportunity</h2>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2 grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Name *</label>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Name *</label>
             <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="SXSW 2027" className={INPUT} autoFocus />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Type *</label>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Type *</label>
             <input value={draft.type} onChange={(e) => set('type', e.target.value)} placeholder="festival, showcase, venue…" className={INPUT} />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Organizer</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Organizer</label>
           <input value={draft.organizer} onChange={(e) => set('organizer', e.target.value)} placeholder="SXSW LLC" className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Deadline</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Deadline</label>
           <input type="date" value={draft.deadline} onChange={(e) => set('deadline', e.target.value)} className={INPUT} />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Submissions open</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Submissions open</label>
           <input type="date" value={draft.submissionOpensAt} onChange={(e) => set('submissionOpensAt', e.target.value)} className={INPUT} />
-          <p className="text-[11px] text-gray-400 mt-1">Leave blank if the window is already open.</p>
+          <p className="text-[11px] text-ink-subtle mt-1">Leave blank if the window is already open.</p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Submissions close</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Submissions close</label>
           <input type="date" value={draft.submissionClosesAt} onChange={(e) => set('submissionClosesAt', e.target.value)} className={INPUT} />
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Application form URL</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Application form URL</label>
           <input type="url" value={draft.applicationUrl} onChange={(e) => set('applicationUrl', e.target.value)} placeholder="Direct link to the form (if different from the main URL)" className={INPUT} />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Fee amount</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Fee amount</label>
           <div className="flex gap-1.5">
             <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={`${INPUT} w-20 shrink-0`}>
               {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
@@ -188,7 +188,7 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Submit via</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Submit via</label>
           <select value={draft.submissionMethod} onChange={(e) => set('submissionMethod', e.target.value)} className={INPUT}>
             <option value="">—</option>
             {SUBMISSION_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -196,11 +196,11 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Audience size</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Audience size</label>
           <input type="number" min="0" value={draft.audienceSize} onChange={(e) => set('audienceSize', e.target.value)} placeholder="500" className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Fit score (1–5)</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Fit score (1–5)</label>
           <select value={draft.genreFitScore} onChange={(e) => set('genreFitScore', e.target.value)} className={INPUT}>
             <option value="">—</option>
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
@@ -208,16 +208,16 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Why it fits</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Why it fits</label>
           <textarea rows={3} value={draft.fitRationale} onChange={(e) => set('fitRationale', e.target.value)} placeholder="Describe the fit…" className={`${INPUT} resize-none`} />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">URL</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">URL</label>
           <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} placeholder="https://…" className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Status</label>
           <select value={draft.status} onChange={(e) => set('status', e.target.value as GigStatus)} className={INPUT}>
             {GIG_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
@@ -225,12 +225,12 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
       </div>
 
       <div className="flex gap-6">
-        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-          <input type="checkbox" checked={draft.paid} onChange={(e) => set('paid', e.target.checked)} className="rounded border-gray-300" />
+        <label className="flex items-center gap-2 text-sm text-ink-muted cursor-pointer">
+          <input type="checkbox" checked={draft.paid} onChange={(e) => set('paid', e.target.checked)} className="rounded border-line-strong" />
           Paid gig
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-          <input type="checkbox" checked={draft.loginRequired} onChange={(e) => set('loginRequired', e.target.checked)} className="rounded border-gray-300" />
+        <label className="flex items-center gap-2 text-sm text-ink-muted cursor-pointer">
+          <input type="checkbox" checked={draft.loginRequired} onChange={(e) => set('loginRequired', e.target.checked)} className="rounded border-line-strong" />
           Application is behind a login
         </label>
       </div>
@@ -239,11 +239,11 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
         <button
           onClick={() => createMutation.mutate()}
           disabled={!draft.name || !draft.type || createMutation.isPending}
-          className="text-sm px-4 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+          className="text-sm px-4 py-1.5 rounded-md bg-ink text-on-accent hover:opacity-90 disabled:opacity-40 transition-colors"
         >
           {createMutation.isPending ? 'Adding…' : 'Add gig'}
         </button>
-        <button onClick={onDone} className="text-sm px-4 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={onDone} className="text-sm px-4 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted transition-colors">
           Cancel
         </button>
       </div>
@@ -312,23 +312,23 @@ function EditGigPanel({
     <div className="space-y-4 max-w-3xl">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Name</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Name</label>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Type</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Type</label>
           <input value={draft.type} onChange={(e) => set('type', e.target.value)} className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Organizer</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Organizer</label>
           <input value={draft.organizer} onChange={(e) => set('organizer', e.target.value)} className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Deadline</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Deadline</label>
           <input type="date" value={draft.deadline} onChange={(e) => set('deadline', e.target.value)} className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Fee</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Fee</label>
           <div className="flex gap-1.5">
             <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={`${INPUT} w-20 shrink-0`}>
               {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
@@ -337,67 +337,67 @@ function EditGigPanel({
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Submit via</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Submit via</label>
           <select value={draft.submissionMethod} onChange={(e) => set('submissionMethod', e.target.value)} className={INPUT}>
             <option value="">—</option>
             {SUBMISSION_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Audience size</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Audience size</label>
           <input type="number" min="0" value={draft.audienceSize} onChange={(e) => set('audienceSize', e.target.value)} className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Fit score (1–5)</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Fit score (1–5)</label>
           <select value={draft.genreFitScore} onChange={(e) => set('genreFitScore', e.target.value)} className={INPUT}>
             <option value="">—</option>
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-400 mb-1">Why it fits</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Why it fits</label>
           <textarea rows={3} value={draft.fitRationale} onChange={(e) => set('fitRationale', e.target.value)} className={`${INPUT} resize-none`} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-400 mb-1">URL</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">URL</label>
           <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} className={INPUT} />
         </div>
 
-        <div className="col-span-2 pt-1 border-t border-gray-200">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-2 mb-2">Submission window</p>
+        <div className="col-span-2 pt-1 border-t border-line">
+          <p className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mt-2 mb-2">Submission window</p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Opens</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Opens</label>
           <input type="date" value={draft.submissionOpensAt} onChange={(e) => set('submissionOpensAt', e.target.value)} className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Closes</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Closes</label>
           <input type="date" value={draft.submissionClosesAt} onChange={(e) => set('submissionClosesAt', e.target.value)} className={INPUT} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-400 mb-1">Application form URL</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Application form URL</label>
           <input type="url" value={draft.applicationUrl} onChange={(e) => set('applicationUrl', e.target.value)} placeholder="Direct link to the form" className={INPUT} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-400 mb-1">Window note</label>
+          <label className="block text-xs font-medium text-ink-subtle mb-1">Window note</label>
           <input value={draft.windowNote} onChange={(e) => set('windowNote', e.target.value)} placeholder="e.g. early bird until Aug 1, applications usually open in March" className={INPUT} />
         </div>
       </div>
       <div className="flex gap-6">
-        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-          <input type="checkbox" checked={draft.paid} onChange={(e) => set('paid', e.target.checked)} className="rounded border-gray-300" />
+        <label className="flex items-center gap-2 text-sm text-ink-muted cursor-pointer">
+          <input type="checkbox" checked={draft.paid} onChange={(e) => set('paid', e.target.checked)} className="rounded border-line-strong" />
           Paid gig
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-          <input type="checkbox" checked={draft.loginRequired} onChange={(e) => set('loginRequired', e.target.checked)} className="rounded border-gray-300" />
+        <label className="flex items-center gap-2 text-sm text-ink-muted cursor-pointer">
+          <input type="checkbox" checked={draft.loginRequired} onChange={(e) => set('loginRequired', e.target.checked)} className="rounded border-line-strong" />
           Behind a login
         </label>
       </div>
       <div className="flex gap-2 pt-1">
-        <button onClick={handleSave} disabled={isSaving} className="text-xs px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition-colors">
+        <button onClick={handleSave} disabled={isSaving} className="text-xs px-3 py-1.5 rounded-md bg-ink text-on-accent hover:opacity-90 disabled:opacity-40 transition-colors">
           {isSaving ? 'Saving…' : 'Save'}
         </button>
-        <button onClick={onCancel} className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={onCancel} className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted transition-colors">
           Cancel
         </button>
       </div>
@@ -412,21 +412,21 @@ function WindowChip({ gig }: { gig: GigOpportunity }) {
   if (state === 'upcoming') {
     const days = daysUntil(gig.submissionOpensAt!)
     return (
-      <span className="bg-white px-2.5 py-1 rounded-md border border-indigo-200 text-indigo-700">
+      <span className="bg-surface px-2.5 py-1 rounded-md border border-scheduled text-scheduled">
         ⏳ Opens {gig.submissionOpensAt} ({days === 0 ? 'today' : `in ${days}d`})
       </span>
     )
   }
   if (state === 'closed') {
     return (
-      <span className="bg-white px-2.5 py-1 rounded-md border border-gray-200 text-gray-500">
+      <span className="bg-surface px-2.5 py-1 rounded-md border border-line text-ink-muted">
         Window closed
       </span>
     )
   }
   if (state === 'open') {
     return (
-      <span className="bg-white px-2.5 py-1 rounded-md border border-green-200 text-green-700">
+      <span className="bg-surface px-2.5 py-1 rounded-md border border-ready text-ready">
         Window open
       </span>
     )
@@ -453,38 +453,38 @@ function GigDetail({
     <div className="space-y-4 max-w-3xl">
       {(gig.fitRationale || gig.fitNotes) && (
         <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Why it fits</p>
-          <p className="text-sm text-gray-700 leading-relaxed">{gig.fitRationale ?? gig.fitNotes}</p>
+          <p className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mb-1.5">Why it fits</p>
+          <p className="text-sm text-ink-muted leading-relaxed">{gig.fitRationale ?? gig.fitNotes}</p>
         </div>
       )}
       <div className="flex flex-wrap gap-2 text-xs">
         <WindowChip gig={gig} />
         {gig.submissionMethod && (
-          <span className="bg-white px-2.5 py-1 rounded-md border border-gray-200 text-gray-600">Submit via {gig.submissionMethod}</span>
+          <span className="bg-surface px-2.5 py-1 rounded-md border border-line text-ink-muted">Submit via {gig.submissionMethod}</span>
         )}
         {gig.audienceSize && (
-          <span className="bg-white px-2.5 py-1 rounded-md border border-gray-200 text-gray-600">~{gig.audienceSize.toLocaleString()} audience</span>
+          <span className="bg-surface px-2.5 py-1 rounded-md border border-line text-ink-muted">~{gig.audienceSize.toLocaleString()} audience</span>
         )}
         {Boolean(gig.loginRequired) && (
-          <span className="bg-white px-2.5 py-1 rounded-md border border-amber-200 text-amber-700">🔒 Login required</span>
+          <span className="bg-surface px-2.5 py-1 rounded-md border border-pending text-pending">🔒 Login required</span>
         )}
         {gig.googleEventId && (
-          <span className="bg-white px-2.5 py-1 rounded-md border border-green-200 text-green-700">📅 Calendar synced</span>
+          <span className="bg-surface px-2.5 py-1 rounded-md border border-ready text-ready">📅 Calendar synced</span>
         )}
         {gig.url && (
-          <a href={gig.url} target="_blank" rel="noreferrer" className="bg-white px-2.5 py-1 rounded-md border border-gray-200 text-blue-600 hover:bg-blue-50 transition-colors">
+          <a href={gig.url} target="_blank" rel="noreferrer" className="bg-surface px-2.5 py-1 rounded-md border border-line text-submitted hover:bg-submitted-soft transition-colors">
             Open link ↗
           </a>
         )}
       </div>
 
-      {gig.windowNote && <p className="text-xs text-gray-500">{gig.windowNote}</p>}
+      {gig.windowNote && <p className="text-xs text-ink-muted">{gig.windowNote}</p>}
 
       {/* Approving something that isn't open yet needs a date to wait on. */}
       {gig.status === 'pending_review' && (
-        <div className="flex flex-wrap items-end gap-2 bg-white border border-gray-200 rounded-lg p-3">
+        <div className="flex flex-wrap items-end gap-2 bg-surface border border-line rounded-lg p-3">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Submissions open on</label>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Submissions open on</label>
             <input
               type="date"
               value={scheduleDate}
@@ -495,11 +495,11 @@ function GigDetail({
           <button
             disabled={!scheduleDate || isPatching}
             onClick={() => onPatch({ submissionOpensAt: scheduleDate, status: 'approved' })}
-            className="text-xs px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-md bg-scheduled text-on-accent hover:brightness-95 disabled:opacity-40 transition-colors"
           >
             Approve for later
           </button>
-          <p className="text-xs text-gray-400 basis-full">
+          <p className="text-xs text-ink-subtle basis-full">
             Files this gig under “awaiting window”, schedules the reminder email, and prepares your
             answers ahead of the date.
           </p>
@@ -509,24 +509,24 @@ function GigDetail({
       <div className="flex gap-2 flex-wrap pt-1">
         {gig.status === 'awaiting_window' && (
           <button disabled={isPatching} onClick={() => onPatch({ status: 'approved' })}
-            className="text-xs px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-40 transition-colors">
+            className="text-xs px-3 py-1.5 rounded-md bg-ready text-on-accent hover:brightness-95 disabled:opacity-40 transition-colors">
             {state === 'upcoming' ? 'Open it early' : 'Mark window open'}
           </button>
         )}
         {active && (
           <button disabled={isPatching} onClick={() => onPatch({ status: 'submitted' })}
-            className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors">
+            className="text-xs px-3 py-1.5 rounded-md bg-submitted text-on-accent hover:brightness-95 disabled:opacity-40 transition-colors">
             Mark Submitted
           </button>
         )}
         {active && (
           <button disabled={isPatching} onClick={() => onPatch({ status: 'archived' })}
-            className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors">
+            className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted disabled:opacity-40 transition-colors">
             Archive
           </button>
         )}
         <button onClick={onEdit}
-          className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">
+          className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted transition-colors">
           Edit details
         </button>
       </div>
@@ -594,7 +594,7 @@ export function GigsPage() {
         const isOpen = expanded.has(info.row.original.id)
         return (
           <button onClick={() => toggleExpand(info.row.original.id)}
-            className="flex items-center gap-2 text-left font-medium text-gray-900 hover:text-blue-600 transition-colors">
+            className="flex items-center gap-2 text-left font-medium text-ink hover:text-submitted transition-colors">
             <Chevron open={isOpen} />
             {info.getValue()}
           </button>
@@ -607,19 +607,19 @@ export function GigsPage() {
     }),
     col.accessor('organizer', {
       header: 'Organizer',
-      cell: (info) => info.getValue() ?? <span className="text-gray-300">—</span>,
+      cell: (info) => info.getValue() ?? <span className="text-ink-subtle">—</span>,
     }),
     col.accessor('deadline', {
       header: 'Deadline',
       cell: (info) => {
         const d = info.getValue()
-        if (!d) return <span className="text-gray-300">—</span>
+        if (!d) return <span className="text-ink-subtle">—</span>
         const days = Math.round((new Date(d).getTime() - Date.now()) / 86400_000)
         const urgent = days >= 0 && days <= 14
         return (
-          <span className={urgent ? 'text-orange-600 font-medium' : 'text-gray-700'}>
+          <span className={`whitespace-nowrap ${urgent ? 'text-pending font-medium' : 'text-ink-muted'}`}>
             {d}
-            {urgent && days <= 7 && <span className="ml-1 text-xs text-orange-400">({days}d)</span>}
+            {urgent && days <= 7 && <span className="ml-1 text-xs text-pending">({days}d)</span>}
           </span>
         )
       },
@@ -633,15 +633,15 @@ export function GigsPage() {
         if (state === 'upcoming') {
           const days = daysUntil(gig.submissionOpensAt!)
           return (
-            <span className="text-indigo-600 whitespace-nowrap">
+            <span className="text-scheduled whitespace-nowrap">
               {gig.submissionOpensAt}
-              <span className="ml-1 text-xs text-indigo-400">({days}d)</span>
+              <span className="ml-1 text-xs text-scheduled">({days}d)</span>
             </span>
           )
         }
-        if (state === 'open') return <span className="text-green-600 text-xs">open</span>
-        if (state === 'closed') return <span className="text-gray-400 text-xs">closed</span>
-        return <span className="text-gray-300">—</span>
+        if (state === 'open') return <span className="text-ready text-xs">open</span>
+        if (state === 'closed') return <span className="text-ink-subtle text-xs">closed</span>
+        return <span className="text-ink-subtle">—</span>
       },
     }),
     col.display({
@@ -649,22 +649,22 @@ export function GigsPage() {
       header: 'Answers',
       cell: (info) => {
         const gig = info.row.original
-        if (!PREP_TRACKED.includes(gig.status)) return <span className="text-gray-300">—</span>
+        if (!PREP_TRACKED.includes(gig.status)) return <span className="text-ink-subtle">—</span>
         switch (gig.prepStatus) {
           case 'ready':
-            return <span className="text-xs text-green-700">prepared</span>
+            return <span className="text-xs text-ready">prepared</span>
           case 'queued':
-            return <span className="text-xs text-blue-600">queued</span>
+            return <span className="text-xs text-submitted">queued</span>
           case 'blocked':
-            return <span className="text-xs text-amber-700">needs you</span>
+            return <span className="text-xs text-pending">needs you</span>
           case 'failed':
-            return <span className="text-xs text-red-600">retrying</span>
+            return <span className="text-xs text-danger">retrying</span>
           default:
             // Forms go up when submissions open, so prep waits for the window.
             return windowStateOf(gig) === 'upcoming' ? (
-              <span className="text-xs text-indigo-500">on open</span>
+              <span className="text-xs text-scheduled">on open</span>
             ) : (
-              <span className="text-gray-300">—</span>
+              <span className="text-ink-subtle">—</span>
             )
         }
       },
@@ -674,16 +674,16 @@ export function GigsPage() {
       cell: (info) => {
         const amt = info.getValue()
         const row = info.row.original
-        if (amt == null && !row.fee) return <span className="text-gray-300">—</span>
+        if (amt == null && !row.fee) return <span className="text-ink-subtle">—</span>
         if (amt != null) return <span>{row.feeCurrency ?? 'USD'} {amt.toLocaleString()}</span>
-        return <span className="text-gray-500 text-xs">{row.fee}</span>
+        return <span className="text-ink-muted text-xs">{row.fee}</span>
       },
     }),
     col.accessor('paid', {
       header: 'Paid',
       cell: (info) => info.getValue()
-        ? <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-50 text-green-700">Paid</span>
-        : <span className="text-gray-300 text-xs">—</span>,
+        ? <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-ready-soft text-ready">Paid</span>
+        : <span className="text-ink-subtle text-xs">—</span>,
     }),
     col.accessor('genreFitScore', {
       header: 'Fit',
@@ -704,12 +704,12 @@ export function GigsPage() {
               <>
                 <button disabled={isPatching}
                   onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'approved' } })}
-                  className="text-xs px-2.5 py-1 rounded-md bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-40 transition-colors">
+                  className="text-xs px-2.5 py-1 rounded-md bg-ready-soft text-ready hover:brightness-95 disabled:opacity-40 transition-colors">
                   Approve
                 </button>
                 <button disabled={isPatching}
                   onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'rejected' } })}
-                  className="text-xs px-2.5 py-1 rounded-md bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-40 transition-colors">
+                  className="text-xs px-2.5 py-1 rounded-md bg-danger-soft text-danger hover:brightness-95 disabled:opacity-40 transition-colors">
                   Reject
                 </button>
               </>
@@ -717,13 +717,13 @@ export function GigsPage() {
             {(row.status === 'approved' || row.status === 'awaiting_window') && (
               <button disabled={isPatching}
                 onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'submitted' } })}
-                className="text-xs px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-40 transition-colors">
+                className="text-xs px-2.5 py-1 rounded-md bg-submitted-soft text-submitted hover:brightness-95 disabled:opacity-40 transition-colors">
                 Mark Submitted
               </button>
             )}
             <button disabled={deleteMutation.isPending}
               onClick={() => { if (confirm(`Delete "${row.name}"?`)) deleteMutation.mutate(row.id) }}
-              className="w-6 h-6 flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors"
+              className="w-6 h-6 flex items-center justify-center rounded text-ink-subtle hover:text-danger hover:bg-danger-soft disabled:opacity-40 transition-colors"
               title="Delete">
               ×
             </button>
@@ -746,7 +746,7 @@ export function GigsPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+      <div className="rounded-lg bg-danger-soft border border-danger px-4 py-3 text-sm text-danger">
         Failed to load gigs — {(error as Error).message}
       </div>
     )
@@ -755,7 +755,7 @@ export function GigsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">Gig Opportunities</h1>
+        <h1 className="text-xl font-semibold text-ink">Gig Opportunities</h1>
         <div className="flex gap-2 items-center">
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER_INPUT}>
             <option value="">All statuses</option>
@@ -770,7 +770,7 @@ export function GigsPage() {
           <button
             onClick={() => { setShowCreate((v) => !v) }}
             className={`text-sm px-3.5 py-1.5 rounded-md font-medium transition-colors ${
-              showCreate ? 'bg-gray-200 text-gray-700' : 'bg-gray-900 text-white hover:bg-gray-700'
+              showCreate ? 'bg-surface-muted text-ink-muted' : 'bg-ink text-on-accent hover:opacity-90'
             }`}
           >
             {showCreate ? 'Cancel' : '+ New gig'}
@@ -783,17 +783,17 @@ export function GigsPage() {
       {isLoading ? (
         <SkeletonTable rows={6} cols={8} />
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-surface border border-line rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[720px]">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-surface-muted border-b border-line">
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id}>
                   {hg.headers.map((header) => (
                     <th key={header.id} onClick={header.column.getToggleSortingHandler()}
-                      className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide select-none cursor-pointer whitespace-nowrap hover:text-gray-700 transition-colors">
+                      className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide select-none cursor-pointer whitespace-nowrap hover:text-ink-muted transition-colors">
                       {flexRender(header.column.columnDef.header, header.getContext())}
-                      <span className="ml-1 text-gray-300">
+                      <span className="ml-1 text-ink-subtle">
                         {header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : ''}
                       </span>
                     </th>
@@ -801,19 +801,19 @@ export function GigsPage() {
                 </tr>
               ))}
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line">
               {table.getRowModel().rows.map((row) => (
                 <Fragment key={row.id}>
-                  <tr className={`transition-colors ${expanded.has(row.original.id) ? 'bg-blue-50/40' : 'hover:bg-gray-50'}`}>
+                  <tr className={`transition-colors ${expanded.has(row.original.id) ? 'bg-surface-muted' : 'hover:bg-surface-muted'}`}>
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-3 text-gray-700">
+                      <td key={cell.id} className="px-4 py-3 text-ink-muted">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
                   </tr>
                   {expanded.has(row.original.id) && (
                     <tr>
-                      <td colSpan={columns.length} className="px-6 pb-5 pt-3 bg-blue-50/40 border-b border-blue-100">
+                      <td colSpan={columns.length} className="px-6 pb-5 pt-3 bg-surface-muted border-b border-line">
                         {editingId === row.original.id ? (
                           <EditGigPanel
                             gig={row.original}
@@ -830,8 +830,8 @@ export function GigsPage() {
                               isPatching={isPatching}
                             />
                             {PREP_TRACKED.includes(row.original.status) && (
-                              <div className="mt-5 pt-4 border-t border-blue-100">
-                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                              <div className="mt-5 pt-4 border-t border-line">
+                                <p className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mb-3">
                                   Application answers
                                 </p>
                                 <ApplicationPrep gigId={row.original.id} />
@@ -846,7 +846,7 @@ export function GigsPage() {
               ))}
               {table.getRowModel().rows.length === 0 && (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={columns.length} className="px-4 py-12 text-center text-ink-subtle text-sm">
                     No gigs match the current filters.
                   </td>
                 </tr>
@@ -858,7 +858,7 @@ export function GigsPage() {
       )}
 
       {!isLoading && (
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-ink-subtle">
           {table.getRowModel().rows.length !== data.length
             ? `${table.getRowModel().rows.length} of ${data.length} gigs`
             : `${data.length} gigs`}

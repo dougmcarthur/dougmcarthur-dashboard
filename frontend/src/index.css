@@ -1,3 +1,119 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* Dark mode is class-driven so the toggle can override the OS preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens. Every colour in the app resolves through one of these, so a
+ * status means the same thing on a badge, a table row, and a chart. Semantic
+ * names on purpose — `--color-warning` survives a palette change, `amber-500`
+ * doesn't.
+ */
+@theme {
+  --font-sans: 'InterVariable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* Surfaces */
+  --color-canvas: oklch(98.4% 0.003 260);
+  --color-surface: oklch(100% 0 0);
+  --color-surface-muted: oklch(96.8% 0.004 260);
+  --color-line: oklch(92.5% 0.005 260);
+  --color-line-strong: oklch(86% 0.007 260);
+
+  /* Text */
+  --color-ink: oklch(24% 0.02 265);
+  --color-ink-muted: oklch(50% 0.015 265);
+  --color-ink-subtle: oklch(64% 0.012 265);
+
+  /* Brand — warm, closer to a stage light than a SaaS blue */
+  --color-brand: oklch(58% 0.15 45);
+  --color-brand-strong: oklch(50% 0.16 45);
+  --color-brand-soft: oklch(95.5% 0.03 60);
+
+  /* Status. These map 1:1 to the app's real states. */
+  --color-pending: oklch(72% 0.15 85);
+  --color-pending-soft: oklch(96.5% 0.05 90);
+  --color-scheduled: oklch(58% 0.14 275);
+  --color-scheduled-soft: oklch(96% 0.03 275);
+  --color-ready: oklch(58% 0.13 155);
+  --color-ready-soft: oklch(95.5% 0.04 160);
+  --color-submitted: oklch(58% 0.13 240);
+  --color-submitted-soft: oklch(96% 0.03 240);
+  --color-danger: oklch(57% 0.19 25);
+  --color-danger-soft: oklch(96% 0.03 25);
+  --color-library: oklch(56% 0.15 300);
+  --color-library-soft: oklch(96% 0.03 300);
+
+  --color-on-accent: oklch(100% 0 0);
+
+  --radius-card: 0.75rem;
+}
+
+/*
+ * Dark mode remaps the same tokens rather than introducing new ones, so every
+ * component that uses them works in both themes without a single dark: variant.
+ */
+.dark {
+  --color-canvas: oklch(19% 0.012 265);
+  --color-surface: oklch(23% 0.014 265);
+  --color-surface-muted: oklch(27% 0.014 265);
+  --color-line: oklch(32% 0.014 265);
+  --color-line-strong: oklch(40% 0.016 265);
+
+  --color-ink: oklch(96% 0.005 265);
+  --color-ink-muted: oklch(76% 0.012 265);
+  --color-ink-subtle: oklch(62% 0.012 265);
+
+  --color-brand: oklch(72% 0.14 55);
+  --color-brand-strong: oklch(78% 0.14 58);
+  --color-brand-soft: oklch(32% 0.06 45);
+
+  --color-pending: oklch(80% 0.13 85);
+  --color-pending-soft: oklch(32% 0.05 85);
+  --color-scheduled: oklch(74% 0.12 275);
+  --color-scheduled-soft: oklch(30% 0.05 275);
+  --color-ready: oklch(75% 0.13 155);
+  --color-ready-soft: oklch(28% 0.05 160);
+  --color-submitted: oklch(74% 0.12 240);
+  --color-submitted-soft: oklch(29% 0.05 240);
+  --color-danger: oklch(70% 0.16 25);
+  --color-danger-soft: oklch(30% 0.06 25);
+  --color-library: oklch(75% 0.13 300);
+  --color-library-soft: oklch(30% 0.06 300);
+
+  /* Accents are lighter in dark mode, so their foreground goes dark. */
+  --color-on-accent: oklch(19% 0.012 265);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  .dark html,
+  html:has(.dark) {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* One visible, consistent focus ring everywhere — keyboard use is a
+     first-class path in this app, not an afterthought. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
+
+  /* Respect the OS setting for anyone who asked for less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

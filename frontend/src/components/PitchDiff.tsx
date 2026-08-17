@@ -67,7 +67,7 @@ export function PitchDiff({
 
   if (!hasChanges) {
     return (
-      <p className="text-xs text-gray-400 italic">
+      <p className="text-xs text-ink-subtle italic">
         Sent email matches draft exactly — no changes detected.
       </p>
     )
@@ -77,30 +77,30 @@ export function PitchDiff({
     <div className="space-y-2">
       <div className="flex gap-3 text-xs">
         {stats.added > 0 && (
-          <span className="text-green-700 font-medium">+{stats.added} lines added</span>
+          <span className="text-ready font-medium">+{stats.added} lines added</span>
         )}
         {stats.removed > 0 && (
-          <span className="text-red-600 font-medium">−{stats.removed} lines removed</span>
+          <span className="text-danger font-medium">−{stats.removed} lines removed</span>
         )}
-        <span className="text-gray-400">{stats.unchanged} unchanged</span>
+        <span className="text-ink-subtle">{stats.unchanged} unchanged</span>
       </div>
-      <div className="rounded-md border border-gray-200 overflow-hidden text-xs font-mono">
+      <div className="rounded-md border border-line overflow-hidden text-xs font-mono">
         {lines.map((line, i) => {
           if (line.type === 'unchanged' && line.text.trim() === '') {
-            return <div key={i} className="h-3 bg-white" />
+            return <div key={i} className="h-3 bg-surface" />
           }
           return (
             <div
               key={i}
               className={`px-3 py-0.5 leading-relaxed whitespace-pre-wrap ${
                 line.type === 'added'
-                  ? 'bg-green-50 text-green-800 border-l-2 border-green-400'
+                  ? 'bg-ready-soft text-ready border-l-2 border-ready'
                   : line.type === 'removed'
-                  ? 'bg-red-50 text-red-700 border-l-2 border-red-400 line-through opacity-60'
-                  : 'bg-white text-gray-600'
+                  ? 'bg-danger-soft text-danger border-l-2 border-danger line-through opacity-60'
+                  : 'bg-surface text-ink-muted'
               }`}
             >
-              <span className="select-none mr-2 text-gray-300">
+              <span className="select-none mr-2 text-ink-subtle">
                 {line.type === 'added' ? '+' : line.type === 'removed' ? '−' : ' '}
               </span>
               {line.text || ' '}

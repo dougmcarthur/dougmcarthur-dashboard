@@ -19,14 +19,14 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-5 py-4 space-y-1">
-          <p className="text-sm font-medium text-red-800">
+        <div className="rounded-lg bg-danger-soft border border-danger px-5 py-4 space-y-1">
+          <p className="text-sm font-medium text-danger">
             {this.props.label ?? 'Something went wrong'}
           </p>
-          <p className="text-xs text-red-600 font-mono">{this.state.error.message}</p>
+          <p className="text-xs text-danger font-mono">{this.state.error.message}</p>
           <button
             onClick={() => this.setState({ error: null })}
-            className="text-xs text-red-500 underline hover:text-red-700"
+            className="text-xs text-danger underline hover:text-danger"
           >
             Try again
           </button>

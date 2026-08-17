@@ -3,14 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type ReferenceDoc } from '../api'
 
 const INPUT_CLASS =
-  'w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition'
+  'w-full text-sm border border-line-strong rounded-md px-3 py-2 bg-surface focus:outline-none focus:border-brand transition'
 
 // ── Integration status card ───────────────────────────────────────────────────
 
 function StatusPill({ ok }: { ok: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${ok ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-green-500' : 'bg-yellow-500'}`} />
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${ok ? 'bg-ready-soft text-ready' : 'bg-pending-soft text-pending'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-ready' : 'bg-pending'}`} />
       {ok ? 'Connected' : 'Not configured'}
     </span>
   )
@@ -23,91 +23,91 @@ function IntegrationCards() {
     staleTime: 60_000,
   })
 
-  if (isLoading) return <div className="h-24 bg-gray-100 rounded-lg animate-pulse" />
+  if (isLoading) return <div className="h-24 bg-surface-muted rounded-lg animate-pulse" />
 
   return (
     <div className="grid grid-cols-2 gap-4">
       {/* Calendar */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="bg-surface border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-gray-900">Google Calendar</h3>
+          <h3 className="text-sm font-semibold text-ink">Google Calendar</h3>
           <StatusPill ok={!!data?.calendarConfigured} />
         </div>
         {data?.calendarConfigured ? (
-          <p className="text-xs text-gray-500">Gig approvals create Calendar events automatically.</p>
+          <p className="text-xs text-ink-muted">Gig approvals create Calendar events automatically.</p>
         ) : (
           <div className="space-y-1.5">
-            <p className="text-xs text-gray-500">Missing secrets:</p>
+            <p className="text-xs text-ink-muted">Missing secrets:</p>
             <div className="flex flex-wrap gap-1">
               {data?.calendarMissingSecrets.map((s) => (
-                <code key={s} className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-mono">{s}</code>
+                <code key={s} className="text-xs bg-surface-muted text-ink-muted px-1.5 py-0.5 rounded font-mono">{s}</code>
               ))}
             </div>
-            <p className="text-xs text-gray-400">
-              See <code className="bg-gray-100 px-1 rounded">docs/google-calendar-setup.md</code>
+            <p className="text-xs text-ink-subtle">
+              See <code className="bg-surface-muted px-1 rounded">docs/google-calendar-setup.md</code>
             </p>
           </div>
         )}
       </div>
 
       {/* Gmail */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="bg-surface border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-gray-900">Gmail</h3>
+          <h3 className="text-sm font-semibold text-ink">Gmail</h3>
           <StatusPill ok={!!data?.gmailConfigured} />
         </div>
         {data?.gmailConfigured ? (
-          <p className="text-xs text-gray-500">Sync page can reconcile pitch statuses from sent mail.</p>
+          <p className="text-xs text-ink-muted">Sync page can reconcile pitch statuses from sent mail.</p>
         ) : (
           <div className="space-y-1.5">
-            <p className="text-xs text-gray-500">Missing secrets:</p>
+            <p className="text-xs text-ink-muted">Missing secrets:</p>
             <div className="flex flex-wrap gap-1">
               {data?.gmailMissingSecrets.map((s) => (
-                <code key={s} className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-mono">{s}</code>
+                <code key={s} className="text-xs bg-surface-muted text-ink-muted px-1.5 py-0.5 rounded font-mono">{s}</code>
               ))}
             </div>
-            <p className="text-xs text-gray-400">
-              See <code className="bg-gray-100 px-1 rounded">docs/gmail-setup.md</code>
+            <p className="text-xs text-ink-subtle">
+              See <code className="bg-surface-muted px-1 rounded">docs/gmail-setup.md</code>
             </p>
           </div>
         )}
       </div>
 
       {/* Reminder emails */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="bg-surface border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-gray-900">Reminder emails</h3>
+          <h3 className="text-sm font-semibold text-ink">Reminder emails</h3>
           <StatusPill ok={!!data?.emailConfigured} />
         </div>
         {data?.emailConfigured ? (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-ink-muted">
             Submission-window and deadline reminders are emailed by the daily cron.
           </p>
         ) : (
           <div className="space-y-1.5">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-ink-muted">
               Reminders stay pending in the dashboard. Missing secrets:
             </p>
             <div className="flex flex-wrap gap-1">
               {data?.emailMissingSecrets?.map((s) => (
-                <code key={s} className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-mono">{s}</code>
+                <code key={s} className="text-xs bg-surface-muted text-ink-muted px-1.5 py-0.5 rounded font-mono">{s}</code>
               ))}
             </div>
-            <p className="text-xs text-gray-400">
-              Needs the <code className="bg-gray-100 px-1 rounded">gmail.send</code> scope — see{' '}
-              <code className="bg-gray-100 px-1 rounded">docs/gmail-setup.md</code>
+            <p className="text-xs text-ink-subtle">
+              Needs the <code className="bg-surface-muted px-1 rounded">gmail.send</code> scope — see{' '}
+              <code className="bg-surface-muted px-1 rounded">docs/gmail-setup.md</code>
             </p>
           </div>
         )}
       </div>
 
       {/* Answer drafting */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="bg-surface border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-gray-900">Application answers</h3>
+          <h3 className="text-sm font-semibold text-ink">Application answers</h3>
           <StatusPill ok={!!data?.answerDraftingConfigured} />
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ink-muted">
           {data?.answerDraftingConfigured
             ? 'Application forms are read and answered from your reference docs before the window opens.'
             : 'Without ANTHROPIC_API_KEY, forms are still read but only name, email, links, genre and bio get filled in.'}
@@ -126,20 +126,20 @@ function CalendarStatus() {
   })
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5">
+    <div className="bg-surface border border-line rounded-lg p-5">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-900">Google Calendar</h2>
+        <h2 className="text-sm font-semibold text-ink">Google Calendar</h2>
         {!isLoading && (
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
               data?.calendarConfigured
-                ? 'bg-green-50 text-green-700'
-                : 'bg-yellow-50 text-yellow-700'
+                ? 'bg-ready-soft text-ready'
+                : 'bg-pending-soft text-pending'
             }`}
           >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
-                data?.calendarConfigured ? 'bg-green-500' : 'bg-yellow-500'
+                data?.calendarConfigured ? 'bg-ready' : 'bg-pending'
               }`}
             />
             {data?.calendarConfigured ? 'Connected' : 'Not configured'}
@@ -148,28 +148,28 @@ function CalendarStatus() {
       </div>
 
       {isLoading ? (
-        <div className="h-4 bg-gray-100 rounded animate-pulse w-48" />
+        <div className="h-4 bg-surface-muted rounded animate-pulse w-48" />
       ) : data?.calendarConfigured ? (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-ink-muted">
           Approving gigs with deadlines will create Calendar events automatically.
         </p>
       ) : (
         <div className="space-y-2">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-ink-muted">
             Set these Worker secrets to enable Calendar sync:
           </p>
           <div className="flex flex-wrap gap-2">
             {data?.calendarMissingSecrets.map((s) => (
               <code
                 key={s}
-                className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded font-mono"
+                className="text-xs bg-surface-muted text-ink-muted px-2 py-1 rounded font-mono"
               >
                 {s}
               </code>
             ))}
           </div>
-          <p className="text-xs text-gray-400">
-            See <code className="bg-gray-100 px-1 rounded">docs/google-calendar-setup.md</code> for
+          <p className="text-xs text-ink-subtle">
+            See <code className="bg-surface-muted px-1 rounded">docs/google-calendar-setup.md</code> for
             the step-by-step setup.
           </p>
         </div>
@@ -209,19 +209,19 @@ function DocEditor({
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+    <div className="border border-line rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 bg-surface-muted border-b border-line">
         {editing ? (
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="text-sm font-medium bg-white border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900 flex-1 mr-3"
+            className="text-sm font-medium bg-surface border border-line-strong rounded px-2 py-1 focus:outline-none focus:ring-2 focus:border-brand flex-1 mr-3"
             autoFocus
           />
         ) : (
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{doc.title}</p>
-            <p className="text-xs text-gray-400 font-mono">{doc.id}</p>
+            <p className="text-sm font-medium text-ink truncate">{doc.title}</p>
+            <p className="text-xs text-ink-subtle font-mono">{doc.id}</p>
           </div>
         )}
         <div className="flex gap-2 shrink-0">
@@ -230,13 +230,13 @@ function DocEditor({
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="text-xs px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-md bg-ink text-on-accent hover:opacity-90 disabled:opacity-40 transition-colors"
               >
                 Save
               </button>
               <button
                 onClick={handleCancel}
-                className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted transition-colors"
               >
                 Cancel
               </button>
@@ -245,7 +245,7 @@ function DocEditor({
             <>
               <button
                 onClick={() => setEditing(true)}
-                className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted transition-colors"
               >
                 Edit
               </button>
@@ -254,7 +254,7 @@ function DocEditor({
                   if (confirm(`Delete "${doc.title}"?`)) onDelete(doc.id)
                 }}
                 disabled={isDeleting}
-                className="w-7 h-7 flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded text-ink-subtle hover:text-danger hover:bg-danger-soft disabled:opacity-40 transition-colors"
                 title="Delete"
               >
                 ×
@@ -269,17 +269,17 @@ function DocEditor({
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={10}
-          className="w-full px-4 py-3 text-sm font-mono text-gray-700 leading-relaxed resize-y focus:outline-none"
+          className="w-full px-4 py-3 text-sm font-mono text-ink-muted leading-relaxed resize-y focus:outline-none"
         />
       ) : (
         <div className="px-4 py-3">
-          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap line-clamp-4">
+          <p className="text-sm text-ink-muted leading-relaxed whitespace-pre-wrap line-clamp-4">
             {doc.content}
           </p>
           {doc.content.split('\n').length > 4 && (
             <button
               onClick={() => setEditing(true)}
-              className="text-xs text-gray-400 hover:text-gray-600 mt-1"
+              className="text-xs text-ink-subtle hover:text-ink-muted mt-1"
             >
               Show all →
             </button>
@@ -315,9 +315,9 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+        className="flex items-center gap-2 text-sm text-ink-muted hover:text-ink transition-colors"
       >
-        <span className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-base leading-none">
+        <span className="w-6 h-6 rounded-full border-2 border-dashed border-line-strong flex items-center justify-center text-ink-subtle text-base leading-none">
           +
         </span>
         Add reference doc
@@ -326,11 +326,11 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="border border-gray-300 border-dashed rounded-lg p-4 space-y-3">
+    <div className="border border-line-strong border-dashed rounded-lg p-4 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">
-            ID <span className="font-normal text-gray-400">(slug, e.g. bio, press-kit)</span>
+          <label className="block text-xs font-medium text-ink-muted mb-1">
+            ID <span className="font-normal text-ink-subtle">(slug, e.g. bio, press-kit)</span>
           </label>
           <input
             value={id}
@@ -341,7 +341,7 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Title</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Title</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -351,7 +351,7 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
         </div>
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Content</label>
+        <label className="block text-xs font-medium text-ink-muted mb-1">Content</label>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
@@ -364,13 +364,13 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
         <button
           onClick={() => createMutation.mutate()}
           disabled={!id || !title || createMutation.isPending}
-          className="text-xs px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-md bg-ink text-on-accent hover:opacity-90 disabled:opacity-40 transition-colors"
         >
           Create
         </button>
         <button
           onClick={() => setOpen(false)}
-          className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted transition-colors"
         >
           Cancel
         </button>
@@ -402,14 +402,14 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-8 max-w-3xl">
-      <h1 className="text-xl font-semibold text-gray-900">Settings</h1>
+      <h1 className="text-xl font-semibold text-ink">Settings</h1>
 
       <IntegrationCards />
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-900">Reference Docs</h2>
-          <p className="text-xs text-gray-400">
+          <h2 className="text-sm font-semibold text-ink">Reference Docs</h2>
+          <p className="text-xs text-ink-subtle">
             Bio, press kit, pitch templates — text blocks the automation agent pulls from
           </p>
         </div>
@@ -417,10 +417,10 @@ export function SettingsPage() {
         {isLoading ? (
           <div className="space-y-2 animate-pulse">
             {[120, 80, 100].map((w, i) => (
-              <div key={i} className="border border-gray-200 rounded-lg p-4 space-y-2">
-                <div className="h-4 bg-gray-100 rounded" style={{ width: w }} />
-                <div className="h-3 bg-gray-100 rounded w-full" />
-                <div className="h-3 bg-gray-100 rounded w-3/4" />
+              <div key={i} className="border border-line rounded-lg p-4 space-y-2">
+                <div className="h-4 bg-surface-muted rounded" style={{ width: w }} />
+                <div className="h-3 bg-surface-muted rounded w-full" />
+                <div className="h-3 bg-surface-muted rounded w-3/4" />
               </div>
             ))}
           </div>
@@ -437,7 +437,7 @@ export function SettingsPage() {
               />
             ))}
             {docs.length === 0 && !isLoading && (
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-ink-subtle">
                 No reference docs yet. Add one below — the automation agent uses these as source
                 material when drafting pitches.
               </p>

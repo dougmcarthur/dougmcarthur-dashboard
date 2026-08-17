@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type ApplicationField, type ApplicationPrep as Prep } from '../api'
 
 const INPUT =
-  'w-full text-sm border border-gray-300 rounded-md px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition'
+  'w-full text-sm border border-line-strong rounded-md px-2.5 py-1.5 bg-surface focus:outline-none focus:border-brand transition'
 
 const PREP_LABEL: Record<string, string> = {
   none: 'Not prepared',
@@ -14,17 +14,17 @@ const PREP_LABEL: Record<string, string> = {
 }
 
 const PREP_COLOR: Record<string, string> = {
-  none: 'bg-gray-100 text-gray-600',
-  queued: 'bg-blue-50 text-blue-700',
-  ready: 'bg-green-50 text-green-700',
-  blocked: 'bg-amber-50 text-amber-800',
-  failed: 'bg-red-50 text-red-700',
+  none: 'bg-surface-muted text-ink-muted',
+  queued: 'bg-submitted-soft text-submitted',
+  ready: 'bg-ready-soft text-ready',
+  blocked: 'bg-pending-soft text-pending',
+  failed: 'bg-danger-soft text-danger',
 }
 
 const CONFIDENCE_COLOR: Record<string, string> = {
-  high: 'text-green-600',
-  medium: 'text-amber-600',
-  low: 'text-gray-400',
+  high: 'text-ready',
+  medium: 'text-pending',
+  low: 'text-ink-subtle',
 }
 
 const SHORT_TYPES = new Set(['text', 'email', 'url', 'number', 'date'])
@@ -82,39 +82,39 @@ function FieldCard({
     <div
       className={`rounded-lg border px-4 py-3 ${
         field.approved
-          ? 'border-green-200 bg-green-50/40'
+          ? 'border-ready bg-ready-soft'
           : field.needsInput && !field.answer
-            ? 'border-amber-200 bg-amber-50/30'
-            : 'border-gray-200 bg-white'
+            ? 'border-pending bg-pending-soft'
+            : 'border-line bg-surface'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900">
+          <p className="text-sm font-medium text-ink">
             {field.label}
-            {field.required ? <span className="text-red-500 ml-0.5">*</span> : null}
+            {field.required ? <span className="text-danger ml-0.5">*</span> : null}
           </p>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-ink-subtle mt-0.5">
             {field.fieldType}
             {field.maxLength ? ` · max ${field.maxLength}` : ''}
             {field.answerSource === 'library' && !edited ? (
-              <span className="ml-2 text-violet-700">↺ from your library</span>
+              <span className="ml-2 text-library">↺ from your library</span>
             ) : field.confidence && !field.answer ? (
               <span className={`ml-2 ${CONFIDENCE_COLOR[field.confidence]}`}>
                 {field.confidence} confidence
               </span>
             ) : null}
-            {edited ? <span className="ml-2 text-gray-500">edited by you</span> : null}
+            {edited ? <span className="ml-2 text-ink-muted">edited by you</span> : null}
           </p>
-          {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
+          {field.helpText && <p className="text-xs text-ink-muted mt-1">{field.helpText}</p>}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+          <label className="flex items-center gap-1.5 text-xs text-ink-muted cursor-pointer">
             <input
               type="checkbox"
               checked={Boolean(field.approved)}
               onChange={(e) => onToggleApprove(e.target.checked)}
-              className="rounded border-gray-300"
+              className="rounded border-line-strong"
             />
             Approved
           </label>
@@ -122,7 +122,7 @@ function FieldCard({
             <button
               onClick={onDelete}
               title="Remove this field"
-              className="w-6 h-6 flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+              className="w-6 h-6 flex items-center justify-center rounded text-ink-subtle hover:text-danger hover:bg-danger-soft transition-colors"
             >
               ×
             </button>
@@ -149,7 +149,7 @@ function FieldCard({
             ))}
           </select>
         ) : field.fieldType === 'file' ? (
-          <p className="text-xs text-gray-500 italic">
+          <p className="text-xs text-ink-muted italic">
             File upload — attach on the day. Note below what you plan to send.
           </p>
         ) : SHORT_TYPES.has(field.fieldType) ? (
@@ -180,14 +180,14 @@ function FieldCard({
 
       {/* The stored answer and this one have diverged — one of them should win. */}
       {field.libraryDrift && !dirty && (
-        <div className="mt-2 flex items-center justify-between gap-3 rounded-md bg-violet-50 border border-violet-200 px-2.5 py-1.5">
-          <p className="text-xs text-violet-800">
+        <div className="mt-2 flex items-center justify-between gap-3 rounded-md bg-library-soft border border-library px-2.5 py-1.5">
+          <p className="text-xs text-library">
             This differs from your stored “{field.libraryLabel}” answer.
           </p>
           <button
             disabled={libraryBusy}
             onClick={onUpdateLibrary}
-            className="text-xs px-2.5 py-1 rounded-md bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors whitespace-nowrap"
+            className="text-xs px-2.5 py-1 rounded-md bg-library text-on-accent hover:brightness-95 disabled:opacity-40 transition-colors whitespace-nowrap"
           >
             Update library
           </button>
@@ -195,21 +195,21 @@ function FieldCard({
       )}
 
       {conflict && (
-        <div className="mt-2 flex items-center justify-between gap-3 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5">
-          <p className="text-xs text-amber-800">
+        <div className="mt-2 flex items-center justify-between gap-3 rounded-md bg-pending-soft border border-pending px-2.5 py-1.5">
+          <p className="text-xs text-pending">
             A different answer is already stored for this question.
           </p>
           <div className="flex gap-2 shrink-0">
             <button
               disabled={libraryBusy}
               onClick={onUpdateLibrary}
-              className="text-xs px-2.5 py-1 rounded-md bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors"
+              className="text-xs px-2.5 py-1 rounded-md bg-pending text-on-accent hover:brightness-95 disabled:opacity-40 transition-colors"
             >
               Replace it
             </button>
             <button
               onClick={onDismissConflict}
-              className="text-xs px-2.5 py-1 rounded-md border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors"
+              className="text-xs px-2.5 py-1 rounded-md border border-pending text-pending hover:brightness-95 transition-colors"
             >
               Keep this one here
             </button>
@@ -222,7 +222,7 @@ function FieldCard({
           <button
             disabled={libraryBusy}
             onClick={onSaveToLibrary}
-            className="text-xs px-2.5 py-1 rounded-md border border-violet-200 text-violet-700 hover:bg-violet-50 disabled:opacity-40 transition-colors"
+            className="text-xs px-2.5 py-1 rounded-md border border-library text-library hover:bg-library-soft disabled:opacity-40 transition-colors"
           >
             Save to library
           </button>
@@ -230,10 +230,10 @@ function FieldCard({
       )}
 
       <div className="flex items-center justify-between mt-1.5">
-        <p className="text-xs text-gray-400">
-          {field.note ? <span className="text-amber-700">{field.note}</span> : null}
+        <p className="text-xs text-ink-subtle">
+          {field.note ? <span className="text-pending">{field.note}</span> : null}
         </p>
-        <p className={`text-xs tabular-nums ${over ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
+        <p className={`text-xs tabular-nums ${over ? 'text-danger font-medium' : 'text-ink-subtle'}`}>
           {isSaving ? 'Saving…' : dirty ? 'Unsaved' : ''}
           {field.maxLength ? ` ${value.length}/${field.maxLength}` : value.length ? ` ${value.length}` : ''}
         </p>
@@ -258,7 +258,7 @@ function AddFieldForm({ onAdd, isAdding }: { onAdd: (label: string) => void; isA
           onAdd(label.trim())
           setLabel('')
         }}
-        className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors whitespace-nowrap"
+        className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted disabled:opacity-40 transition-colors whitespace-nowrap"
       >
         Add field
       </button>
@@ -341,11 +341,11 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
   }
 
   if (isLoading) {
-    return <p className="text-xs text-gray-400">Loading prepared answers…</p>
+    return <p className="text-xs text-ink-subtle">Loading prepared answers…</p>
   }
   if (error || !data) {
     return (
-      <p className="text-xs text-red-600">
+      <p className="text-xs text-danger">
         Couldn’t load the application — {(error as Error)?.message}
       </p>
     )
@@ -362,7 +362,7 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
               waitingForWindow && prepStatus === 'none'
-                ? 'bg-indigo-50 text-indigo-700'
+                ? 'bg-scheduled-soft text-scheduled'
                 : (PREP_COLOR[prepStatus] ?? PREP_COLOR.none)
             }`}
           >
@@ -371,14 +371,14 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
               : (PREP_LABEL[prepStatus] ?? prepStatus)}
           </span>
           {stats.total > 0 && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-ink-muted">
               {stats.approved}/{stats.total} approved · {readyCount} drafted
               {stats.fromLibrary > 0 ? ` · ${stats.fromLibrary} reused` : ''}
               {stats.needsInput > 0 ? ` · ${stats.needsInput} need you` : ''}
             </span>
           )}
           {data.formTitle && (
-            <span className="text-xs text-gray-400 truncate max-w-xs">{data.formTitle}</span>
+            <span className="text-xs text-ink-subtle truncate max-w-xs">{data.formTitle}</span>
           )}
         </div>
         <div className="flex gap-2">
@@ -387,7 +387,7 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
               href={data.applicationUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted transition-colors"
             >
               Open form ↗
             </a>
@@ -396,14 +396,14 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
             <>
               <button
                 onClick={copyAll}
-                className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted transition-colors"
               >
                 {copied ? 'Copied' : 'Copy all'}
               </button>
               <button
                 disabled={approveAll.isPending}
                 onClick={() => approveAll.mutate()}
-                className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted disabled:opacity-40 transition-colors"
               >
                 Approve all drafted
               </button>
@@ -414,8 +414,8 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
             onClick={() => prepare.mutate()}
             className={`text-xs px-3 py-1.5 rounded-md disabled:opacity-40 transition-colors ${
               waitingForWindow
-                ? 'border border-gray-300 text-gray-600 hover:bg-gray-50'
-                : 'bg-gray-900 text-white hover:bg-gray-700'
+                ? 'border border-line-strong text-ink-muted hover:bg-surface-muted'
+                : 'bg-ink text-on-accent hover:opacity-90'
             }`}
           >
             {prepare.isPending
@@ -430,7 +430,7 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
       </div>
 
       {waitingForWindow && (
-        <div className="rounded-md bg-indigo-50 border border-indigo-200 px-3 py-2 text-xs text-indigo-900">
+        <div className="rounded-md bg-scheduled-soft border border-scheduled px-3 py-2 text-xs text-scheduled">
           Submissions open {data.submissionOpensAt ?? 'later'}. The form usually isn’t published
           until then, so your answers are prepared that morning — you’ll get an email once they’re
           ready to review. If you know the form is already live, read it now.
@@ -438,10 +438,10 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
       )}
 
       {data.prepError && (
-        <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+        <div className="rounded-md bg-pending-soft border border-pending px-3 py-2 text-xs text-pending">
           {data.prepError}
           {data.loginRequired && (
-            <span className="block mt-1 text-amber-700">
+            <span className="block mt-1 text-pending">
               Add the questions below by hand and the answers will be drafted the same way.
             </span>
           )}
@@ -449,7 +449,7 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
       )}
 
       {prepare.isSuccess && prepare.data.status === 'ready' && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ink-muted">
           {prepare.data.fieldCount} field{prepare.data.fieldCount === 1 ? '' : 's'} read
           {prepare.data.libraryHits > 0
             ? ` · ${prepare.data.libraryHits} answered from your library`
@@ -459,13 +459,13 @@ export function ApplicationPrep({ gigId }: { gigId: number }) {
       )}
 
       {prepare.isError && (
-        <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+        <div className="rounded-md bg-danger-soft border border-danger px-3 py-2 text-xs text-danger">
           {(prepare.error as Error).message}
         </div>
       )}
 
       {fields.length === 0 ? (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ink-muted">
           No fields yet. Run prep to read the form, or add the questions by hand.
         </p>
       ) : (

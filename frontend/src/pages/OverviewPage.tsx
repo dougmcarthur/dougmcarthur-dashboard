@@ -4,9 +4,9 @@ import { StatusBadge } from '../components/StatusBadge'
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5">
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-sm text-gray-500 mt-0.5">{label}</p>
+    <div className="bg-surface rounded-lg border border-line p-5">
+      <p className="text-2xl font-bold text-ink">{value}</p>
+      <p className="text-sm text-ink-muted mt-0.5">{label}</p>
     </div>
   )
 }
@@ -19,10 +19,10 @@ function daysUntil(dateStr: string): number {
 
 function SectionHeader({ title, count }: { title: string; count?: number }) {
   return (
-    <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+    <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-3">
       {title}
       {count !== undefined && (
-        <span className="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+        <span className="ml-2 inline-flex items-center rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-ink-muted">
           {count}
         </span>
       )}
@@ -54,9 +54,9 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
       <div className="space-y-8 animate-pulse">
         <div className="grid grid-cols-3 gap-4">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-5">
-              <div className="h-8 bg-gray-100 rounded w-12 mb-2" />
-              <div className="h-4 bg-gray-100 rounded w-28" />
+            <div key={i} className="bg-surface rounded-lg border border-line p-5">
+              <div className="h-8 bg-surface-muted rounded w-12 mb-2" />
+              <div className="h-4 bg-surface-muted rounded w-28" />
             </div>
           ))}
         </div>
@@ -66,7 +66,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
 
   if (error || !data) {
     return (
-      <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+      <div className="rounded-lg bg-danger-soft border border-danger px-4 py-3 text-sm text-danger">
         Failed to load overview — {(error as Error)?.message}
       </div>
     )
@@ -92,7 +92,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
     <div className="space-y-8">
       {/* Stats */}
       <div>
-        <h1 className="text-xl font-semibold text-gray-900 mb-4">Overview</h1>
+        <h1 className="text-xl font-semibold text-ink mb-4">Overview</h1>
         <div className="grid grid-cols-5 gap-4">
           <StatCard label="Gig Opportunities" value={stats.totalGigs} />
           <StatCard label="Awaiting window" value={stats.awaitingWindow ?? 0} />
@@ -106,22 +106,22 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
       {applicationsReady.length > 0 && (
         <div>
           <SectionHeader title="Prepared answers to review" count={applicationsReady.length} />
-          <div className="bg-white border border-green-200 rounded-lg divide-y divide-green-50">
+          <div className="bg-surface border border-ready rounded-lg divide-y divide-line">
             {applicationsReady.map((g: GigWithPrep) => (
               <div
                 key={g.id}
                 onClick={() => openGig(g.id)}
-                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-green-50/50 transition-colors"
+                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-ready-soft/50 transition-colors"
               >
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{g.name}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm font-medium text-ink">{g.name}</p>
+                  <p className="text-xs text-ink-muted">
                     {g.prep.approved}/{g.prep.total} approved
                     {g.prep.needsInput > 0 ? ` · ${g.prep.needsInput} need your input` : ''}
                     {g.submissionOpensAt ? ` · opens ${g.submissionOpensAt}` : ''}
                   </p>
                 </div>
-                <span className="text-xs text-gray-400">Review →</span>
+                <span className="text-xs text-ink-subtle">Review →</span>
               </div>
             ))}
           </div>
@@ -132,18 +132,18 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
       {awaitingWindow.length > 0 && (
         <div>
           <SectionHeader title="Waiting on the submission window" count={awaitingWindow.length} />
-          <div className="bg-white border border-indigo-200 rounded-lg divide-y divide-indigo-50">
+          <div className="bg-surface border border-scheduled rounded-lg divide-y divide-line">
             {awaitingWindow.map((g: GigWithPrep) => {
               const days = g.submissionOpensAt ? daysUntil(g.submissionOpensAt) : null
               return (
                 <div
                   key={g.id}
                   onClick={() => openGig(g.id)}
-                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-indigo-50/50 transition-colors"
+                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-scheduled-soft transition-colors"
                 >
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{g.name}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm font-medium text-ink">{g.name}</p>
+                    <p className="text-xs text-ink-muted">
                       {g.type}
                       {g.prep.total > 0
                         ? ` · ${g.prep.total} answers prepared`
@@ -151,10 +151,10 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-xs font-semibold text-indigo-600 tabular-nums">
+                    <span className="text-xs font-semibold text-scheduled tabular-nums">
                       {days === null ? '' : days <= 0 ? 'Opens today' : `${days}d`}
                     </span>
-                    <span className="text-xs text-gray-400">{g.submissionOpensAt}</span>
+                    <span className="text-xs text-ink-subtle">{g.submissionOpensAt}</span>
                   </div>
                 </div>
               )
@@ -167,18 +167,18 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
       {applicationsBlocked.length > 0 && (
         <div>
           <SectionHeader title="Applications needing manual setup" count={applicationsBlocked.length} />
-          <div className="bg-white border border-amber-200 rounded-lg divide-y divide-amber-50">
+          <div className="bg-surface border border-pending rounded-lg divide-y divide-line">
             {applicationsBlocked.map((g: GigWithPrep) => (
               <div
                 key={g.id}
                 onClick={() => openGig(g.id)}
-                className="flex items-start justify-between px-4 py-3 cursor-pointer hover:bg-amber-50/50 transition-colors"
+                className="flex items-start justify-between px-4 py-3 cursor-pointer hover:bg-pending-soft/50 transition-colors"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{g.name}</p>
-                  <p className="text-xs text-amber-700 mt-0.5">{g.prepError ?? 'Prep did not complete.'}</p>
+                  <p className="text-sm font-medium text-ink">{g.name}</p>
+                  <p className="text-xs text-pending mt-0.5">{g.prepError ?? 'Prep did not complete.'}</p>
                 </div>
-                <span className="text-xs text-gray-400 shrink-0 ml-4">Open →</span>
+                <span className="text-xs text-ink-subtle shrink-0 ml-4">Open →</span>
               </div>
             ))}
           </div>
@@ -196,19 +196,19 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
               return (
                 <div
                   key={r.id}
-                  className={`flex items-start justify-between bg-white rounded-lg px-4 py-3 border ${
-                    overdue ? 'border-red-200' : 'border-amber-200'
+                  className={`flex items-start justify-between bg-surface rounded-lg px-4 py-3 border ${
+                    overdue ? 'border-danger' : 'border-pending'
                   }`}
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-ink">
                       {r.gigName ?? `${r.entityType} #${r.entityId}`}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-xs text-ink-muted mt-0.5">
                       {r.gigDeadline ? `Deadline ${r.gigDeadline}` : ''}
                       {r.gigStatus ? ` · ${r.gigStatus.replace(/_/g, ' ')}` : ''}
                     </p>
-                    <p className={`text-xs mt-0.5 font-medium ${overdue ? 'text-red-600' : 'text-amber-600'}`}>
+                    <p className={`text-xs mt-0.5 font-medium ${overdue ? 'text-danger' : 'text-pending'}`}>
                       {overdue
                         ? `${Math.abs(days!)}d overdue — submitted?`
                         : days === 0
@@ -223,7 +223,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
                           patchGig.mutate({ id: r.entityId, body: { status: 'submitted' } })
                           dismissReminder.mutate(r.id)
                         }}
-                        className="text-xs px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                        className="text-xs px-2.5 py-1 rounded-md bg-submitted-soft text-submitted hover:brightness-95 transition-colors"
                       >
                         Mark Submitted
                       </button>
@@ -231,7 +231,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
                     <button
                       onClick={() => dismissReminder.mutate(r.id)}
                       disabled={dismissReminder.isPending}
-                      className="text-xs px-2.5 py-1 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                      className="text-xs px-2.5 py-1 rounded-md border border-line text-ink-muted hover:bg-surface-muted disabled:opacity-40 transition-colors"
                     >
                       Dismiss
                     </button>
@@ -247,28 +247,28 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
       {upcomingDeadlines.length > 0 && (
         <div>
           <SectionHeader title="Deadlines in 14 days" count={upcomingDeadlines.length} />
-          <div className="bg-white border border-orange-200 rounded-lg divide-y divide-orange-50">
+          <div className="bg-surface border border-pending rounded-lg divide-y divide-line">
             {upcomingDeadlines.map((g) => {
               const days = daysUntil(g.deadline!)
               return (
                 <div
                   key={g.id}
                   onClick={() => onNav('gigs')}
-                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-orange-50/50 transition-colors"
+                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-pending-soft transition-colors"
                 >
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{g.name}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm font-medium text-ink">{g.name}</p>
+                    <p className="text-xs text-ink-muted">
                       {g.type}
                       {g.submissionMethod ? ` · via ${g.submissionMethod}` : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    {g.googleEventId && <span className="text-xs text-gray-400" title="Synced to Calendar">📅</span>}
-                    <span className={`text-xs font-semibold tabular-nums ${days <= 3 ? 'text-red-600' : days <= 7 ? 'text-orange-600' : 'text-yellow-600'}`}>
+                    {g.googleEventId && <span className="text-xs text-ink-subtle" title="Synced to Calendar">📅</span>}
+                    <span className={`text-xs font-semibold tabular-nums ${days <= 3 ? 'text-danger' : days <= 7 ? 'text-pending' : 'text-pending'}`}>
                       {days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days}d`}
                     </span>
-                    <span className="text-xs text-gray-400">{g.deadline}</span>
+                    <span className="text-xs text-ink-subtle">{g.deadline}</span>
                   </div>
                 </div>
               )
@@ -283,10 +283,10 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
           <SectionHeader title="Needs review" count={totalPending} />
           <div className="space-y-2">
             {pendingReview.gigs.map((g) => (
-              <div key={g.id} className="flex items-center justify-between bg-white border border-yellow-200 rounded-lg px-4 py-3">
+              <div key={g.id} className="flex items-center justify-between bg-surface border border-pending rounded-lg px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{g.name}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm font-medium text-ink">{g.name}</p>
+                  <p className="text-xs text-ink-muted">
                     {g.type}{g.deadline ? ` · deadline ${g.deadline}` : ''}
                   </p>
                 </div>
@@ -294,18 +294,18 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
                   <button
                     disabled={patchGig.isPending}
                     onClick={() => patchGig.mutate({ id: g.id, body: { status: 'approved' } })}
-                    className="text-xs px-2.5 py-1 rounded-md bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-40 transition-colors"
+                    className="text-xs px-2.5 py-1 rounded-md bg-ready-soft text-ready hover:brightness-95 disabled:opacity-40 transition-colors"
                   >
                     Approve
                   </button>
                   <button
                     disabled={patchGig.isPending}
                     onClick={() => patchGig.mutate({ id: g.id, body: { status: 'rejected' } })}
-                    className="text-xs px-2.5 py-1 rounded-md bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-40 transition-colors"
+                    className="text-xs px-2.5 py-1 rounded-md bg-danger-soft text-danger hover:brightness-95 disabled:opacity-40 transition-colors"
                   >
                     Reject
                   </button>
-                  <button onClick={() => onNav('gigs')} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                  <button onClick={() => onNav('gigs')} className="text-xs text-ink-subtle hover:text-ink-muted transition-colors">
                     Details →
                   </button>
                 </div>
@@ -315,11 +315,11 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
               <div
                 key={s.id}
                 onClick={() => onNav('sync')}
-                className="flex items-center justify-between bg-white border border-purple-200 rounded-lg px-4 py-3 cursor-pointer hover:border-purple-300 transition-colors"
+                className="flex items-center justify-between bg-surface border border-library rounded-lg px-4 py-3 cursor-pointer hover:border-library transition-colors"
               >
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{s.name}</p>
-                  <p className="text-xs text-gray-500">{s.agencyType ?? 'Sync target'}</p>
+                  <p className="text-sm font-medium text-ink">{s.name}</p>
+                  <p className="text-xs text-ink-muted">{s.agencyType ?? 'Sync target'}</p>
                 </div>
                 <StatusBadge status={s.status} />
               </div>
@@ -333,21 +333,21 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
         <div>
           <div className="flex items-center justify-between mb-3">
             <SectionHeader title="Recent task runs" />
-            <button onClick={() => onNav('runs')} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+            <button onClick={() => onNav('runs')} className="text-xs text-ink-subtle hover:text-ink-muted transition-colors">
               View all →
             </button>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+          <div className="bg-surface border border-line rounded-lg divide-y divide-line">
             {recentRuns.map((r) => (
               <div key={r.id} className="flex items-center justify-between px-4 py-2.5">
                 <div>
-                  <p className="text-xs font-mono text-gray-600">{r.taskId}</p>
-                  {r.summary && <p className="text-xs text-gray-500 mt-0.5">{r.summary}</p>}
+                  <p className="text-xs font-mono text-ink-muted">{r.taskId}</p>
+                  {r.summary && <p className="text-xs text-ink-muted mt-0.5">{r.summary}</p>}
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  {r.itemsAdded ? <span className="text-xs text-gray-400">+{r.itemsAdded}</span> : null}
+                  {r.itemsAdded ? <span className="text-xs text-ink-subtle">+{r.itemsAdded}</span> : null}
                   <StatusBadge status={r.status} />
-                  <span className="text-xs text-gray-400">{new Date(r.runAt).toLocaleDateString()}</span>
+                  <span className="text-xs text-ink-subtle">{new Date(r.runAt).toLocaleDateString()}</span>
                 </div>
               </div>
             ))}
@@ -362,7 +362,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
         applicationsReady.length === 0 &&
         applicationsBlocked.length === 0 &&
         recentRuns.length === 0 && (
-        <p className="text-gray-400 text-sm">All clear — nothing needs attention right now.</p>
+        <p className="text-ink-subtle text-sm">All clear — nothing needs attention right now.</p>
       )}
     </div>
   )

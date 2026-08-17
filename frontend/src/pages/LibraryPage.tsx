@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type LibraryEntry, type LibraryResponse, type QuestionKindOption } from '../api'
 
 const INPUT =
-  'w-full text-sm border border-gray-300 rounded-md px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition'
+  'w-full text-sm border border-line-strong rounded-md px-2.5 py-1.5 bg-surface focus:outline-none focus:border-brand transition'
 
 const CATEGORY_LABEL: Record<string, string> = {
   identity: 'Identity',
@@ -16,11 +16,11 @@ const CATEGORY_LABEL: Record<string, string> = {
 const CATEGORY_ORDER = ['identity', 'links', 'story', 'pitch', 'logistics']
 
 const CATEGORY_COLOR: Record<string, string> = {
-  identity: 'bg-sky-50 text-sky-700',
-  links: 'bg-violet-50 text-violet-700',
-  story: 'bg-amber-50 text-amber-800',
-  pitch: 'bg-rose-50 text-rose-700',
-  logistics: 'bg-teal-50 text-teal-700',
+  identity: 'bg-submitted-soft text-submitted',
+  links: 'bg-library-soft text-library',
+  story: 'bg-pending-soft text-pending',
+  pitch: 'bg-danger-soft text-danger',
+  logistics: 'bg-ready-soft text-ready',
 }
 
 function EntryCard({
@@ -39,18 +39,18 @@ function EntryCard({
   const dirty = value !== entry.content
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg px-4 py-3">
+    <div className="bg-surface border border-line rounded-lg px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900">
+          <p className="text-sm font-medium text-ink">
             {entry.label}
             {entry.maxLength ? (
-              <span className="ml-2 text-xs font-normal text-gray-400">
+              <span className="ml-2 text-xs font-normal text-ink-subtle">
                 short version · up to {entry.maxLength} chars
               </span>
             ) : null}
           </p>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-ink-subtle mt-0.5">
             {entry.usedBy.length > 0
               ? `On ${entry.usedBy.length} application${entry.usedBy.length === 1 ? '' : 's'}: ${entry.usedBy
                   .map((g) => g.gigName ?? `#${g.gigId}`)
@@ -60,10 +60,10 @@ function EntryCard({
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-gray-400 tabular-nums">{value.length}</span>
+          <span className="text-xs text-ink-subtle tabular-nums">{value.length}</span>
           <button
             onClick={() => setEditing((v) => !v)}
-            className="text-xs px-2.5 py-1 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+            className="text-xs px-2.5 py-1 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted transition-colors"
           >
             {editing ? 'Done' : 'Edit'}
           </button>
@@ -72,7 +72,7 @@ function EntryCard({
               if (confirm(`Remove the stored “${entry.label}” answer?`)) onDelete()
             }}
             title="Delete"
-            className="w-6 h-6 flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+            className="w-6 h-6 flex items-center justify-center rounded text-ink-subtle hover:text-danger hover:bg-danger-soft transition-colors"
           >
             ×
           </button>
@@ -91,32 +91,32 @@ function EntryCard({
             <button
               disabled={!dirty || isSaving}
               onClick={() => onSave(value)}
-              className="text-xs px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-md bg-ink text-on-accent hover:opacity-90 disabled:opacity-40 transition-colors"
             >
               {isSaving ? 'Saving…' : 'Save'}
             </button>
             {dirty && (
               <button
                 onClick={() => setValue(entry.content)}
-                className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted transition-colors"
               >
                 Revert
               </button>
             )}
             {entry.usedBy.length > 0 && (
-              <p className="text-xs text-gray-400 self-center">
+              <p className="text-xs text-ink-subtle self-center">
                 Editing changes future applications; answers already prepared keep their text.
               </p>
             )}
           </div>
         </div>
       ) : (
-        <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap leading-relaxed">
+        <p className="text-sm text-ink-muted mt-2 whitespace-pre-wrap leading-relaxed">
           {entry.content}
         </p>
       )}
 
-      {entry.notes && <p className="text-xs text-gray-400 mt-2">{entry.notes}</p>}
+      {entry.notes && <p className="text-xs text-ink-subtle mt-2">{entry.notes}</p>}
     </div>
   )
 }
@@ -136,11 +136,11 @@ function AddEntryForm({
   const kind = kinds.find((k) => k.key === questionKey)
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-gray-900">Add an answer</h3>
+    <div className="bg-surface border border-line rounded-lg p-4 space-y-3">
+      <h3 className="text-sm font-semibold text-ink">Add an answer</h3>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Question</label>
+          <label className="block text-xs font-medium text-ink-muted mb-1">Question</label>
           <select value={questionKey} onChange={(e) => setQuestionKey(e.target.value)} className={INPUT}>
             <option value="">Choose a question…</option>
             {CATEGORY_ORDER.map((cat) => (
@@ -158,7 +158,7 @@ function AddEntryForm({
         </div>
         {kind?.lengthSensitive && (
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">
+            <label className="block text-xs font-medium text-ink-muted mb-1">
               Written for a limit of
             </label>
             <input
@@ -190,7 +190,7 @@ function AddEntryForm({
           setContent('')
           setMaxLength('')
         }}
-        className="text-sm px-4 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+        className="text-sm px-4 py-1.5 rounded-md bg-ink text-on-accent hover:opacity-90 disabled:opacity-40 transition-colors"
       >
         {isAdding ? 'Adding…' : 'Add to library'}
       </button>
@@ -239,7 +239,7 @@ export function LibraryPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+      <div className="rounded-lg bg-danger-soft border border-danger px-4 py-3 text-sm text-danger">
         Failed to load the answer library — {(error as Error).message}
       </div>
     )
@@ -257,8 +257,8 @@ export function LibraryPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Answer Library</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl font-semibold text-ink">Answer Library</h1>
+          <p className="text-sm text-ink-muted mt-0.5">
             Answers you’ve approved, reused automatically the next time a form asks the same
             question.
           </p>
@@ -267,14 +267,14 @@ export function LibraryPage() {
           <button
             disabled={seed.isPending}
             onClick={() => seed.mutate()}
-            className="text-sm px-3.5 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+            className="text-sm px-3.5 py-1.5 rounded-md border border-line-strong text-ink-muted hover:bg-surface-muted disabled:opacity-40 transition-colors"
           >
             {seed.isPending ? 'Seeding…' : 'Seed from reference docs'}
           </button>
           <button
             onClick={() => setShowAdd((v) => !v)}
             className={`text-sm px-3.5 py-1.5 rounded-md font-medium transition-colors ${
-              showAdd ? 'bg-gray-200 text-gray-700' : 'bg-gray-900 text-white hover:bg-gray-700'
+              showAdd ? 'bg-surface-muted text-ink-muted' : 'bg-ink text-on-accent hover:opacity-90'
             }`}
           >
             {showAdd ? 'Cancel' : '+ New answer'}
@@ -283,14 +283,14 @@ export function LibraryPage() {
       </div>
 
       {seed.isSuccess && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ink-muted">
           {seed.data.created > 0
             ? `Added ${seed.data.created} answer${seed.data.created === 1 ? '' : 's'} from your reference docs.`
             : 'Nothing new to add — the reference docs are already covered.'}
         </p>
       )}
       {seed.isError && (
-        <p className="text-xs text-red-600">{(seed.error as Error).message}</p>
+        <p className="text-xs text-danger">{(seed.error as Error).message}</p>
       )}
 
       {showAdd && data && (
@@ -301,35 +301,35 @@ export function LibraryPage() {
         />
       )}
       {create.isError && (
-        <p className="text-xs text-red-600">{(create.error as Error).message}</p>
+        <p className="text-xs text-danger">{(create.error as Error).message}</p>
       )}
 
       {isLoading ? (
         <div className="space-y-2 animate-pulse">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-20 bg-gray-100 rounded-lg" />
+            <div key={i} className="h-20 bg-surface-muted rounded-lg" />
           ))}
         </div>
       ) : entries.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-lg px-4 py-8 text-center">
-          <p className="text-sm text-gray-500">Nothing stored yet.</p>
-          <p className="text-xs text-gray-400 mt-1">
+        <div className="bg-surface border border-line rounded-lg px-4 py-8 text-center">
+          <p className="text-sm text-ink-muted">Nothing stored yet.</p>
+          <p className="text-xs text-ink-subtle mt-1">
             Seed from your reference docs to start, or approve an answer on an application — every
             answer you approve is filed here automatically.
           </p>
         </div>
       ) : (
         <>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-ink-subtle">
             {entries.length} answer{entries.length === 1 ? '' : 's'} · reused {totalUses} time
             {totalUses === 1 ? '' : 's'}
           </p>
           {byCategory.map((group) => (
             <div key={group.category}>
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">
                 <span
                   className={`inline-flex items-center rounded px-2 py-0.5 ${
-                    CATEGORY_COLOR[group.category] ?? 'bg-gray-100 text-gray-600'
+                    CATEGORY_COLOR[group.category] ?? 'bg-surface-muted text-ink-muted'
                   }`}
                 >
                   {CATEGORY_LABEL[group.category] ?? group.category}
