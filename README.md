@@ -122,10 +122,30 @@ migration — `scripts/backfill-structured-columns.js` populates the new columns
 
 ## Deploying
 
+Pushing to `main` deploys automatically — `.github/workflows/deploy.yml` runs
+typecheck, tests and the frontend build, then `wrangler deploy`. The Actions
+tab shows every deploy tied to its commit; the workflow can also be run
+manually from there.
+
+It needs two repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | API token with **Account → Workers Scripts → Edit** and **Account → Account Settings → Read**, scoped to the account owning this Worker |
+| `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account ID |
+
+The job targets the `production` GitHub environment, so required reviewers or
+a wait timer can be added under Settings → Environments without editing the
+workflow.
+
+To deploy by hand instead:
+
 ```bash
-npm run build:ui             # build the frontend into dist/
-npm run deploy               # wrangler deploy (publishes Worker + assets)
+npm run build                # build:ui, then predeploy (typecheck + test), then deploy
 ```
+
+Use `npm run build`, not `npm run deploy` — `deploy` alone publishes the Worker
+with whatever is already in `dist/`, so the frontend would not be rebuilt.
 
 Set production secrets once with `wrangler secret put`:
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`,

@@ -1,0 +1,56 @@
+name: Deploy
+
+# Publishes the Worker + static assets to Cloudflare on every push to main.
+# Manual runs are allowed too (Actions tab → Deploy → Run workflow).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two deploys race each other onto the same Worker. A newer push
+# waits for the running deploy rather than cancelling it — a half-finished
+# deploy is worse than a slightly stale one.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Lets you add required reviewers or a wait timer later via
+    # Settings → Environments → production, without touching this file.
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The same gate package.json's `predeploy` hook runs, but as separate
+      # steps so a failure is obvious in the run log. Steps are fail-fast, so
+      # nothing below runs if either of these is red.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build:ui
+
+      # Calls wrangler directly rather than `npm run deploy`, which would
+      # re-run typecheck and tests via predeploy. npx resolves the version
+      # pinned in devDependencies, so CI and local deploys use the same one.
+      - name: Deploy to Cloudflare
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
