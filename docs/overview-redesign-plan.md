@@ -142,9 +142,10 @@ Five blocks. Ordered by decision density, not by entity type.
 
 ### A+B. The decision deck — the whole top of the page
 
-No counters and no totals. The first thing on screen is a decision you can
-make. Four cards drawn from the *same* `buildReviewQueue()` scoring the Review
-screen uses, so the two screens can never disagree:
+No counters and no totals. The first thing on screen is a single decision,
+with the rest of the stack visible behind it so the depth is legible without
+being a list. Order comes from the *same* `buildReviewQueue()` the Review
+screen uses — now served by `GET /api/review` — so the two cannot disagree:
 
 ```
 ┌────────────────────────────────────┐
@@ -166,8 +167,8 @@ rather than table rows: a row truncates to an ellipsis exactly where the
 reasoning lives.
 
 Buttons are named for the outcome — "Approve the spend", "Archive", "Send this
-one" — never generic OK/Cancel. Acting on a card removes it and the next takes
-its place; the deck drains. Header reads "4 of 14 · show the rest →".
+one" — never generic OK/Cancel. Acting on a card, or snoozing it, deals the
+next one; the deck drains. Header reads "1 of 14 · skip →".
 
 The sentence is generated per item from the parsed note, keyed on the dominant
 flag (conflict / paid / overdue / blocked / duplicate). Writing those templates
@@ -215,6 +216,71 @@ once the underlying issues are resolved.
 
 ---
 
+## 3b. Snooze needs somewhere to live
+
+Snooze is not a UI affordance, it is a column. Nothing today can express "not
+now, ask me in September", which is why 16 no-deadline opportunities sit in
+permanent limbo — the only options are act or ignore.
+
+The smallest version is one nullable `snoozed_until` per row on
+`gig_opportunities` and `sync_targets`. `buildReviewQueue()` drops anything
+whose date is still in the future and lets it back in on its own, so the deck
+shrinks honestly rather than by forgetting. A "Snoozed" filter alongside the
+existing ones keeps it auditable — a queue that hides things with no way to
+look is worse than one that nags.
+
+Offered dates should be data-aware where the item allows it: on SXSW, whose
+fee rises September 1, "before the fee rises" beats any generic interval.
+Where there is no such date the menu simply does not offer one rather than
+showing a dead entry.
+
+Decide early: a snooze probably should **not** survive the item changing
+underneath it. If a run updates a snoozed gig — new deadline, a fee appears —
+waking it immediately is more useful than honouring a date set against
+different facts.
+
+## 3c. The email digest
+
+The dashboard only works if something brings you back to it. A digest is that
+thing, and it changes what the app is: today it waits to be visited; this makes
+it reach out when there is a reason.
+
+### Two prerequisites, neither of which exists yet
+
+- **No scheduler.** `wrangler.toml` declares no `[triggers]` and the Worker
+  exports no `scheduled()` handler. A Cron Trigger is the natural fit — the
+  Worker already owns the data.
+- **The Gmail token cannot send.** It holds `gmail.readonly`, deliberately;
+  `docs/gmail-setup.md` states the app never sends. Sending means either
+  re-consenting for `gmail.send`, which widens what a leaked token can do, or
+  a separate transactional sender whose credentials only send. The second
+  keeps read and write access apart and is the safer default.
+
+### What goes in it
+
+A diff, not a report. Four groups, in this order, each dropped when empty:
+
+1. **New since last time** — what the discovery runs added, with the same
+   one-sentence rationale the cards use.
+2. **Now actionable** — snoozes come due, windows opened, deadlines crossed
+   into range. This is the group that earns the email.
+3. **Changed under you** — items already reviewed whose facts moved: a fee
+   appeared, a deadline shifted, a note picked up a conflict.
+4. **Going stale** — the no-deadline pile, capped at two or three, oldest
+   first, so the rot surfaces slowly instead of as a wall.
+
+Every line links straight into `#review` at that item. The digest's job is to
+end in the app, not to substitute for it.
+
+### Rules that keep it welcome
+
+Send nothing when there is nothing — an empty digest teaches you to ignore the
+full ones. Never repeat an item that has not changed, which needs a per-item
+mark for what was last reported, not just a `last_digest_at` timestamp. Keep
+the cadence to one weekly send, with an immediate send reserved for a
+genuinely dated event (a deadline inside a week on something unsubmitted).
+Both switchable from Settings without a deploy.
+
 ## 4. Build order
 
 Phase 0 is not optional — without it the redesign renders empty boxes.
@@ -225,7 +291,9 @@ Phase 0 is not optional — without it the redesign renders empty boxes.
 | **1** | The decision deck. Delete the stat cards outright. Includes writing the per-flag rationale sentences — that copy is the feature, not the card styling. | The whole point of the page |
 | **2** | Block E: collapse the task-run log. | Biggest space win, lowest risk |
 | **3** | Blocks C + D, plus the `deadline` / `deadline_note` / `opens_at` split and a date backfill (17 of 33 recoverable — see §1b) | Makes the time-critical strip real rather than decorative |
-| **4** | Block F, and fix the orphaned reminder: `DELETE /api/gigs/:id` removes the gig and its Calendar event but leaves its reminders behind — reminder 3 points at gig 21, which no longer exists. | Housekeeping |
+| **4** | `snoozed_until` on both tables, the queue filter, a "Snoozed" view, and the deck's snooze action (§3b) | Half the backlog is real work at the wrong moment |
+| **5** | The email digest (§3c): Cron Trigger, `scheduled()` handler, a sender that is not the read-only Gmail token, per-item marks so nothing is reported twice | Depends on 4 — "now actionable" is mostly snoozes coming due |
+| **6** | Block F, and fix the orphaned reminder: `DELETE /api/gigs/:id` removes the gig and its Calendar event but leaves its reminders behind — reminder 3 points at gig 21, which no longer exists. | Housekeeping |
 
 ### Shared-logic note
 
