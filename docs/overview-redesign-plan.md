@@ -107,19 +107,21 @@ list footers.
 and the top of the page. The most decision-dense block goes top-left. Today
 that space holds three numbers that never change.
 
-**Cards for heterogeneous content; lists for homogeneous items.** NN/g is
-explicit that cards suit dashboards mixing content types, but *"when
-presenting very homogenous items, consider using a standard vertical list of
-items or grids of images instead of cards to support scannability and also
-comparisons among items."* Thirty-four gig opportunities are homogeneous.
-They want dense list rows, not bordered cards with generous padding.
+**Cards and rows do different jobs; use both.** NN/g is explicit that
+homogeneous items belong in *"a standard vertical list of items … to support
+scannability and also comparisons among items"* — which is why the Review
+screen's queue rail is a dense list of 34 comparable rows. But the Overview is
+not for comparing; it is for deciding four things and leaving. Each of those
+four needs a full sentence of context, and a sentence does not survive a table
+row — it truncates exactly where the reasoning lives. So the deck gets cards
+and the glanceable strips below it stay rows.
 
 **Progressive disclosure.** Cited at reducing cognitive load substantially,
 and it is the entire answer to the task-run log: one line per run, prose
 behind a disclosure.
 
 **Five to seven blocks, maximum.** Beyond that the page stops being scannable.
-The proposal below has six.
+The proposal below has five.
 
 **Encode urgency preattentively.** Colour, position and size are processed
 before attention engages. Urgency should be a red dot and a position near the
@@ -136,38 +138,43 @@ show a real zero state when it is done.
 
 ## 3. Proposed structure
 
-Six blocks. Ordered by decision density, not by entity type.
+Five blocks. Ordered by decision density, not by entity type.
 
-### A. Action bar — replaces the three stat cards
+### A+B. The decision deck — the whole top of the page
 
-Four counters, each a **filter into Review**, not a total:
-
-```
-Needs decision 14   Blocked on you 11   Costs money 8   Overdue 5
-```
-
-Every number is a door. Clicking one lands on `#review` with that filter
-already applied. Counts of *work*, never of *inventory*. Rendered as one
-compact row, not four cards — they are homogeneous.
-
-Beside it, one primary button: **Start review →**.
-
-### B. Needs you now — top-left, the largest block
-
-The top 5–7 items from the *same* `buildReviewQueue()` scoring the Review
-screen uses, so the two screens can never disagree. Compact list rows:
+No counters and no totals. The first thing on screen is a decision you can
+make. Four cards drawn from the *same* `buildReviewQueue()` scoring the Review
+screen uses, so the two screens can never disagree:
 
 ```
-● Home Routes / Chemin Chez Nous    Status says submitted, note says not    [Approve] [Pass] [Open]
-● Canadian Folk Music Awards 2027   Deadline passed 33d ago · CAD 85        [Approve] [Pass] [Open]
-○ SXSW 2027 Showcase                Paid application · pending your review  [Approve] [Pass] [Open]
+┌────────────────────────────────────┐
+│ GIG ●                  found Jul 2 │
+│ Home Routes / Chemin Chez Nous     │
+│ Marked submitted, but the note     │
+│ says the intake form was never     │
+│ filled in — and it still needs     │
+│ your phone number and mailing      │
+│ address. Did this actually go out? │
+│ [It went out] [Not sent] [Details] │
+└────────────────────────────────────┘
 ```
 
-One line each. A severity dot, a title, one reason chip, inline actions.
-Acting on a row removes it — the list drains. Below it: "9 more →".
+Three parts, in this order: **title**, **one plain sentence naming the actual
+decision**, **buttons underneath**. The sentence is the feature — it is what
+lets a decision happen without opening anything, and it is why these are cards
+rather than table rows: a row truncates to an ellipsis exactly where the
+reasoning lives.
 
-Zero state, when it happens: *"Nothing needs a decision. 16 open
-opportunities are still waiting whenever you want them."*
+Buttons are named for the outcome — "Approve the spend", "Archive", "Send this
+one" — never generic OK/Cancel. Acting on a card removes it and the next takes
+its place; the deck drains. Header reads "4 of 14 · show the rest →".
+
+The sentence is generated per item from the parsed note, keyed on the dominant
+flag (conflict / paid / overdue / blocked / duplicate). Writing those templates
+is the substance of this block, not the card styling.
+
+Zero state: *"Nothing needs a decision. 16 open opportunities are still
+waiting whenever you want them."*
 
 ### C. Time-critical strip
 
@@ -215,7 +222,7 @@ Phase 0 is not optional — without it the redesign renders empty boxes.
 | Phase | Work | Why first |
 | --- | --- | --- |
 | **0** | Make `/api/overview` return what actually needs a decision. Either migrate the status vocabularies to match `GigStatus`/`SyncStatus`, or move the queue logic server-side so Overview and Review share one definition. | Everything below shows nothing until this lands |
-| **1** | Blocks A + B: action bar and "Needs you now". Delete the stat cards. | The whole point of the page |
+| **1** | The decision deck. Delete the stat cards outright. Includes writing the per-flag rationale sentences — that copy is the feature, not the card styling. | The whole point of the page |
 | **2** | Block E: collapse the task-run log. | Biggest space win, lowest risk |
 | **3** | Blocks C + D, plus the `deadline` / `deadline_note` / `opens_at` split and a date backfill (17 of 33 recoverable — see §1b) | Makes the time-critical strip real rather than decorative |
 | **4** | Block F, and fix the orphaned reminder: `DELETE /api/gigs/:id` removes the gig and its Calendar event but leaves its reminders behind — reminder 3 points at gig 21, which no longer exists. | Housekeeping |
