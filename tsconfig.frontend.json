@@ -9,5 +9,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["frontend/src"]
+  "include": ["frontend/src", "shared"]
 }

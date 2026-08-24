@@ -1,42 +1,23 @@
-export type GigStatus = 'pending_review' | 'approved' | 'rejected' | 'submitted' | 'archived'
-export type SyncStatus = 'draft_ready' | 'pitched' | 'confirmed' | 'declined' | 'archived'
+// Entity shapes live in shared/ because the Worker builds the review queue
+// from them too — see shared/types.ts. Re-exported here so UI code can keep
+// importing everything it needs from one module.
+export type {
+  GigStatus,
+  SyncStatus,
+  GigOpportunity,
+  SyncTarget,
+  PromoDraft,
+} from '../../shared/types'
 
-export interface GigOpportunity {
-  id: number
-  name: string
-  type: string
-  organizer: string | null
-  submissionMethod: 'email' | 'portal' | 'form' | null
-  audienceSize: number | null
-  genreFitScore: number | null
-  deadline: string | null
-  feeAmount: number | null
-  feeCurrency: string | null
-  fee: string | null // legacy
-  paid: number
-  fitNotes: string | null // legacy
-  fitRationale: string | null
-  url: string | null
-  status: GigStatus
-  googleEventId: string | null
-  discoveredAt: string
-  updatedAt: string
-}
+import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
+import type { ReviewFilter, ReviewItem } from '../../shared/reviewQueue'
 
-export interface SyncTarget {
-  id: number
-  name: string
-  agencyType: string | null
-  contactEmail: string | null
-  contactRole: string | null
-  confirmationMethod: string | null
-  notes: string | null
-  pitchDraft: string | null
-  pitchSent: string | null
-  status: SyncStatus
-  discoveredAt: string
-  updatedAt: string
-  reconciledAt: string | null
+export type { ReviewFilter, ReviewItem } from '../../shared/reviewQueue'
+
+export interface ReviewQueue {
+  items: ReviewItem[]
+  total: number
+  counts: Record<ReviewFilter, number>
 }
 
 export interface ReconcileResult {
@@ -54,15 +35,6 @@ export interface ReconcileResult {
 export interface ReconcilePreview {
   results: ReconcileResult[]
   unmatched: Array<{ id: number; name: string; contactEmail: string | null; currentStatus: string }>
-}
-
-export interface PromoDraft {
-  id: number
-  month: string
-  title: string
-  content: string
-  status: string
-  createdAt: string
 }
 
 export interface TaskRun {
@@ -125,6 +97,14 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   overview: () => apiFetch<Overview>('/overview'),
+  review: (params?: { filter?: ReviewFilter; limit?: number }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(
+          Object.entries(params).flatMap(([k, v]) => (v === undefined ? [] : [[k, String(v)]])),
+        ).toString()
+      : ''
+    return apiFetch<ReviewQueue>(`/review${qs}`)
+  },
   gigs: {
     list: (params?: Record<string, string>) => {
       const qs = params ? '?' + new URLSearchParams(params).toString() : ''

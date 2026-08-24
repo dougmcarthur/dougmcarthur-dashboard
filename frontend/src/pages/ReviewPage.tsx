@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type GigOpportunity, type SyncTarget, type PromoDraft } from '../api'
 import { StatusBadge } from '../components/StatusBadge'
@@ -7,10 +7,7 @@ import { PitchDiff } from '../components/PitchDiff'
 import {
   Panel, CopyButton, FlagChip, KindTag, AlertList, FieldTable, BulletList, RawNote,
 } from '../components/ReviewPanels'
-import {
-  buildReviewQueue, matchesFilter, countByFilter,
-  type ReviewItem, type ReviewFilter,
-} from '../lib/reviewQueue'
+import type { ReviewItem, ReviewFilter } from '../../../shared/reviewQueue'
 
 const FILTERS: Array<{ id: ReviewFilter; label: string }> = [
   { id: 'needs', label: 'Needs a decision' },
@@ -407,19 +404,16 @@ export function ReviewPage() {
   const [filter, setFilter] = useState<ReviewFilter>('needs')
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
-  const gigsQuery = useQuery({ queryKey: ['gigs', ''], queryFn: () => api.gigs.list() })
-  const syncQuery = useQuery({ queryKey: ['sync', ''], queryFn: () => api.sync.list() })
-  const promoQuery = useQuery({ queryKey: ['promo'], queryFn: api.promo.list })
+  // The queue is built by the Worker (GET /api/review) so this screen and the
+  // Overview share one definition of what needs a decision. Filtering happens
+  // server-side too; `counts` always covers the whole queue.
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['review', filter],
+    queryFn: () => api.review({ filter }),
+  })
 
-  const isLoading = gigsQuery.isLoading || syncQuery.isLoading || promoQuery.isLoading
-  const error = gigsQuery.error ?? syncQuery.error ?? promoQuery.error
-
-  const items = useMemo(
-    () => buildReviewQueue({ gigs: gigsQuery.data, sync: syncQuery.data, promo: promoQuery.data }),
-    [gigsQuery.data, syncQuery.data, promoQuery.data],
-  )
-
-  const visible = useMemo(() => items.filter((i) => matchesFilter(i, filter)), [items, filter])
+  const visible = data?.items ?? []
+  const counts = data?.counts
 
   const selected = visible.find((i) => i.key === selectedKey) ?? visible[0] ?? null
 
@@ -429,6 +423,7 @@ export function ReviewPage() {
   }, [selected, selectedKey])
 
   const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['review'] })
     qc.invalidateQueries({ queryKey: ['gigs'] })
     qc.invalidateQueries({ queryKey: ['sync'] })
     qc.invalidateQueries({ queryKey: ['promo'] })
@@ -477,13 +472,13 @@ export function ReviewPage() {
       <div className="flex items-baseline justify-between gap-4">
         <h1 className="text-xl font-semibold text-gray-900">Review</h1>
         <p className="text-xs text-gray-400">
-          {visible.length} of {items.length} items · <kbd className="font-mono">j</kbd>/<kbd className="font-mono">k</kbd> to move
+          {visible.length} of {counts?.all ?? 0} items · <kbd className="font-mono">j</kbd>/<kbd className="font-mono">k</kbd> to move
         </p>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
         {FILTERS.map((f) => {
-          const count = countByFilter(items, f.id)
+          const count = counts?.[f.id] ?? 0
           const active = filter === f.id
           return (
             <button

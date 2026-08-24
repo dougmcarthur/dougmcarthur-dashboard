@@ -13,5 +13,8 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8787',
     },
+    // shared/ sits outside `root`, so the dev server needs explicit permission
+    // to serve it. Production builds bundle it without this.
+    fs: { allow: ['..'] },
   },
 })

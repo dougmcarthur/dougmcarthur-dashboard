@@ -33,6 +33,7 @@ src/
   routes/             One Hono router per resource (gigs, sync, promo, …)
   lib/                googleCalendar.ts, gmail.ts (OAuth refresh-token helpers)
 frontend/             React + Vite app (its own tsconfig.frontend.json)
+shared/               Wire types + the review-queue logic, imported by BOTH
 migrations/           D1 migrations (applied via wrangler)
 scripts/              One-off maintenance scripts (e.g. column backfill)
 docs/                 Setup guides + the notes-field audit
@@ -46,6 +47,7 @@ All routes are under `/api`; anything else falls through to static assets.
 | Route | Purpose |
 | --- | --- |
 | `GET /api/overview` | Dashboard rollup: counts, pending-review items, upcoming deadlines, due reminders |
+| `GET /api/review` | The decision queue — what needs a decision, ranked, with per-filter counts (`?filter=`, `?limit=`) |
 | `/api/gigs` | Gig opportunities (CRUD). Approving with a deadline creates a Calendar event + pre-deadline reminder |
 | `/api/sync` | Sync-licensing targets (CRUD) |
 | `/api/sync/reconcile` | `GET` preview of sent-pitch matches from Gmail; `POST /apply` to write status/pitch updates |
@@ -62,26 +64,39 @@ All routes are under `/api`; anything else falls through to static assets.
 ## The Review screen
 
 `#review` is the triage queue: one prioritised list of everything waiting on a
-decision, with the full context for the selected item beside it. It adds no
-API routes — it reads `/api/gigs`, `/api/sync` and `/api/promo` and does the
-work client-side.
+decision, with the full context for the selected item beside it. It reads
+`GET /api/review`, which is where the queue is actually built.
 
 Two things about it are worth knowing before changing it:
 
 - **It does not build its queue from `status`.** No production row carries
   `pending_review` / `draft_ready` / `draft`, so a status-driven queue would
   be empty. What actually records "waiting on Doug" is prose in the note
-  columns, so `frontend/src/lib/reviewQueue.ts` combines the parsed note with
-  the workflow status — and surfaces the cases where the two contradict each
-  other as the highest-priority flag.
-- **`frontend/src/lib/reviewParse.ts` is a stopgap.** It pulls entry-fee
-  warnings, drafted application values, outreach copy, requirements, deal
-  terms, blockers and window dates back out of `gig_opportunities.fit_notes`
-  and `sync_targets.notes` at read time, because the structured columns added
-  in migration 0001 were never backfilled (all NULL in production). Read
+  columns, so `shared/reviewQueue.ts` combines the parsed note with the
+  workflow status — and surfaces the cases where the two contradict each other
+  as the highest-priority flag. That logic runs in the Worker, so every screen
+  asking "what needs a decision" gets one answer.
+- **`shared/reviewParse.ts` is a stopgap.** It pulls entry-fee warnings,
+  drafted application values, outreach copy, requirements, deal terms,
+  blockers and window dates back out of `gig_opportunities.fit_notes` and
+  `sync_targets.notes` at read time, because the structured columns added in
+  migration 0001 were never backfilled (all NULL in production). Read
   [`docs/notes-field-audit.md`](docs/notes-field-audit.md) for the inventory,
   the proposed columns, and the data-integrity issues found along the way; the
   parser should be deleted once the backfill lands.
+
+### `shared/` and why it exists
+
+`shared/` holds the wire types and the queue logic, and is included by both
+`tsconfig.json` and `tsconfig.frontend.json`. The Worker imports it for real —
+`GET /api/review` builds the queue — while the frontend imports only its
+*types*, so none of the parser ships to the browser (it is `import type`
+throughout; the client bundle is ~11 kB smaller for it).
+
+Keep it that way. Anything added to `shared/` must run in a Worker: no DOM,
+no React, no Node built-ins. And if a screen needs to know what requires a
+decision, it asks `/api/review` — it does not re-derive the answer locally.
+That duplication is exactly what this directory exists to prevent.
 
 ## Local development
 

@@ -12,6 +12,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "drizzle.config.ts"],
+  "include": ["src", "shared", "drizzle.config.ts"],
   "exclude": ["node_modules", "dist", "frontend"]
 }

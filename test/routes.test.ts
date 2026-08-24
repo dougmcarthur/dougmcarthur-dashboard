@@ -18,6 +18,23 @@ describe('API route registration', () => {
     expect(body.error).toBe('Gmail not configured')
   })
 
+  // The review route validates query params before touching D1, so these two
+  // cases are reachable with no database binding at all.
+  it('GET /api/review rejects an unknown filter before hitting the database', async () => {
+    const res = await app.request('/api/review?filter=nonsense', {}, emptyEnv)
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: string; allowed: string[] }
+    expect(body.error).toContain('nonsense')
+    expect(body.allowed).toContain('needs')
+  })
+
+  it('GET /api/review rejects a non-positive limit', async () => {
+    for (const bad of ['0', '-3', 'abc', '1.5']) {
+      const res = await app.request(`/api/review?limit=${bad}`, {}, emptyEnv)
+      expect(res.status, `limit=${bad}`).toBe(400)
+    }
+  })
+
   it('GET /api/health reports integration config without secrets', async () => {
     const res = await app.request('/api/health', {}, emptyEnv)
     expect(res.status).toBe(200)

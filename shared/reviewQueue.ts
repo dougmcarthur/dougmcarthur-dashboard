@@ -1,5 +1,10 @@
 /**
- * Builds the Review screen's decision queue from the three entity lists.
+ * Builds the decision queue from the three entity lists.
+ *
+ * This runs in the Worker (`GET /api/review`) and is imported by the frontend
+ * only for its types, so the Review screen and the Overview cannot disagree
+ * about what needs a decision.
+ *
  *
  * The queue deliberately does NOT key off `status = 'pending_review'`. In
  * production not one gig carries that status, not one sync target carries
@@ -15,7 +20,7 @@
  * than quietly resolved in favour of either side.
  */
 
-import type { GigOpportunity, SyncTarget, PromoDraft } from '../api'
+import type { GigOpportunity, SyncTarget, PromoDraft } from './types'
 import {
   parseNote,
   parseFee,

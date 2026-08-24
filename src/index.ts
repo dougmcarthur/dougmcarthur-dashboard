@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import type { Env } from './types'
 import overview from './routes/overview'
+import review from './routes/review'
 import gigs from './routes/gigs'
 import sync from './routes/sync'
 import promo from './routes/promo'
@@ -18,6 +19,7 @@ app.use('/api/*', logger())
 app.use('/api/*', cors())
 
 app.route('/api/overview', overview)
+app.route('/api/review', review)
 app.route('/api/gigs', gigs)
 // NOTE: must be registered before '/api/sync' — otherwise the sync router's
 // GET '/:id' route matches '/reconcile' first and swallows this endpoint.

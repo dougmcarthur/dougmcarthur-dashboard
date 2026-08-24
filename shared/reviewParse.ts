@@ -182,7 +182,7 @@ export function parseDeadline(raw: string | null): ParsedDeadline {
  * production row. Distinguish "costs Doug money to apply" from "pays Doug if
  * selected" — both show up in the same column.
  */
-export function parseFee(raw: string | null, paid: number | boolean): ParsedFee {
+export function parseFee(raw: string | null, paid: number | boolean | null): ParsedFee {
   const text = raw?.trim() ?? ''
   const flaggedPaid = paid === 1 || paid === true
 

@@ -221,7 +221,7 @@ Phase 0 is not optional — without it the redesign renders empty boxes.
 
 | Phase | Work | Why first |
 | --- | --- | --- |
-| **0** | Make `/api/overview` return what actually needs a decision. Either migrate the status vocabularies to match `GigStatus`/`SyncStatus`, or move the queue logic server-side so Overview and Review share one definition. | Everything below shows nothing until this lands |
+| **0** | ~~Make the API return what actually needs a decision.~~ **Done.** The queue moved to `shared/` and is served by `GET /api/review`; the Review screen consumes it and derives nothing locally. Status vocabularies were deliberately left alone — the queue reads notes, not statuses, so migrating them is no longer on the critical path. | Everything below shows nothing until this lands |
 | **1** | The decision deck. Delete the stat cards outright. Includes writing the per-flag rationale sentences — that copy is the feature, not the card styling. | The whole point of the page |
 | **2** | Block E: collapse the task-run log. | Biggest space win, lowest risk |
 | **3** | Blocks C + D, plus the `deadline` / `deadline_note` / `opens_at` split and a date backfill (17 of 33 recoverable — see §1b) | Makes the time-critical strip real rather than decorative |
@@ -229,11 +229,12 @@ Phase 0 is not optional — without it the redesign renders empty boxes.
 
 ### Shared-logic note
 
-`buildReviewQueue()` and `reviewParse.ts` currently live in `frontend/src/lib/`
-and run client-side. If Phase 0 moves the "needs a decision" definition to the
-Worker, that logic should move with it (`src/lib/`) and be imported by both,
-so Overview and Review cannot drift apart. That is also the natural moment to
-retire the parser in favour of real columns, per the audit.
+Done as part of Phase 0. `buildReviewQueue()` and `reviewParse.ts` now live in
+`shared/`, included by both tsconfigs. The Worker imports them for real; the
+frontend imports only their types, so the parser no longer ships to the
+browser. Phase 1 gets its cards by calling `/api/review?limit=4` — it must not
+re-derive anything locally. Retiring the parser in favour of real columns, per
+the audit, is now a change in one place.
 
 ### What "done" looks like
 

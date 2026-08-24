@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import type { NoteAlert, DraftedField } from '../lib/reviewParse'
-import type { ReviewFlag, ReviewKind } from '../lib/reviewQueue'
+import type { NoteAlert, DraftedField } from '../../../shared/reviewParse'
+import type { ReviewFlag, ReviewKind } from '../../../shared/reviewQueue'
 
 export type PanelTone = 'neutral' | 'danger' | 'warn' | 'info' | 'accent'
 

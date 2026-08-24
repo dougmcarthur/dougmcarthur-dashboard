@@ -5,7 +5,7 @@ import {
   parseDeadline,
   findDate,
   splitSentences,
-} from '../frontend/src/lib/reviewParse'
+} from '../shared/reviewParse'
 
 // Fixtures below are verbatim excerpts of production rows in the D1 database
 // `dougmcarthur-music-hq` — the exact prose these parsers have to cope with.
