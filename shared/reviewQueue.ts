@@ -21,6 +21,7 @@
  */
 
 import type { GigOpportunity, SyncTarget, PromoDraft } from './types'
+import { decisionFor, type Decision } from './decisionCopy'
 import {
   parseNote,
   parseFee,
@@ -69,6 +70,8 @@ export interface ReviewItem {
   deadline: ParsedDeadline
   flags: ReviewFlag[]
   score: number
+  /** The sentence and buttons for this item — see decisionCopy.ts. */
+  decision: Decision
   source: ReviewSource
 }
 
@@ -152,7 +155,7 @@ function score(flags: ReviewFlag[], deadline: ParsedDeadline): number {
   return base + urgency
 }
 
-function gigItem(row: GigOpportunity): ReviewItem {
+function gigItem(row: GigOpportunity): Omit<ReviewItem, 'decision'> {
   const parsed = parseNote(row.fitRationale ?? row.fitNotes)
   const fee = parseFee(row.fee, row.paid)
   const deadline = parseDeadline(row.deadline)
@@ -173,7 +176,7 @@ function gigItem(row: GigOpportunity): ReviewItem {
   }
 }
 
-function syncItem(row: SyncTarget): ReviewItem {
+function syncItem(row: SyncTarget): Omit<ReviewItem, 'decision'> {
   const parsed = parseNote(row.notes)
   const fee = parseFee(null, 0)
   const deadline = parseDeadline(null)
@@ -194,7 +197,7 @@ function syncItem(row: SyncTarget): ReviewItem {
   }
 }
 
-function promoItem(row: PromoDraft): ReviewItem {
+function promoItem(row: PromoDraft): Omit<ReviewItem, 'decision'> {
   const parsed = parseNote(null)
   const fee = parseFee(null, 0)
   const deadline = parseDeadline(null)
@@ -224,7 +227,11 @@ export function buildReviewQueue(input: {
     ...(input.gigs ?? []).filter((g) => g.status !== 'archived').map(gigItem),
     ...(input.sync ?? []).filter((s) => s.status !== 'archived').map(syncItem),
     ...(input.promo ?? []).map(promoItem),
-  ].sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))
+  ]
+    // Copy is attached here rather than in each *Item builder so there is
+    // exactly one place where an item and its sentence are joined.
+    .map((item) => ({ ...item, decision: decisionFor(item) }))
+    .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))
 }
 
 export function matchesFilter(item: ReviewItem, filter: ReviewFilter): boolean {

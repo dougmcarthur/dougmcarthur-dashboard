@@ -61,6 +61,20 @@ All routes are under `/api`; anything else falls through to static assets.
 > `/api/sync` in `src/index.ts`, so the sync router's `/:id` handler doesn't
 > swallow it. Keep it that way when adding sub-routes.
 
+## The Overview deck
+
+`#overview` opens on one decision at a time, dealt from
+`GET /api/review?filter=needs` with the rest of the stack drawn behind it. The
+sentence on each card and the labels on its buttons come from
+`shared/decisionCopy.ts`, attached to every queue item — so the deck, the
+Review screen and anything built later (a digest, a notification) describe the
+same item the same way instead of each inventing phrasing.
+
+Buttons carry an *intent* (`confirm_sent`, `approve`, `pass`, `archive`, …),
+not a status. `DecisionDeck` maps intent to the right status per entity type,
+because "pass" means `rejected` on a gig and `declined` on a sync target. Add
+a new intent in one place and every kind has to say what it means.
+
 ## The Review screen
 
 `#review` is the triage queue: one prioritised list of everything waiting on a

@@ -288,7 +288,7 @@ Phase 0 is not optional — without it the redesign renders empty boxes.
 | Phase | Work | Why first |
 | --- | --- | --- |
 | **0** | ~~Make the API return what actually needs a decision.~~ **Done.** The queue moved to `shared/` and is served by `GET /api/review`; the Review screen consumes it and derives nothing locally. Status vocabularies were deliberately left alone — the queue reads notes, not statuses, so migrating them is no longer on the critical path. | Everything below shows nothing until this lands |
-| **1** | The decision deck. Delete the stat cards outright. Includes writing the per-flag rationale sentences — that copy is the feature, not the card styling. | The whole point of the page |
+| **1** | ~~The decision deck.~~ **Done.** Stat cards deleted; the deck deals one card at a time from `GET /api/review?filter=needs`. Rationale sentences live in `shared/decisionCopy.ts` and ride on every queue item, so the digest can reuse them. The old "Needs review" section went too — the deck supersedes it, and it was rendering an empty container because it counted promo drafts it never listed. | The whole point of the page |
 | **2** | Block E: collapse the task-run log. | Biggest space win, lowest risk |
 | **3** | Blocks C + D, plus the `deadline` / `deadline_note` / `opens_at` split and a date backfill (17 of 33 recoverable — see §1b) | Makes the time-critical strip real rather than decorative |
 | **4** | `snoozed_until` on both tables, the queue filter, a "Snoozed" view, and the deck's snooze action (§3b) | Half the backlog is real work at the wrong moment |

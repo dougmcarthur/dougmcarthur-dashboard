@@ -1,15 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Overview } from '../api'
 import { StatusBadge } from '../components/StatusBadge'
-
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5">
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-sm text-gray-500 mt-0.5">{label}</p>
-    </div>
-  )
-}
+import { DecisionDeck } from '../components/DecisionDeck'
 
 function daysUntil(dateStr: string): number {
   const today = new Date()
@@ -38,6 +30,13 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
     queryFn: api.overview,
   })
 
+  // The deck asks the Worker what needs deciding — the same endpoint and the
+  // same ordering the Review screen uses, so the two cannot drift apart.
+  const queue = useQuery({
+    queryKey: ['review', 'needs'],
+    queryFn: () => api.review({ filter: 'needs' }),
+  })
+
   const patchGig = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Parameters<typeof api.gigs.patch>[1] }) =>
       api.gigs.patch(id, body),
@@ -52,14 +51,8 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
   if (isLoading) {
     return (
       <div className="space-y-8 animate-pulse">
-        <div className="grid grid-cols-3 gap-4">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-5">
-              <div className="h-8 bg-gray-100 rounded w-12 mb-2" />
-              <div className="h-4 bg-gray-100 rounded w-28" />
-            </div>
-          ))}
-        </div>
+        <div className="h-6 bg-gray-100 rounded w-32" />
+        <div className="h-40 rounded-lg border border-gray-200 bg-white" />
       </div>
     )
   }
@@ -72,20 +65,26 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
     )
   }
 
-  const { stats, recentRuns, pendingReview, upcomingDeadlines, dueReminders } = data
-  const totalPending = pendingReview.gigs.length + pendingReview.sync.length + pendingReview.promo.length
+  const { recentRuns, upcomingDeadlines, dueReminders } = data
 
   return (
     <div className="space-y-8">
-      {/* Stats */}
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900 mb-4">Overview</h1>
-        <div className="grid grid-cols-3 gap-4">
-          <StatCard label="Gig Opportunities" value={stats.totalGigs} />
-          <StatCard label="Sync Targets" value={stats.totalSync} />
-          <StatCard label="Promo Drafts" value={stats.totalPromo} />
+      <h1 className="text-xl font-semibold text-gray-900">Overview</h1>
+
+      {/* The decisions come first — nothing to read past before acting. */}
+      {queue.isLoading ? (
+        <div className="h-40 rounded-lg border border-gray-200 bg-white animate-pulse" />
+      ) : queue.error ? (
+        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          Could not load the decision queue — {(queue.error as Error).message}
         </div>
-      </div>
+      ) : (
+        <DecisionDeck
+          items={queue.data?.items ?? []}
+          total={queue.data?.counts.needs ?? 0}
+          onNav={onNav}
+        />
+      )}
 
       {/* Due reminders */}
       {dueReminders.length > 0 && (
@@ -179,62 +178,6 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
         </div>
       )}
 
-      {/* Needs review */}
-      {totalPending > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <SectionHeader title="Needs review" count={totalPending} />
-            <button onClick={() => onNav('review')} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-              Open review queue →
-            </button>
-          </div>
-          <div className="space-y-2">
-            {pendingReview.gigs.map((g) => (
-              <div key={g.id} className="flex items-center justify-between bg-white border border-yellow-200 rounded-lg px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{g.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {g.type}{g.deadline ? ` · deadline ${g.deadline}` : ''}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={patchGig.isPending}
-                    onClick={() => patchGig.mutate({ id: g.id, body: { status: 'approved' } })}
-                    className="text-xs px-2.5 py-1 rounded-md bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-40 transition-colors"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    disabled={patchGig.isPending}
-                    onClick={() => patchGig.mutate({ id: g.id, body: { status: 'rejected' } })}
-                    className="text-xs px-2.5 py-1 rounded-md bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-40 transition-colors"
-                  >
-                    Reject
-                  </button>
-                  <button onClick={() => onNav('review')} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-                    Details →
-                  </button>
-                </div>
-              </div>
-            ))}
-            {pendingReview.sync.map((s) => (
-              <div
-                key={s.id}
-                onClick={() => onNav('review')}
-                className="flex items-center justify-between bg-white border border-purple-200 rounded-lg px-4 py-3 cursor-pointer hover:border-purple-300 transition-colors"
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{s.name}</p>
-                  <p className="text-xs text-gray-500">{s.agencyType ?? 'Sync target'}</p>
-                </div>
-                <StatusBadge status={s.status} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Recent runs */}
       {recentRuns.length > 0 && (
         <div>
@@ -262,7 +205,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
         </div>
       )}
 
-      {totalPending === 0 && upcomingDeadlines.length === 0 && dueReminders.length === 0 && recentRuns.length === 0 && (
+      {(queue.data?.counts.needs ?? 0) === 0 && upcomingDeadlines.length === 0 && dueReminders.length === 0 && recentRuns.length === 0 && (
         <p className="text-gray-400 text-sm">All clear — nothing needs attention right now.</p>
       )}
     </div>
