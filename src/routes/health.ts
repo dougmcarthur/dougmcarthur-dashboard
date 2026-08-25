@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { calendarConfigured } from '../lib/googleCalendar'
 import { gmailConfigured } from '../lib/gmail'
+import { mailerConfigured } from '../lib/mailer'
 import type { Env } from '../types'
 
 const health = new Hono<{ Bindings: Env }>()
@@ -26,6 +27,9 @@ health.get('/', (c) => {
     calendarMissingSecrets: calMissing,
     gmailConfigured: gmail,
     gmailMissingSecrets: gmailMissing,
+    // The digest sender is a binding, not a secret — it is either declared in
+    // wrangler.toml or it is not, so there is no list of missing keys.
+    emailConfigured: mailerConfigured(c.env),
   })
 })
 

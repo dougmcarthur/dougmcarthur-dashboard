@@ -19,6 +19,7 @@ export type {
   TimingRow,
   TimingBand,
   Backlog,
+  DataHealth,
 } from '../../shared/reviewQueue'
 
 export interface ReviewQueue {
@@ -84,6 +85,33 @@ export interface HealthStatus {
   calendarMissingSecrets: string[]
   gmailConfigured: boolean
   gmailMissingSecrets: string[]
+  emailConfigured: boolean
+}
+
+export interface DigestSettings {
+  enabled: boolean
+  recipient: string
+  sender: string
+}
+
+export interface DigestLine {
+  key: string
+  kind: string
+  id: number
+  title: string
+  rationale: string
+  href: string
+}
+
+export interface DigestPreview {
+  empty: boolean
+  subject: string
+  groups: Array<{ id: string; heading: string; lines: DigestLine[] }>
+  html: string
+  text: string
+  settings: DigestSettings
+  mailerConfigured: boolean
+  wouldSend: boolean
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -168,4 +196,13 @@ export const api = {
     delete: (id: string) => apiFetch<{ ok: boolean }>(`/reference-docs/${id}`, { method: 'DELETE' }),
   },
   health: () => apiFetch<HealthStatus>('/health'),
+  digest: {
+    preview: () => apiFetch<DigestPreview>('/digest/preview'),
+    send: () =>
+      apiFetch<{ sent: boolean; reason?: string; to?: string; subject?: string }>('/digest/send', {
+        method: 'POST',
+      }),
+    patch: (body: Partial<DigestSettings>) =>
+      apiFetch<DigestSettings>('/digest/settings', { method: 'PATCH', body: JSON.stringify(body) }),
+  },
 }

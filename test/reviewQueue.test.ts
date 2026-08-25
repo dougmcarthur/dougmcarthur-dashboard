@@ -414,3 +414,68 @@ describe('snooze — what the Overview blocks do with it', () => {
     expect(backlog.openEnded).toBe(1)
   })
 })
+
+
+// --- data health (block F) ---------------------------------------------------
+
+describe('summariseQueue — data health', () => {
+  it('is clean, and hides itself, when nothing is wrong', () => {
+    const { health } = summariseQueue(on({ gigs: [gig({ id: 30, name: 'Fine', deadline: '2026-12-01' })] }))
+    expect(health).toEqual({ conflicts: 0, proseDeadlines: 0, orphanedReminders: 0, clean: true })
+  })
+
+  it('counts a status that contradicts its own note', () => {
+    const { health } = summariseQueue(on({
+      gigs: [gig({ id: 31, name: 'Contradictory', status: 'submitted', fitNotes: 'Submission status: NOT submitted.' })],
+    }))
+    expect(health).toMatchObject({ conflicts: 1, clean: false })
+  })
+
+  it('counts a deadline still stored as prose', () => {
+    const { health } = summariseQueue(on({
+      gigs: [
+        gig({ id: 32, name: 'Prose', deadline: 'None — rolling artist roster intake' }),
+        gig({ id: 33, name: 'Real', deadline: '2026-12-01' }),
+      ],
+    }))
+    expect(health.proseDeadlines).toBe(1)
+  })
+
+  it('treats a backfilled row as a real date', () => {
+    // deadline is now ISO and the prose has moved to deadline_note, which is
+    // exactly what the backfill produces — it must not still read as a finding.
+    const { health } = summariseQueue(on({
+      gigs: [gig({
+        id: 34, name: 'Backfilled', deadline: '2026-12-31',
+        deadlineNote: 'Submission window: September 1 – December 31, 2026',
+      })],
+    }))
+    expect(health.proseDeadlines).toBe(0)
+  })
+
+  it('still reports a snoozed row as unhealthy', () => {
+    // Deferring a decision does not make a contradictory status correct.
+    const { health } = summariseQueue(on({
+      gigs: [gig({
+        id: 35, name: 'Deferred conflict', status: 'submitted',
+        fitNotes: 'Submission status: NOT submitted.',
+        snoozedUntil: '2026-09-15', snoozedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z',
+      })],
+    }))
+    expect(health.conflicts).toBe(1)
+  })
+
+  it('does not count rows that are already settled', () => {
+    const { health } = summariseQueue(on({
+      gigs: [gig({ id: 36, name: 'Done', status: 'rejected', deadline: 'rolling forever' })],
+    }))
+    expect(health.proseDeadlines).toBe(0)
+  })
+
+  it('takes the orphan count from the caller, which is the one with the table', () => {
+    const { health } = summariseQueue(on({ gigs: [gig({ id: 37, name: 'Fine', deadline: '2026-12-01' })] }), {
+      orphanedReminders: 1,
+    })
+    expect(health).toMatchObject({ orphanedReminders: 1, clean: false })
+  })
+})

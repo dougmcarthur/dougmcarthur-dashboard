@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, sql } from 'drizzle-orm'
 import { getDb } from '../db'
-import { gigOpportunities, syncTargets, promoDrafts } from '../db/schema'
+import { gigOpportunities, syncTargets, promoDrafts, reminders } from '../db/schema'
 import { buildReviewQueue, matchesFilter, summariseQueue, type ReviewFilter } from '../../shared/reviewQueue'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
 import type { Env } from '../types'
@@ -54,10 +54,24 @@ review.get('/', async (c) => {
 
   const db = getDb(c.env.DB)
 
-  const [gigs, sync, promo] = await Promise.all([
+  const [gigs, sync, promo, [orphans]] = await Promise.all([
     db.select().from(gigOpportunities).orderBy(desc(gigOpportunities.discoveredAt)),
     db.select().from(syncTargets).orderBy(desc(syncTargets.discoveredAt)),
     db.select().from(promoDrafts).orderBy(desc(promoDrafts.createdAt)),
+    // Reminders reference entities by (type, id) with no foreign key, so a
+    // deleted gig leaves its reminders pointing at nothing — reminder 3 has
+    // aimed at gig 21 since that gig was removed. Both delete handlers now
+    // clean up after themselves; this counts what is already broken.
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(reminders)
+      .where(sql`
+        ${reminders.status} = 'pending' AND (
+          (${reminders.entityType} = 'gig'
+            AND ${reminders.entityId} NOT IN (SELECT id FROM gig_opportunities))
+          OR (${reminders.entityType} = 'sync'
+            AND ${reminders.entityId} NOT IN (SELECT id FROM sync_targets))
+        )`),
   ])
 
   const items = buildReviewQueue({
@@ -80,7 +94,7 @@ review.get('/', async (c) => {
     items: limit ? filtered.slice(0, limit) : filtered,
     total: filtered.length,
     counts,
-    summary: summariseQueue(items),
+    summary: summariseQueue(items, { orphanedReminders: orphans.count }),
   })
 })
 

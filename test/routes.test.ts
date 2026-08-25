@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import app from '../src/index'
+import { app } from '../src/index'
 
 // No integration secrets configured — enough to exercise routing without a DB.
 const emptyEnv = {} as Record<string, unknown>

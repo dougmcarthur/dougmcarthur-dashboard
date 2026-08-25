@@ -4,6 +4,7 @@ import { DecisionDeck } from '../components/DecisionDeck'
 import { ActivityList } from '../components/ActivityList'
 import { TimingStrip } from '../components/TimingStrip'
 import { OpenEndedRow } from '../components/OpenEndedRow'
+import { DataHealthRow } from '../components/DataHealthRow'
 
 export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
   const qc = useQueryClient()
@@ -90,6 +91,15 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
 
       {/* Automation activity — one line per run, prose behind a disclosure */}
       {recentRuns.length > 0 && <ActivityList runs={recentRuns} onNav={onNav} />}
+
+      {/* Block F, last and quiet. Renders nothing once the counts are zero,
+          and the whole block should be deleted when they stay that way. */}
+      {queue.data && (
+        <DataHealthRow
+          health={queue.data.summary.health}
+          onReview={(filter) => onNav(`review/${filter}`)}
+        />
+      )}
 
       {(queue.data?.counts.needs ?? 0) === 0 &&
         (queue.data?.summary.timing.length ?? 0) === 0 &&

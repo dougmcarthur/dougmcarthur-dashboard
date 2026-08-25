@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { eq, and, desc } from 'drizzle-orm'
 import { getDb } from '../db'
-import { syncTargets } from '../db/schema'
+import { syncTargets, reminders } from '../db/schema'
 import type { Env } from '../types'
 
 const sync = new Hono<{ Bindings: Env }>()
@@ -92,7 +92,13 @@ sync.patch('/:id', zValidator('json', SyncPatchSchema), async (c) => {
 
 sync.delete('/:id', async (c) => {
   const db = getDb(c.env.DB)
-  await db.delete(syncTargets).where(eq(syncTargets.id, Number(c.req.param('id'))))
+  const id = Number(c.req.param('id'))
+  // Same orphaning as gigs: reminders point at (entity_type, entity_id) with
+  // no foreign key to enforce it, so the reminder has to go with the row.
+  await db
+    .delete(reminders)
+    .where(and(eq(reminders.entityType, 'sync'), eq(reminders.entityId, id)))
+  await db.delete(syncTargets).where(eq(syncTargets.id, id))
   return c.json({ ok: true })
 })
 

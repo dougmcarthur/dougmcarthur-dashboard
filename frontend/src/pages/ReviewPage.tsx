@@ -436,9 +436,16 @@ function Detail({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export function ReviewPage() {
+const isFilter = (v: string | null): v is ReviewFilter =>
+  v !== null && FILTERS.some((f) => f.id === v)
+
+export function ReviewPage({ initialFilter }: { initialFilter?: string | null }) {
   const qc = useQueryClient()
-  const [filter, setFilter] = useState<ReviewFilter>('needs')
+  // `#review/conflict` opens on that filter; an unknown segment falls back
+  // rather than showing an empty queue for a filter that does not exist.
+  const [filter, setFilter] = useState<ReviewFilter>(
+    isFilter(initialFilter ?? null) ? (initialFilter as ReviewFilter) : 'needs',
+  )
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
   // The queue is built by the Worker (GET /api/review) so this screen and the

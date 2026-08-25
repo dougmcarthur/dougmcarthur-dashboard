@@ -10,13 +10,13 @@ import { SettingsPage } from './pages/SettingsPage'
 import { TaskRunsPage } from './pages/TaskRunsPage'
 
 export default function App() {
-  const [page, navigate] = useHashRoute('overview')
+  const [page, navigate, arg] = useHashRoute('overview')
 
   return (
     <Layout page={page}>
       <ErrorBoundary label="Page error">
         {page === 'overview' && <OverviewPage onNav={navigate} />}
-        {page === 'review' && <ReviewPage />}
+        {page === 'review' && <ReviewPage initialFilter={arg} />}
         {page === 'gigs' && <GigsPage />}
         {page === 'sync' && <SyncPage />}
         {page === 'promo' && <PromoDraftsPage />}

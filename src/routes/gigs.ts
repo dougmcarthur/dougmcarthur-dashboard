@@ -232,6 +232,15 @@ gigs.delete('/:id', async (c) => {
     }
   }
 
+  // Reminders reference gigs by (entity_type, entity_id) with no foreign key,
+  // so deleting the gig alone leaves them behind pointing at nothing. That is
+  // how reminder 3 ended up aimed at gig 21, which has not existed for months:
+  // the Overview's join then renders it as "gig #21", a follow-up on an
+  // opportunity nobody can open. Delete both, in that order — an orphaned
+  // reminder is worse than a missing one.
+  await db
+    .delete(reminders)
+    .where(and(eq(reminders.entityType, 'gig'), eq(reminders.entityId, id)))
   await db.delete(gigOpportunities).where(eq(gigOpportunities.id, id))
   return c.json({ ok: true })
 })

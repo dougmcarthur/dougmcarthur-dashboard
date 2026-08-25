@@ -16,3 +16,28 @@ binding = "ASSETS"
 
 # NOTE: compatibility_date is a best-effort guess (matches Worker's created_on).
 # Verify against the real deployed Worker settings before relying on it.
+
+# The weekly digest. Monday 13:00 UTC ≈ 08:00 Winnipeg (CDT) — a Monday-morning
+# email about the week ahead, not a Sunday-night one about the week gone.
+# Cron is UTC year-round, so this drifts an hour against Winnipeg in winter.
+[triggers]
+crons = ["0 13 * * 1"]
+
+# Cloudflare Email Service. The allowlist is the security boundary: the Worker
+# can send to these addresses and nowhere else, whatever the code says.
+#
+# Sending to a VERIFIED DESTINATION ADDRESS on the account is free on every
+# plan and does not touch the monthly quota; sending to any other recipient
+# needs Workers Paid. dougmcarthur0@gmail.com is the free path. Whether
+# doug@dougmcarthur.net also qualifies depends on it being added and verified
+# under Email Routing → Destination Addresses; both are listed so the choice is
+# a setting change rather than a deploy.
+[[send_email]]
+name = "EMAIL"
+allowed_destination_addresses = [
+  "dougmcarthur0@gmail.com",
+  "doug@dougmcarthur.net",
+]
+
+[vars]
+DASHBOARD_URL = "https://dashboard.dougmcarthur.net"

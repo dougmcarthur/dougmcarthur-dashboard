@@ -79,9 +79,31 @@ export const reminders = sqliteTable('reminders', {
   createdAt: text('created_at').notNull(),
 })
 
+/**
+ * What the digest has already told you about each item, and under which
+ * heading. See migration 0005 — the fingerprint is what makes "never repeat an
+ * item that has not changed" enforceable.
+ */
+export const digestReports = sqliteTable('digest_reports', {
+  entityType: text('entity_type').notNull(),
+  entityId: integer('entity_id').notNull(),
+  grp: text('grp').notNull(),
+  fingerprint: text('fingerprint').notNull(),
+  reportedAt: text('reported_at').notNull(),
+})
+
+/** Key/value settings that must be changeable without a deploy. */
+export const appSettings = sqliteTable('app_settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
 export type GigOpportunity = typeof gigOpportunities.$inferSelect
 export type SyncTarget = typeof syncTargets.$inferSelect
 export type PromoDraft = typeof promoDrafts.$inferSelect
 export type ReferenceDoc = typeof referenceDocs.$inferSelect
 export type TaskRun = typeof taskRuns.$inferSelect
 export type Reminder = typeof reminders.$inferSelect
+export type DigestReport = typeof digestReports.$inferSelect
+export type AppSetting = typeof appSettings.$inferSelect

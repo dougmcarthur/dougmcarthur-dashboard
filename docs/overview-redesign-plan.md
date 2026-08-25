@@ -318,6 +318,26 @@ it reach out when there is a reason.
   a separate transactional sender whose credentials only send. The second
   keeps read and write access apart and is the safer default.
 
+**Resolved, and by neither of those.** Cloudflare Email Service exposes a
+`send_email` binding to Workers, so the app that already owns the data can send
+the mail with no API key and no third-party account. Three things make it the
+right answer rather than merely a third option:
+
+- **The allowlist is the security boundary.** `allowed_destination_addresses`
+  in `wrangler.toml` names every address the Worker may write to. A leaked API
+  key sends anywhere its owner can; this binding cannot, whatever the code says.
+- **Gmail stays read-only.** The scope question above simply does not arise,
+  because nothing about the Gmail integration is touched.
+- **It is free for this shape of use.** Sending to a *verified destination
+  address* on the account costs nothing on any plan and does not touch the
+  monthly quota. Sending to an arbitrary recipient needs Workers Paid — which
+  is why the recipient is a setting rather than a constant, and why the default
+  is the address that is unambiguously free.
+
+The scheduler is a Cron Trigger, `0 13 * * 1` — Monday 13:00 UTC, roughly 08:00
+in Winnipeg. Cron is UTC year-round, so it drifts an hour against local time in
+winter; for a Monday-morning email that is not worth a timezone library.
+
 ### What goes in it
 
 A diff, not a report. Four groups, in this order, each dropped when empty:
@@ -343,6 +363,40 @@ the cadence to one weekly send, with an immediate send reserved for a
 genuinely dated event (a deadline inside a week on something unsubmitted).
 Both switchable from Settings without a deploy.
 
+**Built.** `digest_reports` holds one row per item with a *fingerprint* of the
+facts as reported — status, deadline, window, fee, snooze, flag set. A run
+mentions an item only when that fingerprint differs from the stored one, so a
+research run rewording a note does not resurface anything. `updated_at` is
+deliberately not in the fingerprint for exactly that reason.
+
+Three rules were wrong when first written and only failed against a live
+database, which is worth recording because none of them were type errors:
+
+- **"Going stale" cannot obey the never-repeat rule.** Those items never
+  change — that is the whole complaint — so a strict rule mentions each one
+  once and then hides the pile forever, which is the failure the group exists
+  to prevent. It repeats on a **28-day cooldown** instead: named, quiet for a
+  month, eligible again. Weekly repetition is how an email stops being read;
+  monthly is a nag.
+- **"Now actionable" must mean it *became* actionable.** The first version
+  promoted anything currently due, so a gig nine days from its deadline that
+  merely gained a fee jumped the queue. It now compares against the flags in
+  the stored fingerprint. If everything lands in the group that earns the
+  email, the group stops earning it.
+- **A lapsed snooze cannot be detected from the stored mark.** Snoozed items
+  are never reported, so no mark ever records that one *was* snoozed — the
+  original check was unreachable and every wake arrived as "changed under you".
+  It reads the row instead: `snoozed_until` set but no longer in force is a
+  snooze that ended, and the mark then carries that date so the same wake is
+  not announced twice.
+
+The marks are written **after** a successful send, never before. Marking first
+would mean a failed send silently swallows a week of changes, because the next
+run considers them already reported. `GET /api/digest/preview` renders exactly
+what would go out and writes no marks at all, so previewing is free of side
+effects — otherwise looking at the email twice would make the real one go
+quiet.
+
 ## 4. Build order
 
 Phase 0 is not optional — without it the redesign renders empty boxes.
@@ -354,8 +408,8 @@ Phase 0 is not optional — without it the redesign renders empty boxes.
 | **2** | ~~Block E: collapse the task-run log.~~ **Done.** One line per run, capped at five, prose behind a per-row disclosure, full history on the Log page. Measured against identical data: the block goes 684px → 214px, a 69% cut. | Biggest space win, lowest risk |
 | **3** | ~~Blocks C + D, plus the `deadline` / `deadline_note` / `opens_at` split and a date backfill.~~ **Done.** Migration 0003 adds the two columns; `splitDeadline()` does the extraction and `scripts/backfill-deadlines.ts` applies it, dry-run by default. Blocks C and D are served from `GET /api/review` as `summary`, so the strip and the deck rank urgency identically. The dead `upcomingDeadlines` and `pendingReview` queries were deleted from `/api/overview`. | Makes the time-critical strip real rather than decorative |
 | **4** | ~~`snoozed_until` on both tables, the queue filter, a "Snoozed" view, and the deck's snooze action.~~ **Done.** Migration 0004 adds `snoozed_until` **and** `snoozed_at`; the wake-on-change question in §3b was answered yes and implemented against that pair. `POST /api/review/snooze` is the only writer. Offers come from `shared/snoozeOptions.ts`. | Half the backlog is real work at the wrong moment |
-| **5** | The email digest (§3c): Cron Trigger, `scheduled()` handler, a sender that is not the read-only Gmail token, per-item marks so nothing is reported twice | Depends on 4 — "now actionable" is mostly snoozes coming due |
-| **6** | Block F, and fix the orphaned reminder: `DELETE /api/gigs/:id` removes the gig and its Calendar event but leaves its reminders behind — reminder 3 points at gig 21, which no longer exists. | Housekeeping |
+| **5** | ~~The email digest (§3c).~~ **Done.** Cron Trigger + `scheduled()`, `shared/digest.ts` for content, per-item marks with a fingerprint. The sender question resolved better than either option below: Cloudflare Email Service's `send_email` binding. | Depends on 4 — "now actionable" is mostly snoozes coming due |
+| **6** | ~~Block F, and fix the orphaned reminder.~~ **Done.** Both delete handlers now remove reminders first — `sync` had the same bug, unrecorded. `DataHealthRow` counts contradictions, prose deadlines and orphans, links into the filtered queue, and renders nothing once clean. | Housekeeping |
 
 ### Shared-logic note
 

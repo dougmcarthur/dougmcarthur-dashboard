@@ -338,9 +338,25 @@ export interface Backlog {
   oldestDiscoveredAt: string | null
 }
 
+/**
+ * Block F — findings that are wrong with the data itself, not with any
+ * decision. Each is something the audit found and nothing in the UI could say.
+ */
+export interface DataHealth {
+  /** Rows whose status and note flatly contradict each other. */
+  conflicts: number
+  /** Live rows whose `deadline` still holds prose instead of a date. */
+  proseDeadlines: number
+  /** Reminders pointing at an entity that no longer exists. */
+  orphanedReminders: number
+  /** True when there is nothing to report — the block hides itself. */
+  clean: boolean
+}
+
 export interface QueueSummary {
   timing: TimingRow[]
   backlog: Backlog
+  health: DataHealth
 }
 
 function settled(item: ReviewItem): boolean {
@@ -367,7 +383,15 @@ function discovery(item: ReviewItem): { discoveredAt: string; updatedAt: string 
  * that mostly holds prose, so it matched nothing and rendered nothing, for
  * months, without ever looking broken.
  */
-export function summariseQueue(items: ReviewItem[]): QueueSummary {
+export function summariseQueue(
+  items: ReviewItem[],
+  /**
+   * Counts the queue cannot see for itself. Orphaned reminders live in a table
+   * `buildReviewQueue()` never reads, so the caller that has the binding
+   * supplies the number rather than this module growing a data dependency.
+   */
+  extra: { orphanedReminders?: number } = {},
+): QueueSummary {
   const timing: TimingRow[] = []
 
   for (const item of items) {
@@ -398,8 +422,29 @@ export function summariseQueue(items: ReviewItem[]): QueueSummary {
     (i) => !settled(i) && i.deadline.date === null && i.deadline.opensAt === null && discovery(i) !== null,
   )
 
+  // The two findings need different populations, which is easy to get wrong.
+  //
+  // A conflict is BY DEFINITION a row claiming to be finished while its note
+  // says otherwise, so it must be counted over everything — filtering to
+  // unsettled rows first discards every conflict there is.
+  //
+  // A prose deadline on a rejected gig, by contrast, is not worth anyone's
+  // time. That one is counted over live rows only. Snoozed rows stay in both:
+  // deferring a decision does not make a contradictory status correct.
+  const conflicts = items.filter((i) => i.flags.some((f) => f.id === 'conflict')).length
+  const proseDeadlines = items.filter(
+    (i) => (!settled(i) || i.snooze.active) && i.deadline.raw !== null && !i.deadline.exact,
+  ).length
+  const orphanedReminders = extra.orphanedReminders ?? 0
+
   return {
     timing,
+    health: {
+      conflicts,
+      proseDeadlines,
+      orphanedReminders,
+      clean: conflicts === 0 && proseDeadlines === 0 && orphanedReminders === 0,
+    },
     backlog: {
       openEnded: openEnded.length,
       // Compared by calendar day, not by string: discovered_at is a bare date

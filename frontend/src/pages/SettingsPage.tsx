@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type ReferenceDoc } from '../api'
+import { DigestSettingsCard } from '../components/DigestSettingsCard'
 
 const INPUT_CLASS =
   'w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition'
@@ -364,6 +365,8 @@ export function SettingsPage() {
       <h1 className="text-xl font-semibold text-gray-900">Settings</h1>
 
       <IntegrationCards />
+
+      <DigestSettingsCard />
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
