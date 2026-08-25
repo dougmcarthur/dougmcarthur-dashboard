@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Overview } from '../api'
-import { StatusBadge } from '../components/StatusBadge'
 import { DecisionDeck } from '../components/DecisionDeck'
+import { ActivityList } from '../components/ActivityList'
 
 function daysUntil(dateStr: string): number {
   const today = new Date()
@@ -178,32 +178,8 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
         </div>
       )}
 
-      {/* Recent runs */}
-      {recentRuns.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <SectionHeader title="Recent task runs" />
-            <button onClick={() => onNav('runs')} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-              View all →
-            </button>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-            {recentRuns.map((r) => (
-              <div key={r.id} className="flex items-center justify-between px-4 py-2.5">
-                <div>
-                  <p className="text-xs font-mono text-gray-600">{r.taskId}</p>
-                  {r.summary && <p className="text-xs text-gray-500 mt-0.5">{r.summary}</p>}
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  {r.itemsAdded ? <span className="text-xs text-gray-400">+{r.itemsAdded}</span> : null}
-                  <StatusBadge status={r.status} />
-                  <span className="text-xs text-gray-400">{new Date(r.runAt).toLocaleDateString()}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Automation activity — one line per run, prose behind a disclosure */}
+      {recentRuns.length > 0 && <ActivityList runs={recentRuns} onNav={onNav} />}
 
       {(queue.data?.counts.needs ?? 0) === 0 && upcomingDeadlines.length === 0 && dueReminders.length === 0 && recentRuns.length === 0 && (
         <p className="text-gray-400 text-sm">All clear — nothing needs attention right now.</p>

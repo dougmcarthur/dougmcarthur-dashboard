@@ -75,6 +75,13 @@ not a status. `DecisionDeck` maps intent to the right status per entity type,
 because "pass" means `rejected` on a gig and `declined` on a sync target. Add
 a new intent in one place and every kind has to say what it means.
 
+### Automation activity
+
+The Overview shows five runs, one line each, with the summary behind a
+disclosure — `ActivityList`. The summaries are three to five lines of agent
+prose apiece; inline they were the bulk of the page. Full history stays on the
+Log page.
+
 ## The Review screen
 
 `#review` is the triage queue: one prioritised list of everything waiting on a
