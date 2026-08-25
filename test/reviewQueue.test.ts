@@ -11,7 +11,8 @@ function gig(o: Partial<GigOpportunity> & { id: number; name: string }): GigOppo
     genreFitScore: null, deadline: null, deadlineNote: null, opensAt: null,
     feeAmount: null, feeCurrency: 'USD', fee: null,
     paid: 0, fitNotes: null, fitRationale: null, url: null, status: 'approved',
-    googleEventId: null, discoveredAt: '2026-07-01', updatedAt: '2026-08-01', ...o,
+    googleEventId: null, snoozedUntil: null, snoozedAt: null,
+    discoveredAt: '2026-07-01', updatedAt: '2026-08-01', ...o,
   }
 }
 
@@ -19,6 +20,7 @@ function sync(o: Partial<SyncTarget> & { id: number; name: string }): SyncTarget
   return {
     agencyType: null, contactEmail: null, contactRole: null, confirmationMethod: null,
     notes: null, pitchDraft: null, pitchSent: null, status: 'pitched',
+    snoozedUntil: null, snoozedAt: null,
     discoveredAt: '2026-06-21', updatedAt: '2026-06-29', reconciledAt: null, ...o,
   }
 }
@@ -271,5 +273,144 @@ describe('summariseQueue — the open-ended backlog', () => {
 
   it('is all zeroes on an empty queue', () => {
     expect(summarise({}).backlog).toEqual({ openEnded: 0, untouched: 0, oldestDiscoveredAt: null })
+  })
+})
+
+
+// --- snooze -----------------------------------------------------------------
+
+const TODAY = '2026-08-25'
+
+/** The queue as of TODAY, so snooze boundaries are exact rather than "roughly now". */
+const on = (input: Omit<Parameters<typeof buildReviewQueue>[0], 'today'>) =>
+  buildReviewQueue({ ...input, today: TODAY })
+
+describe('snooze — whether the deferral still holds', () => {
+  it('holds while the date is in the future', () => {
+    const [item] = on({
+      gigs: [gig({ id: 1, name: 'Later', snoozedUntil: '2026-09-15', snoozedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z' })],
+    })
+    expect(item.snooze).toMatchObject({ active: true, wokenByChange: false, until: '2026-09-15' })
+  })
+
+  it('lapses on the day it comes due, not the day after', () => {
+    const [item] = on({
+      gigs: [gig({ id: 2, name: 'Due today', snoozedUntil: TODAY, snoozedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z' })],
+    })
+    expect(item.snooze.active).toBe(false)
+  })
+
+  it('breaks when the row changed after the snooze was set', () => {
+    // A run gave it a deadline. The snooze was a judgement about an item that
+    // no longer exists in that form.
+    const [item] = on({
+      gigs: [gig({
+        id: 3, name: 'Changed', deadline: '2026-09-01',
+        snoozedUntil: '2026-10-01', snoozedAt: '2026-08-20T10:00:00.000Z',
+        updatedAt: '2026-08-22T08:30:00.000Z',
+      })],
+    })
+    expect(item.snooze).toMatchObject({ active: false, wokenByChange: true })
+  })
+
+  it('does not wake itself the moment the snooze is written', () => {
+    // Setting a snooze is a write, so snoozed_at and updated_at are stamped
+    // with the same value — otherwise every snooze would break instantly.
+    const ts = '2026-08-25T14:03:11.900Z'
+    const [item] = on({
+      gigs: [gig({ id: 4, name: 'Just set', snoozedUntil: '2026-09-30', snoozedAt: ts, updatedAt: ts })],
+    })
+    expect(item.snooze.active).toBe(true)
+  })
+
+  it('treats a legacy bare-date updated_at as unchanged', () => {
+    // Production rows carry '2026-08-25' where newer writes carry a full
+    // timestamp. A bare date sorts before any same-day timestamp, so this must
+    // not read as "changed since the snooze".
+    const [item] = on({
+      gigs: [gig({ id: 5, name: 'Legacy', snoozedUntil: '2026-09-30', snoozedAt: '2026-08-25T09:00:00.000Z', updatedAt: '2026-08-25' })],
+    })
+    expect(item.snooze.active).toBe(true)
+  })
+
+  it('is inert on a row that was never snoozed', () => {
+    const [item] = on({ gigs: [gig({ id: 6, name: 'Plain' })] })
+    expect(item.snooze).toEqual({ until: null, active: false, wokenByChange: false, daysUntil: null })
+  })
+
+  it('applies to sync targets too', () => {
+    const [item] = on({
+      sync: [sync({ id: 7, name: 'Agency', snoozedUntil: '2026-09-15', snoozedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z' })],
+    })
+    expect(item.snooze.active).toBe(true)
+  })
+})
+
+describe('snooze — what the filters do with it', () => {
+  const items = on({
+    gigs: [
+      gig({ id: 10, name: 'Awake', fitNotes: 'Submission status: NOT submitted.' }),
+      gig({
+        id: 11, name: 'Deferred', fitNotes: 'Submission status: NOT submitted. Doug should pick a video.',
+        snoozedUntil: '2026-09-15', snoozedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z',
+      }),
+    ],
+  })
+  const named = (f: Parameters<typeof matchesFilter>[1]) =>
+    items.filter((i) => matchesFilter(i, f)).map((i) => i.title)
+
+  it('keeps a snoozed item in the queue rather than dropping it', () => {
+    expect(items.map((i) => i.title).sort()).toEqual(['Awake', 'Deferred'])
+  })
+
+  it('hides it from every ordinary filter, including "all"', () => {
+    for (const f of ['needs', 'blocked', 'all', 'timing', 'paid', 'conflict'] as const) {
+      expect(named(f), f).not.toContain('Deferred')
+    }
+  })
+
+  it('shows it, and only it, under "snoozed"', () => {
+    expect(named('snoozed')).toEqual(['Deferred'])
+  })
+
+  it('lets a woken item back into the ordinary filters on its own', () => {
+    const woken = on({
+      gigs: [gig({
+        id: 12, name: 'Back', fitNotes: 'Submission status: NOT submitted.',
+        snoozedUntil: '2026-08-01', snoozedAt: '2026-07-01T10:00:00.000Z', updatedAt: '2026-07-01T10:00:00.000Z',
+      })],
+    })
+    expect(woken.filter((i) => matchesFilter(i, 'needs')).map((i) => i.title)).toEqual(['Back'])
+    expect(woken.filter((i) => matchesFilter(i, 'snoozed'))).toEqual([])
+  })
+})
+
+describe('snooze — what the Overview blocks do with it', () => {
+  it('leaves a snoozed deadline off the time-critical strip', () => {
+    const { timing } = summariseQueue(on({
+      gigs: [
+        gig({ id: 20, name: 'Visible', deadline: '2026-08-30' }),
+        gig({
+          id: 21, name: 'Deferred', deadline: '2026-08-30',
+          snoozedUntil: '2026-09-15', snoozedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z',
+        }),
+      ],
+    }))
+    expect(timing.map((t) => t.title)).toEqual(['Visible'])
+  })
+
+  it('does not count a snoozed row in the open-ended backlog', () => {
+    // Snoozing is exactly how that number is meant to come down, so counting
+    // deferred rows would make the row impossible to drain.
+    const { backlog } = summariseQueue(on({
+      gigs: [
+        gig({ id: 22, name: 'Rotting', deadline: 'rolling' }),
+        gig({
+          id: 23, name: 'Deferred', deadline: 'rolling',
+          snoozedUntil: '2026-09-15', snoozedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z',
+        }),
+      ],
+    }))
+    expect(backlog.openEnded).toBe(1)
   })
 })

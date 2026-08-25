@@ -41,6 +41,10 @@ export interface GigOpportunity {
   url: string | null
   status: string
   googleEventId: string | null
+  /** ISO date this row comes back into the queue on its own. */
+  snoozedUntil: string | null
+  /** When the snooze was set; a later `updatedAt` wakes it. See migration 0004. */
+  snoozedAt: string | null
   discoveredAt: string
   updatedAt: string
 }
@@ -56,6 +60,10 @@ export interface SyncTarget {
   pitchDraft: string | null
   pitchSent: string | null
   status: string
+  /** ISO date this row comes back into the queue on its own. */
+  snoozedUntil: string | null
+  /** When the snooze was set; a later `updatedAt` wakes it. See migration 0004. */
+  snoozedAt: string | null
   discoveredAt: string
   updatedAt: string
   reconciledAt: string | null

@@ -4,6 +4,8 @@ import { api, type GigOpportunity, type SyncTarget, type PromoDraft } from '../a
 import { StatusBadge } from '../components/StatusBadge'
 import { SkeletonList } from '../components/Skeleton'
 import { PitchDiff } from '../components/PitchDiff'
+import { SnoozeMenu } from '../components/SnoozeMenu'
+import { shortDate } from '../format'
 import {
   Panel, CopyButton, FlagChip, KindTag, AlertList, FieldTable, BulletList, RawNote,
 } from '../components/ReviewPanels'
@@ -15,6 +17,7 @@ const FILTERS: Array<{ id: ReviewFilter; label: string }> = [
   { id: 'blocked', label: 'Blocked on you' },
   { id: 'paid', label: 'Costs money' },
   { id: 'timing', label: 'Timing' },
+  { id: 'snoozed', label: 'Snoozed' },
   { id: 'all', label: 'Everything' },
 ]
 
@@ -122,12 +125,14 @@ function Detail({
   onGig,
   onSync,
   onPromo,
+  onSnooze,
   isSaving,
 }: {
   item: ReviewItem
   onGig: (body: Partial<GigOpportunity>) => void
   onSync: (body: Partial<SyncTarget>) => void
   onPromo: (body: Partial<PromoDraft>) => void
+  onSnooze: (until: string | null) => void
   isSaving: boolean
 }) {
   const { parsed, fee, deadline } = item
@@ -172,9 +177,41 @@ function Detail({
           </div>
         )}
 
+        {/* A snooze is stated where the item is, with the way out beside it.
+            The whole point of the Snoozed view is that deferring is visible
+            and reversible rather than a quiet disappearance. */}
+        {item.snooze.active && (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-indigo-200 bg-indigo-50/50 px-3 py-2">
+            <p className="text-xs text-indigo-900">
+              Snoozed until <span className="font-semibold">{shortDate(item.snooze.until!)}</span>
+              {item.snooze.daysUntil !== null && (
+                <span className="text-indigo-500"> · {item.snooze.daysUntil}d away</span>
+              )}
+            </p>
+            <button
+              onClick={() => onSnooze(null)}
+              disabled={isSaving}
+              className="shrink-0 text-xs px-2.5 py-1 rounded-md border border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50 disabled:opacity-40 transition-colors"
+            >
+              Bring it back now
+            </button>
+          </div>
+        )}
+
+        {item.snooze.wokenByChange && (
+          <p className="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-800 leading-relaxed">
+            This was snoozed until {shortDate(item.snooze.until!)}, but it changed
+            afterwards — so it came back early rather than sitting on a decision
+            made about different facts.
+          </p>
+        )}
+
         <div className="pt-1 border-t border-gray-100">
-          <div className="pt-3">
+          <div className="pt-3 flex flex-wrap items-center gap-2">
             <DecisionBar item={item} onGig={onGig} onSync={onSync} onPromo={onPromo} isSaving={isSaving} />
+            {item.kind !== 'promo' && !item.snooze.active && (
+              <SnoozeMenu item={item} onPick={(until) => onSnooze(until)} disabled={isSaving} />
+            )}
           </div>
         </div>
       </div>
@@ -442,7 +479,13 @@ export function ReviewPage() {
     mutationFn: ({ id, body }: { id: number; body: Partial<PromoDraft> }) => api.promo.patch(id, body),
     onSuccess: invalidate,
   })
-  const isSaving = patchGig.isPending || patchSync.isPending || patchPromo.isPending
+  const snooze = useMutation({
+    mutationFn: ({ kind, id, until }: { kind: 'gig' | 'sync'; id: number; until: string | null }) =>
+      api.snooze({ kind, id, until }),
+    onSuccess: invalidate,
+  })
+  const isSaving =
+    patchGig.isPending || patchSync.isPending || patchPromo.isPending || snooze.isPending
 
   // j / k step through the queue without leaving the keyboard.
   useEffect(() => {
@@ -472,7 +515,12 @@ export function ReviewPage() {
       <div className="flex items-baseline justify-between gap-4">
         <h1 className="text-xl font-semibold text-gray-900">Review</h1>
         <p className="text-xs text-gray-400">
-          {visible.length} of {counts?.all ?? 0} items · <kbd className="font-mono">j</kbd>/<kbd className="font-mono">k</kbd> to move
+          {/* Snoozed items are excluded from `all`, so "n of all" would count
+              the shown item against a total it is not part of. */}
+          {filter === 'snoozed'
+            ? `${visible.length} snoozed`
+            : `${visible.length} of ${counts?.all ?? 0} items`}{' '}
+          · <kbd className="font-mono">j</kbd>/<kbd className="font-mono">k</kbd> to move
         </p>
       </div>
 
@@ -499,7 +547,9 @@ export function ReviewPage() {
         <SkeletonList rows={6} />
       ) : visible.length === 0 ? (
         <p className="rounded-lg border border-gray-200 bg-white px-4 py-12 text-center text-sm text-gray-400">
-          Nothing in this queue.
+          {filter === 'snoozed'
+            ? 'Nothing is snoozed. Deferred items wait here until their date, so none of them are hidden.'
+            : 'Nothing in this queue.'}
         </p>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[19rem_minmax(0,1fr)]">
@@ -522,6 +572,9 @@ export function ReviewPage() {
               onGig={(body) => patchGig.mutate({ id: selected.id, body })}
               onSync={(body) => patchSync.mutate({ id: selected.id, body })}
               onPromo={(body) => patchPromo.mutate({ id: selected.id, body })}
+              onSnooze={(until) =>
+                snooze.mutate({ kind: selected.kind as 'gig' | 'sync', id: selected.id, until })
+              }
             />
           )}
         </div>

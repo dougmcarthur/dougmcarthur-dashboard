@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
-import { desc } from 'drizzle-orm'
+import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
+import { desc, eq } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets, promoDrafts } from '../db/schema'
 import { buildReviewQueue, matchesFilter, summariseQueue, type ReviewFilter } from '../../shared/reviewQueue'
@@ -15,7 +17,7 @@ import type { Env } from '../types'
  * no production row carries, and the two could not agree.
  *
  * Query params:
- *   filter  needs | conflict | blocked | paid | timing | all   (default: all)
+ *   filter  needs | conflict | blocked | paid | timing | snoozed | all  (default: all)
  *   limit   cap the number of items returned; counts always cover everything
  *
  * `counts` and `summary` are computed over the whole queue regardless of
@@ -30,7 +32,7 @@ import type { Env } from '../types'
  */
 const review = new Hono<{ Bindings: Env }>()
 
-const FILTERS: ReviewFilter[] = ['needs', 'conflict', 'blocked', 'paid', 'timing', 'all']
+const FILTERS: ReviewFilter[] = ['needs', 'conflict', 'blocked', 'paid', 'timing', 'snoozed', 'all']
 
 function isFilter(value: string | undefined): value is ReviewFilter {
   return value !== undefined && (FILTERS as string[]).includes(value)
@@ -68,7 +70,11 @@ review.get('/', async (c) => {
     FILTERS.map((f) => [f, items.filter((i) => matchesFilter(i, f)).length]),
   ) as Record<ReviewFilter, number>
 
-  const filtered = requested ? items.filter((i) => matchesFilter(i, requested)) : items
+  // Default to `all` rather than skipping the filter entirely. Both used to
+  // mean the same thing; since snoozed items are excluded inside
+  // matchesFilter(), skipping it would quietly leak them into an unfiltered
+  // request — the one place the rule could be forgotten.
+  const filtered = items.filter((i) => matchesFilter(i, requested ?? 'all'))
 
   return c.json({
     items: limit ? filtered.slice(0, limit) : filtered,
@@ -76,6 +82,53 @@ review.get('/', async (c) => {
     counts,
     summary: summariseQueue(items),
   })
+})
+
+/**
+ * POST /api/review/snooze — defer an item, or bring it back.
+ *
+ * A dedicated endpoint rather than a field on PATCH /api/gigs, because
+ * `snoozed_until` and `snoozed_at` are only meaningful together: the wake rule
+ * compares `updated_at` against `snoozed_at`, so a caller that set the date
+ * without the stamp would create a snooze that breaks on the very write that
+ * created it. Both are written here, from one timestamp, and there is no path
+ * that can set one without the other.
+ *
+ * `until: null` clears the snooze. Clearing also clears `snoozed_at` — leaving
+ * it behind would mean a later snooze inherits an older stamp and wakes
+ * immediately.
+ */
+const SnoozeSchema = z.object({
+  kind: z.enum(['gig', 'sync']),
+  id: z.number().int().positive(),
+  /** ISO date (YYYY-MM-DD) to resurface on, or null to wake it now. */
+  until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+})
+
+review.post('/snooze', zValidator('json', SnoozeSchema), async (c) => {
+  const { kind, id, until } = c.req.valid('json')
+
+  // A snooze into the past is almost certainly a timezone or picker bug, and
+  // it would silently do nothing — which is worse than refusing it.
+  const today = new Date().toISOString().slice(0, 10)
+  if (until !== null && until <= today) {
+    return c.json({ error: `snooze date must be after ${today}` }, 400)
+  }
+
+  const db = getDb(c.env.DB)
+  const ts = new Date().toISOString()
+
+  // updated_at gets the same value as snoozed_at, not a later one: they are
+  // the same event, and any gap would read as "changed since the snooze".
+  const values = until === null
+    ? { snoozedUntil: null, snoozedAt: null, updatedAt: ts }
+    : { snoozedUntil: until, snoozedAt: ts, updatedAt: ts }
+
+  const table = kind === 'gig' ? gigOpportunities : syncTargets
+  const [row] = await db.update(table).set(values).where(eq(table.id, id)).returning({ id: table.id })
+
+  if (!row) return c.json({ error: `no ${kind} with id ${id}` }, 404)
+  return c.json({ kind, id, snoozedUntil: until })
 })
 
 export default review

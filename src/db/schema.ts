@@ -20,6 +20,8 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   url: text('url'),
   status: text('status').default('pending_review'),
   googleEventId: text('google_event_id'),
+  snoozedUntil: text('snoozed_until'), // ISO date this comes back on its own
+  snoozedAt: text('snoozed_at'), // when the snooze was set — see migration 0004
   discoveredAt: text('discovered_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 })
@@ -35,6 +37,8 @@ export const syncTargets = sqliteTable('sync_targets', {
   pitchDraft: text('pitch_draft'),
   pitchSent: text('pitch_sent'),
   status: text('status').default('draft_ready'),
+  snoozedUntil: text('snoozed_until'),
+  snoozedAt: text('snoozed_at'),
   discoveredAt: text('discovered_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   reconciledAt: text('reconciled_at'),

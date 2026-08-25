@@ -8,7 +8,8 @@ function gig(o: Partial<GigOpportunity> & { id: number; name: string }): GigOppo
     genreFitScore: null, deadline: null, deadlineNote: null, opensAt: null,
     feeAmount: null, feeCurrency: 'USD', fee: null,
     paid: 0, fitNotes: null, fitRationale: null, url: null, status: 'approved',
-    googleEventId: null, discoveredAt: '2026-07-01', updatedAt: '2026-08-01', ...o,
+    googleEventId: null, snoozedUntil: null, snoozedAt: null,
+    discoveredAt: '2026-07-01', updatedAt: '2026-08-01', ...o,
   }
 }
 
@@ -16,6 +17,7 @@ function sync(o: Partial<SyncTarget> & { id: number; name: string }): SyncTarget
   return {
     agencyType: null, contactEmail: null, contactRole: null, confirmationMethod: null,
     notes: null, pitchDraft: null, pitchSent: null, status: 'pitched',
+    snoozedUntil: null, snoozedAt: null,
     discoveredAt: '2026-06-21', updatedAt: '2026-06-29', reconciledAt: null, ...o,
   }
 }

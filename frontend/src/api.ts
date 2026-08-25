@@ -108,6 +108,12 @@ export const api = {
       : ''
     return apiFetch<ReviewQueue>(`/review${qs}`)
   },
+  /** Defer an item to a date, or pass `until: null` to bring it back now. */
+  snooze: (body: { kind: 'gig' | 'sync'; id: number; until: string | null }) =>
+    apiFetch<{ kind: string; id: number; snoozedUntil: string | null }>('/review/snooze', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   gigs: {
     list: (params?: Record<string, string>) => {
       const qs = params ? '?' + new URLSearchParams(params).toString() : ''
@@ -116,7 +122,9 @@ export const api = {
     patch: (id: number, body: Partial<GigOpportunity>) =>
       apiFetch<GigOpportunity>(`/gigs/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (id: number) => apiFetch<{ ok: boolean }>(`/gigs/${id}`, { method: 'DELETE' }),
-    create: (body: Omit<GigOpportunity, 'id' | 'discoveredAt' | 'updatedAt'>) =>
+    // Snooze fields are excluded, not defaulted: nothing can be created
+    // already deferred, and a create form should not have to say so.
+    create: (body: Omit<GigOpportunity, 'id' | 'discoveredAt' | 'updatedAt' | 'snoozedUntil' | 'snoozedAt'>) =>
       apiFetch<{ id: number }>('/gigs', { method: 'POST', body: JSON.stringify(body) }),
   },
   sync: {
@@ -124,7 +132,7 @@ export const api = {
       const qs = params ? '?' + new URLSearchParams(params).toString() : ''
       return apiFetch<SyncTarget[]>(`/sync${qs}`)
     },
-    create: (body: Omit<SyncTarget, 'id' | 'discoveredAt' | 'updatedAt' | 'reconciledAt' | 'pitchSent'>) =>
+    create: (body: Omit<SyncTarget, 'id' | 'discoveredAt' | 'updatedAt' | 'reconciledAt' | 'pitchSent' | 'snoozedUntil' | 'snoozedAt'>) =>
       apiFetch<{ id: number }>('/sync', { method: 'POST', body: JSON.stringify(body) }),
     patch: (id: number, body: Partial<SyncTarget>) =>
       apiFetch<SyncTarget>(`/sync/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

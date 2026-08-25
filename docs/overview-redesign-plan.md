@@ -268,6 +268,39 @@ underneath it. If a run updates a snoozed gig — new deadline, a fee appears �
 waking it immediately is more useful than honouring a date set against
 different facts.
 
+**Built, and that question was answered yes.** Which is why there are two
+columns and not one. `snoozed_at` records when the snooze was set, and the
+queue wakes anything whose `updated_at` has moved past it — a snooze is a
+judgement about a set of facts, and once a run changes the row, the judgement
+was about a different item. The woken item says so in the detail panel rather
+than reappearing unexplained.
+
+Three consequences worth knowing before changing any of it:
+
+- **Both columns are written by one endpoint.** `POST /api/review/snooze` sets
+  `snoozed_until`, `snoozed_at` and `updated_at` from a single timestamp. A
+  caller that set the date through an ordinary PATCH would leave `snoozed_at`
+  null and create a snooze that breaks on the write that created it — so there
+  is no path that can set one without the other. Unsnoozing clears both;
+  leaving the stamp behind would make the *next* snooze inherit it and wake
+  instantly.
+- **Snoozed items stay in the queue.** They are excluded inside
+  `matchesFilter()` — one gate ahead of every predicate, including `all` —
+  rather than filtered out of `buildReviewQueue()`, so the Snoozed view has
+  something to show and nothing is truly hidden. `/api/review` with no filter
+  now runs through `all` rather than skipping the filter, which was the one
+  path that could have leaked them.
+- **They do not count toward the Overview blocks.** Not on the time-critical
+  strip, not in the open-ended backlog. Snoozing is precisely how that number
+  is meant to come down; counting deferred rows would make the row undrainable.
+
+Offers are built by `shared/snoozeOptions.ts`, which does the data-aware part
+above and adds one rule the spec did not: **nothing is offered at or past a
+live deadline.** Deferring an item beyond the date it stops being actionable is
+archiving it while looking like deferral. On an item due in two days the menu
+offers nothing at all and says why — the typed date stays available, because
+the person may know something the row does not.
+
 ## 3c. The email digest
 
 The dashboard only works if something brings you back to it. A digest is that
@@ -320,7 +353,7 @@ Phase 0 is not optional — without it the redesign renders empty boxes.
 | **1** | ~~The decision deck.~~ **Done.** Stat cards deleted; the deck deals one card at a time from `GET /api/review?filter=needs`. Rationale sentences live in `shared/decisionCopy.ts` and ride on every queue item, so the digest can reuse them. The old "Needs review" section went too — the deck supersedes it, and it was rendering an empty container because it counted promo drafts it never listed. | The whole point of the page |
 | **2** | ~~Block E: collapse the task-run log.~~ **Done.** One line per run, capped at five, prose behind a per-row disclosure, full history on the Log page. Measured against identical data: the block goes 684px → 214px, a 69% cut. | Biggest space win, lowest risk |
 | **3** | ~~Blocks C + D, plus the `deadline` / `deadline_note` / `opens_at` split and a date backfill.~~ **Done.** Migration 0003 adds the two columns; `splitDeadline()` does the extraction and `scripts/backfill-deadlines.ts` applies it, dry-run by default. Blocks C and D are served from `GET /api/review` as `summary`, so the strip and the deck rank urgency identically. The dead `upcomingDeadlines` and `pendingReview` queries were deleted from `/api/overview`. | Makes the time-critical strip real rather than decorative |
-| **4** | `snoozed_until` on both tables, the queue filter, a "Snoozed" view, and the deck's snooze action (§3b) | Half the backlog is real work at the wrong moment |
+| **4** | ~~`snoozed_until` on both tables, the queue filter, a "Snoozed" view, and the deck's snooze action.~~ **Done.** Migration 0004 adds `snoozed_until` **and** `snoozed_at`; the wake-on-change question in §3b was answered yes and implemented against that pair. `POST /api/review/snooze` is the only writer. Offers come from `shared/snoozeOptions.ts`. | Half the backlog is real work at the wrong moment |
 | **5** | The email digest (§3c): Cron Trigger, `scheduled()` handler, a sender that is not the read-only Gmail token, per-item marks so nothing is reported twice | Depends on 4 — "now actionable" is mostly snoozes coming due |
 | **6** | Block F, and fix the orphaned reminder: `DELETE /api/gigs/:id` removes the gig and its Calendar event but leaves its reminders behind — reminder 3 points at gig 21, which no longer exists. | Housekeeping |
 

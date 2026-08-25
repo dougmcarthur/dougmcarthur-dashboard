@@ -52,6 +52,7 @@ All routes are under `/api`; anything else falls through to static assets.
 | `/api/sync` | Sync-licensing targets (CRUD) |
 | `/api/sync/reconcile` | `GET` preview of sent-pitch matches from Gmail; `POST /apply` to write status/pitch updates |
 | `/api/promo` | Monthly promo drafts (CRUD) |
+| `POST /api/review/snooze` | Defer a gig or sync target to a date, or `until: null` to bring it back |
 | `/api/reference-docs` | Reference documents (CRUD) |
 | `/api/reminders` | List/patch reminders; `POST /dismiss` to clear an entity's pending reminders |
 | `/api/task-runs` | Log + list automated task runs |
@@ -94,6 +95,29 @@ One row, `OpenEndedRow`: how many live opportunities have no date of any kind.
 They are open right now, permanently, nothing will ever make them urgent, and
 no other screen can say they exist. This is where the backlog actually is — see
 §1 of the redesign plan for the counts that led here.
+
+### Snoozing
+
+A row can say "not now, ask me in September". `POST /api/review/snooze` is the
+only thing that writes `snoozed_until`, because it also writes `snoozed_at` and
+the two are only meaningful together: the queue wakes a snoozed item early if
+`updated_at` has moved past `snoozed_at`, so a snooze set without the stamp
+would break on the write that created it.
+
+That early wake is deliberate. A snooze is a judgement about a set of facts, so
+once a research run gives the row a deadline or a fee, the judgement was about a
+different item and it comes back with an explanation rather than sitting until
+its date.
+
+Snoozed items are excluded inside `matchesFilter()` — one gate ahead of every
+predicate, `all` included — rather than dropped from the queue, so the
+**Snoozed** filter can list them and every one has a "Bring it back now" beside
+it. A queue that hides things with no way to look is worse than one that nags.
+
+Offered dates come from `shared/snoozeOptions.ts`: the item's own dates where
+it has them ("when it opens", "a week before the deadline"), generic intervals
+otherwise, and never a date at or past a live deadline — deferring something
+past the point of acting on it is archiving it in disguise.
 
 ### Automation activity
 
@@ -170,6 +194,9 @@ npm run db:generate          # generate a migration from schema changes
 npm run db:migrate:local     # apply to the local D1 instance
 npm run db:migrate:remote    # apply to production D1
 ```
+
+Migration 0004 adds `snoozed_until` and `snoozed_at` to `gig_opportunities`
+and `sync_targets`. No backfill — every existing row is simply not snoozed.
 
 `schema.sql` is a historical snapshot of the original production schema; the
 current schema is the sum of that plus everything in `migrations/`. Some legacy

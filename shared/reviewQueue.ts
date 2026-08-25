@@ -26,6 +26,7 @@ import {
   parseNote,
   parseFee,
   parseDeadline,
+  daysUntil,
   type ParsedNote,
   type ParsedFee,
   type ParsedDeadline,
@@ -70,12 +71,62 @@ export interface ReviewItem {
   deadline: ParsedDeadline
   flags: ReviewFlag[]
   score: number
+  /** Deferral state. An active snooze hides the item from every filter but "snoozed". */
+  snooze: SnoozeState
   /** The sentence and buttons for this item — see decisionCopy.ts. */
   decision: Decision
   source: ReviewSource
 }
 
-export type ReviewFilter = 'needs' | 'conflict' | 'blocked' | 'paid' | 'timing' | 'all'
+export type ReviewFilter = 'needs' | 'conflict' | 'blocked' | 'paid' | 'timing' | 'snoozed' | 'all'
+
+export interface SnoozeState {
+  /** ISO date this was deferred to, whether or not the snooze still holds. */
+  until: string | null
+  /** The snooze is holding: this item is out of every queue but "Snoozed". */
+  active: boolean
+  /** Set when a still-future snooze was broken by the row changing under it. */
+  wokenByChange: boolean
+  daysUntil: number | null
+}
+
+/**
+ * Whether a snooze still holds.
+ *
+ * Two ways to stop holding. The date arrives — the ordinary case, and the
+ * point of the feature. Or the row changes underneath it: a snooze is a
+ * judgement about a set of facts ("nothing here needs me until September"),
+ * and once a research run gives the row a deadline or a fee, that judgement
+ * was made about a different item. Waking it is more useful than honouring a
+ * date chosen against information that no longer applies.
+ *
+ * `snoozed_at` is written with the same timestamp as `updated_at` when the
+ * snooze is set, so setting one does not immediately wake it. Any later write
+ * pushes `updated_at` past it. Comparison is lexicographic, which is safe
+ * here: both are ISO, and production's bare-date `updated_at` values sort
+ * before same-day timestamps, so a legacy row reads as unchanged rather than
+ * spuriously woken.
+ */
+function snoozeState(
+  row: { snoozedUntil: string | null; snoozedAt: string | null; updatedAt: string },
+  today: string,
+): SnoozeState {
+  const until = row.snoozedUntil
+  if (!until) return { until: null, active: false, wokenByChange: false, daysUntil: null }
+
+  const stillFuture = until.slice(0, 10) > today
+  const changed = row.snoozedAt === null || row.updatedAt > row.snoozedAt
+
+  return {
+    until,
+    active: stillFuture && !changed,
+    wokenByChange: stillFuture && changed,
+    daysUntil: daysUntil(until.slice(0, 10)),
+  }
+}
+
+/** No snooze columns to consult — promo drafts, and anything else without them. */
+const NO_SNOOZE: SnoozeState = { until: null, active: false, wokenByChange: false, daysUntil: null }
 
 /** Statuses that mean the workflow believes this item is finished. */
 const GIG_DONE = new Set(['submitted', 'archived'])
@@ -155,7 +206,7 @@ function score(flags: ReviewFlag[], deadline: ParsedDeadline): number {
   return base + urgency
 }
 
-function gigItem(row: GigOpportunity): Omit<ReviewItem, 'decision'> {
+function gigItem(row: GigOpportunity, today: string): Omit<ReviewItem, 'decision'> {
   const parsed = parseNote(row.fitRationale ?? row.fitNotes)
   const fee = parseFee(row.fee, row.paid)
   const deadline = parseDeadline(row.deadline, { note: row.deadlineNote, opensAt: row.opensAt })
@@ -172,11 +223,12 @@ function gigItem(row: GigOpportunity): Omit<ReviewItem, 'decision'> {
     note: row.fitRationale ?? row.fitNotes,
     parsed, fee, deadline, flags,
     score: score(flags, deadline),
+    snooze: snoozeState(row, today),
     source: { kind: 'gig', row },
   }
 }
 
-function syncItem(row: SyncTarget): Omit<ReviewItem, 'decision'> {
+function syncItem(row: SyncTarget, today: string): Omit<ReviewItem, 'decision'> {
   const parsed = parseNote(row.notes)
   const fee = parseFee(null, 0)
   const deadline = parseDeadline(null)
@@ -193,6 +245,7 @@ function syncItem(row: SyncTarget): Omit<ReviewItem, 'decision'> {
     note: row.notes,
     parsed, fee, deadline, flags,
     score: score(flags, deadline),
+    snooze: snoozeState(row, today),
     source: { kind: 'sync', row },
   }
 }
@@ -214,6 +267,7 @@ function promoItem(row: PromoDraft): Omit<ReviewItem, 'decision'> {
     parsed, fee, deadline,
     flags: row.status === 'draft' ? [{ id: 'not_submitted', label: 'Unapproved draft', severity: 'warn' }] : [],
     score: row.status === 'draft' ? FLAG_WEIGHT.not_submitted : 0,
+    snooze: NO_SNOOZE,
     source: { kind: 'promo', row },
   }
 }
@@ -222,10 +276,18 @@ export function buildReviewQueue(input: {
   gigs?: GigOpportunity[]
   sync?: SyncTarget[]
   promo?: PromoDraft[]
+  /** Today, as YYYY-MM-DD. Injectable so snooze boundaries are testable. */
+  today?: string
 }): ReviewItem[] {
+  const today = input.today ?? new Date().toISOString().slice(0, 10)
+
+  // Snoozed items stay IN the queue rather than being filtered out here. A
+  // queue that hides things with no way to look at them is worse than one that
+  // nags, so they are carried through, excluded from every filter but
+  // "snoozed", and left visible and reversible there.
   return [
-    ...(input.gigs ?? []).filter((g) => g.status !== 'archived').map(gigItem),
-    ...(input.sync ?? []).filter((s) => s.status !== 'archived').map(syncItem),
+    ...(input.gigs ?? []).filter((g) => g.status !== 'archived').map((g) => gigItem(g, today)),
+    ...(input.sync ?? []).filter((s) => s.status !== 'archived').map((s) => syncItem(s, today)),
     ...(input.promo ?? []).map(promoItem),
   ]
     // Copy is attached here rather than in each *Item builder so there is
@@ -282,6 +344,9 @@ export interface QueueSummary {
 }
 
 function settled(item: ReviewItem): boolean {
+  // A snoozed item is settled for now by the only measure these blocks care
+  // about: it is not something to act on today.
+  if (item.snooze.active) return true
   if (item.kind === 'gig') return GIG_SETTLED.has(item.status)
   if (item.kind === 'sync') return SYNC_SETTLED.has(item.status)
   return item.status !== 'draft'
@@ -353,6 +418,12 @@ export function summariseQueue(items: ReviewItem[]): QueueSummary {
 }
 
 export function matchesFilter(item: ReviewItem, filter: ReviewFilter): boolean {
+  // One gate, ahead of every predicate: a snoozed item is absent from the
+  // whole app except the view that exists to show it. Putting this in each
+  // case is how one filter eventually forgets.
+  if (filter === 'snoozed') return item.snooze.active
+  if (item.snooze.active) return false
+
   switch (filter) {
     case 'all':
       return true

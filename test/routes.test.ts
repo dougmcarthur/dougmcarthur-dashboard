@@ -35,6 +35,51 @@ describe('API route registration', () => {
     }
   })
 
+  // The snooze endpoint validates shape and date before touching D1, so these
+  // are reachable with no database binding.
+  it('POST /api/review/snooze rejects a date that is not a date', async () => {
+    const res = await app.request(
+      '/api/review/snooze',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'gig', id: 1, until: 'next tuesday' }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('POST /api/review/snooze refuses a date in the past', async () => {
+    // Snoozing backwards would silently do nothing, which is worse than an
+    // error — the item would look deferred and reappear immediately.
+    const res = await app.request(
+      '/api/review/snooze',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'gig', id: 1, until: '2020-01-01' }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: string }
+    expect(body.error).toContain('must be after')
+  })
+
+  it('POST /api/review/snooze rejects an unknown entity kind', async () => {
+    // Promo drafts have no snooze columns; the schema is what keeps them out.
+    const res = await app.request(
+      '/api/review/snooze',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'promo', id: 1, until: '2030-01-01' }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('GET /api/review accepts the snoozed filter', async () => {
+    // Guards the FILTERS list in the route against drifting from ReviewFilter:
+    // an unlisted filter 400s before reaching the database, so a 400 here would
+    // mean the route rejects a filter the type system allows.
+    const res = await app.request('/api/review?filter=snoozed', {}, emptyEnv)
+    expect(res.status).not.toBe(400)
+  })
+
   it('GET /api/health reports integration config without secrets', async () => {
     const res = await app.request('/api/health', {}, emptyEnv)
     expect(res.status).toBe(200)

@@ -4,6 +4,7 @@ import { api, type GigOpportunity, type SyncTarget, type PromoDraft } from '../a
 import type { ReviewItem } from '../../../shared/reviewQueue'
 import type { DecisionIntent } from '../../../shared/decisionCopy'
 import { KindTag } from './ReviewPanels'
+import { SnoozeMenu } from './SnoozeMenu'
 
 /**
  * One decision at a time, with the rest of the stack showing behind it.
@@ -73,6 +74,22 @@ export function DecisionDeck({
   const remaining = items.filter((i) => !settled.has(i.key))
   const item = remaining[Math.min(index, Math.max(remaining.length - 1, 0))]
 
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['review'] })
+    qc.invalidateQueries({ queryKey: ['overview'] })
+    qc.invalidateQueries({ queryKey: ['gigs'] })
+    qc.invalidateQueries({ queryKey: ['sync'] })
+    qc.invalidateQueries({ queryKey: ['promo'] })
+  }
+
+  // Snooze goes through its own endpoint, not a status PATCH — the date and
+  // the timestamp it is measured against have to be written together.
+  const snooze = useMutation({
+    mutationFn: ({ target, until }: { target: ReviewItem; until: string }) =>
+      api.snooze({ kind: target.kind as 'gig' | 'sync', id: target.id, until }),
+    onSuccess: invalidate,
+  })
+
   const patch = useMutation({
     mutationFn: async ({ target, status }: { target: ReviewItem; status: string }): Promise<void> => {
       const body = { status }
@@ -84,13 +101,7 @@ export function DecisionDeck({
         await api.promo.patch(target.id, body as Partial<PromoDraft>)
       }
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['review'] })
-      qc.invalidateQueries({ queryKey: ['overview'] })
-      qc.invalidateQueries({ queryKey: ['gigs'] })
-      qc.invalidateQueries({ queryKey: ['sync'] })
-      qc.invalidateQueries({ queryKey: ['promo'] })
-    },
+    onSuccess: invalidate,
   })
 
   if (!item) {
@@ -119,6 +130,12 @@ export function DecisionDeck({
     setSettled((prev) => new Set(prev).add(item.key))
     setIndex(0)
     patch.mutate({ target: item, status })
+  }
+
+  const defer = (until: string) => {
+    setSettled((prev) => new Set(prev).add(item.key))
+    setIndex(0)
+    snooze.mutate({ target: item, until })
   }
 
   const position = items.length - remaining.length + 1
@@ -179,6 +196,11 @@ export function DecisionDeck({
             >
               Details
             </button>
+            {/* Promo drafts have no snooze columns — a monthly draft defers by
+                being a different month, not by a date on the row. */}
+            {item.kind !== 'promo' && (
+              <SnoozeMenu item={item} onPick={defer} disabled={snooze.isPending} />
+            )}
             <button
               onClick={() => setIndex((i) => (i + 1) % Math.max(remaining.length, 1))}
               disabled={remaining.length < 2}
@@ -188,9 +210,10 @@ export function DecisionDeck({
             </button>
           </div>
 
-          {patch.isError && (
+          {(patch.isError || snooze.isError) && (
             <p className="mt-2 text-xs text-red-600">
-              Could not save that — {(patch.error as Error).message}
+              Could not save that —{' '}
+              {((patch.error ?? snooze.error) as Error).message}
             </p>
           )}
         </div>
