@@ -10,6 +10,7 @@ import {
   deleteCalendarEvent,
   calendarConfigured,
 } from '../lib/googleCalendar'
+import { splitDeadline } from '../../shared/reviewParse'
 import type { Env } from '../types'
 
 const gigs = new Hono<{ Bindings: Env }>()
@@ -22,6 +23,8 @@ const GigInsertSchema = z.object({
   audienceSize: z.number().int().positive().optional(),
   genreFitScore: z.number().int().min(1).max(5).optional(),
   deadline: z.string().optional(),
+  deadlineNote: z.string().nullable().optional(),
+  opensAt: z.string().nullable().optional(),
   feeAmount: z.number().nonnegative().optional(),
   feeCurrency: z.string().optional(),
   paid: z.boolean().optional(),
@@ -73,6 +76,8 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
       audienceSize: b.audienceSize ?? null,
       genreFitScore: b.genreFitScore ?? null,
       deadline: b.deadline ?? null,
+      deadlineNote: b.deadlineNote ?? null,
+      opensAt: b.opensAt ?? null,
       feeAmount: b.feeAmount ?? null,
       feeCurrency: b.feeCurrency ?? 'USD',
       paid: b.paid ? 1 : 0,
@@ -121,10 +126,17 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
   const deadline = b.deadline ?? before.deadline
   const name = b.name ?? before.name
 
+  // Calendar events and reminders need a real date. 26 of 34 production rows
+  // hold prose here ("None — rolling artist roster intake"), which used to be
+  // handed to Google verbatim and to `new Date()` — the latter yielding
+  // Invalid Date and a reminder scheduled for "NaN-NaN-NaN". Recover a date
+  // when the prose contains one and skip both steps when it does not.
+  const deadlineDate = deadline ? splitDeadline(deadline).date : null
+
   // --- Calendar sync ---
   if (calendarConfigured(c.env)) {
     try {
-      if (statusChanging && newStatus === 'approved' && deadline) {
+      if (statusChanging && newStatus === 'approved' && deadlineDate) {
         // Approving with a deadline → create Calendar event
         const event = await createCalendarEvent(c.env, {
           summary: `🎵 ${name}`,
@@ -136,7 +148,7 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
           ]
             .filter(Boolean)
             .join('\n'),
-          date: deadline,
+          date: deadlineDate,
           reminderMinutes: 1440, // 24 h before
         })
         updates.googleEventId = event.id
@@ -149,7 +161,7 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
           // Deadline or name changed → update the existing event
           await updateCalendarEvent(c.env, before.googleEventId, {
             summary: name ? `🎵 ${name}` : undefined,
-            date: deadline ?? undefined,
+            date: deadlineDate ?? undefined,
           })
         }
       }
@@ -162,10 +174,10 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
   await db.update(gigOpportunities).set(updates).where(eq(gigOpportunities.id, id))
 
   // --- Reminder creation on approval ---
-  if (statusChanging && newStatus === 'approved' && deadline) {
+  if (statusChanging && newStatus === 'approved' && deadlineDate) {
     const ts = new Date().toISOString()
     // Write a pre-deadline reminder: fire 7 days before if nothing submitted
-    const reminderDate = new Date(deadline)
+    const reminderDate = new Date(deadlineDate)
     reminderDate.setDate(reminderDate.getDate() - 7)
 
     await db.insert(reminders).values({

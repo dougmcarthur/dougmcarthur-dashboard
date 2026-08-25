@@ -87,6 +87,25 @@ export interface ParsedDeadline {
   /** The column held a clean ISO date — no recovery needed. */
   exact: boolean
   daysUntil: number | null
+  /** The qualifier: "rolling artist roster intake", "TBD", "Submission window". */
+  note: string | null
+  /** ISO date the window opens, which is not the same as when it closes. */
+  opensAt: string | null
+  opensInDays: number | null
+}
+
+/**
+ * The three things a `deadline` column value can be carrying at once.
+ * `splitDeadline()` produces it from prose; migration 0003 gives each part a
+ * column of its own, and `scripts/backfill-deadlines.ts` moves them across.
+ */
+export interface DeadlineSplit {
+  /** When submissions close. */
+  date: string | null
+  /** When submissions open, when the value describes a window. */
+  opensAt: string | null
+  /** Everything the dates do not say, kept verbatim. */
+  note: string | null
 }
 
 const KNOWN_TRACKS = ['Magic', 'Lost Weekends', 'Hermit Phase', 'Draw the Line']
@@ -156,24 +175,128 @@ export function findDate(text: string): string | null {
   return `${written[3]}-${String(monthIndex + 1).padStart(2, '0')}-${day}`
 }
 
+const MONTH_NAME = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
+
+/** Words that, just before a date, mean it is when things START, not when they end. */
+const OPENS_CUE = /\b(?:opens?|opening|re-?opens?|check back(?: in)?|not open(?: until)?|available from|starts?|submissions? (?:open|begin)|applications? open|window opens?)\b[^.]{0,30}$/i
+
+const RANGE = new RegExp(
+  `\\b${MONTH_NAME}\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s*\\d{4})?` +
+    `\\s*(?:–|—|--?|to|through|thru|until|till)\\s*` +
+    `(?:${MONTH_NAME}\\.?\\s+)?\\d{1,2}(?:st|nd|rd|th)?,?\\s*\\d{4}\\b`,
+  'i',
+)
+
+const ANY_DATE = new RegExp(
+  `\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b${MONTH_NAME}\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4}\\b`,
+  'gi',
+)
+
+interface FoundDate {
+  iso: string
+  start: number
+  end: number
+}
+
+/** Every date in `text`, in the order they appear, with where they sit. */
+function findDates(text: string): FoundDate[] {
+  const out: FoundDate[] = []
+  for (const m of text.matchAll(ANY_DATE)) {
+    const iso = findDate(m[0])
+    if (iso) out.push({ iso, start: m.index, end: m.index + m[0].length })
+  }
+  return out
+}
+
+/**
+ * Pulls a range apart. "September 1 – December 31, 2026" has no year on its
+ * opening half, so the year is borrowed from the closing half — which is why
+ * this cannot just be two calls to findDate().
+ */
+function splitRange(range: string): { opensAt: string | null; date: string | null } {
+  const closes = findDates(range).at(-1) ?? null
+  if (!closes) return { opensAt: null, date: null }
+
+  const head = range.slice(0, range.search(/\s*(?:–|—|--?|to|through|thru|until|till)\s*/i))
+  const opensAt = findDate(head) ?? findDate(`${head}, ${closes.iso.slice(0, 4)}`)
+  return { opensAt, date: closes.iso }
+}
+
+/**
+ * Separates a `deadline` value into a closing date, an opening date, and the
+ * prose that is neither.
+ *
+ * The note is kept verbatim rather than reconstructed from the leftovers,
+ * because subtracting a date out of a sentence produces fragments
+ * ("Submission window: – , 2026") that are worse than the original. It is
+ * dropped only when removing the dates leaves nothing but punctuation, i.e.
+ * the value really was just a date.
+ */
+export function splitDeadline(raw: string | null): DeadlineSplit {
+  const text = raw?.trim() ?? ''
+  if (!text) return { date: null, opensAt: null, note: null }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return { date: text, opensAt: null, note: null }
+
+  const found = findDates(text)
+  const range = text.match(RANGE)
+
+  let date: string | null = null
+  let opensAt: string | null = null
+
+  if (range) {
+    ;({ opensAt, date } = splitRange(range[0]))
+  } else if (found.length === 1) {
+    // One date and an "opens" cue in front of it describes a window that has
+    // not started, not a deadline that has.
+    if (OPENS_CUE.test(text.slice(0, found[0].start))) opensAt = found[0].iso
+    else date = found[0].iso
+  } else if (found.length > 1) {
+    const opener = found.find((d) => OPENS_CUE.test(text.slice(0, d.start)))
+    opensAt = opener?.iso ?? null
+    date = (opener ? found.filter((d) => d !== opener) : found).at(-1)?.iso ?? null
+  }
+
+  const leftover = text.replace(ANY_DATE, ' ')
+  const note = /[a-z]/i.test(leftover) ? text : null
+
+  return { date, opensAt, note }
+}
+
 /**
  * The `deadline` column is a TEXT field and roughly half of production rows
  * hold prose instead of a date ("None — rolling artist roster intake",
  * "Submission window: September 1 – December 31, 2026"). Recover a date when
  * one is in there, and flag the row as inexact so the UI can say so rather
  * than pretend the countdown is trustworthy.
+ *
+ * Migration 0003 gives the qualifier and the window-open date real columns.
+ * Pass them and they win; leave them out and the same values are recovered
+ * from the prose. The output is identical either way, which is the point —
+ * the backfill changes where these facts are stored, not what the UI shows.
  */
-export function parseDeadline(raw: string | null): ParsedDeadline {
+export function parseDeadline(
+  raw: string | null,
+  columns: { note?: string | null; opensAt?: string | null } = {},
+): ParsedDeadline {
   const text = raw?.trim() ?? ''
-  if (!text) return { raw: raw ?? null, date: null, exact: false, daysUntil: null }
+  const split = splitDeadline(text)
 
-  const exact = /^\d{4}-\d{2}-\d{2}$/.test(text)
-  const date = findDate(text)
+  const note = columns.note ?? split.note
+  const opensAt = columns.opensAt ?? split.opensAt
+
+  if (!text && !note && !opensAt) {
+    return { raw: raw ?? null, date: null, exact: false, daysUntil: null, note: null, opensAt: null, opensInDays: null }
+  }
+
   return {
-    raw: text,
-    date,
-    exact,
-    daysUntil: date ? daysUntil(date) : null,
+    raw: text || null,
+    date: split.date,
+    exact: /^\d{4}-\d{2}-\d{2}$/.test(text),
+    daysUntil: split.date ? daysUntil(split.date) : null,
+    note,
+    opensAt,
+    opensInDays: opensAt ? daysUntil(opensAt) : null,
   }
 }
 

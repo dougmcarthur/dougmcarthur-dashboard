@@ -5,7 +5,8 @@ import type { GigOpportunity, SyncTarget, PromoDraft } from '../shared/types'
 function gig(o: Partial<GigOpportunity> & { id: number; name: string }): GigOpportunity {
   return {
     type: 'festival', organizer: null, submissionMethod: null, audienceSize: null,
-    genreFitScore: null, deadline: null, feeAmount: null, feeCurrency: 'USD', fee: null,
+    genreFitScore: null, deadline: null, deadlineNote: null, opensAt: null,
+    feeAmount: null, feeCurrency: 'USD', fee: null,
     paid: 0, fitNotes: null, fitRationale: null, url: null, status: 'approved',
     googleEventId: null, discoveredAt: '2026-07-01', updatedAt: '2026-08-01', ...o,
   }

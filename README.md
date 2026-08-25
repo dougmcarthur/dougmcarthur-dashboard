@@ -46,8 +46,8 @@ All routes are under `/api`; anything else falls through to static assets.
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/overview` | Dashboard rollup: counts, pending-review items, upcoming deadlines, due reminders |
-| `GET /api/review` | The decision queue — what needs a decision, ranked, with per-filter counts (`?filter=`, `?limit=`) |
+| `GET /api/overview` | Totals, the recent task-run log, and due reminders |
+| `GET /api/review` | The decision queue — what needs a decision, ranked, with per-filter counts and the Overview's `summary` (`?filter=`, `?limit=`) |
 | `/api/gigs` | Gig opportunities (CRUD). Approving with a deadline creates a Calendar event + pre-deadline reminder |
 | `/api/sync` | Sync-licensing targets (CRUD) |
 | `/api/sync/reconcile` | `GET` preview of sent-pitch matches from Gmail; `POST /apply` to write status/pitch updates |
@@ -74,6 +74,26 @@ Buttons carry an *intent* (`confirm_sent`, `approve`, `pass`, `archive`, …),
 not a status. `DecisionDeck` maps intent to the right status per entity type,
 because "pass" means `rejected` on a gig and `declined` on a sync target. Add
 a new intent in one place and every kind has to say what it means.
+
+### On the clock
+
+Below the deck, everything carrying a date: passed deadlines, deadlines inside
+two weeks, windows opening inside sixty days, and pending reminders — one list,
+`TimingStrip`. The bands come from `summary.timing` on the same `/api/review`
+response that fills the deck, so the strip cannot call something urgent that
+the deck does not rank.
+
+A date recovered from prose renders as *"about Sep 3 — recovered from the
+note"* rather than as a plain countdown. Until the backfill has run everywhere,
+some of these dates are inferences, and a countdown that hides that is worse
+than no countdown.
+
+### Open anytime
+
+One row, `OpenEndedRow`: how many live opportunities have no date of any kind.
+They are open right now, permanently, nothing will ever make them urgent, and
+no other screen can say they exist. This is where the backlog actually is — see
+§1 of the redesign plan for the counts that led here.
 
 ### Automation activity
 
@@ -155,6 +175,26 @@ npm run db:migrate:remote    # apply to production D1
 current schema is the sum of that plus everything in `migrations/`. Some legacy
 gig columns (`fee`, `fit_notes`) are retained during the structured-column
 migration — `scripts/backfill-structured-columns.js` populates the new columns.
+
+### The deadline backfill
+
+Migration 0003 splits the gig deadline into `deadline` (ISO date),
+`deadline_note` (the qualifier) and `opens_at` (when a window opens), because
+26 of 34 production rows hold prose in a column everything else treats as a
+date. Run it after applying the migration:
+
+```bash
+npx tsx scripts/backfill-deadlines.ts --remote            # dry run, prints every change
+npx tsx scripts/backfill-deadlines.ts --remote --apply
+```
+
+Dry run is the default; nothing is written without `--apply`. `tsx` comes in
+with the existing devDependencies, so `npm ci` is enough to run it. The extraction is
+`splitDeadline()` from `shared/reviewParse.ts` — the same function the Worker
+already uses to read these rows, so a disagreement between the backfill and the
+UI is a bug in one function rather than a difference of opinion between two.
+Reversible: the original value is kept verbatim in `deadline_note` whenever it
+held anything beyond a date.
 
 ## Deploying
 

@@ -10,14 +10,23 @@ export type {
 } from '../../shared/types'
 
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
-import type { ReviewFilter, ReviewItem } from '../../shared/reviewQueue'
+import type { ReviewFilter, ReviewItem, QueueSummary } from '../../shared/reviewQueue'
 
-export type { ReviewFilter, ReviewItem } from '../../shared/reviewQueue'
+export type {
+  ReviewFilter,
+  ReviewItem,
+  QueueSummary,
+  TimingRow,
+  TimingBand,
+  Backlog,
+} from '../../shared/reviewQueue'
 
 export interface ReviewQueue {
   items: ReviewItem[]
   total: number
   counts: Record<ReviewFilter, number>
+  /** Blocks C and D of the Overview — see summariseQueue(). */
+  summary: QueueSummary
 }
 
 export interface ReconcileResult {
@@ -60,12 +69,6 @@ export interface DueReminder {
 export interface Overview {
   stats: { totalGigs: number; totalSync: number; totalPromo: number }
   recentRuns: TaskRun[]
-  pendingReview: {
-    gigs: GigOpportunity[]
-    sync: SyncTarget[]
-    promo: PromoDraft[]
-  }
-  upcomingDeadlines: GigOpportunity[]
   dueReminders: DueReminder[]
 }
 

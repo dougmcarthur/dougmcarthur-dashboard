@@ -81,6 +81,10 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
         type: draft.type,
         organizer: draft.organizer || null,
         deadline: draft.deadline || null,
+        // The form takes a date picker's value, so there is nothing to
+        // qualify and no window — migration 0003's columns start empty.
+        deadlineNote: null,
+        opensAt: null,
         feeAmount: draft.feeAmount ? parseFloat(draft.feeAmount) : null,
         feeCurrency: draft.feeCurrency || 'USD',
         paid: draft.paid ? 1 : 0,

@@ -158,7 +158,7 @@ function score(flags: ReviewFlag[], deadline: ParsedDeadline): number {
 function gigItem(row: GigOpportunity): Omit<ReviewItem, 'decision'> {
   const parsed = parseNote(row.fitRationale ?? row.fitNotes)
   const fee = parseFee(row.fee, row.paid)
-  const deadline = parseDeadline(row.deadline)
+  const deadline = parseDeadline(row.deadline, { note: row.deadlineNote, opensAt: row.opensAt })
   const flags = flagsFor('gig', row.status, parsed, fee, deadline)
 
   return {
@@ -232,6 +232,124 @@ export function buildReviewQueue(input: {
     // exactly one place where an item and its sentence are joined.
     .map((item) => ({ ...item, decision: decisionFor(item) }))
     .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))
+}
+
+/**
+ * Statuses that mean nobody owes this item anything further. Wider than
+ * *_DONE above, which answers a different question: a rejected gig is settled,
+ * but a rejected gig whose note says "not submitted" is not a contradiction.
+ */
+const GIG_SETTLED = new Set(['submitted', 'archived', 'rejected'])
+const SYNC_SETTLED = new Set(['pitched', 'sent', 'confirmed', 'declined', 'archived'])
+
+/** Deadline horizon for the time-critical strip. Matches the due_soon flag. */
+const DUE_SOON_DAYS = 14
+
+/**
+ * How far ahead a window opening is worth showing. Sixty days because the
+ * research runs are roughly monthly: at this horizon a window cannot open
+ * without having appeared here on a previous visit first.
+ */
+const OPENING_DAYS = 60
+
+export type TimingBand = 'overdue' | 'due_soon' | 'opening'
+
+export interface TimingRow {
+  key: string
+  kind: ReviewKind
+  id: number
+  title: string
+  band: TimingBand
+  /** The date this row turns on: the deadline, or the day the window opens. */
+  date: string
+  daysUntil: number
+  /** Set when the date was recovered from prose rather than read from a column. */
+  approximate: boolean
+}
+
+export interface Backlog {
+  /** Live items carrying no date of any kind — nothing will ever force these. */
+  openEnded: number
+  /** Of those, how many nobody has touched since the day they were found. */
+  untouched: number
+  /** Oldest discovery date among them, so the row can say how long it has been. */
+  oldestDiscoveredAt: string | null
+}
+
+export interface QueueSummary {
+  timing: TimingRow[]
+  backlog: Backlog
+}
+
+function settled(item: ReviewItem): boolean {
+  if (item.kind === 'gig') return GIG_SETTLED.has(item.status)
+  if (item.kind === 'sync') return SYNC_SETTLED.has(item.status)
+  return item.status !== 'draft'
+}
+
+function discovery(item: ReviewItem): { discoveredAt: string; updatedAt: string } | null {
+  const { source } = item
+  if (source.kind === 'promo') return null
+  return { discoveredAt: source.row.discoveredAt, updatedAt: source.row.updatedAt }
+}
+
+/**
+ * Blocks C and D of the Overview, computed here rather than in the browser so
+ * the strip and the deck cannot disagree about what is urgent.
+ *
+ * Both are deliberately derived from the same items the deck deals. The old
+ * "Deadlines in 14 days" panel ran its own SQL BETWEEN against a TEXT column
+ * that mostly holds prose, so it matched nothing and rendered nothing, for
+ * months, without ever looking broken.
+ */
+export function summariseQueue(items: ReviewItem[]): QueueSummary {
+  const timing: TimingRow[] = []
+
+  for (const item of items) {
+    if (settled(item)) continue
+    const { date, daysUntil: days, opensAt, opensInDays, exact } = item.deadline
+
+    if (date && days !== null && days <= DUE_SOON_DAYS) {
+      timing.push({
+        key: item.key, kind: item.kind, id: item.id, title: item.title,
+        band: days < 0 ? 'overdue' : 'due_soon',
+        date, daysUntil: days, approximate: !exact,
+      })
+    } else if (opensAt && opensInDays !== null && opensInDays >= 0 && opensInDays <= OPENING_DAYS) {
+      // Only when there is no live deadline of its own: a row with both is
+      // already listed above, and the deadline is the harder constraint.
+      timing.push({
+        key: item.key, kind: item.kind, id: item.id, title: item.title,
+        band: 'opening',
+        date: opensAt, daysUntil: opensInDays, approximate: !exact,
+      })
+    }
+  }
+
+  const BAND_ORDER: Record<TimingBand, number> = { overdue: 0, due_soon: 1, opening: 2 }
+  timing.sort((a, b) => BAND_ORDER[a.band] - BAND_ORDER[b.band] || a.daysUntil - b.daysUntil)
+
+  const openEnded = items.filter(
+    (i) => !settled(i) && i.deadline.date === null && i.deadline.opensAt === null && discovery(i) !== null,
+  )
+
+  return {
+    timing,
+    backlog: {
+      openEnded: openEnded.length,
+      // Compared by calendar day, not by string: discovered_at is a bare date
+      // while updated_at is sometimes a full timestamp, so an exact match
+      // would report every row as touched.
+      untouched: openEnded.filter((i) => {
+        const d = discovery(i)!
+        return d.updatedAt.slice(0, 10) === d.discoveredAt.slice(0, 10)
+      }).length,
+      oldestDiscoveredAt: openEnded.reduce<string | null>((oldest, i) => {
+        const at = discovery(i)!.discoveredAt.slice(0, 10)
+        return oldest === null || at < oldest ? at : oldest
+      }, null),
+    },
+  }
 }
 
 export function matchesFilter(item: ReviewItem, filter: ReviewFilter): boolean {

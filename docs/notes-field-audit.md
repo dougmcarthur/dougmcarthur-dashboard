@@ -118,6 +118,13 @@ returns `NaN` on them, and `PATCH /api/gigs` passes the raw string to Google
 Calendar. Suggested fix: keep `deadline` as a real ISO date, add
 `deadline_note TEXT` for the qualifier, and add `opens_at TEXT`.
 
+> **Resolved.** Migration 0003 adds both columns;
+> `scripts/backfill-deadlines.ts` moves the values across, dry-run by default.
+> `PATCH /api/gigs` now recovers a date before creating a Calendar event or a
+> reminder and skips both when there is no date to be had — previously the raw
+> prose went to Google verbatim and to `new Date()`, which scheduled reminders
+> for `Invalid Date`.
+
 **4. `type` is doing two jobs on some rows.** Most rows hold a clean value
 (`festival`, `showcase`, `residency`), but several hold a sentence —
 `House concert touring network (gig opportunity)`, `Paid live performance
@@ -144,9 +151,10 @@ already exists.
    update `SyncStatus`/`GigStatus`) — this unblocks the Overview page.
 2. Resolve the three status/note conflicts by hand; they are real
    "did we actually send this?" questions, not data-cleaning.
-3. Split `deadline` into `deadline` (ISO) + `deadline_note` + `opens_at`.
+3. ~~Split `deadline` into `deadline` (ISO) + `deadline_note` + `opens_at`.~~
+   Done — migration 0003 and `scripts/backfill-deadlines.ts`.
 4. Add the columns in the tables above and backfill them, using
-   `frontend/src/lib/reviewParse.ts` as the extraction spec — its unit tests in
+   `shared/reviewParse.ts` as the extraction spec — its unit tests in
    `test/reviewParse.test.ts` run against verbatim production note bodies.
 5. Once backfilled, the Review screen reads columns and the parser is deleted.
 

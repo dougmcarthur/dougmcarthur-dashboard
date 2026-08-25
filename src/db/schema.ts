@@ -8,7 +8,9 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   submissionMethod: text('submission_method'), // 'email' | 'portal' | 'form'
   audienceSize: integer('audience_size'),
   genreFitScore: integer('genre_fit_score'), // 1-5
-  deadline: text('deadline'),
+  deadline: text('deadline'), // ISO date after migration 0003; legacy rows may still hold prose
+  deadlineNote: text('deadline_note'), // the qualifier the prose carried ("rolling intake", "TBD")
+  opensAt: text('opens_at'), // when a submission window opens, distinct from when it closes
   feeAmount: real('fee_amount'),
   feeCurrency: text('fee_currency').default('USD'),
   fee: text('fee'), // legacy column, kept during migration

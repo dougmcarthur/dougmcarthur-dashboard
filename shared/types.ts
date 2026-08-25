@@ -26,7 +26,12 @@ export interface GigOpportunity {
   submissionMethod: 'email' | 'portal' | 'form' | null
   audienceSize: number | null
   genreFitScore: number | null
+  /** ISO date. Legacy rows may still hold prose — see migration 0003. */
   deadline: string | null
+  /** The qualifier that used to be crammed into `deadline` ("rolling intake"). */
+  deadlineNote: string | null
+  /** ISO date a submission window opens, when that differs from when it closes. */
+  opensAt: string | null
   feeAmount: number | null
   feeCurrency: string | null
   fee: string | null // legacy

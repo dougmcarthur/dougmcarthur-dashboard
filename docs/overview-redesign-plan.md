@@ -177,11 +177,29 @@ is the substance of this block, not the card styling.
 Zero state: *"Nothing needs a decision. 16 open opportunities are still
 waiting whenever you want them."*
 
-### C. Time-critical strip
+### C. Time-critical strip — "On the clock"
 
 Overdue, due-soon, and windows about to open — the honest contents of which is
 currently 5 + 1 + a handful. Small by design, because the data says it is
 small. Includes the pending reminders that "Follow up" shows today.
+
+**Built.** `TimingStrip`, fed by `summary.timing` from `GET /api/review`.
+Three decisions worth recording:
+
+- **Reminders share the list rather than getting their own panel.** "Your
+  deadline is in two days" and "did you ever submit this?" are the same
+  question at different stages, and two panels meant two places to look.
+- **Bands are computed server-side.** `summariseQueue()` decides what is
+  overdue, due soon, or opening; the component only styles it. The block this
+  replaces did its own date maths in the browser against a different data
+  source, which is how it ended up disagreeing with everything else.
+- **Recovered dates say so.** A date parsed out of a sentence renders as
+  *"about Sep 3 — recovered from the note"*. The alternative is a countdown
+  that looks identical to a real one and is a guess.
+
+A window opening shows within 60 days rather than 14. The research runs are
+roughly monthly, so at that horizon a window cannot open without having
+appeared here on an earlier visit.
 
 ### D. Open anytime — the rot detector
 
@@ -191,6 +209,17 @@ One row, the thing no current screen can say:
 > issue. 9 have never been actioned. **Review →**
 
 This is where the actual backlog lives.
+
+**Built.** `OpenEndedRow`, fed by `summary.backlog`. "Never actioned" is
+`updated_at` falling on the same day as `discovered_at` — compared by day
+rather than by string, because `discovered_at` is a bare date while
+`updated_at` is sometimes a full timestamp, and an exact match reports every
+row as touched. It follows that anything writing to these rows en masse
+destroys the signal, which is why `scripts/backfill-deadlines.ts` deliberately
+does not touch `updated_at`.
+
+The plan's "9 have never been actioned" came from a production query before
+this shipped; the live figure is whatever the row now says.
 
 ### E. Automation activity — collapsed
 
@@ -290,7 +319,7 @@ Phase 0 is not optional — without it the redesign renders empty boxes.
 | **0** | ~~Make the API return what actually needs a decision.~~ **Done.** The queue moved to `shared/` and is served by `GET /api/review`; the Review screen consumes it and derives nothing locally. Status vocabularies were deliberately left alone — the queue reads notes, not statuses, so migrating them is no longer on the critical path. | Everything below shows nothing until this lands |
 | **1** | ~~The decision deck.~~ **Done.** Stat cards deleted; the deck deals one card at a time from `GET /api/review?filter=needs`. Rationale sentences live in `shared/decisionCopy.ts` and ride on every queue item, so the digest can reuse them. The old "Needs review" section went too — the deck supersedes it, and it was rendering an empty container because it counted promo drafts it never listed. | The whole point of the page |
 | **2** | ~~Block E: collapse the task-run log.~~ **Done.** One line per run, capped at five, prose behind a per-row disclosure, full history on the Log page. Measured against identical data: the block goes 684px → 214px, a 69% cut. | Biggest space win, lowest risk |
-| **3** | Blocks C + D, plus the `deadline` / `deadline_note` / `opens_at` split and a date backfill (17 of 33 recoverable — see §1b) | Makes the time-critical strip real rather than decorative |
+| **3** | ~~Blocks C + D, plus the `deadline` / `deadline_note` / `opens_at` split and a date backfill.~~ **Done.** Migration 0003 adds the two columns; `splitDeadline()` does the extraction and `scripts/backfill-deadlines.ts` applies it, dry-run by default. Blocks C and D are served from `GET /api/review` as `summary`, so the strip and the deck rank urgency identically. The dead `upcomingDeadlines` and `pendingReview` queries were deleted from `/api/overview`. | Makes the time-critical strip real rather than decorative |
 | **4** | `snoozed_until` on both tables, the queue filter, a "Snoozed" view, and the deck's snooze action (§3b) | Half the backlog is real work at the wrong moment |
 | **5** | The email digest (§3c): Cron Trigger, `scheduled()` handler, a sender that is not the read-only Gmail token, per-item marks so nothing is reported twice | Depends on 4 — "now actionable" is mostly snoozes coming due |
 | **6** | Block F, and fix the orphaned reminder: `DELETE /api/gigs/:id` removes the gig and its Calendar event but leaves its reminders behind — reminder 3 points at gig 21, which no longer exists. | Housekeeping |

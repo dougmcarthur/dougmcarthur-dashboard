@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { desc } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets, promoDrafts } from '../db/schema'
-import { buildReviewQueue, matchesFilter, type ReviewFilter } from '../../shared/reviewQueue'
+import { buildReviewQueue, matchesFilter, summariseQueue, type ReviewFilter } from '../../shared/reviewQueue'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
 import type { Env } from '../types'
 
@@ -18,8 +18,10 @@ import type { Env } from '../types'
  *   filter  needs | conflict | blocked | paid | timing | all   (default: all)
  *   limit   cap the number of items returned; counts always cover everything
  *
- * `counts` is computed over the whole queue regardless of `filter`/`limit`,
- * so a caller asking for four cards still learns how much is behind them.
+ * `counts` and `summary` are computed over the whole queue regardless of
+ * `filter`/`limit`, so a caller asking for four cards still learns how much is
+ * behind them, and the Overview gets its time-critical strip and backlog row
+ * out of the same request that fills the deck.
  *
  * Day arithmetic (overdue, due-in-Nd) runs against the Worker's UTC clock
  * rather than the viewer's timezone, so a deadline can tick over up to a day
@@ -72,6 +74,7 @@ review.get('/', async (c) => {
     items: limit ? filtered.slice(0, limit) : filtered,
     total: filtered.length,
     counts,
+    summary: summariseQueue(items),
   })
 })
 

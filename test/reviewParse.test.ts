@@ -3,6 +3,7 @@ import {
   parseNote,
   parseFee,
   parseDeadline,
+  splitDeadline,
   findDate,
   splitSentences,
 } from '../shared/reviewParse'
@@ -88,6 +89,100 @@ describe('parseDeadline', () => {
     const d = parseDeadline('None — rolling artist roster intake')
     expect(d.date).toBeNull()
     expect(d.daysUntil).toBeNull()
+  })
+
+  it('keeps the qualifier that the date does not say', () => {
+    const d = parseDeadline('None — rolling artist roster intake')
+    expect(d.note).toBe('None — rolling artist roster intake')
+  })
+
+  it('does not invent a note when the column held nothing but a date', () => {
+    expect(parseDeadline('2026-11-20').note).toBeNull()
+    expect(parseDeadline('July 16, 2026').note).toBeNull()
+  })
+
+  it('separates when a window opens from when it closes', () => {
+    const d = parseDeadline('Submission window: September 1 – December 31, 2026')
+    expect(d.opensAt).toBe('2026-09-01')
+    expect(d.date).toBe('2026-12-31')
+  })
+
+  // The whole point of migration 0003: after the backfill the same facts come
+  // out of columns instead of prose, and nothing downstream can tell.
+  it('reads the same values from prose and from real columns', () => {
+    const fromProse = parseDeadline('Submission window: September 1 – December 31, 2026')
+    const fromColumns = parseDeadline('2026-12-31', {
+      note: 'Submission window: September 1 – December 31, 2026',
+      opensAt: '2026-09-01',
+    })
+    expect(fromColumns.date).toBe(fromProse.date)
+    expect(fromColumns.opensAt).toBe(fromProse.opensAt)
+    expect(fromColumns.note).toBe(fromProse.note)
+    expect(fromColumns.daysUntil).toBe(fromProse.daysUntil)
+    // …except that the backfilled row no longer has to be recovered.
+    expect(fromColumns.exact).toBe(true)
+    expect(fromProse.exact).toBe(false)
+  })
+
+  it('lets a column override what the prose would have guessed', () => {
+    const d = parseDeadline('rolling', { note: 'Confirmed rolling by email', opensAt: null })
+    expect(d.note).toBe('Confirmed rolling by email')
+  })
+
+  it('stays empty when there is nothing anywhere', () => {
+    const d = parseDeadline(null)
+    expect(d).toEqual({
+      raw: null, date: null, exact: false, daysUntil: null,
+      note: null, opensAt: null, opensInDays: null,
+    })
+  })
+})
+
+describe('splitDeadline', () => {
+  it('passes a clean ISO date straight through', () => {
+    expect(splitDeadline('2026-07-31')).toEqual({ date: '2026-07-31', opensAt: null, note: null })
+  })
+
+  it('borrows the year from the closing half of a range', () => {
+    // "September 1" carries no year of its own — the reason this cannot be two
+    // calls to findDate().
+    expect(splitDeadline('Submission window: September 1 – December 31, 2026')).toMatchObject({
+      opensAt: '2026-09-01',
+      date: '2026-12-31',
+    })
+  })
+
+  it('reads a lone date behind an "opens" cue as a start, not a deadline', () => {
+    expect(splitDeadline('applications open October 1, 2026')).toMatchObject({
+      date: null,
+      opensAt: '2026-10-01',
+    })
+  })
+
+  it('reads a lone date with no cue as the deadline', () => {
+    expect(splitDeadline('July 16, 2026')).toMatchObject({ date: '2026-07-16', opensAt: null })
+  })
+
+  it('picks the opener out of a value carrying both dates', () => {
+    expect(splitDeadline('Deadline 2026-09-15 (portal opens 2026-08-01)')).toMatchObject({
+      date: '2026-09-15',
+      opensAt: '2026-08-01',
+    })
+  })
+
+  it('finds no date in a month without a day', () => {
+    // "check back September 2026" is a hint, not a date — treating it as the
+    // 1st would put a fake countdown on the dashboard.
+    expect(splitDeadline('Submissions not open as of July 2026 — check back September 2026')).toEqual({
+      date: null,
+      opensAt: null,
+      note: 'Submissions not open as of July 2026 — check back September 2026',
+    })
+  })
+
+  it('is empty for an empty column', () => {
+    expect(splitDeadline(null)).toEqual({ date: null, opensAt: null, note: null })
+    expect(splitDeadline('   ')).toEqual({ date: null, opensAt: null, note: null })
   })
 })
 
