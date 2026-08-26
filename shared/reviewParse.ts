@@ -180,6 +180,17 @@ const MONTH_NAME = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(
 /** Words that, just before a date, mean it is when things START, not when they end. */
 const OPENS_CUE = /\b(?:opens?|opening|re-?opens?|check back(?: in)?|not open(?: until)?|available from|starts?|submissions? (?:open|begin)|applications? open|window opens?)\b[^.]{0,30}$/i
 
+/**
+ * Past-tense framing, which turns a date into a historical note rather than a
+ * commitment: "2026 deadline was October 17, 2025", "last year's cutoff".
+ *
+ * Without this the parser hands back a date that has long gone, the queue ranks
+ * it as badly overdue, and the deck opens on an emergency that was never real.
+ * A wrong date is worse here than no date: no date leaves the row in the
+ * open-ended pile, where it honestly belongs.
+ */
+const PAST_CUE = /\b(?:was|were|had been|expired|already passed|closed on|last year'?s?)\s*[:—-]?\s*$/i
+
 const RANGE = new RegExp(
   `\\b${MONTH_NAME}\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s*\\d{4})?` +
     `\\s*(?:–|—|--?|to|through|thru|until|till)\\s*` +
@@ -246,15 +257,30 @@ export function splitDeadline(raw: string | null): DeadlineSplit {
 
   if (range) {
     ;({ opensAt, date } = splitRange(range[0]))
-  } else if (found.length === 1) {
-    // One date and an "opens" cue in front of it describes a window that has
-    // not started, not a deadline that has.
-    if (OPENS_CUE.test(text.slice(0, found[0].start))) opensAt = found[0].iso
-    else date = found[0].iso
-  } else if (found.length > 1) {
-    const opener = found.find((d) => OPENS_CUE.test(text.slice(0, d.start)))
-    opensAt = opener?.iso ?? null
-    date = (opener ? found.filter((d) => d !== opener) : found).at(-1)?.iso ?? null
+  } else {
+    // Drop dates the sentence itself frames as history before deciding
+    // anything — a past-tense date is a note about a previous cycle, not a
+    // commitment for this one.
+    const live = found.filter((d) => !PAST_CUE.test(text.slice(0, d.start)))
+
+    // Only a cue BEFORE the date counts.
+    //
+    // A trailing one ("2027-05-06 (applications open February 2027)") reads as
+    // though it describes the date it follows, and it usually does not — the
+    // clause names its own time, vaguely enough that no amount of pattern
+    // matching reliably tells the two apart. Three attempts at scoping it each
+    // fixed one production row and broke another; against the 26 real values
+    // the rule was right once and wrong four times, so it is not here.
+    const isOpener = (d: FoundDate) => OPENS_CUE.test(text.slice(0, d.start))
+
+    if (live.length === 1) {
+      if (isOpener(live[0])) opensAt = live[0].iso
+      else date = live[0].iso
+    } else if (live.length > 1) {
+      const opener = live.find(isOpener)
+      opensAt = opener?.iso ?? null
+      date = (opener ? live.filter((d) => d !== opener) : live).at(-1)?.iso ?? null
+    }
   }
 
   const leftover = text.replace(ANY_DATE, ' ')

@@ -118,8 +118,21 @@ returns `NaN` on them, and `PATCH /api/gigs` passes the raw string to Google
 Calendar. Suggested fix: keep `deadline` as a real ISO date, add
 `deadline_note TEXT` for the qualifier, and add `opens_at TEXT`.
 
-> **Resolved.** Migration 0003 adds both columns;
+> **Resolved and applied.** Migration 0003 adds both columns;
 > `scripts/backfill-deadlines.ts` moves the values across, dry-run by default.
+> Run against production 2026-08-26: 26 prose values in, **0 left**. 8 dates
+> recovered (16 real dates total), 3 submission windows separated into
+> `opens_at`, 25 original values preserved verbatim in `deadline_note`, 18 rows
+> confirmed as genuinely undated. All 4 rows that came out overdue are
+> `archived`, so none reach the queue.
+>
+> The dry run found two parser bugs that only these real values expose, both
+> now fixed and covered by tests using the production strings verbatim:
+> a past-tense date (`2026 deadline **was** October 17, 2025`) was being read as
+> a live deadline, which would have opened the deck on a ten-month-overdue
+> emergency that never existed; and a trailing `(applications open …)` clause
+> was being treated as describing the date it followed rather than the one it
+> introduces.
 > `PATCH /api/gigs` now recovers a date before creating a Calendar event or a
 > reminder and skips both when there is no date to be had — previously the raw
 > prose went to Google verbatim and to `new Date()`, which scheduled reminders

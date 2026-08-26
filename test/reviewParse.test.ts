@@ -186,6 +186,65 @@ describe('splitDeadline', () => {
   })
 })
 
+// Verbatim production values. These came out of the backfill dry run against
+// the live database, which is the only place several of these shapes exist.
+describe('splitDeadline — against real gig_opportunities values', () => {
+  it('refuses a date the sentence frames as history', () => {
+    // The bug that stopped the first backfill: this reads "2026 deadline WAS
+    // October 17, 2025" and used to return that date, which would have put a
+    // ten-month-overdue emergency at the top of the deck. A wrong date is
+    // worse than none — none leaves the row in the open-ended pile, honestly.
+    expect(splitDeadline(
+      "TBD — typically opens October/November for the following year's residency; 2026 deadline was October 17, 2025",
+    )).toMatchObject({ date: null, opensAt: null })
+  })
+
+  it('still reads a passed date that is genuinely this cycle', () => {
+    // "already passed" here describes the early-bird, not the final deadline,
+    // and the past-tense guard must not swallow the date it precedes.
+    expect(splitDeadline(
+      'Final deadline: July 15, 2026 (early-bird of June 15 already passed) — only 16 days away',
+    )).toMatchObject({ date: '2026-07-15' })
+  })
+
+  it('keeps a parenthetical about opening from stealing the deadline', () => {
+    // A trailing "applications open …" clause describes its own date, not the
+    // one it follows. Treating it as a cue swapped these two round.
+    expect(splitDeadline('January 15, 2027 (applications open October 1, 2026)'))
+      .toMatchObject({ date: '2027-01-15', opensAt: '2026-10-01' })
+    expect(splitDeadline('~2027-05-06 (applications open February 2027)'))
+      .toMatchObject({ date: '2027-05-06', opensAt: null })
+    expect(splitDeadline('~2027-01-31 (applications open fall 2026)'))
+      .toMatchObject({ date: '2027-01-31', opensAt: null })
+    expect(splitDeadline('2026-07-31 (open now)'))
+      .toMatchObject({ date: '2026-07-31', opensAt: null })
+  })
+
+  it('splits the two real submission windows', () => {
+    expect(splitDeadline(
+      'Submission window: September 1 – December 31, 2026 (annual; email-based, not a web form)',
+    )).toMatchObject({ opensAt: '2026-09-01', date: '2026-12-31' })
+    expect(splitDeadline(
+      'Submission window: November 2 – November 30, 2026 (audition held April 10, 2027 in Orillia, ON)',
+    )).toMatchObject({ opensAt: '2026-11-02', date: '2026-11-30' })
+  })
+
+  it('finds nothing in the genuinely undated ones', () => {
+    for (const raw of [
+      'None — rolling artist roster intake',
+      'Rolling, no deadline (review takes roughly 8-12 weeks)',
+      'Applications currently CLOSED — site states they reopen in Fall 2026. Watch wecc.ca/applications.',
+      'TBD — email submissions accepted year-round; festival held mid-July annually in Dawson City, YT',
+      'December 2026 (applications open; festival held mid-August 2027 in Salmon Arm, BC)',
+      'Unknown — 2026 apps now closed; 2027 cycle likely opens winter 2026',
+      'Fall 2026 — early bird was active late July 2026 at $25/entry',
+      'TBC (applications active Aug 2026)',
+    ]) {
+      expect(splitDeadline(raw), raw).toMatchObject({ date: null, opensAt: null })
+    }
+  })
+})
+
 describe('parseFee', () => {
   it('reads a required entry fee out of prose', () => {
     const fee = parseFee('$35 (non-members) / $25 (members) — REQUIRED, non-refundable', 1)
