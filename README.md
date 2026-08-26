@@ -125,6 +125,12 @@ past the point of acting on it is archiving it in disguise.
 A quiet last line counting what is wrong with the *data* rather than what needs
 deciding — contradictory statuses, deadlines still stored as prose, reminders
 pointing at rows that no longer exist. Each links into the filtered queue.
+
+Orphaned reminders are counted at every status, not just `pending`. Filtering
+to pending undercounts: production held two and the row reported one, because
+the dismissed orphan was excluded and so stayed invisible indefinitely. A
+dismissed reminder aimed at a deleted row still is not sound data — this block
+is about whether the data holds together, not about what is nagging you today.
 It renders nothing once the counts are zero, and the block should be deleted
 when they stay that way; a permanently clean health row is furniture.
 

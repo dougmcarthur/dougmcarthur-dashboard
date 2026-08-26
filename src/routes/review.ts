@@ -59,19 +59,24 @@ review.get('/', async (c) => {
     db.select().from(syncTargets).orderBy(desc(syncTargets.discoveredAt)),
     db.select().from(promoDrafts).orderBy(desc(promoDrafts.createdAt)),
     // Reminders reference entities by (type, id) with no foreign key, so a
-    // deleted gig leaves its reminders pointing at nothing — reminder 3 has
-    // aimed at gig 21 since that gig was removed. Both delete handlers now
-    // clean up after themselves; this counts what is already broken.
+    // deleted gig leaves its reminders pointing at nothing. Both delete
+    // handlers now clean up after themselves; this counts what is already
+    // broken.
+    //
+    // Deliberately not filtered to `status = 'pending'`. It was, and that
+    // undercounted: production held two orphans and this reported one, because
+    // the dismissed one was filtered out and stayed invisible. A dismissed
+    // reminder pointing at a deleted row is not harmless-and-therefore-fine,
+    // it is rot that nothing will ever surface again. This block is about
+    // whether the data is sound, not about what is nagging you today.
     db
       .select({ count: sql<number>`count(*)` })
       .from(reminders)
       .where(sql`
-        ${reminders.status} = 'pending' AND (
-          (${reminders.entityType} = 'gig'
-            AND ${reminders.entityId} NOT IN (SELECT id FROM gig_opportunities))
-          OR (${reminders.entityType} = 'sync'
-            AND ${reminders.entityId} NOT IN (SELECT id FROM sync_targets))
-        )`),
+        (${reminders.entityType} = 'gig'
+          AND ${reminders.entityId} NOT IN (SELECT id FROM gig_opportunities))
+        OR (${reminders.entityType} = 'sync'
+          AND ${reminders.entityId} NOT IN (SELECT id FROM sync_targets))`),
   ])
 
   const items = buildReviewQueue({
