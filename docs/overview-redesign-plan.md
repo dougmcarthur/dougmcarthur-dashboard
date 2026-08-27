@@ -219,7 +219,11 @@ destroys the signal, which is why `scripts/backfill-deadlines.ts` deliberately
 does not touch `updated_at`.
 
 The plan's "9 have never been actioned" came from a production query before
-this shipped; the live figure is whatever the row now says.
+this shipped. The live figure is **16 open-ended, 1 never touched** — far fewer
+untouched than predicted, because most of these rows have been edited at some
+point even though none of them ever got a decision. Worth knowing: "never
+touched" is a much weaker signal on this data than §1 assumed, and the number
+that actually matters is the 16.
 
 ### E. Automation activity — collapsed
 

@@ -133,6 +133,26 @@ Calendar. Suggested fix: keep `deadline` as a real ISO date, add
 > emergency that never existed; and a trailing `(applications open …)` clause
 > was being treated as describing the date it followed rather than the one it
 > introduces.
+>
+> **Two rows were then set by hand**, because the parser is deliberately
+> conservative about dates a regex cannot read without guessing:
+>
+> - **#8 Edmonton Folk** — *"submission window typically opens October 1 and
+>   runs through end of November 2026"*. Set `opens_at = 2026-10-01`,
+>   `deadline = 2026-11-30`. Both are readings rather than guesses: the year
+>   comes from "November 2026", and "end of November" is the 30th. Left as NULL
+>   this row was invisible — permanently in the open-ended pile despite having
+>   a real window.
+> - **#25 Mission Folk** — the note says *"September 1, 2026 (submissions
+>   open…)"*, so that date opens the window rather than closing it. Moved from
+>   `deadline` to `opens_at`. This is the row the removed trailing-cue rule
+>   would have caught; one hand-fix was cheaper than a regex that broke four
+>   other rows.
+>
+> **#26 Salmon Arm was deliberately left NULL.** *"December 2026 (applications
+> open…)"* names a month and no day, and picking the 1st would put an invented
+> date in a column the UI renders as fact. It stays in the open-ended pile,
+> which is where a row with no usable date belongs.
 > `PATCH /api/gigs` now recovers a date before creating a Calendar event or a
 > reminder and skips both when there is no date to be had — previously the raw
 > prose went to Google verbatim and to `new Date()`, which scheduled reminders
