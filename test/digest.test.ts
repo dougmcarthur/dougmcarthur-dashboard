@@ -310,3 +310,111 @@ describe('buildDigest — the contract with the caller', () => {
     expect(titlesIn(d, 'new')).toEqual(['Agency'])
   })
 })
+
+describe('buildDigest — the top five', () => {
+  /** A gig whose note makes it a live decision, so it is eligible for focus. */
+  const live = (id: number, name: string, o: Partial<GigOpportunity> = {}) =>
+    gig({ id, name, fitNotes: 'Submission status: NOT submitted.', ...o })
+
+  it('caps the focus list at five however long the queue is', () => {
+    const gigs = Array.from({ length: 12 }, (_, i) => live(100 + i, `Item ${i}`))
+    expect(digest({ gigs }).focus).toHaveLength(5)
+  })
+
+  it('ranks focus by the queue score, so the email and the deck agree', () => {
+    const items = queue({
+      gigs: [
+        live(110, 'Just waiting'),
+        live(111, 'Costs money', { paid: 1, fee: '$50' }),
+        live(112, 'Due next week', { deadline: '2026-08-29' }),
+      ],
+    })
+    const d = buildDigest({ items, prior: [], today: TODAY })
+    expect(d.focus.map((l) => l.title)).toEqual(items.slice(0, 3).map((i) => i.title))
+    // due_soon (80) outranks paid (45) outranks not_submitted (35).
+    expect(d.focus[0].title).toBe('Due next week')
+  })
+
+  it('leaves out an item whose submission window has not opened', () => {
+    // Ranking it highly would spend the most valuable line in the email on a
+    // row whose only correct action is to wait.
+    const d = digest({
+      gigs: [live(120, 'Opens in November', { deadline: '2026-11-30', opensAt: '2026-11-02' })],
+    })
+    expect(d.focus).toEqual([])
+    expect(d.rollups.find((r) => r.id === 'window')?.count).toBe(1)
+  })
+
+  it('leaves out a snoozed item', () => {
+    const d = digest({
+      gigs: [live(121, 'Not now', { snoozedUntil: '2026-09-30', snoozedAt: '2026-08-20T10:00:00.000Z' })],
+    })
+    expect(d.focus).toEqual([])
+    expect(d.rollups).toEqual([])
+  })
+
+  it('leaves out a row whose only flag is an observation about the data', () => {
+    const d = digest({ gigs: [gig({ id: 122, name: 'Vague', deadline: 'rolling intake' })] })
+    expect(d.focus).toEqual([])
+  })
+})
+
+describe('buildDigest — the rollups', () => {
+  const live = (id: number, name: string, o: Partial<GigOpportunity> = {}) =>
+    gig({ id, name, fitNotes: 'Submission status: NOT submitted.', ...o })
+
+  it('counts every item the focus list did not name, exactly once', () => {
+    const gigs = Array.from({ length: 9 }, (_, i) =>
+      live(200 + i, `Item ${i}`, i < 4 ? { paid: 1, fee: '$50' } : {}),
+    )
+    const d = digest({ gigs })
+    const counted = d.rollups.reduce((n, r) => n + r.count, 0)
+    expect(d.focus).toHaveLength(5)
+    // The partition is exact: nothing counted twice, nothing dropped.
+    expect(counted).toBe(gigs.length - d.focus.length)
+  })
+
+  it('files an item under its most decisive flag, not under all of them', () => {
+    // Paid and blocked at once must not add two to the totals, or the counts
+    // sum to more than the queue and read as a bug even when each is right.
+    const d = digest({
+      gigs: [
+        live(210, 'A'), live(211, 'B'), live(212, 'C'), live(213, 'D'), live(214, 'E'),
+        live(215, 'Both', { paid: 1, fee: '$50', fitNotes: 'Contact Phone: needs Doug, not on file.' }),
+      ],
+    })
+    expect(d.rollups.reduce((n, r) => n + r.count, 0)).toBe(1)
+  })
+
+  it('names the idle piles separately, so you can see which one is growing', () => {
+    const d = digest({
+      sync: [sync({ id: 220, name: 'Pitched and quiet' })],
+      gigs: [live(221, 'A'), live(222, 'B'), live(223, 'C'), live(224, 'D'), live(225, 'E')],
+    })
+    expect(d.rollups.find((r) => r.id === 'idle_sync')).toMatchObject({ count: 1 })
+  })
+
+  it('never earns a send on its own', () => {
+    // An email whose whole content is "one thing is where you left it" is the
+    // one that trains you to stop opening these.
+    const s = sync({ id: 230, name: 'Quiet' })
+    const item = queue({ sync: [s] })[0]
+    const d = digest({ sync: [s] }, [
+      { entityType: 'sync', entityId: 230, grp: 'new', fingerprint: fingerprint(item), reportedAt: daysAgo(7) },
+    ])
+    expect(d.focus).toEqual([])
+    expect(d.rollups.length).toBeGreaterThan(0)
+    expect(d.empty).toBe(true)
+  })
+
+  it('still speaks on a week when nothing changed but work remains', () => {
+    const g = gig({ id: 240, name: 'Still waiting', fitNotes: 'Submission status: NOT submitted.' })
+    const item = queue({ gigs: [g] })[0]
+    const d = digest({ gigs: [g] }, [
+      { entityType: 'gig', entityId: 240, grp: 'new', fingerprint: fingerprint(item), reportedAt: daysAgo(7) },
+    ])
+    expect(d.groups).toEqual([])
+    expect(d.focus.map((l) => l.title)).toEqual(['Still waiting'])
+    expect(d.empty).toBe(false)
+  })
+})

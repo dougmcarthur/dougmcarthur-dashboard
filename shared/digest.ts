@@ -12,7 +12,7 @@
  * saying, and can be tested without a database or a mailbox.
  */
 
-import type { ReviewItem } from './reviewQueue'
+import type { FlagId, ReviewItem } from './reviewQueue'
 
 export type DigestGroupId = 'new' | 'actionable' | 'changed' | 'stale'
 
@@ -34,7 +34,33 @@ export interface DigestGroup {
   lines: DigestLine[]
 }
 
+/**
+ * One line of the "everything else" summary: a count and where to see it.
+ *
+ * Never a list of items. The whole point of collapsing the tail into counts is
+ * that the dashboard already renders the tail, and an email that reproduces it
+ * is one you learn to scroll past.
+ */
+export interface DigestRollup {
+  id: string
+  /** Reads as a sentence after the count: "4 cost money to enter". */
+  label: string
+  count: number
+  /** Deep link into the Review screen, filtered to exactly these rows. */
+  href: string
+}
+
 export interface Digest {
+  /**
+   * The five things most worth doing something about right now, ranked by the
+   * queue's own score so the email and the deck cannot disagree about what
+   * matters. Unlike the change groups this is current state, not a diff: an
+   * item you did not act on last week is still the most important thing this
+   * week, and saying so again is the job.
+   */
+  focus: DigestLine[]
+  /** Everything else, as counts. Never a reason to send on its own. */
+  rollups: DigestRollup[]
   groups: DigestGroup[]
   /** Nothing worth sending. The caller must not send an empty digest. */
   empty: boolean
@@ -61,6 +87,66 @@ const HEADINGS: Record<DigestGroupId, string> = {
 
 /** Cap on the stale group, so the rot surfaces a little at a time. */
 const STALE_LIMIT = 3
+
+/**
+ * How many items lead the email.
+ *
+ * Five because the list has to be finishable in one sitting to be worth
+ * ranking at all. A "top ten" is a backlog with an opinion; a top five is a
+ * plan for the week. Everything below it is counted, not listed.
+ */
+const FOCUS_LIMIT = 5
+
+/**
+ * Whether this is something that can actually be done today.
+ *
+ * A submission window that has not opened is the case this exists for. Those
+ * rows are real work and rank highly on urgency, but no amount of intent gets
+ * them submitted before the window opens, so putting one at the top of a "do
+ * these now" list spends the most valuable line in the email on a row whose
+ * only correct action is to wait. They stay in the rollups, and reach the top
+ * five by themselves on the week the window opens.
+ */
+function actionableNow(item: ReviewItem): boolean {
+  if (item.snooze.active) return false
+  if (item.deadline.opensInDays !== null && item.deadline.opensInDays > 0) return false
+  // `vague_deadline` is an observation about the data, not a thing to do.
+  return item.flags.some((f) => f.id !== 'vague_deadline')
+}
+
+/**
+ * Flags in the order that decides which bucket an item is counted under.
+ *
+ * Deliberately the same precedence `decisionCopy` uses to pick a sentence: an
+ * item described to you as a money decision must not then be counted under
+ * "waiting on you", or the totals and the copy tell different stories about
+ * the same row.
+ */
+const BUCKET_ORDER: Array<{ flag: FlagId; label: string; filter: string }> = [
+  { flag: 'conflict', label: 'contradict their own status', filter: 'conflict' },
+  { flag: 'overdue', label: 'are past their deadline', filter: 'timing' },
+  { flag: 'paid', label: 'cost money to enter', filter: 'paid' },
+  { flag: 'issue', label: 'have a flagged problem', filter: 'needs' },
+  { flag: 'due_soon', label: 'are due within two weeks', filter: 'timing' },
+  { flag: 'blocked', label: 'need something only you can supply', filter: 'blocked' },
+  { flag: 'not_submitted', label: 'are drafted but never sent', filter: 'needs' },
+  { flag: 'window', label: 'are waiting for a window to open', filter: 'timing' },
+]
+
+/**
+ * Where an item with no flag worth acting on is counted.
+ *
+ * Bucketing these by kind rather than dropping them: they are the bulk of the
+ * queue, and "18 sync targets sitting where they were pitched" is a fact worth
+ * one line — it is the shape of the backlog, and the reason the deck never
+ * empties. Lumping them under one "everything else" total would hide which
+ * pile is actually growing.
+ */
+const IDLE_BUCKET: Record<ReviewItem['kind'], string> = {
+  gig: 'are open-ended, with nothing forcing them',
+  sync: 'are sync targets sitting where they were pitched',
+  promo: 'are approved posts not marked published',
+}
 
 /**
  * How long a stale item stays quiet after being named.
@@ -205,9 +291,51 @@ export function buildDigest(input: {
     .map((id) => ({ id, heading: HEADINGS[id], lines: buckets[id].map(line) }))
     .filter((g) => g.lines.length > 0)
 
+  // The queue arrives sorted by score, so "most important" is just the first
+  // few that can actually be acted on today.
+  const live = input.items.filter((i) => !i.snooze.active)
+  const focus = live.filter(actionableNow).slice(0, FOCUS_LIMIT)
+  const inFocus = new Set(focus.map((i) => i.key))
+
+  // Everything the top five did not name, counted once each under its most
+  // decisive flag. Counting an item under every flag it carries would make the
+  // totals sum to more than the queue, which reads as an error even when each
+  // individual number is right.
+  const tallies = new Map<string, { label: string; filter: string; count: number }>()
+  for (const item of live) {
+    if (inFocus.has(item.key)) continue
+    // An unopened window decides the bucket on its own, ahead of every other
+    // flag. It is the reason the item is down here rather than in the top
+    // five, and counting a row you cannot submit yet under "drafted but never
+    // sent" reads as a reproach for not having done something impossible.
+    const shut = item.deadline.opensInDays !== null && item.deadline.opensInDays > 0
+    const bucket = shut
+      ? BUCKET_ORDER.find((b) => b.flag === 'window')
+      : BUCKET_ORDER.find((b) => item.flags.some((f) => f.id === b.flag))
+    const id = bucket ? bucket.flag : `idle_${item.kind}`
+    const label = bucket ? bucket.label : IDLE_BUCKET[item.kind]
+    const filter = bucket ? bucket.filter : 'all'
+    const seen = tallies.get(id)
+    if (seen) seen.count += 1
+    else tallies.set(id, { label, filter, count: 1 })
+  }
+
+  const rollupOrder = [...BUCKET_ORDER.map((b) => b.flag), 'idle_gig', 'idle_sync', 'idle_promo']
+  const rollups: DigestRollup[] = rollupOrder
+    .filter((id) => tallies.has(id))
+    .map((id) => {
+      const t = tallies.get(id)!
+      return { id, label: t.label, count: t.count, href: `#review/${t.filter}` }
+    })
+
   return {
+    focus: focus.map(line),
+    rollups,
     groups,
-    empty: groups.length === 0,
+    // Rollups never earn a send on their own. They are context for the five
+    // above them, and an email whose entire content is "18 things are still
+    // where you left them" is the one that trains you to stop opening these.
+    empty: focus.length === 0 && groups.length === 0,
     // Marks cover every group including stale, so an item mentioned as going
     // stale is not mentioned again next week unchanged.
     marks: groups.flatMap((g) =>
