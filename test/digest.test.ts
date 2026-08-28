@@ -418,3 +418,32 @@ describe('buildDigest — the rollups', () => {
     expect(d.empty).toBe(false)
   })
 })
+
+describe('buildDigest — rollup wording', () => {
+  const live = (id: number, name: string, o: Partial<GigOpportunity> = {}) =>
+    gig({ id, name, fitNotes: 'Submission status: NOT submitted.', ...o })
+
+  it('agrees with its own count', () => {
+    // "1 have a flagged problem" is what makes a generated email read as
+    // generated, and these counts reach 1 routinely.
+    //
+    // The filler is due_soon (80) so it outranks paid (45) and fills the focus
+    // list, pushing the paid rows down into the rollups where the wording is.
+    const soon = (id: number) => live(id, `Due ${id}`, { deadline: '2026-08-29' })
+    const filler = [soon(300), soon(301), soon(302), soon(303), soon(304)]
+
+    const one = digest({ gigs: [...filler, live(305, 'Solo', { paid: 1, fee: '$50' })] })
+    expect(one.rollups.find((r) => r.id === 'paid')).toMatchObject({ count: 1, label: 'costs money to enter' })
+
+    const many = digest({
+      gigs: [...filler, live(306, 'X', { paid: 1, fee: '$50' }), live(307, 'Y', { paid: 1, fee: '$50' })],
+    })
+    expect(many.rollups.find((r) => r.id === 'paid')).toMatchObject({ count: 2, label: 'cost money to enter' })
+  })
+
+  it('agrees with its own count in the idle piles too', () => {
+    const filler = [live(310, 'A'), live(311, 'B'), live(312, 'C'), live(313, 'D'), live(314, 'E')]
+    const d = digest({ gigs: filler, sync: [sync({ id: 315, name: 'Quiet' })] })
+    expect(d.rollups.find((r) => r.id === 'idle_sync')?.label).toBe('is a sync target sitting where it was pitched')
+  })
+})

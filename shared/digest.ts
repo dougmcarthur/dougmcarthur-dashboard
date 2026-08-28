@@ -122,15 +122,15 @@ function actionableNow(item: ReviewItem): boolean {
  * "waiting on you", or the totals and the copy tell different stories about
  * the same row.
  */
-const BUCKET_ORDER: Array<{ flag: FlagId; label: string; filter: string }> = [
-  { flag: 'conflict', label: 'contradict their own status', filter: 'conflict' },
-  { flag: 'overdue', label: 'are past their deadline', filter: 'timing' },
-  { flag: 'paid', label: 'cost money to enter', filter: 'paid' },
-  { flag: 'issue', label: 'have a flagged problem', filter: 'needs' },
-  { flag: 'due_soon', label: 'are due within two weeks', filter: 'timing' },
-  { flag: 'blocked', label: 'need something only you can supply', filter: 'blocked' },
-  { flag: 'not_submitted', label: 'are drafted but never sent', filter: 'needs' },
-  { flag: 'window', label: 'are waiting for a window to open', filter: 'timing' },
+const BUCKET_ORDER: Array<{ flag: FlagId; one: string; many: string; filter: string }> = [
+  { flag: 'conflict', one: 'contradicts its own status', many: 'contradict their own status', filter: 'conflict' },
+  { flag: 'overdue', one: 'is past its deadline', many: 'are past their deadline', filter: 'timing' },
+  { flag: 'paid', one: 'costs money to enter', many: 'cost money to enter', filter: 'paid' },
+  { flag: 'issue', one: 'has a flagged problem', many: 'have a flagged problem', filter: 'needs' },
+  { flag: 'due_soon', one: 'is due within two weeks', many: 'are due within two weeks', filter: 'timing' },
+  { flag: 'blocked', one: 'needs something only you can supply', many: 'need something only you can supply', filter: 'blocked' },
+  { flag: 'not_submitted', one: 'is drafted but never sent', many: 'are drafted but never sent', filter: 'needs' },
+  { flag: 'window', one: 'is waiting for a window to open', many: 'are waiting for a window to open', filter: 'timing' },
 ]
 
 /**
@@ -142,10 +142,10 @@ const BUCKET_ORDER: Array<{ flag: FlagId; label: string; filter: string }> = [
  * empties. Lumping them under one "everything else" total would hide which
  * pile is actually growing.
  */
-const IDLE_BUCKET: Record<ReviewItem['kind'], string> = {
-  gig: 'are open-ended, with nothing forcing them',
-  sync: 'are sync targets sitting where they were pitched',
-  promo: 'are approved posts not marked published',
+const IDLE_BUCKET: Record<ReviewItem['kind'], { one: string; many: string }> = {
+  gig: { one: 'is open-ended, with nothing forcing it', many: 'are open-ended, with nothing forcing them' },
+  sync: { one: 'is a sync target sitting where it was pitched', many: 'are sync targets sitting where they were pitched' },
+  promo: { one: 'is an approved post not marked published', many: 'are approved posts not marked published' },
 }
 
 /**
@@ -301,7 +301,7 @@ export function buildDigest(input: {
   // decisive flag. Counting an item under every flag it carries would make the
   // totals sum to more than the queue, which reads as an error even when each
   // individual number is right.
-  const tallies = new Map<string, { label: string; filter: string; count: number }>()
+  const tallies = new Map<string, { one: string; many: string; filter: string; count: number }>()
   for (const item of live) {
     if (inFocus.has(item.key)) continue
     // An unopened window decides the bucket on its own, ahead of every other
@@ -312,12 +312,12 @@ export function buildDigest(input: {
     const bucket = shut
       ? BUCKET_ORDER.find((b) => b.flag === 'window')
       : BUCKET_ORDER.find((b) => item.flags.some((f) => f.id === b.flag))
+    const idle = IDLE_BUCKET[item.kind]
     const id = bucket ? bucket.flag : `idle_${item.kind}`
-    const label = bucket ? bucket.label : IDLE_BUCKET[item.kind]
     const filter = bucket ? bucket.filter : 'all'
     const seen = tallies.get(id)
     if (seen) seen.count += 1
-    else tallies.set(id, { label, filter, count: 1 })
+    else tallies.set(id, { one: bucket?.one ?? idle.one, many: bucket?.many ?? idle.many, filter, count: 1 })
   }
 
   const rollupOrder = [...BUCKET_ORDER.map((b) => b.flag), 'idle_gig', 'idle_sync', 'idle_promo']
@@ -325,7 +325,9 @@ export function buildDigest(input: {
     .filter((id) => tallies.has(id))
     .map((id) => {
       const t = tallies.get(id)!
-      return { id, label: t.label, count: t.count, href: `#review/${t.filter}` }
+      // "1 have a flagged problem" is the kind of line that makes a generated
+      // email read as generated. The counts reach 1 often enough to matter.
+      return { id, label: t.count === 1 ? t.one : t.many, count: t.count, href: `#review/${t.filter}` }
     })
 
   return {
