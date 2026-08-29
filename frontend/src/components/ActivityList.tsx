@@ -30,18 +30,18 @@ export function ActivityList({ runs, onNav }: { runs: TaskRun[]; onNav: (page: s
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <h2 className="text-xs font-semibold text-muted uppercase tracking-wider">
           Automation activity
         </h2>
         <button
           onClick={() => onNav('runs')}
-          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          className="text-xs text-muted hover:text-body transition-colors"
         >
           {runs.length > SHOWN ? `View all ${runs.length} →` : 'View all →'}
         </button>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+      <div className="bg-surface border border-line rounded-xl shadow-card divide-y divide-line">
         {shown.map((run) => {
           const isOpen = expanded.has(run.id)
           const hasSummary = Boolean(run.summary)
@@ -51,7 +51,7 @@ export function ActivityList({ runs, onNav }: { runs: TaskRun[]; onNav: (page: s
                 onClick={() => hasSummary && toggle(run.id)}
                 aria-expanded={hasSummary ? isOpen : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
-                  hasSummary ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'
+                  hasSummary ? 'hover:bg-sunken cursor-pointer' : 'cursor-default'
                 }`}
               >
                 {hasSummary ? (
@@ -59,18 +59,18 @@ export function ActivityList({ runs, onNav }: { runs: TaskRun[]; onNav: (page: s
                 ) : (
                   <span className="w-4 shrink-0" aria-hidden="true" />
                 )}
-                <span className="font-mono text-xs text-gray-700 truncate">{run.taskId}</span>
-                <span className="ml-auto text-xs text-gray-400 tabular-nums shrink-0">
+                <span className="font-mono text-xs text-body truncate">{run.taskId}</span>
+                <span className="ml-auto text-xs text-muted tabular-nums shrink-0">
                   {run.itemsAdded ? `+${run.itemsAdded}` : ''}
                 </span>
                 <StatusBadge status={run.status} />
-                <span className="text-xs text-gray-400 tabular-nums shrink-0 w-16 text-right">
+                <span className="text-xs text-muted tabular-nums shrink-0 w-16 text-right">
                   {shortDate(run.runAt)}
                 </span>
               </button>
 
               {isOpen && run.summary && (
-                <p className="px-3 pb-3 pl-10 text-xs text-gray-600 leading-relaxed max-w-3xl">
+                <p className="px-3 pb-3 pl-10 text-xs text-body leading-relaxed max-w-3xl">
                   {run.summary}
                 </p>
               )}

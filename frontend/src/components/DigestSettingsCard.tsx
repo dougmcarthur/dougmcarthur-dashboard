@@ -32,11 +32,11 @@ export function DigestSettingsCard() {
   const settings = d?.settings
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-3">
+    <div className="rounded-xl border border-line bg-surface shadow-card p-4 space-y-3">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-sm font-semibold text-gray-900">Weekly digest</h2>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <h2 className="text-sm font-semibold text-ink">Weekly digest</h2>
+          <p className="text-xs text-muted mt-0.5">
             Monday morning, and only when something moved. Nothing is sent when there is
             nothing to say.
           </p>
@@ -46,8 +46,8 @@ export function DigestSettingsCard() {
           disabled={!settings || patch.isPending}
           className={`shrink-0 text-xs px-3 py-1.5 rounded-md font-medium transition-colors disabled:opacity-40 ${
             settings?.enabled
-              ? 'bg-green-600 text-white hover:bg-green-700'
-              : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+              ? 'bg-success-solid text-accent-fg hover:brightness-110'
+              : 'bg-surface border border-line-strong text-body hover:bg-sunken'
           }`}
         >
           {settings?.enabled ? 'On' : 'Off'}
@@ -55,7 +55,7 @@ export function DigestSettingsCard() {
       </div>
 
       {d && !d.mailerConfigured && (
-        <p className="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-800">
+        <p className="rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg">
           No email binding on this deploy — add <code>[[send_email]]</code> to wrangler.toml.
           Everything below still previews.
         </p>
@@ -63,23 +63,23 @@ export function DigestSettingsCard() {
 
       {settings && (
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-          <dt className="text-gray-400">To</dt>
-          <dd className="text-gray-700 font-mono">{settings.recipient}</dd>
-          <dt className="text-gray-400">From</dt>
-          <dd className="text-gray-700 font-mono">{settings.sender}</dd>
+          <dt className="text-muted">To</dt>
+          <dd className="text-body font-mono">{settings.recipient}</dd>
+          <dt className="text-muted">From</dt>
+          <dd className="text-body font-mono">{settings.sender}</dd>
         </dl>
       )}
 
       {d && (
-        <div className="pt-2 border-t border-gray-100">
+        <div className="pt-2 border-t border-line">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-body">
               {d.empty ? (
-                <span className="text-gray-400">Nothing to report right now.</span>
+                <span className="text-muted">Nothing to report right now.</span>
               ) : (
                 <>
-                  Next send: <span className="font-medium text-gray-900">{d.subject}</span>
-                  <span className="text-gray-400">
+                  Next send: <span className="font-medium text-ink">{d.subject}</span>
+                  <span className="text-muted">
                     {' '}
                     · {d.groups.map((g) => `${g.lines.length} ${g.heading.toLowerCase()}`).join(', ')}
                   </span>
@@ -90,7 +90,7 @@ export function DigestSettingsCard() {
               {!d.empty && (
                 <button
                   onClick={() => setOpen((o) => !o)}
-                  className="text-xs px-2.5 py-1 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                  className="text-xs px-2.5 py-1 rounded-md border border-line text-body hover:bg-sunken transition-colors"
                 >
                   {open ? 'Hide' : 'Preview'}
                 </button>
@@ -98,7 +98,7 @@ export function DigestSettingsCard() {
               <button
                 onClick={() => send.mutate()}
                 disabled={d.empty || !d.mailerConfigured || send.isPending}
-                className="text-xs px-2.5 py-1 rounded-md bg-gray-900 text-white disabled:opacity-30 transition-colors"
+                className="text-xs px-2.5 py-1 rounded-md bg-accent text-accent-fg disabled:opacity-30 transition-colors"
               >
                 {send.isPending ? 'Sending…' : 'Send now'}
               </button>
@@ -109,12 +109,12 @@ export function DigestSettingsCard() {
             <div className="mt-3 space-y-3">
               {d.groups.map((g) => (
                 <div key={g.id}>
-                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{g.heading}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted mb-1">{g.heading}</p>
                   <ul className="space-y-1.5">
                     {g.lines.map((l) => (
                       <li key={l.key} className="text-xs">
-                        <span className="font-medium text-gray-900">{l.title}</span>
-                        <span className="block text-gray-500 leading-relaxed">{l.rationale}</span>
+                        <span className="font-medium text-ink">{l.title}</span>
+                        <span className="block text-muted leading-relaxed">{l.rationale}</span>
                       </li>
                     ))}
                   </ul>
@@ -124,12 +124,12 @@ export function DigestSettingsCard() {
           )}
 
           {send.isSuccess && (
-            <p className="mt-2 text-xs text-green-700">
+            <p className="mt-2 text-xs text-success-fg">
               {send.data.sent ? `Sent to ${send.data.to}.` : `Not sent — ${send.data.reason}.`}
             </p>
           )}
           {send.isError && (
-            <p className="mt-2 text-xs text-red-600">Send failed — {(send.error as Error).message}</p>
+            <p className="mt-2 text-xs text-danger-fg">Send failed — {(send.error as Error).message}</p>
           )}
         </div>
       )}

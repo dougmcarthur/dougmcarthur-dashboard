@@ -5,11 +5,11 @@ import type { ReviewFlag, ReviewKind } from '../../../shared/reviewQueue'
 export type PanelTone = 'neutral' | 'danger' | 'warn' | 'info' | 'accent'
 
 const PANEL_TONES: Record<PanelTone, { box: string; head: string }> = {
-  neutral: { box: 'bg-white border-gray-200', head: 'text-gray-500' },
-  danger: { box: 'bg-red-50 border-red-200', head: 'text-red-700' },
-  warn: { box: 'bg-amber-50 border-amber-200', head: 'text-amber-700' },
-  info: { box: 'bg-blue-50/60 border-blue-200', head: 'text-blue-700' },
-  accent: { box: 'bg-purple-50/50 border-purple-200', head: 'text-purple-700' },
+  neutral: { box: 'bg-surface border-line', head: 'text-muted' },
+  danger: { box: 'bg-danger-bg border-danger-line', head: 'text-danger-fg' },
+  warn: { box: 'bg-warn-bg border-warn-line', head: 'text-warn-fg' },
+  info: { box: 'bg-info-bg/60 border-info-line', head: 'text-info-fg' },
+  accent: { box: 'bg-cat-violet-bg/50 border-cat-violet-line', head: 'text-cat-violet-fg' },
 }
 
 /** One titled container. Every parsed fact type gets its own. */
@@ -57,7 +57,7 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
           setCopied(false)
         }
       }}
-      className="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:bg-white hover:text-gray-800 transition-colors"
+      className="text-xs px-2 py-0.5 rounded border border-line-strong text-muted hover:bg-surface hover:text-ink transition-colors"
     >
       {copied ? 'Copied' : label}
     </button>
@@ -65,9 +65,9 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
 }
 
 const SEVERITY_STYLES = {
-  danger: 'bg-red-100 text-red-800 border-red-200',
-  warn: 'bg-amber-100 text-amber-800 border-amber-200',
-  info: 'bg-gray-100 text-gray-600 border-gray-200',
+  danger: 'bg-danger-bg text-danger-fg border-danger-line',
+  warn: 'bg-warn-bg text-warn-fg border-warn-line',
+  info: 'bg-sunken text-body border-line',
 } as const
 
 export function FlagChip({ flag }: { flag: ReviewFlag }) {
@@ -81,9 +81,9 @@ export function FlagChip({ flag }: { flag: ReviewFlag }) {
 }
 
 const KIND_STYLES: Record<ReviewKind, string> = {
-  gig: 'bg-sky-100 text-sky-800',
-  sync: 'bg-purple-100 text-purple-800',
-  promo: 'bg-teal-100 text-teal-800',
+  gig: 'bg-cat-sky-bg text-cat-sky-fg',
+  sync: 'bg-cat-violet-bg text-cat-violet-fg',
+  promo: 'bg-cat-teal-bg text-cat-teal-fg',
 }
 
 export function KindTag({ kind }: { kind: ReviewKind }) {
@@ -102,14 +102,14 @@ export function AlertList({ alerts }: { alerts: NoteAlert[] }) {
           key={i}
           className={`rounded-md border px-3 py-2 text-sm leading-relaxed ${
             alert.severity === 'danger'
-              ? 'bg-white border-red-200 text-red-800'
+              ? 'bg-surface border-danger-line text-danger-fg'
               : alert.severity === 'warn'
-              ? 'bg-white border-amber-200 text-amber-800'
-              : 'bg-white border-gray-200 text-gray-600'
+              ? 'bg-surface border-warn-line text-warn-fg'
+              : 'bg-surface border-line text-body'
           }`}
         >
           {alert.flaggedAt && (
-            <span className="mr-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-500">
+            <span className="mr-2 rounded bg-sunken px-1.5 py-0.5 text-[10px] font-mono text-muted">
               {alert.flaggedAt}
             </span>
           )}
@@ -123,15 +123,15 @@ export function AlertList({ alerts }: { alerts: NoteAlert[] }) {
 /** The drafted application values, as a copyable label/value table. */
 export function FieldTable({ fields }: { fields: DraftedField[] }) {
   return (
-    <dl className="divide-y divide-gray-100 rounded-md border border-gray-200 bg-white">
+    <dl className="divide-y divide-line rounded-md border border-line bg-surface">
       {fields.map((field, i) => (
         <div key={i} className="flex items-start gap-3 px-3 py-2">
-          <dt className="w-40 shrink-0 text-xs font-medium text-gray-500 pt-0.5">
-            {field.label || <span className="text-gray-300">—</span>}
+          <dt className="w-40 shrink-0 text-xs font-medium text-muted pt-0.5">
+            {field.label || <span className="text-faint">—</span>}
           </dt>
           <dd
             className={`min-w-0 flex-1 text-sm break-words ${
-              field.needsDoug ? 'text-amber-700 font-medium' : 'text-gray-800'
+              field.needsDoug ? 'text-warn-fg font-medium' : 'text-ink'
             }`}
           >
             {field.value}
@@ -151,9 +151,9 @@ export function BulletList({ items, tone = 'gray' }: { items: string[]; tone?: '
       {items.map((item, i) => (
         <li
           key={i}
-          className={`flex gap-2 text-sm leading-relaxed ${tone === 'amber' ? 'text-amber-900' : 'text-gray-700'}`}
+          className={`flex gap-2 text-sm leading-relaxed ${tone === 'amber' ? 'text-warn-fg' : 'text-body'}`}
         >
-          <span className={tone === 'amber' ? 'text-amber-400' : 'text-gray-300'}>•</span>
+          <span className={tone === 'amber' ? 'text-warn-fg' : 'text-faint'}>•</span>
           <span className="min-w-0">{item}</span>
         </li>
       ))}
@@ -165,16 +165,16 @@ export function BulletList({ items, tone = 'gray' }: { items: string[]; tone?: '
 export function RawNote({ note }: { note: string }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="rounded-lg border border-dashed border-gray-200 bg-white">
+    <div className="rounded-lg border border-dashed border-line bg-surface">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-4 py-2.5 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
+        className="flex w-full items-center justify-between px-4 py-2.5 text-xs font-medium text-muted hover:text-body transition-colors"
       >
         <span>{open ? 'Hide' : 'Show'} original note text</span>
         <span className="font-mono">{note.length} chars</span>
       </button>
       {open && (
-        <pre className="whitespace-pre-wrap break-words border-t border-gray-100 px-4 py-3 text-xs leading-relaxed text-gray-600 font-sans">
+        <pre className="whitespace-pre-wrap break-words border-t border-line px-4 py-3 text-xs leading-relaxed text-body font-sans">
           {note}
         </pre>
       )}

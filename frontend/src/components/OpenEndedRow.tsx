@@ -30,14 +30,14 @@ export function OpenEndedRow({ backlog, onNav }: { backlog: Backlog; onNav: (pag
   return (
     <button
       onClick={() => onNav('review')}
-      className="w-full text-left bg-white border border-gray-200 rounded-lg px-4 py-3 hover:border-gray-300 hover:bg-gray-50 transition-colors group"
+      className="w-full text-left bg-surface border border-line rounded-xl shadow-card px-4 py-3 hover:border-line-strong hover:bg-sunken transition-colors group"
     >
-      <p className="text-sm text-gray-900">
+      <p className="text-sm text-ink">
         <span className="font-semibold tabular-nums">{openEnded}</span>{' '}
         {openEnded === 1 ? 'opportunity has' : 'opportunities have'} no deadline
-        <span className="text-gray-500"> — open right now, nothing forcing the issue.</span>
+        <span className="text-muted"> — open right now, nothing forcing the issue.</span>
       </p>
-      <p className="text-xs text-gray-500 mt-1">
+      <p className="text-xs text-muted mt-1">
         {untouched > 0 && (
           <>
             <span className="tabular-nums">{untouched}</span>{' '}
@@ -46,7 +46,7 @@ export function OpenEndedRow({ backlog, onNav }: { backlog: Backlog; onNav: (pag
             {waited ? `, the oldest ${waited} ago` : ''}.{' '}
           </>
         )}
-        <span className="text-gray-400 group-hover:text-gray-600 transition-colors">Review →</span>
+        <span className="text-muted group-hover:text-body transition-colors">Review →</span>
       </p>
     </button>
   )

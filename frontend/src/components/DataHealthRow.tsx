@@ -41,18 +41,18 @@ export function DataHealthRow({
   }
 
   return (
-    <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-xs text-gray-400">
-      <span className="text-gray-400">Data health:</span>
+    <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-xs text-muted">
+      <span className="text-muted">Data health:</span>
       {parts.map((p, i) => (
         <span key={p.key}>
           {p.onClick ? (
-            <button onClick={p.onClick} className="underline decoration-dotted hover:text-gray-600 transition-colors">
+            <button onClick={p.onClick} className="underline decoration-dotted hover:text-body transition-colors">
               {p.text}
             </button>
           ) : (
             p.text
           )}
-          {i < parts.length - 1 && <span className="text-gray-300"> ·</span>}
+          {i < parts.length - 1 && <span className="text-faint"> ·</span>}
         </span>
       ))}
     </div>

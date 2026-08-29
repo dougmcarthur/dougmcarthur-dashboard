@@ -35,15 +35,15 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
   if (isLoading) {
     return (
       <div className="space-y-8 animate-pulse">
-        <div className="h-6 bg-gray-100 rounded w-32" />
-        <div className="h-40 rounded-lg border border-gray-200 bg-white" />
+        <div className="h-7 bg-sunken rounded w-40" />
+        <div className="h-40 rounded-xl border border-line bg-surface shadow-card" />
       </div>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+      <div className="rounded-xl bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
         Failed to load overview — {(error as Error)?.message}
       </div>
     )
@@ -53,60 +53,72 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-xl font-semibold text-gray-900">Overview</h1>
+      <h1 className="text-2xl font-semibold text-ink tracking-tight">Overview</h1>
 
-      {/* The decisions come first — nothing to read past before acting. */}
-      {queue.isLoading ? (
-        <div className="h-40 rounded-lg border border-gray-200 bg-white animate-pulse" />
-      ) : queue.error ? (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-          Could not load the decision queue — {(queue.error as Error).message}
+      {/*
+        One column until xl, then a main column and a rail.
+        A single column of full-width rows on a 2560px display puts the title at
+        the far left and its status a metre away at the far right, with nothing
+        in between — the reading distance is the problem, not the pixel count.
+        Splitting the page shortens every row and fills the space with something
+        worth looking at instead of padding.
+      */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr),22rem] 3xl:grid-cols-[minmax(0,1fr),26rem] gap-8 items-start">
+        <div className="space-y-8 min-w-0">
+          {/* The decisions come first — nothing to read past before acting. */}
+          {queue.isLoading ? (
+            <div className="h-40 rounded-xl border border-line bg-surface shadow-card animate-pulse" />
+          ) : queue.error ? (
+            <div className="rounded-xl bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
+              Could not load the decision queue — {(queue.error as Error).message}
+            </div>
+          ) : (
+            <DecisionDeck
+              items={queue.data?.items ?? []}
+              total={queue.data?.counts.needs ?? 0}
+              onNav={onNav}
+            />
+          )}
+
+          {/* Blocks C and D. Both come out of the same /api/review response as
+              the deck above, so the strip cannot claim something is urgent that
+              the deck does not rank, and vice versa. */}
+          <TimingStrip
+            rows={queue.data?.summary.timing ?? []}
+            reminders={dueReminders}
+            onNav={onNav}
+            onSubmitted={(r: DueReminder) => {
+              patchGig.mutate({ id: r.entityId, body: { status: 'submitted' } })
+              dismissReminder.mutate(r.id)
+            }}
+            onDismiss={(id: number) => dismissReminder.mutate(id)}
+            dismissing={dismissReminder.isPending}
+          />
         </div>
-      ) : (
-        <DecisionDeck
-          items={queue.data?.items ?? []}
-          total={queue.data?.counts.needs ?? 0}
-          onNav={onNav}
-        />
-      )}
 
-      {/* Blocks C and D. Both come out of the same /api/review response as the
-          deck above, so the strip cannot claim something is urgent that the
-          deck does not rank, and vice versa. The old "Deadlines in 14 days"
-          panel is gone: it ran a SQL BETWEEN against a TEXT column that mostly
-          holds prose, matched nothing, and rendered nothing, indefinitely. */}
-      <TimingStrip
-        rows={queue.data?.summary.timing ?? []}
-        reminders={dueReminders}
-        onNav={onNav}
-        onSubmitted={(r: DueReminder) => {
-          patchGig.mutate({ id: r.entityId, body: { status: 'submitted' } })
-          dismissReminder.mutate(r.id)
-        }}
-        onDismiss={(id: number) => dismissReminder.mutate(id)}
-        dismissing={dismissReminder.isPending}
-      />
+        <aside className="space-y-8 min-w-0 xl:sticky xl:top-20" aria-label="Backlog and activity">
+          {queue.data && <OpenEndedRow backlog={queue.data.summary.backlog} onNav={onNav} />}
 
-      {queue.data && <OpenEndedRow backlog={queue.data.summary.backlog} onNav={onNav} />}
+          {/* Automation activity — one line per run, prose behind a disclosure */}
+          {recentRuns.length > 0 && <ActivityList runs={recentRuns} onNav={onNav} />}
 
-      {/* Automation activity — one line per run, prose behind a disclosure */}
-      {recentRuns.length > 0 && <ActivityList runs={recentRuns} onNav={onNav} />}
-
-      {/* Block F, last and quiet. Renders nothing once the counts are zero,
-          and the whole block should be deleted when they stay that way. */}
-      {queue.data && (
-        <DataHealthRow
-          health={queue.data.summary.health}
-          onReview={(filter) => onNav(`review/${filter}`)}
-        />
-      )}
+          {/* Block F, last and quiet. Renders nothing once the counts are zero,
+              and the whole block should be deleted when they stay that way. */}
+          {queue.data && (
+            <DataHealthRow
+              health={queue.data.summary.health}
+              onReview={(filter) => onNav(`review/${filter}`)}
+            />
+          )}
+        </aside>
+      </div>
 
       {(queue.data?.counts.needs ?? 0) === 0 &&
         (queue.data?.summary.timing.length ?? 0) === 0 &&
         (queue.data?.summary.backlog.openEnded ?? 0) === 0 &&
         dueReminders.length === 0 &&
         recentRuns.length === 0 && (
-        <p className="text-gray-400 text-sm">All clear — nothing needs attention right now.</p>
+        <p className="text-muted text-sm">All clear — nothing needs attention right now.</p>
       )}
     </div>
   )

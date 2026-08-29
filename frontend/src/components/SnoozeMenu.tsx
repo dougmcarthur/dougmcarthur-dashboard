@@ -55,35 +55,35 @@ export function SnoozeMenu({
         onClick={() => setOpen((o) => !o)}
         disabled={disabled}
         aria-expanded={open}
-        className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+        className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken disabled:opacity-40 transition-colors"
       >
         Snooze
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-20 w-64 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+        <div className="absolute left-0 top-full mt-1 z-20 w-64 rounded-xl border border-line bg-surface shadow-pop py-1">
           {options.map((o) => (
             <button
               key={o.date}
               onClick={() => pick(o.date)}
-              className="w-full flex items-baseline justify-between gap-3 px-3 py-1.5 text-left text-xs hover:bg-gray-50 transition-colors"
+              className="w-full flex items-baseline justify-between gap-3 px-3 py-1.5 text-left text-xs hover:bg-sunken transition-colors"
             >
-              <span className={o.derived ? 'text-gray-900 font-medium' : 'text-gray-600'}>
+              <span className={o.derived ? 'text-ink font-medium' : 'text-body'}>
                 {o.label}
               </span>
-              <span className="text-gray-400 tabular-nums shrink-0">{shortDate(o.date)}</span>
+              <span className="text-muted tabular-nums shrink-0">{shortDate(o.date)}</span>
             </button>
           ))}
 
           {options.length === 0 && (
-            <p className="px-3 py-2 text-xs text-gray-500 leading-relaxed">
+            <p className="px-3 py-2 text-xs text-muted leading-relaxed">
               Nothing useful to defer to — this is due too soon for a snooze to
               bring it back in time.
             </p>
           )}
 
-          <div className="border-t border-gray-100 mt-1 pt-2 px-3 pb-1">
-            <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">
+          <div className="border-t border-line mt-1 pt-2 px-3 pb-1">
+            <label className="block text-[10px] uppercase tracking-wide text-muted mb-1">
               Or pick a date
             </label>
             <div className="flex gap-1.5">
@@ -92,12 +92,12 @@ export function SnoozeMenu({
                 value={custom}
                 min={tomorrow}
                 onChange={(e) => setCustom(e.target.value)}
-                className="flex-1 min-w-0 rounded-md border border-gray-200 px-2 py-1 text-xs"
+                className="flex-1 min-w-0 rounded-md border border-line px-2 py-1 text-xs"
               />
               <button
                 onClick={() => custom && pick(custom)}
                 disabled={!custom || custom <= today}
-                className="text-xs px-2 py-1 rounded-md bg-gray-900 text-white disabled:opacity-30 transition-colors"
+                className="text-xs px-2 py-1 rounded-md bg-accent text-accent-fg disabled:opacity-30 transition-colors"
               >
                 Set
               </button>

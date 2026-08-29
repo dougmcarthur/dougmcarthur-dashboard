@@ -1,7 +1,7 @@
 export function Chevron({ open }: { open: boolean }) {
   return (
     <svg
-      className={`w-4 h-4 text-gray-400 transition-transform duration-150 shrink-0 ${open ? 'rotate-90' : ''}`}
+      className={`w-4 h-4 text-muted transition-transform duration-150 shrink-0 ${open ? 'rotate-90' : ''}`}
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"

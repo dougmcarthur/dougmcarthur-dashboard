@@ -46,7 +46,7 @@ function DeckShell({ children, head }: { children: React.ReactNode; head: React.
   return (
     <div>
       <div className="flex items-baseline justify-between gap-4 mb-2">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <h2 className="text-xs font-semibold text-muted uppercase tracking-wider">
           Decide these
         </h2>
         {head}
@@ -107,11 +107,11 @@ export function DecisionDeck({
   if (!item) {
     return (
       <DeckShell head={null}>
-        <div className="rounded-lg border border-gray-200 bg-white px-5 py-8 text-center">
-          <p className="text-sm font-medium text-gray-700">Nothing needs a decision.</p>
-          <p className="text-xs text-gray-500 mt-1">
+        <div className="rounded-xl border border-line bg-surface shadow-card px-5 py-8 text-center">
+          <p className="text-sm font-medium text-body">Nothing needs a decision.</p>
+          <p className="text-xs text-muted mt-1">
             Anything still open is waiting on a date, not on you.{' '}
-            <button onClick={() => onNav('review')} className="text-blue-600 hover:underline">
+            <button onClick={() => onNav('review')} className="text-info-fg hover:underline">
               Open the review queue
             </button>
           </p>
@@ -123,7 +123,7 @@ export function DecisionDeck({
   const { decision } = item
   const severity = item.flags[0]?.severity ?? 'info'
   const stripe =
-    severity === 'danger' ? 'border-t-red-500' : severity === 'warn' ? 'border-t-amber-400' : 'border-t-gray-300'
+    severity === 'danger' ? 'border-t-danger-solid' : severity === 'warn' ? 'border-t-warn-fg' : 'border-t-line-strong'
 
   const act = (intent: DecisionIntent) => {
     const status = STATUS_BY_INTENT[item.kind][intent]
@@ -143,9 +143,9 @@ export function DecisionDeck({
   return (
     <DeckShell
       head={
-        <span className="text-xs text-gray-400 tabular-nums">
+        <span className="text-xs text-muted tabular-nums">
           {position} of {total} ·{' '}
-          <button onClick={() => onNav('review')} className="text-blue-600 hover:underline">
+          <button onClick={() => onNav('review')} className="text-info-fg hover:underline">
             show the rest →
           </button>
         </span>
@@ -153,29 +153,29 @@ export function DecisionDeck({
     >
       <div className="relative pb-6">
         {remaining.length > 2 && (
-          <div className="absolute inset-0 rounded-lg border border-gray-300 border-t-[3px] border-t-gray-300 bg-gray-100 translate-y-[20px] scale-x-[0.962]" />
+          <div aria-hidden className="absolute inset-0 rounded-xl border border-line bg-surface shadow-card translate-y-[14px] scale-x-[0.955] opacity-60" />
         )}
         {remaining.length > 1 && (
-          <div className="absolute inset-0 rounded-lg border border-gray-300 border-t-[3px] border-t-gray-300 bg-gray-50 translate-y-[10px] scale-x-[0.982]" />
+          <div aria-hidden className="absolute inset-0 rounded-xl border border-line bg-surface shadow-card translate-y-[7px] scale-x-[0.978] opacity-80" />
         )}
 
-        <div className={`relative rounded-lg border border-gray-200 border-t-[3px] ${stripe} bg-white p-5`}>
+        <div className={`relative rounded-xl border border-line border-t-[3px] ${stripe} bg-surface shadow-raised p-5 lg:p-6`}>
           <div className="flex items-center gap-2 mb-1.5">
             <KindTag kind={item.kind} />
             {item.flags[0] && (
-              <span className="text-xs text-gray-400">{item.flags[0].label}</span>
+              <span className="text-xs text-muted">{item.flags[0].label}</span>
             )}
-            <span className="ml-auto text-xs text-gray-300 tabular-nums">
+            <span className="ml-auto text-xs text-faint tabular-nums">
               {remaining.length} left
             </span>
           </div>
 
-          <h3 className="text-base font-semibold text-gray-900 leading-snug">{item.title}</h3>
-          <p className="mt-1.5 text-sm text-gray-600 leading-relaxed max-w-2xl">
+          <h3 className="text-base font-semibold text-ink leading-snug">{item.title}</h3>
+          <p className="mt-1.5 text-sm text-body leading-relaxed max-w-2xl">
             {decision.rationale}
           </p>
 
-          <div className="mt-4 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-2">
+          <div className="mt-4 pt-3 border-t border-line flex flex-wrap items-center gap-2">
             {decision.actions.map((a) => (
               <button
                 key={a.intent + a.label}
@@ -183,8 +183,8 @@ export function DecisionDeck({
                 disabled={patch.isPending}
                 className={`text-xs px-3 py-1.5 rounded-md font-medium disabled:opacity-40 transition-colors ${
                   a.tone === 'go'
-                    ? 'bg-green-600 text-white hover:bg-green-700'
-                    : 'bg-white border border-red-200 text-red-600 hover:bg-red-50'
+                    ? 'bg-success-solid text-accent-fg hover:brightness-110'
+                    : 'bg-surface border border-danger-line text-danger-fg hover:bg-danger-bg'
                 }`}
               >
                 {a.label}
@@ -192,7 +192,7 @@ export function DecisionDeck({
             ))}
             <button
               onClick={() => onNav('review')}
-              className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors"
             >
               Details
             </button>
@@ -204,14 +204,14 @@ export function DecisionDeck({
             <button
               onClick={() => setIndex((i) => (i + 1) % Math.max(remaining.length, 1))}
               disabled={remaining.length < 2}
-              className="ml-auto text-xs px-3 py-1.5 rounded-md text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition-colors"
+              className="ml-auto text-xs px-3 py-1.5 rounded-md text-muted hover:bg-sunken disabled:opacity-30 transition-colors"
             >
               Skip →
             </button>
           </div>
 
           {(patch.isError || snooze.isError) && (
-            <p className="mt-2 text-xs text-red-600">
+            <p className="mt-2 text-xs text-danger-fg">
               Could not save that —{' '}
               {((patch.error ?? snooze.error) as Error).message}
             </p>

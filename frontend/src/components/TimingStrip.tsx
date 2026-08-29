@@ -19,9 +19,9 @@ import { shortDate } from '../format'
  */
 
 const BAND_STYLE: Record<TimingRow['band'], { dot: string; text: string }> = {
-  overdue: { dot: 'bg-red-500', text: 'text-red-600' },
-  due_soon: { dot: 'bg-amber-500', text: 'text-amber-600' },
-  opening: { dot: 'bg-sky-500', text: 'text-sky-600' },
+  overdue: { dot: 'bg-danger-solid', text: 'text-danger-fg' },
+  due_soon: { dot: 'bg-warn-fg', text: 'text-warn-fg' },
+  opening: { dot: 'bg-cat-sky-fg', text: 'text-cat-sky-fg' },
 }
 
 function countdown(band: TimingRow['band'], days: number): string {
@@ -56,12 +56,12 @@ function Row({
   return (
     <div
       onClick={onClick}
-      className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
+      className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-sunken transition-colors"
     >
       <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${tone.dot}`} aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-gray-900 truncate">{title}</p>
-        <p className="text-xs text-gray-500 truncate">{meta}</p>
+        <p className="text-sm text-ink truncate">{title}</p>
+        <p className="text-xs text-muted truncate">{meta}</p>
       </div>
       {children}
       <span className={`text-xs font-medium tabular-nums shrink-0 ${tone.text}`}>{right}</span>
@@ -88,11 +88,11 @@ export function TimingStrip({
 
   return (
     <div>
-      <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+      <h2 className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
         On the clock
       </h2>
 
-      <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+      <div className="bg-surface border border-line rounded-xl shadow-card divide-y divide-line">
         {reminders.map((r) => {
           // Reminders carry a real scheduled date, so they get the same
           // countdown as everything else here rather than a bare date — one
@@ -111,7 +111,7 @@ export function TimingStrip({
                 {r.gigStatus === 'approved' && (
                   <button
                     onClick={() => onSubmitted(r)}
-                    className="text-xs px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                    className="text-xs px-2 py-0.5 rounded-md bg-info-bg text-info-fg hover:bg-info-bg transition-colors"
                   >
                     Sent
                   </button>
@@ -119,7 +119,7 @@ export function TimingStrip({
                 <button
                   onClick={() => onDismiss(r.id)}
                   disabled={dismissing}
-                  className="text-xs px-2 py-0.5 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                  className="text-xs px-2 py-0.5 rounded-md border border-line text-muted hover:bg-sunken disabled:opacity-40 transition-colors"
                 >
                   Dismiss
                 </button>

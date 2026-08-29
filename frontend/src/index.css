@@ -1,3 +1,249 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Appearance tokens.
+ *
+ * Every colour in the app resolves through one of these. The point is not
+ * tidiness: it is that "dark mode" and "high contrast" become a variable swap
+ * on one element instead of a second set of classes on nine hundred.
+ *
+ * The greys are deliberately darker than the Tailwind defaults they replace.
+ * `text-gray-400` on white is about 2.8:1, which fails WCAG AA for body text,
+ * and it was the single most common colour in the app — 76 uses. Tertiary text
+ * now lands at 4.6:1 or better in both themes.
+ */
+:root {
+  color-scheme: light;
+
+  --c-canvas: #f4f6f8;
+  --c-surface: #ffffff;
+  --c-raised: #ffffff;
+  --c-sunken: #eef1f4;
+  --c-line: #e2e6ea;
+  --c-line-strong: #c9d1d9;
+
+  --c-ink: #0f141a;
+  --c-body: #3b4552;
+  --c-muted: #5c6674;
+  --c-faint: #7b8593;
+
+  --c-accent: #1f2937;
+  --c-accent-hover: #0f141a;
+  --c-accent-fg: #ffffff;
+  --c-accent-soft: #eef2f7;
+
+  --c-danger-bg: #fdf2f2;
+  --c-danger-line: #f3c9c9;
+  --c-danger-fg: #a12020;
+  --c-danger-solid: #b42318;
+
+  --c-success-bg: #f0f9f3;
+  --c-success-line: #bfe3cd;
+  --c-success-fg: #1c6b3c;
+  --c-success-solid: #17803d;
+
+  --c-warn-bg: #fdf7ec;
+  --c-warn-line: #ecd6ad;
+  --c-warn-fg: #8a5a08;
+
+  --c-info-bg: #eff5fd;
+  --c-info-line: #c6dcf6;
+  --c-info-fg: #1d4f91;
+
+
+  /* Categorical hues. These encode a kind or a type rather than a severity, so
+     they stay distinguishable from each other and from the status colours —
+     and, unlike the Tailwind shades they replace, they hold up on a dark
+     surface instead of glowing. */
+  --c-cat-violet-bg: #f4f1fd; --c-cat-violet-line: #ded4f7; --c-cat-violet-fg: #5b3fb8;
+  --c-cat-sky-bg: #edf6fe;    --c-cat-sky-line: #c7e2f7;    --c-cat-sky-fg: #17608f;
+  --c-cat-teal-bg: #ecf8f6;   --c-cat-teal-line: #c2e8e1;   --c-cat-teal-fg: #10645c;
+  --c-cat-orange-bg: #fdf3ea; --c-cat-orange-line: #f3d5b6; --c-cat-orange-fg: #96500d;
+  --c-cat-rose-bg: #fdf2f5;   --c-cat-rose-line: #f6cdd7;   --c-cat-rose-fg: #9c2a4d;
+
+  --shadow-card: 0 1px 2px rgba(15, 20, 26, 0.05), 0 1px 3px rgba(15, 20, 26, 0.04);
+  --shadow-raised: 0 2px 4px rgba(15, 20, 26, 0.05), 0 6px 16px -4px rgba(15, 20, 26, 0.09);
+  --shadow-pop: 0 8px 12px -4px rgba(15, 20, 26, 0.10), 0 18px 36px -12px rgba(15, 20, 26, 0.16);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+
+  --font-ui: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  --shell-width: 1280px;
+  --motion-fast: 150ms;
+  --motion-slow: 260ms;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --c-canvas: #0d1117;
+  --c-surface: #161b22;
+  --c-raised: #1b2029;
+  --c-sunken: #10151b;
+  --c-line: #272e3a;
+  --c-line-strong: #3a4353;
+
+  --c-ink: #e9edf2;
+  --c-body: #bcc6d2;
+  --c-muted: #949fad;
+  --c-faint: #78828f;
+
+  --c-accent: #e9edf2;
+  --c-accent-hover: #ffffff;
+  --c-accent-fg: #10151b;
+  --c-accent-soft: #222a35;
+
+  --c-danger-bg: #2a1618;
+  --c-danger-line: #55282c;
+  --c-danger-fg: #f4a9a4;
+  --c-danger-solid: #d2483c;
+
+  --c-success-bg: #12241a;
+  --c-success-line: #26472f;
+  --c-success-fg: #86d6a2;
+  --c-success-solid: #2f9e5b;
+
+  --c-warn-bg: #271e10;
+  --c-warn-line: #4b3a1d;
+  --c-warn-fg: #e5bf7c;
+
+  --c-info-bg: #131e2d;
+  --c-info-line: #26384f;
+  --c-info-fg: #9cc4f0;
+
+
+  --c-cat-violet-bg: #1f1b31; --c-cat-violet-line: #3a3159; --c-cat-violet-fg: #c0aef5;
+  --c-cat-sky-bg: #12212e;    --c-cat-sky-line: #24405a;    --c-cat-sky-fg: #8fc6ee;
+  --c-cat-teal-bg: #102523;   --c-cat-teal-line: #21453f;   --c-cat-teal-fg: #7fd3c6;
+  --c-cat-orange-bg: #291c11; --c-cat-orange-line: #4d3620; --c-cat-orange-fg: #eab183;
+  --c-cat-rose-bg: #2a161d;   --c-cat-rose-line: #512733;   --c-cat-rose-fg: #f0a3ba;
+
+  /* On a dark surface a cast shadow is nearly invisible, so elevation is
+     carried by a lifted surface colour plus a hairline instead. */
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.02);
+  --shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Raises every border and drops tertiary text onto near-primary contrast. */
+[data-contrast='high'] {
+  --c-line: #9aa5b1;
+  --c-line-strong: #6b7684;
+  --c-body: #1b222b;
+  --c-muted: #2b333d;
+  --c-faint: #3d4653;
+}
+
+[data-theme='dark'][data-contrast='high'] {
+  --c-line: #4d5766;
+  --c-line-strong: #6b7684;
+  --c-body: #e4eaf1;
+  --c-muted: #cbd4de;
+  --c-faint: #aab4c0;
+}
+
+@layer base {
+  html {
+    /* Every Tailwind size is in rem, so the whole interface scales from here. */
+    font-size: calc(16px * var(--ui-scale, 1));
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--c-canvas);
+    color: var(--c-body);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* A visible, consistent focus ring is the cheapest accessibility win there
+     is, and the browser default disappears against dark surfaces. */
+  :focus-visible {
+    outline: 2px solid var(--c-info-fg);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  ::selection {
+    background: var(--c-accent-soft);
+    color: var(--c-ink);
+  }
+
+  /* Firefox and WebKit scrollbars follow the theme rather than staying light. */
+  * {
+    scrollbar-color: var(--c-line-strong) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--c-line-strong);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /* The shell width is a setting, so it lives in a class rather than a
+     hardcoded max-w-7xl repeated in the nav and the main element. */
+  .shell {
+    width: 100%;
+    max-width: var(--shell-width);
+    margin-inline: auto;
+  }
+
+  .skip-link {
+    position: absolute;
+    left: 0.75rem;
+    top: -3rem;
+    z-index: 60;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.375rem;
+    background: var(--c-accent);
+    color: var(--c-accent-fg);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    transition: top var(--motion-fast) ease;
+  }
+  .skip-link:focus {
+    top: 0.75rem;
+  }
+}
+
+/* Marking links by more than colour alone, for anyone who wants it. Scoped to
+   real anchors with an href so buttons styled as links are unaffected. */
+[data-links='underline'] main a[href] {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Honour the OS setting, and the in-app override that mirrors it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+[data-motion='reduced'] *,
+[data-motion='reduced'] *::before,
+[data-motion='reduced'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}

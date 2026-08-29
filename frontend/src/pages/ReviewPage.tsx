@@ -39,7 +39,7 @@ function QueueRow({
     <button
       onClick={onSelect}
       className={`w-full text-left px-3 py-2.5 border-l-2 transition-colors ${
-        active ? 'bg-gray-900/[0.04] border-gray-900' : 'border-transparent hover:bg-gray-50'
+        active ? 'bg-accent/[0.04] border-accent' : 'border-transparent hover:bg-sunken'
       }`}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -47,16 +47,16 @@ function QueueRow({
         {top && (
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              top.severity === 'danger' ? 'bg-red-500' : top.severity === 'warn' ? 'bg-amber-400' : 'bg-gray-300'
+              top.severity === 'danger' ? 'bg-danger-solid' : top.severity === 'warn' ? 'bg-warn-fg' : 'bg-line-strong'
             }`}
           />
         )}
-        <span className="text-[11px] text-gray-400 truncate">{item.subtitle}</span>
+        <span className="text-[11px] text-muted truncate">{item.subtitle}</span>
       </div>
-      <p className={`text-sm leading-snug ${active ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+      <p className={`text-sm leading-snug ${active ? 'font-semibold text-ink' : 'font-medium text-body'}`}>
         {item.title}
       </p>
-      {top && <p className="text-[11px] text-gray-500 mt-0.5 truncate">{top.label}</p>}
+      {top && <p className="text-[11px] text-muted mt-0.5 truncate">{top.label}</p>}
     </button>
   )
 }
@@ -81,30 +81,30 @@ function DecisionBar({
   if (item.source.kind === 'gig') {
     const { status } = item.source.row
     if (status !== 'approved') {
-      buttons.push({ label: 'Approve', className: 'bg-green-600 text-white hover:bg-green-700', run: () => onGig({ status: 'approved' }) })
+      buttons.push({ label: 'Approve', className: 'bg-success-solid text-accent-fg hover:brightness-110', run: () => onGig({ status: 'approved' }) })
     }
     if (status !== 'submitted') {
-      buttons.push({ label: 'Mark submitted', className: 'bg-blue-600 text-white hover:bg-blue-700', run: () => onGig({ status: 'submitted' }) })
+      buttons.push({ label: 'Mark submitted', className: 'bg-info-fg text-accent-fg hover:brightness-110', run: () => onGig({ status: 'submitted' }) })
     }
     if (status !== 'rejected') {
-      buttons.push({ label: 'Pass', className: 'bg-white border border-red-200 text-red-600 hover:bg-red-50', run: () => onGig({ status: 'rejected' }) })
+      buttons.push({ label: 'Pass', className: 'bg-surface border border-danger-line text-danger-fg hover:bg-danger-bg', run: () => onGig({ status: 'rejected' }) })
     }
-    buttons.push({ label: 'Archive', className: 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50', run: () => onGig({ status: 'archived' }) })
+    buttons.push({ label: 'Archive', className: 'bg-surface border border-line-strong text-body hover:bg-sunken', run: () => onGig({ status: 'archived' }) })
   }
 
   if (item.source.kind === 'sync') {
     const { status } = item.source.row
     if (status !== 'pitched') {
-      buttons.push({ label: 'Mark pitched', className: 'bg-indigo-600 text-white hover:bg-indigo-700', run: () => onSync({ status: 'pitched' }) })
+      buttons.push({ label: 'Mark pitched', className: 'bg-info-fg text-accent-fg hover:brightness-110', run: () => onSync({ status: 'pitched' }) })
     }
-    buttons.push({ label: 'Confirmed', className: 'bg-green-600 text-white hover:bg-green-700', run: () => onSync({ status: 'confirmed' }) })
-    buttons.push({ label: 'Declined', className: 'bg-white border border-red-200 text-red-600 hover:bg-red-50', run: () => onSync({ status: 'declined' }) })
-    buttons.push({ label: 'Archive', className: 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50', run: () => onSync({ status: 'archived' }) })
+    buttons.push({ label: 'Confirmed', className: 'bg-success-solid text-accent-fg hover:brightness-110', run: () => onSync({ status: 'confirmed' }) })
+    buttons.push({ label: 'Declined', className: 'bg-surface border border-danger-line text-danger-fg hover:bg-danger-bg', run: () => onSync({ status: 'declined' }) })
+    buttons.push({ label: 'Archive', className: 'bg-surface border border-line-strong text-body hover:bg-sunken', run: () => onSync({ status: 'archived' }) })
   }
 
   if (item.source.kind === 'promo') {
-    buttons.push({ label: 'Approve', className: 'bg-green-600 text-white hover:bg-green-700', run: () => onPromo({ status: 'approved' }) })
-    buttons.push({ label: 'Mark published', className: 'bg-blue-600 text-white hover:bg-blue-700', run: () => onPromo({ status: 'published' }) })
+    buttons.push({ label: 'Approve', className: 'bg-success-solid text-accent-fg hover:brightness-110', run: () => onPromo({ status: 'approved' }) })
+    buttons.push({ label: 'Mark published', className: 'bg-info-fg text-accent-fg hover:brightness-110', run: () => onPromo({ status: 'published' }) })
   }
 
   return (
@@ -146,15 +146,15 @@ function Detail({
   return (
     <div className="space-y-4">
       {/* Identity + decision */}
-      <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-3">
+      <div className="rounded-xl border border-line bg-surface shadow-card p-5 space-y-3">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
               <KindTag kind={item.kind} />
               <StatusBadge status={item.status} />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 leading-snug">{item.title}</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <h2 className="text-lg font-semibold text-ink leading-snug">{item.title}</h2>
+            <p className="text-sm text-muted mt-0.5">
               {item.subtitle}
               {parsed.location && <span> · {parsed.location}</span>}
             </p>
@@ -164,7 +164,7 @@ function Detail({
               href={item.url}
               target="_blank"
               rel="noreferrer"
-              className="shrink-0 text-xs px-3 py-1.5 rounded-md border border-gray-300 text-blue-600 hover:bg-blue-50 transition-colors"
+              className="shrink-0 text-xs px-3 py-1.5 rounded-md border border-line-strong text-info-fg hover:bg-info-bg transition-colors"
             >
               Open source ↗
             </a>
@@ -181,17 +181,17 @@ function Detail({
             The whole point of the Snoozed view is that deferring is visible
             and reversible rather than a quiet disappearance. */}
         {item.snooze.active && (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-indigo-200 bg-indigo-50/50 px-3 py-2">
-            <p className="text-xs text-indigo-900">
+          <div className="flex items-center justify-between gap-3 rounded-md border border-info-line bg-info-bg/50 px-3 py-2">
+            <p className="text-xs text-info-fg">
               Snoozed until <span className="font-semibold">{shortDate(item.snooze.until!)}</span>
               {item.snooze.daysUntil !== null && (
-                <span className="text-indigo-500"> · {item.snooze.daysUntil}d away</span>
+                <span className="text-info-fg"> · {item.snooze.daysUntil}d away</span>
               )}
             </p>
             <button
               onClick={() => onSnooze(null)}
               disabled={isSaving}
-              className="shrink-0 text-xs px-2.5 py-1 rounded-md border border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50 disabled:opacity-40 transition-colors"
+              className="shrink-0 text-xs px-2.5 py-1 rounded-md border border-info-line bg-surface text-info-fg hover:bg-info-bg disabled:opacity-40 transition-colors"
             >
               Bring it back now
             </button>
@@ -199,14 +199,14 @@ function Detail({
         )}
 
         {item.snooze.wokenByChange && (
-          <p className="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-800 leading-relaxed">
+          <p className="rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg leading-relaxed">
             This was snoozed until {shortDate(item.snooze.until!)}, but it changed
             afterwards — so it came back early rather than sitting on a decision
             made about different facts.
           </p>
         )}
 
-        <div className="pt-1 border-t border-gray-100">
+        <div className="pt-1 border-t border-line">
           <div className="pt-3 flex flex-wrap items-center gap-2">
             <DecisionBar item={item} onGig={onGig} onSync={onSync} onPromo={onPromo} isSaving={isSaving} />
             {item.kind !== 'promo' && !item.snooze.active && (
@@ -242,19 +242,19 @@ function Detail({
       {(deadline.raw || parsed.timing.length > 0) && (
         <Panel title="Timing" tone={deadline.daysUntil !== null && deadline.daysUntil <= 14 ? 'warn' : 'neutral'}>
           {deadline.raw && (
-            <div className="mb-3 rounded-md border border-gray-200 bg-white px-3 py-2">
+            <div className="mb-3 rounded-md border border-line bg-surface px-3 py-2">
               <div className="flex items-baseline gap-3">
-                <span className="text-xs font-medium text-gray-500 w-20 shrink-0">Deadline</span>
-                <span className="text-sm text-gray-800">
+                <span className="text-xs font-medium text-muted w-20 shrink-0">Deadline</span>
+                <span className="text-sm text-ink">
                   {deadline.date ?? 'no date found'}
                   {deadline.daysUntil !== null && (
                     <span
                       className={`ml-2 text-xs font-semibold ${
                         deadline.daysUntil < 0
-                          ? 'text-red-600'
+                          ? 'text-danger-fg'
                           : deadline.daysUntil <= 7
-                          ? 'text-orange-600'
-                          : 'text-gray-400'
+                          ? 'text-cat-orange-fg'
+                          : 'text-muted'
                       }`}
                     >
                       {deadline.daysUntil < 0
@@ -267,8 +267,8 @@ function Detail({
                 </span>
               </div>
               {!deadline.exact && (
-                <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">
-                  <span className="text-amber-600 font-medium">Stored as prose, not a date:</span>{' '}
+                <p className="mt-1.5 text-xs text-muted leading-relaxed">
+                  <span className="text-warn-fg font-medium">Stored as prose, not a date:</span>{' '}
                   “{deadline.raw}”
                 </p>
               )}
@@ -281,20 +281,20 @@ function Detail({
       {/* Cost */}
       {(fee.raw || fee.payout) && (
         <Panel title="Cost to enter" tone={fee.required ? 'warn' : 'neutral'}>
-          <p className="text-sm text-gray-800">
+          <p className="text-sm text-ink">
             {fee.required ? (
               <>
                 <span className="font-semibold">
                   {fee.amount != null ? `${fee.currency} ${fee.amount.toLocaleString()}` : 'Paid entry'}
                 </span>{' '}
-                <span className="text-gray-500">— needs your approval before anything is submitted</span>
+                <span className="text-muted">— needs your approval before anything is submitted</span>
               </>
             ) : (
-              <span className="text-gray-600">No entry fee</span>
+              <span className="text-body">No entry fee</span>
             )}
           </p>
-          {fee.payout && <p className="mt-1 text-sm text-green-700">Pays out: {fee.payout}</p>}
-          {fee.raw && <p className="mt-1.5 text-xs text-gray-400">Raw: “{fee.raw}”</p>}
+          {fee.payout && <p className="mt-1 text-sm text-success-fg">Pays out: {fee.payout}</p>}
+          {fee.raw && <p className="mt-1.5 text-xs text-muted">Raw: “{fee.raw}”</p>}
         </Panel>
       )}
 
@@ -304,26 +304,26 @@ function Detail({
           <div className="space-y-3">
             <div className="flex flex-wrap gap-1.5">
               {parsed.submissionMethod && (
-                <span className="rounded-md border border-blue-200 bg-white px-2.5 py-1 text-xs text-blue-800 capitalize">
+                <span className="rounded-md border border-info-line bg-surface px-2.5 py-1 text-xs text-info-fg capitalize">
                   via {parsed.submissionMethod}
                 </span>
               )}
               {parsed.submissionState !== 'unknown' && (
-                <span className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-600">
+                <span className="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-body">
                   {parsed.submissionState === 'not_submitted' ? 'Not submitted' : 'Submitted'}
                 </span>
               )}
             </div>
 
             {parsed.submissionNote && (
-              <p className="text-sm text-gray-700 leading-relaxed">{parsed.submissionNote}</p>
+              <p className="text-sm text-body leading-relaxed">{parsed.submissionNote}</p>
             )}
 
             {parsed.contactEmails.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {parsed.contactEmails.map((email) => (
-                  <span key={email} className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1">
-                    <a href={`mailto:${email}`} className="text-xs font-mono text-blue-700 hover:underline">{email}</a>
+                  <span key={email} className="inline-flex items-center gap-1.5 rounded-md border border-line bg-surface px-2 py-1">
+                    <a href={`mailto:${email}`} className="text-xs font-mono text-info-fg hover:underline">{email}</a>
                     <CopyButton text={email} />
                   </span>
                 ))}
@@ -332,7 +332,7 @@ function Detail({
 
             {parsed.requirements.length > 0 && (
               <div>
-                <p className="mb-1.5 text-xs font-medium text-gray-500">Requirements</p>
+                <p className="mb-1.5 text-xs font-medium text-muted">Requirements</p>
                 <BulletList items={parsed.requirements} />
               </div>
             )}
@@ -340,7 +340,7 @@ function Detail({
             {parsed.links.length > 0 && (
               <div className="flex flex-col gap-1">
                 {parsed.links.map((link) => (
-                  <a key={link} href={link} target="_blank" rel="noreferrer" className="truncate text-xs text-blue-600 hover:underline">
+                  <a key={link} href={link} target="_blank" rel="noreferrer" className="truncate text-xs text-info-fg hover:underline">
                     {link}
                   </a>
                 ))}
@@ -369,7 +369,7 @@ function Detail({
           tone="accent"
           action={<CopyButton text={parsed.draftedMessage.body} />}
         >
-          <p className="whitespace-pre-wrap rounded-md border border-purple-100 bg-white p-3 text-sm leading-relaxed text-gray-800">
+          <p className="whitespace-pre-wrap rounded-md border border-cat-violet-line bg-surface p-3 text-sm leading-relaxed text-ink">
             {parsed.draftedMessage.body}
           </p>
         </Panel>
@@ -378,12 +378,12 @@ function Detail({
       {/* Sync pitch draft + what actually went out */}
       {sync?.pitchDraft && (
         <Panel title="Pitch draft" tone="accent" action={<CopyButton text={sync.pitchDraft} />}>
-          <p className="whitespace-pre-wrap rounded-md border border-purple-100 bg-white p-3 text-sm leading-relaxed text-gray-800">
+          <p className="whitespace-pre-wrap rounded-md border border-cat-violet-line bg-surface p-3 text-sm leading-relaxed text-ink">
             {sync.pitchDraft}
           </p>
           {sync.pitchSent && (
             <div className="mt-3">
-              <p className="mb-1.5 text-xs font-medium text-gray-500">Changes in what was actually sent</p>
+              <p className="mb-1.5 text-xs font-medium text-muted">Changes in what was actually sent</p>
               <PitchDiff draft={sync.pitchDraft} sent={sync.pitchSent} />
             </div>
           )}
@@ -393,7 +393,7 @@ function Detail({
       {/* Promo copy */}
       {promo && (
         <Panel title="Draft copy" tone="accent" action={<CopyButton text={promo.content} />}>
-          <p className="whitespace-pre-wrap rounded-md border border-teal-100 bg-white p-3 text-sm leading-relaxed text-gray-800">
+          <p className="whitespace-pre-wrap rounded-md border border-cat-teal-line bg-surface p-3 text-sm leading-relaxed text-ink">
             {promo.content}
           </p>
         </Panel>
@@ -409,11 +409,11 @@ function Detail({
       {/* Narrative remainder */}
       {parsed.summary && (
         <Panel title={item.kind === 'gig' ? 'Why it fits' : 'Background'}>
-          <p className="text-sm leading-relaxed text-gray-700">{parsed.summary}</p>
+          <p className="text-sm leading-relaxed text-body">{parsed.summary}</p>
           {parsed.tracks.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {parsed.tracks.map((track) => (
-                <span key={track} className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                <span key={track} className="rounded-full bg-sunken px-2.5 py-0.5 text-xs font-medium text-body">
                   ♪ {track}
                 </span>
               ))}
@@ -511,7 +511,7 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
 
   if (error) {
     return (
-      <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+      <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
         Failed to load the review queue — {(error as Error).message}
       </div>
     )
@@ -520,8 +520,8 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
   return (
     <div className="space-y-4">
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="text-xl font-semibold text-gray-900">Review</h1>
-        <p className="text-xs text-gray-400">
+        <h1 className="text-xl font-semibold text-ink">Review</h1>
+        <p className="text-xs text-muted">
           {/* Snoozed items are excluded from `all`, so "n of all" would count
               the shown item against a total it is not part of. */}
           {filter === 'snoozed'
@@ -540,11 +540,11 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
               key={f.id}
               onClick={() => setFilter(f.id)}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                active ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                active ? 'bg-accent text-accent-fg' : 'bg-surface border border-line text-body hover:bg-sunken'
               }`}
             >
               {f.label}
-              <span className={`ml-1.5 text-xs ${active ? 'text-gray-300' : 'text-gray-400'}`}>{count}</span>
+              <span className={`ml-1.5 text-xs ${active ? 'text-faint' : 'text-muted'}`}>{count}</span>
             </button>
           )
         })}
@@ -553,14 +553,14 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
       {isLoading ? (
         <SkeletonList rows={6} />
       ) : visible.length === 0 ? (
-        <p className="rounded-lg border border-gray-200 bg-white px-4 py-12 text-center text-sm text-gray-400">
+        <p className="rounded-xl border border-line bg-surface shadow-card px-4 py-12 text-center text-sm text-muted">
           {filter === 'snoozed'
             ? 'Nothing is snoozed. Deferred items wait here until their date, so none of them are hidden.'
             : 'Nothing in this queue.'}
         </p>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[19rem_minmax(0,1fr)]">
-          <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
+          <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl border border-line bg-surface shadow-card divide-y divide-line">
             {visible.map((item) => (
               <QueueRow
                 key={item.key}

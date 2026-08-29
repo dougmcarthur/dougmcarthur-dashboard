@@ -8,8 +8,8 @@ import { ReconcilePanel } from '../components/ReconcilePanel'
 
 const SYNC_STATUSES: SyncStatus[] = ['draft_ready', 'pitched', 'confirmed', 'declined', 'archived']
 
-const INPUT = 'w-full text-sm border border-gray-300 rounded-md px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition'
-const FILTER_INPUT = 'text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition'
+const INPUT = 'w-full text-sm border border-line-strong rounded-md px-2.5 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition'
+const FILTER_INPUT = 'text-sm border border-line-strong rounded-md px-3 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition'
 
 type SyncDraft = {
   name: string; agencyType: string; contactEmail: string; contactRole: string
@@ -49,50 +49,50 @@ function CreateSyncForm({ onDone }: { onDone: () => void }) {
   })
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5 space-y-4">
-      <h2 className="text-sm font-semibold text-gray-900">New Sync Target</h2>
+    <div className="bg-surface border border-line rounded-xl shadow-card p-5 space-y-4">
+      <h2 className="text-sm font-semibold text-ink">New Sync Target</h2>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Name *</label>
+          <label className="block text-xs font-medium text-muted mb-1">Name *</label>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="Epitaph Records" className={INPUT} autoFocus />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Agency type</label>
+          <label className="block text-xs font-medium text-muted mb-1">Agency type</label>
           <input value={draft.agencyType} onChange={(e) => set('agencyType', e.target.value)} placeholder="label, library, supervisor…" className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Contact email</label>
+          <label className="block text-xs font-medium text-muted mb-1">Contact email</label>
           <input type="email" value={draft.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} placeholder="sync@label.com" className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Contact role</label>
+          <label className="block text-xs font-medium text-muted mb-1">Contact role</label>
           <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} placeholder="A&R, Sync Supervisor…" className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Confirm via</label>
+          <label className="block text-xs font-medium text-muted mb-1">Confirm via</label>
           <input value={draft.confirmationMethod} onChange={(e) => set('confirmationMethod', e.target.value)} placeholder="email, phone, portal…" className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Initial status</label>
+          <label className="block text-xs font-medium text-muted mb-1">Initial status</label>
           <select value={draft.status} onChange={(e) => set('status', e.target.value as SyncStatus)} className={INPUT}>
             {SYNC_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+          <label className="block text-xs font-medium text-muted mb-1">Notes</label>
           <textarea rows={2} value={draft.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Context about this target…" className={`${INPUT} resize-none`} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Pitch draft</label>
+          <label className="block text-xs font-medium text-muted mb-1">Pitch draft</label>
           <textarea rows={4} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} placeholder="Dear…" className={`${INPUT} resize-y font-mono`} />
         </div>
       </div>
       <div className="flex gap-2 pt-1">
         <button onClick={() => createMutation.mutate()} disabled={!draft.name || createMutation.isPending}
-          className="text-sm px-4 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition-colors">
+          className="text-sm px-4 py-1.5 rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40 transition-colors">
           {createMutation.isPending ? 'Adding…' : 'Add target'}
         </button>
-        <button onClick={onDone} className="text-sm px-4 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={onDone} className="text-sm px-4 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors">
           Cancel
         </button>
       </div>
@@ -128,31 +128,31 @@ function EditSyncPanel({
     <div className="space-y-4 max-w-2xl">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Name</label>
+          <label className="block text-xs font-medium text-muted mb-1">Name</label>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Agency type</label>
+          <label className="block text-xs font-medium text-muted mb-1">Agency type</label>
           <input value={draft.agencyType} onChange={(e) => set('agencyType', e.target.value)} className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Contact email</label>
+          <label className="block text-xs font-medium text-muted mb-1">Contact email</label>
           <input type="email" value={draft.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Contact role</label>
+          <label className="block text-xs font-medium text-muted mb-1">Contact role</label>
           <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} className={INPUT} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-400 mb-1">Confirm via</label>
+          <label className="block text-xs font-medium text-muted mb-1">Confirm via</label>
           <input value={draft.confirmationMethod} onChange={(e) => set('confirmationMethod', e.target.value)} className={INPUT} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-400 mb-1">Notes</label>
+          <label className="block text-xs font-medium text-muted mb-1">Notes</label>
           <textarea rows={3} value={draft.notes} onChange={(e) => set('notes', e.target.value)} className={`${INPUT} resize-none`} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-400 mb-1">Pitch draft</label>
+          <label className="block text-xs font-medium text-muted mb-1">Pitch draft</label>
           <textarea rows={6} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} className={`${INPUT} resize-y font-mono`} />
         </div>
       </div>
@@ -166,10 +166,10 @@ function EditSyncPanel({
           notes: draft.notes || null,
           pitchDraft: draft.pitchDraft || null,
         })} disabled={isSaving}
-          className="text-xs px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition-colors">
+          className="text-xs px-3 py-1.5 rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40 transition-colors">
           {isSaving ? 'Saving…' : 'Save'}
         </button>
-        <button onClick={onCancel} className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={onCancel} className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors">
           Cancel
         </button>
       </div>
@@ -184,27 +184,27 @@ function SyncDetail({ target, onEdit }: { target: SyncTarget; onEdit: () => void
     <div className="space-y-4 max-w-2xl">
       {target.notes && (
         <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Notes</p>
-          <p className="text-sm text-gray-700 leading-relaxed">{target.notes}</p>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Notes</p>
+          <p className="text-sm text-body leading-relaxed">{target.notes}</p>
         </div>
       )}
       {target.pitchDraft && (
         <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Pitch Draft</p>
-          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-white rounded-md border border-gray-100 p-3">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Pitch Draft</p>
+          <p className="text-sm text-body leading-relaxed whitespace-pre-wrap bg-surface rounded-md border border-line p-3">
             {target.pitchDraft}
           </p>
         </div>
       )}
       {target.confirmationMethod && (
-        <span className="inline-block bg-white px-2.5 py-1 rounded-md border border-gray-200 text-xs text-gray-600">
+        <span className="inline-block bg-surface px-2.5 py-1 rounded-md border border-line text-xs text-body">
           Confirm via {target.confirmationMethod}
         </span>
       )}
       {!target.notes && !target.pitchDraft && !target.confirmationMethod && (
-        <p className="text-xs text-gray-400">No additional details.</p>
+        <p className="text-xs text-muted">No additional details.</p>
       )}
-      <button onClick={onEdit} className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">
+      <button onClick={onEdit} className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors">
         Edit details
       </button>
     </div>
@@ -252,7 +252,7 @@ export function SyncPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+      <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
         Failed to load sync targets — {(error as Error).message}
       </div>
     )
@@ -263,7 +263,7 @@ export function SyncPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">Sync Targets</h1>
+        <h1 className="text-xl font-semibold text-ink">Sync Targets</h1>
         <div className="flex gap-2 items-center">
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER_INPUT}>
             <option value="">All statuses</option>
@@ -273,8 +273,8 @@ export function SyncPage() {
             onClick={() => { setShowReconcile((v) => !v); setShowCreate(false) }}
             className={`text-sm px-3.5 py-1.5 rounded-md font-medium border transition-colors ${
               showReconcile
-                ? 'bg-gray-200 text-gray-700 border-gray-200'
-                : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                ? 'bg-line text-body border-line'
+                : 'border-line-strong text-body hover:bg-sunken'
             }`}
           >
             Reconcile with Gmail
@@ -282,7 +282,7 @@ export function SyncPage() {
           <button
             onClick={() => { setShowCreate((v) => !v); setShowReconcile(false) }}
             className={`text-sm px-3.5 py-1.5 rounded-md font-medium transition-colors ${
-              showCreate ? 'bg-gray-200 text-gray-700' : 'bg-gray-900 text-white hover:bg-gray-700'
+              showCreate ? 'bg-line text-body' : 'bg-accent text-accent-fg hover:bg-accent-hover'
             }`}
           >
             {showCreate ? 'Cancel' : '+ New target'}
@@ -296,7 +296,7 @@ export function SyncPage() {
       {isLoading ? (
         <SkeletonList rows={5} />
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+        <div className="bg-surface border border-line rounded-xl shadow-card divide-y divide-line">
           {data.map((target) => {
             const isOpen = expanded.has(target.id)
             const isEditing = editingId === target.id
@@ -304,15 +304,15 @@ export function SyncPage() {
               <div key={target.id}>
                 <div
                   onClick={() => toggleExpand(target.id)}
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isOpen ? 'bg-purple-50/40' : 'hover:bg-gray-50'}`}
+                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isOpen ? 'bg-cat-violet-bg/40' : 'hover:bg-sunken'}`}
                 >
                   <Chevron open={isOpen} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">{target.name}</p>
+                    <p className="text-sm font-medium text-ink truncate">{target.name}</p>
                     <div className="flex gap-2 mt-0.5 flex-wrap">
-                      {target.agencyType && <span className="text-xs text-gray-500 capitalize">{target.agencyType}</span>}
-                      {target.contactEmail && <span className="text-xs text-gray-400">{target.contactEmail}</span>}
-                      {target.contactRole && <span className="text-xs text-gray-400">· {target.contactRole}</span>}
+                      {target.agencyType && <span className="text-xs text-muted capitalize">{target.agencyType}</span>}
+                      {target.contactEmail && <span className="text-xs text-muted">{target.contactEmail}</span>}
+                      {target.contactRole && <span className="text-xs text-muted">· {target.contactRole}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -320,7 +320,7 @@ export function SyncPage() {
                     {target.status === 'draft_ready' && (
                       <button disabled={isPatching}
                         onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'pitched' } }) }}
-                        className="text-xs px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-40 transition-colors">
+                        className="text-xs px-2.5 py-1 rounded-md bg-info-bg text-info-fg hover:bg-info-bg disabled:opacity-40 transition-colors">
                         Mark Pitched
                       </button>
                     )}
@@ -328,19 +328,19 @@ export function SyncPage() {
                       <>
                         <button disabled={isPatching}
                           onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'confirmed' } }) }}
-                          className="text-xs px-2.5 py-1 rounded-md bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-40 transition-colors">
+                          className="text-xs px-2.5 py-1 rounded-md bg-success-bg text-success-fg hover:bg-success-bg disabled:opacity-40 transition-colors">
                           Confirmed
                         </button>
                         <button disabled={isPatching}
                           onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'declined' } }) }}
-                          className="text-xs px-2.5 py-1 rounded-md bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-40 transition-colors">
+                          className="text-xs px-2.5 py-1 rounded-md bg-danger-bg text-danger-fg hover:bg-danger-bg disabled:opacity-40 transition-colors">
                           Declined
                         </button>
                       </>
                     )}
                     <button disabled={deleteMutation.isPending}
                       onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${target.name}"?`)) deleteMutation.mutate(target.id) }}
-                      className="w-6 h-6 flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                      className="w-6 h-6 flex items-center justify-center rounded text-faint hover:text-danger-fg hover:bg-danger-bg disabled:opacity-40 transition-colors"
                       title="Delete">
                       ×
                     </button>
@@ -348,7 +348,7 @@ export function SyncPage() {
                 </div>
 
                 {isOpen && (
-                  <div className="px-6 pb-5 pt-3 bg-purple-50/40 border-t border-purple-100">
+                  <div className="px-6 pb-5 pt-3 bg-cat-violet-bg/40 border-t border-cat-violet-line">
                     {isEditing ? (
                       <EditSyncPanel
                         target={target}
@@ -365,12 +365,12 @@ export function SyncPage() {
             )
           })}
           {data.length === 0 && (
-            <p className="px-4 py-12 text-center text-gray-400 text-sm">No sync targets found.</p>
+            <p className="px-4 py-12 text-center text-muted text-sm">No sync targets found.</p>
           )}
         </div>
       )}
 
-      {!isLoading && <p className="text-xs text-gray-400">{data.length} targets</p>}
+      {!isLoading && <p className="text-xs text-muted">{data.length} targets</p>}
     </div>
   )
 }
