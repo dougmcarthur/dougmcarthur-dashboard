@@ -11,12 +11,14 @@ import reference from './routes/reference'
 import taskRuns from './routes/taskRuns'
 import reminders from './routes/reminders'
 import health from './routes/health'
-import notifications from './routes/notifications'
+import notifications, { pruneNotifications } from './routes/notifications'
 import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
 import { isDigestDue } from '../shared/digestSchedule'
 import { sendMail, mailerConfigured } from './lib/mailer'
+import { recordEvent } from './lib/notificationEvents'
+import { localParts } from '../shared/digestSchedule'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -86,18 +88,62 @@ async function runDigest(env: Env): Promise<void> {
   const { digest: built, subject, html, text } = await composeDigest(env)
   if (built.empty) return
 
-  await sendMail(env, {
-    to: settings.recipient,
-    from: settings.sender,
-    subject: `Music HQ — ${subject}`,
-    text,
-    html,
-  })
+  try {
+    await sendMail(env, {
+      to: settings.recipient,
+      from: settings.sender,
+      subject: `Music HQ — ${subject}`,
+      text,
+      html,
+    })
+  } catch (err) {
+    // A digest that fails to send is the one failure nothing else can tell you
+    // about: the digest *is* the channel that reaches you when you are not
+    // looking at the dashboard. So this is critical, and it is written before
+    // the throw so the record survives the retry.
+    await recordEvent(env, {
+      kind: 'digest',
+      tier: 'critical',
+      title: 'Weekly digest failed to send',
+      body: err instanceof Error ? err.message : String(err),
+      href: '#settings',
+      action: 'Check email',
+      dedupeKey: `digest:failed:${due.localDate}`,
+    })
+    throw err
+  }
+
   await recordDigest(env, built)
   // Written only after the send resolves, for the same reason the reporting
   // marks are: a failed send must be retried on the next tick, not counted as
   // this week's.
   await writeSetting(env, DIGEST_KEYS.lastSentAt, new Date().toISOString())
+
+  await recordEvent(env, {
+    kind: 'digest',
+    tier: 'info',
+    title: `Weekly digest sent — ${built.focus.length} to act on`,
+    body: subject,
+    href: '#review/needs',
+    action: 'Open queue',
+    dedupeKey: `digest:sent:${due.localDate}`,
+  })
+}
+
+/**
+ * Housekeeping, once a day rather than on every hourly tick.
+ *
+ * Pinned to a local hour instead of tracked in a settings row: it needs no
+ * state, it cannot drift, and a tick missed at 3am costs a day of retention on
+ * a table measured in tens of rows.
+ */
+async function runHousekeeping(env: Env): Promise<void> {
+  const settings = await readDigestSettings(env)
+  if (localParts(new Date(), settings.schedule.timezone).hour !== 3) return
+  const pruned = await pruneNotifications(env)
+  if (pruned.marks || pruned.events) {
+    console.log(`pruned ${pruned.marks} marks, ${pruned.events} notification events`)
+  }
 }
 
 /**
@@ -112,9 +158,14 @@ export default {
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     // waitUntil, so a slow send cannot be cut short when scheduled() returns.
     ctx.waitUntil(
-      runDigest(env).catch((err) => {
-        console.error('digest run failed:', err)
-      }),
+      Promise.all([
+        runDigest(env).catch((err) => {
+          console.error('digest run failed:', err)
+        }),
+        runHousekeeping(env).catch((err) => {
+          console.error('housekeeping failed:', err)
+        }),
+      ]),
     )
   },
 }

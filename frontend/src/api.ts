@@ -80,23 +80,31 @@ export interface ReferenceDoc {
   updatedAt: string
 }
 
-export type NotificationTier = 'critical' | 'attention' | 'info'
+// Re-exported rather than restated: the Worker returns exactly these, and a
+// second declaration of the same shape is a place for the two to drift.
+export type {
+  Tier as NotificationTier,
+  NotificationKind,
+  Notification as AppNotification,
+} from '../../shared/notifications'
+export { KIND_LABELS } from '../../shared/notifications'
 
-export interface AppNotification {
-  key: string
-  tier: NotificationTier
-  title: string
-  body: string
-  href: string
-  action?: string
-  read: boolean
-  firstSeen: string
-}
+import type { Notification as AppNotification } from '../../shared/notifications'
 
 export interface NotificationFeed {
   items: AppNotification[]
   unread: number
   unreadCritical: number
+  /** Including anything past the pane's cap, which lives in History. */
+  total: number
+}
+
+export interface TaskRunPage {
+  runs: TaskRun[]
+  /** Matching the filter, across every page. */
+  total: number
+  /** Values that actually occur in the log, so no control offers a dead click. */
+  facets: { tasks: string[]; statuses: string[] }
 }
 
 export interface HealthStatus {
@@ -210,9 +218,12 @@ export const api = {
     delete: (id: number) => apiFetch<{ ok: boolean }>(`/promo/${id}`, { method: 'DELETE' }),
   },
   taskRuns: {
-    list: (params?: { limit?: number; offset?: number }) => {
-      const qs = params ? '?' + new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString() : ''
-      return apiFetch<TaskRun[]>(`/task-runs${qs}`)
+    list: (params?: { limit?: number; offset?: number; task?: string; status?: string }) => {
+      const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== '')
+      const qs = entries.length > 0
+        ? '?' + new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString()
+        : ''
+      return apiFetch<TaskRunPage>(`/task-runs${qs}`)
     },
   },
   reminders: {

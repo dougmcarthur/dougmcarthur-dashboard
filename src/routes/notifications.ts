@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { desc, inArray, sql } from 'drizzle-orm'
+import { desc, inArray, lt, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import {
   gigOpportunities,
@@ -11,7 +11,14 @@ import {
   notificationMarks,
 } from '../db/schema'
 import { buildReviewQueue, summariseQueue } from '../../shared/reviewQueue'
-import { buildNotifications, type Mark } from '../../shared/notifications'
+import { buildNotifications, eventIdsFromKey, type Mark } from '../../shared/notifications'
+import {
+  readEvents,
+  markEventsRead,
+  markAllEventsRead,
+  dismissEvents,
+  pruneEvents,
+} from '../lib/notificationEvents'
 import { calendarConfigured } from '../lib/googleCalendar'
 import { gmailConfigured } from '../lib/gmail'
 import { mailerConfigured } from '../lib/mailer'
@@ -21,10 +28,10 @@ import type { Env } from '../types'
 /**
  * The bell.
  *
- * Everything here is derived on read — see shared/notifications.ts and
- * migration 0006. The only writes are your read and dismiss marks, which is
- * what lets a condition disappear the moment it stops holding without anything
- * having to tidy up after it.
+ * Two halves, merged here and indistinguishable to the client: conditions
+ * derived on read (see shared/notifications.ts and migration 0006), and events
+ * read from a table (migration 0007). The only writes on the read path are
+ * first-seen marks for conditions nobody has observed before.
  */
 const notifications = new Hono<{ Bindings: Env }>()
 
@@ -39,10 +46,16 @@ async function readMarks(env: Env): Promise<Mark[]> {
   }))
 }
 
-notifications.get('/', async (c) => {
-  const db = getDb(c.env.DB)
+/**
+ * The whole feed, exported because the pruning job needs the same answer.
+ *
+ * A live key set derived any other way would drift from what the bell shows,
+ * and pruning against a drifted set deletes marks that are still in use.
+ */
+export async function composeFeed(env: Env, now = new Date()) {
+  const db = getDb(env.DB)
 
-  const [gigs, sync, promo, [orphans], marks] = await Promise.all([
+  const [gigs, sync, promo, [orphans], marks, events] = await Promise.all([
     db.select().from(gigOpportunities).orderBy(desc(gigOpportunities.discoveredAt)),
     db.select().from(syncTargets).orderBy(desc(syncTargets.discoveredAt)),
     db.select().from(promoDrafts).orderBy(desc(promoDrafts.createdAt)),
@@ -57,7 +70,8 @@ notifications.get('/', async (c) => {
           AND ${reminders.entityId} NOT IN (SELECT id FROM gig_opportunities))
         OR (${reminders.entityType} = 'sync'
           AND ${reminders.entityId} NOT IN (SELECT id FROM sync_targets))`),
-    readMarks(c.env),
+    readMarks(env),
+    readEvents(env, now),
   ])
 
   const items = buildReviewQueue({
@@ -70,19 +84,28 @@ notifications.get('/', async (c) => {
     items,
     summary: summariseQueue(items, { orphanedReminders: orphans.count }),
     health: {
-      calendarConfigured: calendarConfigured(c.env),
-      gmailConfigured: gmailConfigured(c.env),
-      emailConfigured: mailerConfigured(c.env),
+      calendarConfigured: calendarConfigured(env),
+      gmailConfigured: gmailConfigured(env),
+      emailConfigured: mailerConfigured(env),
     },
     marks,
-    now: new Date().toISOString(),
+    events,
+    now: now.toISOString(),
   })
+
+  return { built, marks }
+}
+
+notifications.get('/', async (c) => {
+  const db = getDb(c.env.DB)
+  const { built, marks } = await composeFeed(c.env)
 
   // First sighting of a condition is recorded here rather than by a separate
   // job: nothing else runs often enough, and a notification with no first_seen
-  // cannot say how long it has been true.
+  // cannot say how long it has been true. Events need none of this — they
+  // carry the moment they happened.
   const known = new Set(marks.map((m) => m.dedupeKey))
-  const fresh = built.items.filter((n) => !known.has(n.key))
+  const fresh = built.items.filter((n) => n.source === 'condition' && !known.has(n.key))
   if (fresh.length > 0) {
     const firstSeen = new Date().toISOString()
     for (const n of fresh) {
@@ -111,13 +134,22 @@ notifications.post('/read', zValidator('json', ReadSchema), async (c) => {
   const readAt = new Date().toISOString()
 
   if (all) {
-    await db.update(notificationMarks).set({ readAt })
+    await Promise.all([
+      db.update(notificationMarks).set({ readAt }),
+      markAllEventsRead(c.env, readAt),
+    ])
     return c.json({ read: 'all', readAt })
   }
+
+  // An event key names the rows it stands for, so a grouped row marks exactly
+  // what was on screen when it was clicked.
+  const eventIds = keys!.flatMap(eventIdsFromKey)
+  await markEventsRead(c.env, eventIds, readAt)
 
   // Upsert rather than update: a condition can be marked read on the same
   // request that first surfaced it, before any row exists for it.
   for (const key of keys!) {
+    if (eventIdsFromKey(key).length > 0) continue
     await db
       .insert(notificationMarks)
       .values({ dedupeKey: key, firstSeen: readAt, readAt, dismissedAt: null })
@@ -133,6 +165,15 @@ notifications.post('/dismiss', zValidator('json', DismissSchema), async (c) => {
   const db = getDb(c.env.DB)
   const now = new Date().toISOString()
 
+  // Dismissing an event is permanent — it already happened, so there is
+  // nothing for it to come back and tell you. Dismissing a condition lasts for
+  // the day, because the connection may still be broken tomorrow.
+  const eventIds = eventIdsFromKey(key)
+  if (eventIds.length > 0) {
+    await dismissEvents(c.env, eventIds, now)
+    return c.json({ dismissed: key, until: 'never' })
+  }
+
   // Dismissing also marks read. Putting something away without having read it
   // is still a decision about it, and leaving the badge up afterwards would be
   // the badge lying.
@@ -147,20 +188,40 @@ notifications.post('/dismiss', zValidator('json', DismissSchema), async (c) => {
   return c.json({ dismissed: key, until: 'tomorrow' })
 })
 
+/** Marks older than this with no live condition are dead weight. */
+const MARK_RETENTION_DAYS = 30
+
 /**
- * Housekeeping: marks whose condition can never recur are dead weight.
+ * Housekeeping, run from the hourly cron.
  *
- * Not called on a schedule yet — the table is tiny and this is here so the
- * cleanup has an obvious home when phase 3 adds real events.
+ * Two age guards, for the same reason. A mark is what remembers how long a
+ * condition has been true and whether you have already read it, so deleting
+ * one whose condition merely *flickered* — Calendar reconnecting for an hour —
+ * silently resets its age and makes it unread again. Only marks that have been
+ * absent from the feed for a month go, and by then a returning condition
+ * genuinely is news.
  */
-export async function pruneMarks(env: Env, liveKeys: string[]): Promise<number> {
-  if (liveKeys.length === 0) return 0
+export async function pruneNotifications(
+  env: Env,
+  now = new Date(),
+): Promise<{ marks: number; events: number }> {
+  const { built } = await composeFeed(env, now)
+  const live = new Set(built.items.map((n) => n.key))
+
   const db = getDb(env.DB)
-  const rows = await db.select().from(notificationMarks)
-  const dead = rows.filter((r) => !liveKeys.includes(r.dedupeKey)).map((r) => r.dedupeKey)
-  if (dead.length === 0) return 0
-  await db.delete(notificationMarks).where(inArray(notificationMarks.dedupeKey, dead))
-  return dead.length
+  const cutoff = new Date(now.getTime() - MARK_RETENTION_DAYS * 86_400_000).toISOString()
+
+  const stale = await db
+    .select()
+    .from(notificationMarks)
+    .where(lt(notificationMarks.firstSeen, cutoff))
+
+  const dead = stale.filter((r) => !live.has(r.dedupeKey)).map((r) => r.dedupeKey)
+  if (dead.length > 0) {
+    await db.delete(notificationMarks).where(inArray(notificationMarks.dedupeKey, dead))
+  }
+
+  return { marks: dead.length, events: await pruneEvents(env, now) }
 }
 
 export default notifications

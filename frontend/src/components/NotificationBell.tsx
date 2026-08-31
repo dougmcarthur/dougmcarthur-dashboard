@@ -1,6 +1,13 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, type AppNotification, type NotificationFeed } from '../api'
+import {
+  api,
+  KIND_LABELS,
+  type AppNotification,
+  type NotificationFeed,
+  type NotificationKind,
+  type NotificationTier,
+} from '../api'
 import { relativeTime } from '../format'
 
 /**
@@ -36,6 +43,33 @@ function Icon({ name, className }: { name: string; className?: string }) {
         <path d="M8 4.8V8l2.2 1.6" />
       </>
     ),
+    info: (
+      <>
+        <circle cx="8" cy="8" r="6" />
+        <path d="M8 7.4v3.4M8 5.2v.1" />
+      </>
+    ),
+    plug: (
+      <>
+        <path d="M6 2.5v3M10 2.5v3" />
+        <path d="M4 5.5h8v2a4 4 0 0 1-8 0z" />
+        <path d="M8 11.5v2" />
+      </>
+    ),
+    pulse: <path d="M1.5 8h3l2-4.5 3 9 2-4.5h3" />,
+    moon: <path d="M13 9.4A5.6 5.6 0 0 1 6.6 3 5.6 5.6 0 1 0 13 9.4z" />,
+    bolt: <path d="M9 1.8 3.8 9h3.4l-.6 5.2L12.2 7H8.8z" />,
+    mail: (
+      <>
+        <rect x="1.8" y="3.5" width="12.4" height="9" rx="1.5" />
+        <path d="m2.4 4.6 5.6 4 5.6-4" />
+      </>
+    ),
+    swap: (
+      <>
+        <path d="M2.5 5.5h9l-2-2M13.5 10.5h-9l2 2" />
+      </>
+    ),
     x: <path d="M4.5 4.5l7 7m0-7l-7 7" />,
   }
   return (
@@ -54,9 +88,210 @@ function Icon({ name, className }: { name: string; className?: string }) {
   )
 }
 
-function tierIcon(tier: AppNotification['tier']): string {
-  return tier === 'critical' ? 'alert' : 'clock'
+/**
+ * Icon carries the *kind*, colour carries the tier.
+ *
+ * Two channels for two facts, rather than both saying severity twice and
+ * neither saying what the thing is about.
+ */
+const KIND_ICON: Record<NotificationKind, string> = {
+  connection: 'plug',
+  health: 'pulse',
+  timing: 'clock',
+  snooze: 'moon',
+  automation: 'bolt',
+  digest: 'mail',
+  reconcile: 'swap',
 }
+
+const TIER_ICON: Record<NotificationTier, string> = {
+  critical: 'alert',
+  attention: 'clock',
+  info: 'info',
+}
+
+/** Same colours the row icons use, so the bar and the list agree. */
+const TIER_CHIP_TINT: Record<NotificationTier, string> = {
+  critical: 'text-danger-fg',
+  attention: 'text-ink',
+  info: 'text-muted',
+}
+
+const TIER_LABELS: Record<NotificationTier, string> = {
+  critical: 'Critical',
+  attention: 'Attention',
+  info: 'Info',
+}
+
+const TIER_ORDER: NotificationTier[] = ['critical', 'attention', 'info']
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+
+interface Filters {
+  unreadOnly: boolean
+  tier: NotificationTier | null
+  kind: NotificationKind | null
+}
+
+const NO_FILTERS: Filters = { unreadOnly: false, tier: null, kind: null }
+
+/**
+ * Three independent axes, deliberately not one.
+ *
+ * "Unread and critical" is a real thing to want; folding state and severity
+ * into one mutually-exclusive control would make it unaskable.
+ */
+function matches(n: AppNotification, f: Filters): boolean {
+  if (f.unreadOnly && n.read) return false
+  if (f.tier && n.tier !== f.tier) return false
+  if (f.kind && n.kind !== f.kind) return false
+  return true
+}
+
+function Chip({
+  active,
+  count,
+  onClick,
+  icon,
+  iconClass,
+  label,
+  children,
+}: {
+  active: boolean
+  count: number
+  onClick: () => void
+  icon?: string
+  iconClass?: string
+  /** Accessible name, for the chips that show only an icon and a number. */
+  label: string
+  children?: React.ReactNode
+}) {
+  // A chip that would leave you looking at nothing is shown, not hidden —
+  // removing it would make the row reflow under the cursor mid-click — but it
+  // is disabled, so the count and the affordance agree.
+  const empty = count === 0
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={empty && !active}
+      aria-pressed={active}
+      aria-label={children ? undefined : `${label}, ${count}`}
+      title={children ? undefined : label}
+      className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-lg border text-xs font-semibold
+                  transition-colors whitespace-nowrap disabled:opacity-40 ${
+                    active
+                      ? 'bg-accent text-accent-fg border-accent'
+                      : 'bg-surface text-body border-line enabled:hover:bg-sunken'
+                  }`}
+    >
+      {icon && (
+        <Icon name={icon} className={`h-3.5 w-3.5 ${active ? '' : (iconClass ?? '')}`} />
+      )}
+      {children}
+      <span className={`tabular-nums ${active ? '' : 'text-muted'}`}>{count}</span>
+    </button>
+  )
+}
+
+/**
+ * One row, deliberately.
+ *
+ * The obvious build — a chip per tier and a chip per kind — came out as ten
+ * chips over four rows, taller than the notifications underneath it. A filter
+ * bar that costs more attention than the list it filters is not a feature.
+ *
+ * So: the severities are icon-and-count, because there are only ever three of
+ * them and the icons already appear on every row below; the kinds go in a
+ * select, because there can be seven and they are the axis you reach for least.
+ * Every count is what clicking would actually leave you looking at, with the
+ * other filters already applied.
+ */
+function FilterBar({
+  items,
+  filters,
+  onChange,
+}: {
+  items: AppNotification[]
+  filters: Filters
+  onChange: (f: Filters) => void
+}) {
+  const countIf = (patch: Partial<Filters>) =>
+    items.filter((n) => matches(n, { ...filters, ...patch })).length
+
+  const kinds = useMemo(() => {
+    const present = new Set(items.map((n) => n.kind))
+    return (Object.keys(KIND_LABELS) as NotificationKind[]).filter((k) => present.has(k))
+  }, [items])
+
+  const tiers = useMemo(() => {
+    const present = new Set(items.map((n) => n.tier))
+    return TIER_ORDER.filter((t) => present.has(t))
+  }, [items])
+
+  // Controls that cannot change anything are worse than no controls.
+  const useful = kinds.length > 1 || tiers.length > 1 || items.some((n) => !n.read)
+  if (!useful) return null
+
+  const dirty = filters.unreadOnly || filters.tier !== null || filters.kind !== null
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 px-3.5 py-2.5 border-b border-line bg-sunken/50">
+      <Chip
+        label="Unread only"
+        active={filters.unreadOnly}
+        count={countIf({ unreadOnly: true })}
+        onClick={() => onChange({ ...filters, unreadOnly: !filters.unreadOnly })}
+      >
+        Unread
+      </Chip>
+
+      {tiers.length > 1 &&
+        tiers.map((t) => (
+          <Chip
+            key={t}
+            icon={TIER_ICON[t]}
+            iconClass={TIER_CHIP_TINT[t]}
+            label={TIER_LABELS[t]}
+            active={filters.tier === t}
+            count={countIf({ tier: t })}
+            onClick={() => onChange({ ...filters, tier: filters.tier === t ? null : t })}
+          />
+        ))}
+
+      {kinds.length > 1 && (
+        <select
+          value={filters.kind ?? ''}
+          aria-label="Filter by type"
+          onChange={(e) =>
+            onChange({ ...filters, kind: (e.target.value || null) as NotificationKind | null })
+          }
+          className="h-7 rounded-lg border border-line bg-surface text-xs font-semibold text-body
+                     px-1.5 focus:outline-none focus:ring-2 focus:ring-accent transition"
+        >
+          <option value="">All types</option>
+          {kinds.map((k) => (
+            <option key={k} value={k}>
+              {KIND_LABELS[k]} ({countIf({ kind: k })})
+            </option>
+          ))}
+        </select>
+      )}
+
+      {dirty && (
+        <button
+          type="button"
+          onClick={() => onChange(NO_FILTERS)}
+          className="ml-auto text-xs font-semibold text-muted hover:text-ink transition-colors px-1"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ── Rows ──────────────────────────────────────────────────────────────────────
 
 function Row({
   note,
@@ -79,15 +314,16 @@ function Row({
             ? 'text-danger-fg border-danger-line'
             : 'text-muted border-line'
         }`}
+        title={`${KIND_LABELS[note.kind]} · ${TIER_LABELS[note.tier]}`}
       >
-        <Icon name={tierIcon(note.tier)} className="h-3.5 w-3.5" />
+        <Icon name={KIND_ICON[note.kind] ?? TIER_ICON[note.tier]} className="h-3.5 w-3.5" />
       </span>
 
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-ink leading-snug pr-6">
           {note.title}
         </span>
-        <span className="block text-sm text-muted mt-0.5">{note.body}</span>
+        {note.body && <span className="block text-sm text-muted mt-0.5">{note.body}</span>}
         <span className="flex items-center gap-2.5 mt-2">
           <span className="text-xs text-faint">{relativeTime(note.firstSeen)}</span>
           {note.action && (
@@ -120,6 +356,7 @@ function Row({
 export function NotificationBell({ onNav }: { onNav: (page: string) => void }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS)
   const wrapRef = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
 
@@ -158,12 +395,22 @@ export function NotificationBell({ onNav }: { onNav: (page: string) => void }) {
   const items = data?.items ?? []
   const unread = data?.unread ?? 0
   const critical = (data?.unreadCritical ?? 0) > 0
+  // Everything the feed holds, including what is past the pane's cap.
+  const hidden = Math.max(0, (data?.total ?? items.length) - items.length)
+
+  const visible = items.filter((n) => matches(n, filters))
+  const filtered = visible.length !== items.length
 
   const openItem = (n: AppNotification) => {
     markRead.mutate({ keys: [n.key] })
     setOpen(false)
     // Hash routes carry their own leading '#'; strip it for the router.
     onNav(n.href.replace(/^#/, ''))
+  }
+
+  const goHistory = () => {
+    setOpen(false)
+    onNav('runs')
   }
 
   return (
@@ -194,7 +441,7 @@ export function NotificationBell({ onNav }: { onNav: (page: string) => void }) {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-full mt-2 w-[min(24rem,calc(100vw-2rem))] z-40
+          className="absolute right-0 top-full mt-2 w-[min(26rem,calc(100vw-2rem))] z-40
                      rounded-xl border border-line bg-surface shadow-pop overflow-hidden"
         >
           <div className="flex items-center justify-between gap-3 px-3.5 py-3 border-b border-line">
@@ -209,16 +456,48 @@ export function NotificationBell({ onNav }: { onNav: (page: string) => void }) {
             </button>
           </div>
 
-          <ul className="max-h-[26rem] overflow-y-auto" aria-live="polite">
-            {items.map((n) => (
+          {items.length > 0 && (
+            <FilterBar items={items} filters={filters} onChange={setFilters} />
+          )}
+
+          <ul className="max-h-[min(30rem,55vh)] overflow-y-auto" aria-live="polite">
+            {visible.map((n) => (
               <Row key={n.key} note={n} onOpen={openItem} onDismiss={(k) => dismiss.mutate(k)} />
             ))}
           </ul>
 
-          {items.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm text-muted">
-              Nothing needs your attention.
-            </p>
+          {visible.length === 0 && (
+            <div className="px-4 py-8 text-center">
+              <p className="text-sm text-muted">
+                {filtered ? 'Nothing matches these filters.' : 'Nothing needs your attention.'}
+              </p>
+              {filtered && (
+                <button
+                  type="button"
+                  onClick={() => setFilters(NO_FILTERS)}
+                  className="mt-2 text-xs font-semibold text-info-fg"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* The pane is capped; History is where everything that happened lives.
+              The wording changes when a filter is on because the filter runs on
+              the rows the server sent, not on the whole feed — claiming
+              otherwise would be the pane quietly hiding matches. */}
+          {hidden > 0 && (
+            <button
+              type="button"
+              onClick={goHistory}
+              className="w-full px-3.5 py-2.5 border-t border-line text-xs font-semibold
+                         text-info-fg hover:bg-sunken transition-colors"
+            >
+              {filters.unreadOnly || filters.tier || filters.kind
+                ? `Filtered within the 20 newest — ${hidden} more in History`
+                : `View all — ${hidden} more in History`}
+            </button>
           )}
         </div>
       )}

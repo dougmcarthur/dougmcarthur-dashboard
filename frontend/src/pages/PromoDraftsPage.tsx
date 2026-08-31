@@ -1,13 +1,29 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type PromoDraft } from '../api'
 import { StatusBadge } from '../components/StatusBadge'
 import { Chevron } from '../components/Chevron'
 import { SkeletonList } from '../components/Skeleton'
 
+/** "2026-09" is a key, not a label. */
+function monthLabel(m: string): string {
+  const [y, mo] = m.split('-').map(Number)
+  if (!y || !mo) return m
+  return new Date(Date.UTC(y, mo - 1, 1)).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
+const FILTER_INPUT =
+  'text-sm border border-line-strong rounded-md px-3 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition'
+
 export function PromoDraftsPage() {
   const qc = useQueryClient()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const [statusFilter, setStatusFilter] = useState('')
+  const [monthFilter, setMonthFilter] = useState('')
 
   const { data = [], isLoading, error } = useQuery({
     queryKey: ['promo'],
@@ -32,6 +48,25 @@ export function PromoDraftsPage() {
       return next
     })
 
+  // Every draft is already on the client — this list is not paginated — so
+  // filtering here costs nothing and responds instantly. Facets come from the
+  // data rather than a hardcoded list, so no option is ever a dead click.
+  const statuses = useMemo(
+    () => [...new Set(data.map((d) => d.status))].sort(),
+    [data],
+  )
+  const months = useMemo(
+    () => [...new Set(data.map((d) => d.month).filter(Boolean))].sort().reverse(),
+    [data],
+  )
+
+  const visible = data.filter(
+    (d) =>
+      (statusFilter === '' || d.status === statusFilter) &&
+      (monthFilter === '' || d.month === monthFilter),
+  )
+  const filtered = statusFilter !== '' || monthFilter !== ''
+
   if (error) {
     return (
       <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
@@ -42,26 +77,64 @@ export function PromoDraftsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-ink">Promo Drafts</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-xl font-semibold text-ink">Promo Drafts</h1>
+        <div className="flex items-center gap-2">
+          {statuses.length > 1 && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter by status"
+              className={FILTER_INPUT}
+            >
+              <option value="">All statuses</option>
+              {statuses.map((s) => (
+                <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+          )}
+          {months.length > 1 && (
+            <select
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              aria-label="Filter by month"
+              className={FILTER_INPUT}
+            >
+              <option value="">All months</option>
+              {months.map((m) => (
+                <option key={m} value={m}>{monthLabel(m)}</option>
+              ))}
+            </select>
+          )}
+          {filtered && (
+            <button
+              onClick={() => { setStatusFilter(''); setMonthFilter('') }}
+              className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
 
       {isLoading ? (
         <SkeletonList rows={4} />
       ) : (
         <div className="bg-surface border border-line rounded-xl shadow-card divide-y divide-line">
-          {data.map((draft) => {
+          {visible.map((draft) => {
             const isOpen = expanded.has(draft.id)
             return (
               <div key={draft.id}>
                 <div
                   onClick={() => toggleExpand(draft.id)}
                   className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
-                    isOpen ? 'bg-warn-bg/40' : 'hover:bg-sunken'
+                    isOpen ? 'bg-sunken' : 'hover:bg-sunken'
                   }`}
                 >
                   <Chevron open={isOpen} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-ink truncate">{draft.title}</p>
-                    <p className="text-xs text-muted mt-0.5">{draft.month}</p>
+                    <p className="text-xs text-muted mt-0.5">{monthLabel(draft.month)}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <StatusBadge status={draft.status} />
@@ -92,7 +165,7 @@ export function PromoDraftsPage() {
                 </div>
 
                 {isOpen && (
-                  <div className="px-6 pb-5 pt-3 bg-warn-bg/40 border-t border-warn-line">
+                  <div className="px-6 pb-5 pt-3 bg-sunken border-t border-line">
                     <p className="text-sm text-body leading-relaxed whitespace-pre-wrap">
                       {draft.content}
                     </p>
@@ -101,14 +174,18 @@ export function PromoDraftsPage() {
               </div>
             )
           })}
-          {data.length === 0 && (
-            <p className="px-4 py-12 text-center text-muted text-sm">No promo drafts.</p>
+          {visible.length === 0 && (
+            <p className="px-4 py-12 text-center text-muted text-sm">
+              {filtered ? 'No drafts match these filters.' : 'No promo drafts.'}
+            </p>
           )}
         </div>
       )}
 
       {!isLoading && (
-        <p className="text-xs text-muted">{data.length} drafts</p>
+        <p className="text-xs text-muted tabular-nums">
+          {filtered ? `${visible.length} of ${data.length} drafts` : `${data.length} drafts`}
+        </p>
       )}
     </div>
   )

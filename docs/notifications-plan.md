@@ -161,15 +161,42 @@ have both. The client treats them identically.
 
 ## 9. Build order
 
-| Phase | Work |
-|---|---|
-| 1 | `notification_marks` table, the condition generators (connection, data health, deadline, snooze), `GET /api/notifications`, read/dismiss. Conditions only — no new table for events yet. |
-| 2 | Bell, badge, pane in the header. Polling with visibility pause. |
-| 3 | `notifications` table for events; automation runs and digest sends write to it. Grouping. |
-| 4 | Pruning, "View all" into History, and delete the standalone alarm banner the pane replaces. |
+| Phase | Work | |
+|---|---|---|
+| 1 | `notification_marks` table, the condition generators (connection, data health, deadline, snooze), `GET /api/notifications`, read/dismiss. Conditions only — no new table for events yet. | done |
+| 2 | Bell, badge, pane in the header. Polling with visibility pause. | done |
+| 3 | `notification_events` table (migration 0007); automation runs and digest sends write to it. Grouping. | done |
+| 4 | Pruning, "View all" into History, and delete the standalone alarm banner the pane replaces. | done |
 
 Phase 1 and 2 alone are worth shipping: they cover every critical, and the
 critical ones are the only notifications that can cost you something.
+
+### What phases 3 and 4 settled that the plan left open
+
+**Dismissal means two different things, and that is correct.** Dismissing a
+condition lasts for the day; dismissing an event is permanent. The condition
+may still be true tomorrow — the Calendar is still down — so it has to come
+back. An event already happened and has nothing to return and tell you.
+
+**Group keys carry their member ids** (`event:automation:14+13+12`). Read and
+dismiss then act on exactly the rows that were on screen when they were
+clicked, rather than on whatever the group has since become.
+
+**Nothing writes `reconcile` events yet.** Reconciling is something you start
+by clicking a button and then watch happen, so a notification saying it
+happened would be telling you what you just did. The kind stays defined for
+when a background reconciler exists.
+
+**The pruning job reuses the feed builder** rather than deriving its own idea
+of which marks are live. A second definition would drift, and pruning against
+a drifted one deletes marks still in use. Marks also get a 30-day age guard:
+a condition that merely flickers — Calendar reconnecting for an hour — must
+not lose the record of how long it has been true.
+
+**The filter bar is one row.** The obvious build, a chip per tier and a chip
+per kind, came out as ten chips over four rows — taller than the notifications
+underneath it. Severities are icon-and-count, kinds are a select, and every
+count is what clicking would actually leave you looking at.
 
 ## 10. What this feature must never become
 

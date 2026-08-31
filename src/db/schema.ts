@@ -103,6 +103,28 @@ export const notificationMarks = sqliteTable('notification_marks', {
   dismissedAt: text('dismissed_at'),
 })
 
+/**
+ * Notifications that are events rather than conditions. See migration 0007.
+ *
+ * The other half of the bell. `notificationMarks` above covers conditions,
+ * which are recomputed on every read and need no row of their own; this covers
+ * the things that happened at a moment and are gone if nobody wrote them down.
+ */
+export const notificationEvents = sqliteTable('notification_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  kind: text('kind').notNull(), // 'automation' | 'digest' | 'reconcile'
+  tier: text('tier').notNull(), // 'critical' | 'attention' | 'info'
+  title: text('title').notNull(),
+  body: text('body'),
+  href: text('href'),
+  actionLabel: text('action_label'),
+  /** Set only where a writer needs at-most-once; unique when present. */
+  dedupeKey: text('dedupe_key'),
+  createdAt: text('created_at').notNull(),
+  readAt: text('read_at'),
+  dismissedAt: text('dismissed_at'),
+})
+
 /** Key/value settings that must be changeable without a deploy. */
 export const appSettings = sqliteTable('app_settings', {
   key: text('key').primaryKey(),
@@ -119,3 +141,4 @@ export type Reminder = typeof reminders.$inferSelect
 export type DigestReport = typeof digestReports.$inferSelect
 export type AppSetting = typeof appSettings.$inferSelect
 export type NotificationMark = typeof notificationMarks.$inferSelect
+export type NotificationEvent = typeof notificationEvents.$inferSelect
