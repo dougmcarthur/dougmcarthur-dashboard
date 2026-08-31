@@ -10,6 +10,7 @@ import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
 import { subjectFor, renderHtml, renderText } from '../lib/digestMail'
 import { sendMail, mailerConfigured } from '../lib/mailer'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from '../lib/settings'
+import { describeSchedule, nextRun } from '../../shared/digestSchedule'
 import type { Env } from '../types'
 
 /**
@@ -82,6 +83,7 @@ export async function recordDigest(env: Env, built: Digest): Promise<void> {
 digest.get('/preview', async (c) => {
   const { digest: built, subject, html, text } = await composeDigest(c.env)
   const settings = await readDigestSettings(c.env)
+  const now = new Date()
   return c.json({
     empty: built.empty,
     subject,
@@ -93,6 +95,12 @@ digest.get('/preview', async (c) => {
     // Says plainly why a send would be skipped, rather than leaving the
     // Settings screen to infer it from three separate flags.
     wouldSend: !built.empty && settings.enabled && mailerConfigured(c.env),
+    schedule: {
+      ...settings.schedule,
+      describes: describeSchedule(settings.schedule),
+      nextRun: nextRun(now, settings.schedule, settings.lastSentAt)?.toISOString() ?? null,
+      lastSentAt: settings.lastSentAt,
+    },
   })
 })
 
@@ -124,6 +132,22 @@ const SettingsSchema = z.object({
   enabled: z.boolean().optional(),
   recipient: z.string().email().optional(),
   sender: z.string().email().optional(),
+  day: z.enum(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']).optional(),
+  hour: z.number().int().min(0).max(23).optional(),
+  // Checked against the runtime's own zone table rather than a hardcoded list:
+  // an unknown zone would make every scheduling comparison throw, which reads
+  // as "the digest silently stopped".
+  timezone: z
+    .string()
+    .refine((tz) => {
+      try {
+        new Intl.DateTimeFormat('en-CA', { timeZone: tz })
+        return true
+      } catch {
+        return false
+      }
+    }, 'unknown time zone')
+    .optional(),
 })
 
 digest.patch('/settings', zValidator('json', SettingsSchema), async (c) => {
@@ -131,6 +155,9 @@ digest.patch('/settings', zValidator('json', SettingsSchema), async (c) => {
   if (body.enabled !== undefined) await writeSetting(c.env, DIGEST_KEYS.enabled, String(body.enabled))
   if (body.recipient !== undefined) await writeSetting(c.env, DIGEST_KEYS.recipient, body.recipient)
   if (body.sender !== undefined) await writeSetting(c.env, DIGEST_KEYS.sender, body.sender)
+  if (body.day !== undefined) await writeSetting(c.env, DIGEST_KEYS.day, body.day)
+  if (body.hour !== undefined) await writeSetting(c.env, DIGEST_KEYS.hour, String(body.hour))
+  if (body.timezone !== undefined) await writeSetting(c.env, DIGEST_KEYS.timezone, body.timezone)
   return c.json(await readDigestSettings(c.env))
 })
 

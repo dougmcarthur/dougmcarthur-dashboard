@@ -10,18 +10,26 @@
 import { eq } from 'drizzle-orm'
 import { getDb } from '../db'
 import { appSettings } from '../db/schema'
+import type { Weekday, Schedule } from '../../shared/digestSchedule'
 import type { Env } from '../types'
 
 export const DIGEST_KEYS = {
   enabled: 'digest.enabled',
   recipient: 'digest.recipient',
   sender: 'digest.sender',
+  day: 'digest.day',
+  hour: 'digest.hour',
+  timezone: 'digest.timezone',
+  /** Written after a successful send; the once-per-day guard reads it. */
+  lastSentAt: 'digest.lastSentAt',
 } as const
 
 export interface DigestSettings {
   enabled: boolean
   recipient: string
   sender: string
+  schedule: Schedule
+  lastSentAt: string | null
 }
 
 /**
@@ -33,16 +41,35 @@ export const DIGEST_DEFAULTS: DigestSettings = {
   enabled: false,
   recipient: 'dougmcarthur0@gmail.com',
   sender: 'digest@dougmcarthur.net',
+  // Monday 08:00 local, which is what the hardcoded cron meant in practice.
+  // Winnipeg rather than UTC because "Monday morning" is a claim about the
+  // morning you are actually having.
+  schedule: { day: 'mon', hour: 8, timezone: 'America/Winnipeg' },
+  lastSentAt: null,
 }
 
 export async function readDigestSettings(env: Env): Promise<DigestSettings> {
   const db = getDb(env.DB)
   const rows = await db.select().from(appSettings)
   const map = new Map(rows.map((r) => [r.key, r.value]))
+  // A stored hour that is not a number falls back rather than scheduling the
+  // send for NaN o'clock, which never matches and so never sends.
+  const storedHour = Number(map.get(DIGEST_KEYS.hour))
+  const hour =
+    Number.isInteger(storedHour) && storedHour >= 0 && storedHour <= 23
+      ? storedHour
+      : DIGEST_DEFAULTS.schedule.hour
+
   return {
     enabled: (map.get(DIGEST_KEYS.enabled) ?? String(DIGEST_DEFAULTS.enabled)) === 'true',
     recipient: map.get(DIGEST_KEYS.recipient) ?? DIGEST_DEFAULTS.recipient,
     sender: map.get(DIGEST_KEYS.sender) ?? DIGEST_DEFAULTS.sender,
+    schedule: {
+      day: (map.get(DIGEST_KEYS.day) as Weekday | undefined) ?? DIGEST_DEFAULTS.schedule.day,
+      hour,
+      timezone: map.get(DIGEST_KEYS.timezone) ?? DIGEST_DEFAULTS.schedule.timezone,
+    },
+    lastSentAt: map.get(DIGEST_KEYS.lastSentAt) ?? null,
   }
 }
 

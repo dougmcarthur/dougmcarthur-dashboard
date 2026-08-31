@@ -107,10 +107,22 @@ export interface HealthStatus {
   emailConfigured: boolean
 }
 
+export type Weekday = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
+
 export interface DigestSettings {
   enabled: boolean
   recipient: string
   sender: string
+}
+
+export interface DigestSchedule {
+  day: Weekday
+  hour: number
+  timezone: string
+  /** "Mondays at 08:00" */
+  describes: string
+  nextRun: string | null
+  lastSentAt: string | null
 }
 
 export interface DigestLine {
@@ -131,6 +143,7 @@ export interface DigestPreview {
   settings: DigestSettings
   mailerConfigured: boolean
   wouldSend: boolean
+  schedule: DigestSchedule
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -234,7 +247,9 @@ export const api = {
       apiFetch<{ sent: boolean; reason?: string; to?: string; subject?: string }>('/digest/send', {
         method: 'POST',
       }),
-    patch: (body: Partial<DigestSettings>) =>
+    patch: (
+      body: Partial<DigestSettings> & { day?: Weekday; hour?: number; timezone?: string },
+    ) =>
       apiFetch<DigestSettings>('/digest/settings', { method: 'PATCH', body: JSON.stringify(body) }),
   },
 }

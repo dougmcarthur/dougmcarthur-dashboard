@@ -14,7 +14,8 @@ import health from './routes/health'
 import notifications from './routes/notifications'
 import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
-import { readDigestSettings } from './lib/settings'
+import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
+import { isDigestDue } from '../shared/digestSchedule'
 import { sendMail, mailerConfigured } from './lib/mailer'
 
 const app = new Hono<{ Bindings: Env }>()
@@ -72,6 +73,16 @@ async function runDigest(env: Env): Promise<void> {
     return
   }
 
+  // The cron now fires hourly and this decides whether the hour is the one,
+  // because the schedule lives in app_settings where it can be changed without
+  // a deploy. `isDigestDue` also carries the once-per-day guard.
+  const due = isDigestDue({
+    now: new Date(),
+    schedule: settings.schedule,
+    lastSentAt: settings.lastSentAt,
+  })
+  if (!due.due) return
+
   const { digest: built, subject, html, text } = await composeDigest(env)
   if (built.empty) return
 
@@ -83,6 +94,10 @@ async function runDigest(env: Env): Promise<void> {
     html,
   })
   await recordDigest(env, built)
+  // Written only after the send resolves, for the same reason the reporting
+  // marks are: a failed send must be retried on the next tick, not counted as
+  // this week's.
+  await writeSetting(env, DIGEST_KEYS.lastSentAt, new Date().toISOString())
 }
 
 /**

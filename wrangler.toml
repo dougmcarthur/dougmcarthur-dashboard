@@ -17,11 +17,15 @@ binding = "ASSETS"
 # NOTE: compatibility_date is a best-effort guess (matches Worker's created_on).
 # Verify against the real deployed Worker settings before relying on it.
 
-# The weekly digest. Monday 13:00 UTC ≈ 08:00 Winnipeg (CDT) — a Monday-morning
-# email about the week ahead, not a Sunday-night one about the week gone.
-# Cron is UTC year-round, so this drifts an hour against Winnipeg in winter.
+# The weekly digest ticks hourly; it does not send hourly.
+#
+# The day, hour and time zone live in `app_settings` so they can be changed
+# from the Settings screen without a deploy, and `isDigestDue` decides whether
+# a given tick is the one. That also fixes what this cron could not: cron is
+# UTC year-round, so a fixed hour drifted against Winnipeg every time the
+# clocks changed. The zone is applied when the comparison is made instead.
 [triggers]
-crons = ["0 13 * * 1"]
+crons = ["0 * * * *"]
 
 # Cloudflare Email Service. The allowlist is the security boundary: the Worker
 # can send to these addresses and nowhere else, whatever the code says.

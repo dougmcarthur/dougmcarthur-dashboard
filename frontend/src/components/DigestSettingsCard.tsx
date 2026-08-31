@@ -1,6 +1,20 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '../api'
+import { api, type Weekday } from '../api'
+import { relativeTime, shortDate } from '../format'
+
+const DAYS: Array<{ id: Weekday; label: string }> = [
+  { id: 'mon', label: 'Mon' },
+  { id: 'tue', label: 'Tue' },
+  { id: 'wed', label: 'Wed' },
+  { id: 'thu', label: 'Thu' },
+  { id: 'fri', label: 'Fri' },
+  { id: 'sat', label: 'Sat' },
+  { id: 'sun', label: 'Sun' },
+]
+
+/** Every hour, so "07:00" is reachable without a stepper. */
+const HOURS = Array.from({ length: 24 }, (_, h) => h)
 
 /**
  * The digest's switch, its recipient, and a preview of exactly what would go
@@ -37,8 +51,7 @@ export function DigestSettingsCard() {
         <div>
           <h2 className="text-sm font-semibold text-ink">Weekly digest</h2>
           <p className="text-xs text-muted mt-0.5">
-            Monday morning, and only when something moved. Nothing is sent when there is
-            nothing to say.
+            Only when something moved. Nothing is sent when there is nothing to say.
           </p>
         </div>
         <button
@@ -61,12 +74,74 @@ export function DigestSettingsCard() {
         </p>
       )}
 
+      {d?.schedule && (
+        <div className="pt-2 border-t border-line space-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="text-xs text-muted w-10 shrink-0">Day</span>
+            <div role="radiogroup" aria-label="Send day" className="inline-flex flex-wrap gap-1">
+              {DAYS.map((day) => {
+                const active = d.schedule.day === day.id
+                return (
+                  <button
+                    key={day.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    disabled={patch.isPending}
+                    onClick={() => patch.mutate({ day: day.id })}
+                    className={`text-xs px-2.5 py-1 rounded-md border transition-colors disabled:opacity-40 ${
+                      active
+                        ? 'bg-accent border-transparent text-accent-fg'
+                        : 'bg-surface border-line text-body hover:bg-sunken hover:text-ink'
+                    }`}
+                  >
+                    {day.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <label htmlFor="digest-hour" className="text-xs text-muted w-10 shrink-0">
+              Time
+            </label>
+            <select
+              id="digest-hour"
+              value={d.schedule.hour}
+              disabled={patch.isPending}
+              onChange={(e) => patch.mutate({ hour: Number(e.target.value) })}
+              className="text-xs rounded-md border border-line bg-surface text-ink px-2 py-1 disabled:opacity-40"
+            >
+              {HOURS.map((h) => (
+                <option key={h} value={h}>
+                  {String(h).padStart(2, '0')}:00
+                </option>
+              ))}
+            </select>
+            {/* The zone is what makes the hour mean anything, so it is stated
+                rather than assumed. It is not editable here: there is one
+                reader, in one place, and a zone picker would be a list of 400
+                strings guarding against a move. */}
+            <span className="text-xs text-faint">{d.schedule.timezone.replace('_', ' ')}</span>
+          </div>
+
+          <p className="text-xs text-muted">
+            {d.schedule.describes}
+            {d.schedule.nextRun && settings?.enabled && (
+              <> · next {shortDate(d.schedule.nextRun)}</>
+            )}
+            {d.schedule.lastSentAt && <> · last sent {relativeTime(d.schedule.lastSentAt)}</>}
+          </p>
+        </div>
+      )}
+
       {settings && (
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
           <dt className="text-muted">To</dt>
-          <dd className="text-body font-mono">{settings.recipient}</dd>
+          <dd className="text-body">{settings.recipient}</dd>
           <dt className="text-muted">From</dt>
-          <dd className="text-body font-mono">{settings.sender}</dd>
+          <dd className="text-body">{settings.sender}</dd>
         </dl>
       )}
 
@@ -78,7 +153,7 @@ export function DigestSettingsCard() {
                 <span className="text-muted">Nothing to report right now.</span>
               ) : (
                 <>
-                  Next send: <span className="font-medium text-ink">{d.subject}</span>
+                  Would say: <span className="font-medium text-ink">{d.subject}</span>
                   <span className="text-muted">
                     {' '}
                     · {d.groups.map((g) => `${g.lines.length} ${g.heading.toLowerCase()}`).join(', ')}
