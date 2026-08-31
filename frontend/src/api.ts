@@ -80,6 +80,25 @@ export interface ReferenceDoc {
   updatedAt: string
 }
 
+export type NotificationTier = 'critical' | 'attention' | 'info'
+
+export interface AppNotification {
+  key: string
+  tier: NotificationTier
+  title: string
+  body: string
+  href: string
+  action?: string
+  read: boolean
+  firstSeen: string
+}
+
+export interface NotificationFeed {
+  items: AppNotification[]
+  unread: number
+  unreadCritical: number
+}
+
 export interface HealthStatus {
   calendarConfigured: boolean
   calendarMissingSecrets: string[]
@@ -196,6 +215,19 @@ export const api = {
     delete: (id: string) => apiFetch<{ ok: boolean }>(`/reference-docs/${id}`, { method: 'DELETE' }),
   },
   health: () => apiFetch<HealthStatus>('/health'),
+  notifications: {
+    list: () => apiFetch<NotificationFeed>('/notifications'),
+    read: (body: { keys?: string[]; all?: boolean }) =>
+      apiFetch<{ readAt: string }>('/notifications/read', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    dismiss: (key: string) =>
+      apiFetch<{ dismissed: string }>('/notifications/dismiss', {
+        method: 'POST',
+        body: JSON.stringify({ key }),
+      }),
+  },
   digest: {
     preview: () => apiFetch<DigestPreview>('/digest/preview'),
     send: () =>

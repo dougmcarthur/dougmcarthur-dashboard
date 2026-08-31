@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAppearance } from '../hooks/useAppearance'
+import { NotificationBell } from './NotificationBell'
 
 const NAV_LINKS = [
   { id: 'overview', label: 'Overview' },
@@ -26,7 +27,15 @@ function ThemeIcon({ dark }: { dark: boolean }) {
   )
 }
 
-export function Layout({ children, page }: { children: ReactNode; page: string }) {
+export function Layout({
+  children,
+  page,
+  onNav,
+}: {
+  children: ReactNode
+  page: string
+  onNav: (p: string) => void
+}) {
   const { appearance, set, resolved } = useAppearance()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -86,6 +95,8 @@ export function Layout({ children, page }: { children: ReactNode; page: string }
             </nav>
 
             <div className="flex items-center gap-1">
+              <NotificationBell onNav={onNav} />
+
               <button
                 type="button"
                 onClick={toggleTheme}

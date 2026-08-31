@@ -13,7 +13,7 @@ export default function App() {
   const [page, navigate, arg] = useHashRoute('overview')
 
   return (
-    <Layout page={page}>
+    <Layout page={page} onNav={navigate}>
       <ErrorBoundary label="Page error">
         {page === 'overview' && <OverviewPage onNav={navigate} />}
         {page === 'review' && <ReviewPage initialFilter={arg} />}

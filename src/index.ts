@@ -11,6 +11,7 @@ import reference from './routes/reference'
 import taskRuns from './routes/taskRuns'
 import reminders from './routes/reminders'
 import health from './routes/health'
+import notifications from './routes/notifications'
 import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
 import { readDigestSettings } from './lib/settings'
@@ -33,6 +34,7 @@ app.route('/api/reference-docs', reference)
 app.route('/api/task-runs', taskRuns)
 app.route('/api/reminders', reminders)
 app.route('/api/health', health)
+app.route('/api/notifications', notifications)
 app.route('/api/digest', digest)
 
 app.notFound((c) => c.json({ error: 'not found' }, 404))

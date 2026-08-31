@@ -92,6 +92,17 @@ export const digestReports = sqliteTable('digest_reports', {
   reportedAt: text('reported_at').notNull(),
 })
 
+/**
+ * What you have already seen. See migration 0006 — there is no notifications
+ * table because phase 1 carries only conditions, which are derived on read.
+ */
+export const notificationMarks = sqliteTable('notification_marks', {
+  dedupeKey: text('dedupe_key').primaryKey(),
+  firstSeen: text('first_seen').notNull(),
+  readAt: text('read_at'),
+  dismissedAt: text('dismissed_at'),
+})
+
 /** Key/value settings that must be changeable without a deploy. */
 export const appSettings = sqliteTable('app_settings', {
   key: text('key').primaryKey(),
@@ -107,3 +118,4 @@ export type TaskRun = typeof taskRuns.$inferSelect
 export type Reminder = typeof reminders.$inferSelect
 export type DigestReport = typeof digestReports.$inferSelect
 export type AppSetting = typeof appSettings.$inferSelect
+export type NotificationMark = typeof notificationMarks.$inferSelect
