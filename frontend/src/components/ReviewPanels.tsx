@@ -64,10 +64,19 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
   )
 }
 
+/**
+ * Only a genuine problem gets the clay.
+ *
+ * `warn` used to have an amber of its own; collapsing the palette to two hues
+ * sent it to clay, which put four identical alarm-coloured chips in a row and
+ * flattened the hierarchy the severities exist to express. A warning is now a
+ * neutral chip with full-strength ink — present, legible, and visibly not an
+ * error.
+ */
 const SEVERITY_STYLES = {
   danger: 'bg-danger-bg text-danger-fg border-danger-line',
-  warn: 'bg-warn-bg text-warn-fg border-warn-line',
-  info: 'bg-sunken text-body border-line',
+  warn: 'bg-raised text-ink border-line-strong',
+  info: 'bg-sunken text-muted border-line',
 } as const
 
 export function FlagChip({ flag }: { flag: ReviewFlag }) {

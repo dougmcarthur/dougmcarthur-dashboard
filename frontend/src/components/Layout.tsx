@@ -8,8 +8,17 @@ const NAV_LINKS = [
   { id: 'gigs', label: 'Gigs' },
   { id: 'sync', label: 'Sync' },
   { id: 'promo', label: 'Promo' },
-  { id: 'runs', label: 'Log' },
+]
+
+/**
+ * The drawer. Everything you open occasionally rather than daily.
+ *
+ * "Log" is "History": a log is what a system writes, history is what you go
+ * looking for.
+ */
+const MORE_LINKS = [
   { id: 'settings', label: 'Settings' },
+  { id: 'runs', label: 'History' },
 ]
 
 /** Sun and moon, inline so the toggle costs no request and follows currentColor. */
@@ -62,7 +71,7 @@ export function Layout({
 
   const linkClass = (id: string) =>
     `px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
-      page === id ? 'bg-accent text-accent-fg' : 'text-muted hover:text-ink hover:bg-sunken'
+      page === id ? 'bg-raised text-ink shadow-inset' : 'text-muted hover:text-ink hover:bg-sunken'
     }`
 
   return (
@@ -111,7 +120,7 @@ export function Layout({
                 <ThemeIcon dark={resolved === 'dark'} />
               </button>
 
-              <div className="md:hidden" ref={menuRef}>
+              <div ref={menuRef}>
                 <button
                   type="button"
                   onClick={() => setMenuOpen((o) => !o)}
@@ -127,10 +136,24 @@ export function Layout({
                 {menuOpen && (
                   <nav
                     id="mobile-nav"
-                    aria-label="Primary"
-                    className="absolute right-3 mt-2 w-44 rounded-lg border border-line bg-surface shadow-pop p-1"
+                    aria-label="More"
+                    className="absolute right-3 mt-2 w-48 rounded-xl border border-line bg-surface shadow-pop p-1"
                   >
-                    {NAV_LINKS.map((l) => (
+                    {/* Below md the main destinations have nowhere else to go. */}
+                    <span className="md:hidden">
+                      {NAV_LINKS.map((l) => (
+                        <a
+                          key={l.id}
+                          href={`#${l.id}`}
+                          aria-current={page === l.id ? 'page' : undefined}
+                          className={`block ${linkClass(l.id)}`}
+                        >
+                          {l.label}
+                        </a>
+                      ))}
+                      <hr className="border-line my-1" />
+                    </span>
+                    {MORE_LINKS.map((l) => (
                       <a
                         key={l.id}
                         href={`#${l.id}`}

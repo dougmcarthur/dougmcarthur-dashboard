@@ -55,9 +55,14 @@ export function SnoozeMenu({
         onClick={() => setOpen((o) => !o)}
         disabled={disabled}
         aria-expanded={open}
-        className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken disabled:opacity-40 transition-colors"
+        title="Snooze"
+        aria-label="Snooze"
+        className="grid place-items-center h-9 w-9 rounded-lg border border-line text-body hover:bg-sunken hover:text-ink disabled:opacity-40 transition-colors"
       >
-        Snooze
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
+             strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+          <path d="M13 9.6A5.4 5.4 0 1 1 6.4 3a4.4 4.4 0 0 0 6.6 6.6z" />
+        </svg>
       </button>
 
       {open && (

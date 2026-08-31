@@ -47,7 +47,7 @@ function QueueRow({
         {top && (
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              top.severity === 'danger' ? 'bg-danger-solid' : top.severity === 'warn' ? 'bg-warn-fg' : 'bg-line-strong'
+              top.severity === 'danger' ? 'bg-danger-solid' : top.severity === 'warn' ? 'bg-line-strong' : 'bg-line'
             }`}
           />
         )}
@@ -81,10 +81,10 @@ function DecisionBar({
   if (item.source.kind === 'gig') {
     const { status } = item.source.row
     if (status !== 'approved') {
-      buttons.push({ label: 'Approve', className: 'bg-success-solid text-accent-fg hover:brightness-110', run: () => onGig({ status: 'approved' }) })
+      buttons.push({ label: 'Approve', className: 'bg-accent text-accent-fg hover:bg-accent-hover', run: () => onGig({ status: 'approved' }) })
     }
     if (status !== 'submitted') {
-      buttons.push({ label: 'Mark submitted', className: 'bg-info-fg text-accent-fg hover:brightness-110', run: () => onGig({ status: 'submitted' }) })
+      buttons.push({ label: 'Mark submitted', className: 'bg-surface border border-line-strong text-body hover:bg-sunken hover:text-ink', run: () => onGig({ status: 'submitted' }) })
     }
     if (status !== 'rejected') {
       buttons.push({ label: 'Pass', className: 'bg-surface border border-danger-line text-danger-fg hover:bg-danger-bg', run: () => onGig({ status: 'rejected' }) })
@@ -95,16 +95,16 @@ function DecisionBar({
   if (item.source.kind === 'sync') {
     const { status } = item.source.row
     if (status !== 'pitched') {
-      buttons.push({ label: 'Mark pitched', className: 'bg-info-fg text-accent-fg hover:brightness-110', run: () => onSync({ status: 'pitched' }) })
+      buttons.push({ label: 'Mark pitched', className: 'bg-surface border border-line-strong text-body hover:bg-sunken hover:text-ink', run: () => onSync({ status: 'pitched' }) })
     }
-    buttons.push({ label: 'Confirmed', className: 'bg-success-solid text-accent-fg hover:brightness-110', run: () => onSync({ status: 'confirmed' }) })
+    buttons.push({ label: 'Confirmed', className: 'bg-accent text-accent-fg hover:bg-accent-hover', run: () => onSync({ status: 'confirmed' }) })
     buttons.push({ label: 'Declined', className: 'bg-surface border border-danger-line text-danger-fg hover:bg-danger-bg', run: () => onSync({ status: 'declined' }) })
     buttons.push({ label: 'Archive', className: 'bg-surface border border-line-strong text-body hover:bg-sunken', run: () => onSync({ status: 'archived' }) })
   }
 
   if (item.source.kind === 'promo') {
-    buttons.push({ label: 'Approve', className: 'bg-success-solid text-accent-fg hover:brightness-110', run: () => onPromo({ status: 'approved' }) })
-    buttons.push({ label: 'Mark published', className: 'bg-info-fg text-accent-fg hover:brightness-110', run: () => onPromo({ status: 'published' }) })
+    buttons.push({ label: 'Approve', className: 'bg-accent text-accent-fg hover:bg-accent-hover', run: () => onPromo({ status: 'approved' }) })
+    buttons.push({ label: 'Mark published', className: 'bg-surface border border-line-strong text-body hover:bg-sunken hover:text-ink', run: () => onPromo({ status: 'published' }) })
   }
 
   return (

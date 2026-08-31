@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Overview, type DueReminder } from '../api'
 import { DecisionDeck } from '../components/DecisionDeck'
-import { ActivityList } from '../components/ActivityList'
 import { TimingStrip } from '../components/TimingStrip'
 import { OpenEndedRow } from '../components/OpenEndedRow'
 import { DataHealthRow } from '../components/DataHealthRow'
@@ -49,7 +48,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
     )
   }
 
-  const { recentRuns, dueReminders } = data
+  const { dueReminders } = data
 
   return (
     <div className="space-y-8">
@@ -99,9 +98,6 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
         <aside className="space-y-8 min-w-0 xl:sticky xl:top-20" aria-label="Backlog and activity">
           {queue.data && <OpenEndedRow backlog={queue.data.summary.backlog} onNav={onNav} />}
 
-          {/* Automation activity — one line per run, prose behind a disclosure */}
-          {recentRuns.length > 0 && <ActivityList runs={recentRuns} onNav={onNav} />}
-
           {/* Block F, last and quiet. Renders nothing once the counts are zero,
               and the whole block should be deleted when they stay that way. */}
           {queue.data && (
@@ -116,10 +112,9 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
       {(queue.data?.counts.needs ?? 0) === 0 &&
         (queue.data?.summary.timing.length ?? 0) === 0 &&
         (queue.data?.summary.backlog.openEnded ?? 0) === 0 &&
-        dueReminders.length === 0 &&
-        recentRuns.length === 0 && (
-        <p className="text-muted text-sm">All clear — nothing needs attention right now.</p>
-      )}
+        dueReminders.length === 0 && (
+          <p className="text-muted text-sm">All clear — nothing needs attention right now.</p>
+        )}
     </div>
   )
 }

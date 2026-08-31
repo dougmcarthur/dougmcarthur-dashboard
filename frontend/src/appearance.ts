@@ -29,7 +29,9 @@ export interface Appearance {
 }
 
 export const DEFAULTS: Appearance = {
-  theme: 'system',
+  // Dark by default rather than 'system'. Asked for explicitly, and it is the
+  // ground the palette was designed against — light is the alternate.
+  theme: 'dark',
   textSize: 'default',
   font: 'system',
   customFont: '',
@@ -62,9 +64,9 @@ export const WIDTHS: Record<ShellWidth, string> = {
 
 const STACKS: Record<Exclude<FontChoice, 'custom'>, string> = {
   system:
-    "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    "'Public Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
   humanist:
-    "'Optima', 'Gill Sans', 'Gill Sans MT', 'Segoe UI', Candara, Calibri, system-ui, sans-serif",
+    "'Bricolage Grotesque', 'Optima', 'Gill Sans', 'Segoe UI', system-ui, sans-serif",
   serif: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif",
   mono: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace",
 }

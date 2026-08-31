@@ -89,7 +89,7 @@ export function TimingStrip({
   return (
     <div>
       <h2 className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
-        On the clock
+        Time-sensitive
       </h2>
 
       <div className="bg-surface border border-line rounded-xl shadow-card divide-y divide-line">
