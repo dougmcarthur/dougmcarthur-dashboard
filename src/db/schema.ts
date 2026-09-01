@@ -18,8 +18,18 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   fitNotes: text('fit_notes'), // legacy column
   fitRationale: text('fit_rationale'),
   url: text('url'),
-  status: text('status').default('pending_review'),
+  status: text('status').default('discovered'),
+  /** Calendar id for the "apply by" deadline reminder. See migration 0008. */
   googleEventId: text('google_event_id'),
+  /** Calendar id for the "applications open" reminder. */
+  opensEventId: text('opens_event_id'),
+  /** Calendar id for the performance itself. Only ever set once booked. */
+  showEventId: text('show_event_id'),
+  /** When you are actually on stage. Null until something reaches `booked`. */
+  performanceStart: text('performance_start'),
+  performanceEnd: text('performance_end'),
+  /** The pre-rename status, kept so a bad reading can be argued with. */
+  legacyStatus: text('legacy_status'),
   snoozedUntil: text('snoozed_until'), // ISO date this comes back on its own
   snoozedAt: text('snoozed_at'), // when the snooze was set — see migration 0004
   discoveredAt: text('discovered_at').notNull(),

@@ -4,12 +4,8 @@ import { z } from 'zod'
 import { eq, and, desc } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, reminders } from '../db/schema'
-import {
-  createCalendarEvent,
-  updateCalendarEvent,
-  deleteCalendarEvent,
-  calendarConfigured,
-} from '../lib/googleCalendar'
+import { syncGigCalendar, removeGigCalendar, type GigRow } from '../lib/gigCalendar'
+import { normaliseGigStatus, isGigSettled } from '../../shared/gigStatus'
 import { splitDeadline } from '../../shared/reviewParse'
 import type { Env } from '../types'
 
@@ -83,7 +79,10 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
       paid: b.paid ? 1 : 0,
       fitRationale: b.fitRationale ?? null,
       url: b.url || null,
-      status: b.status ?? 'pending_review',
+      // Normalised on the way in: the research agents that POST here still
+      // send `approved`, and a row should land in the right column rather
+      // than carrying a word the pipeline no longer uses.
+      status: normaliseGigStatus(b.status),
       discoveredAt: ts,
       updatedAt: ts,
     })
@@ -121,62 +120,37 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
   const updates: Record<string, unknown> = { ...b, updatedAt: new Date().toISOString() }
   if (b.paid !== undefined) updates.paid = b.paid ? 1 : 0
 
-  const statusChanging = b.status !== undefined && b.status !== before.status
-  const newStatus = b.status ?? before.status
-  const deadline = b.deadline ?? before.deadline
-  const name = b.name ?? before.name
+  // Statuses arriving from the research agents are still the pre-rename ones
+  // (`approved`, `pending_review`), so normalise on the way in rather than
+  // storing a value nothing else recognises. See shared/gigStatus.ts.
+  const newStatus = normaliseGigStatus(b.status ?? before.status)
+  if (b.status !== undefined) updates.status = newStatus
 
-  // Calendar events and reminders need a real date. 26 of 34 production rows
-  // hold prose here ("None — rolling artist roster intake"), which used to be
-  // handed to Google verbatim and to `new Date()` — the latter yielding
-  // Invalid Date and a reminder scheduled for "NaN-NaN-NaN". Recover a date
-  // when the prose contains one and skip both steps when it does not.
-  const deadlineDate = deadline ? splitDeadline(deadline).date : null
+  // Both sides normalised, or a legacy row would look like it was changing
+  // every time it was touched: `approved` -> `shortlisted` is a rename, not a
+  // transition, and must not fire the reminders that a real one does.
+  const statusChanging = newStatus !== normaliseGigStatus(before.status)
 
-  // --- Calendar sync ---
-  if (calendarConfigured(c.env)) {
-    try {
-      if (statusChanging && newStatus === 'approved' && deadlineDate) {
-        // Approving with a deadline → create Calendar event
-        const event = await createCalendarEvent(c.env, {
-          summary: `🎵 ${name}`,
-          description: [
-            before.organizer ? `Organiser: ${before.organizer}` : '',
-            before.type ? `Type: ${before.type}` : '',
-            before.fitRationale ?? before.fitNotes ?? '',
-            before.url ? `Link: ${before.url}` : '',
-          ]
-            .filter(Boolean)
-            .join('\n'),
-          date: deadlineDate,
-          reminderMinutes: 1440, // 24 h before
-        })
-        updates.googleEventId = event.id
-      } else if (before.googleEventId) {
-        if (statusChanging && newStatus === 'rejected') {
-          // Rejecting → remove the Calendar event
-          await deleteCalendarEvent(c.env, before.googleEventId)
-          updates.googleEventId = null
-        } else if (b.deadline || b.name) {
-          // Deadline or name changed → update the existing event
-          await updateCalendarEvent(c.env, before.googleEventId, {
-            summary: name ? `🎵 ${name}` : undefined,
-            date: deadlineDate ?? undefined,
-          })
-        }
-      }
-    } catch (err) {
-      // Calendar errors are non-fatal — log and continue
-      console.error('Calendar sync error:', err)
-    }
+  // The calendar is reconciled against the row's resulting state rather than
+  // driven by the transition. Transition handlers missed a row that arrived
+  // already shortlisted, and happily updated an event on a row you had passed
+  // on. See src/lib/gigCalendar.ts for what the three entries are allowed to
+  // say — in particular, that deciding to apply is not a date in your diary.
+  const after: GigRow = {
+    ...(before as unknown as GigRow),
+    ...(b as Partial<GigRow>),
+    status: newStatus,
   }
+  Object.assign(updates, await syncGigCalendar(c.env, after))
 
   await db.update(gigOpportunities).set(updates).where(eq(gigOpportunities.id, id))
 
-  // --- Reminder creation on approval ---
-  if (statusChanging && newStatus === 'approved' && deadlineDate) {
-    const ts = new Date().toISOString()
-    // Write a pre-deadline reminder: fire 7 days before if nothing submitted
+  const deadlineDate = after.deadline ? splitDeadline(after.deadline).date : null
+
+  // A nudge to actually do the thing, once you have said you will. Written on
+  // entry to `shortlisted` only — `preparing` and `submitted` mean it is
+  // already in hand, and a second reminder then is noise.
+  if (statusChanging && newStatus === 'shortlisted' && deadlineDate) {
     const reminderDate = new Date(deadlineDate)
     reminderDate.setDate(reminderDate.getDate() - 7)
 
@@ -186,12 +160,14 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
       reminderType: 'pre_deadline',
       scheduledFor: reminderDate.toISOString().slice(0, 10),
       status: 'pending',
-      createdAt: ts,
+      createdAt: new Date().toISOString(),
     })
   }
 
-  // Clear reminders if rejected
-  if (statusChanging && newStatus === 'rejected') {
+  // Anything settled — you passed, they declined, it expired — has no pending
+  // chores left. Previously only `rejected` cleared them, so a gig that closed
+  // any other way kept nagging.
+  if (statusChanging && isGigSettled(newStatus)) {
     await db
       .update(reminders)
       .set({ status: 'dismissed' })
@@ -217,20 +193,20 @@ gigs.delete('/:id', async (c) => {
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
 
-  // Remove Calendar event if one exists
+  // A gig can own three calendar entries now, not one. Deleting only the
+  // deadline reminder would leave an orphaned show on the calendar for a gig
+  // that no longer exists.
   const row = await db
-    .select({ googleEventId: gigOpportunities.googleEventId })
+    .select({
+      googleEventId: gigOpportunities.googleEventId,
+      opensEventId: gigOpportunities.opensEventId,
+      showEventId: gigOpportunities.showEventId,
+    })
     .from(gigOpportunities)
     .where(eq(gigOpportunities.id, id))
     .get()
 
-  if (row?.googleEventId && calendarConfigured(c.env)) {
-    try {
-      await deleteCalendarEvent(c.env, row.googleEventId)
-    } catch (err) {
-      console.error('Calendar delete error:', err)
-    }
-  }
+  if (row) await removeGigCalendar(c.env, row)
 
   // Reminders reference gigs by (entity_type, entity_id) with no foreign key,
   // so deleting the gig alone leaves them behind pointing at nothing. That is

@@ -12,8 +12,9 @@
  * does not support. See docs/notes-field-audit.md.
  */
 
-/** Gig statuses the UI offers. Stored values are not constrained to these. */
-export type GigStatus = 'pending_review' | 'approved' | 'rejected' | 'submitted' | 'archived'
+// The gig pipeline's vocabulary lives in ./gigStatus, with its phases, its
+// legacy mapping and the rule that a status must say *who* decided.
+export type { GigStatus } from './gigStatus'
 
 /** Sync statuses the UI offers. Stored values are not constrained to these. */
 export type SyncStatus = 'draft_ready' | 'pitched' | 'confirmed' | 'declined' | 'archived'
@@ -40,7 +41,17 @@ export interface GigOpportunity {
   fitRationale: string | null
   url: string | null
   status: string
+  /** The pre-rename value, where there was one. See migration 0008. */
+  legacyStatus?: string | null
+  /** ISO datetime you are actually on stage. Only set once `booked`. */
+  performanceStart?: string | null
+  performanceEnd?: string | null
+  /** Calendar id for the "apply by" deadline reminder. */
   googleEventId: string | null
+  /** Calendar id for the "applications open" reminder. */
+  opensEventId?: string | null
+  /** Calendar id for the performance itself. */
+  showEventId?: string | null
   /** ISO date this row comes back into the queue on its own. */
   snoozedUntil: string | null
   /** When the snooze was set; a later `updatedAt` wakes it. See migration 0004. */

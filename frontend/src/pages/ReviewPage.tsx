@@ -10,6 +10,7 @@ import {
   Panel, CopyButton, FlagChip, KindTag, AlertList, FieldTable, BulletList, RawNote,
 } from '../components/ReviewPanels'
 import type { ReviewItem, ReviewFilter } from '../../../shared/reviewQueue'
+import { normaliseGigStatus } from '../../../shared/gigStatus'
 
 const FILTERS: Array<{ id: ReviewFilter; label: string }> = [
   { id: 'needs', label: 'Needs a decision' },
@@ -79,15 +80,17 @@ function DecisionBar({
   const buttons: Array<{ label: string; className: string; run: () => void }> = []
 
   if (item.source.kind === 'gig') {
-    const { status } = item.source.row
-    if (status !== 'approved') {
-      buttons.push({ label: 'Approve', className: 'bg-accent text-accent-fg hover:bg-accent-hover', run: () => onGig({ status: 'approved' }) })
+    // "Will apply", not "Approve". The old label read as a booking, and the
+    // app agreed with it by putting the deadline on your calendar as a gig.
+    const status = normaliseGigStatus(item.source.row.status)
+    if (status !== 'shortlisted') {
+      buttons.push({ label: 'Will apply', className: 'bg-accent text-accent-fg hover:bg-accent-hover', run: () => onGig({ status: 'shortlisted' }) })
     }
     if (status !== 'submitted') {
-      buttons.push({ label: 'Mark submitted', className: 'bg-surface border border-line-strong text-body hover:bg-sunken hover:text-ink', run: () => onGig({ status: 'submitted' }) })
+      buttons.push({ label: 'Applied', className: 'bg-surface border border-line-strong text-body hover:bg-sunken hover:text-ink', run: () => onGig({ status: 'submitted' }) })
     }
-    if (status !== 'rejected') {
-      buttons.push({ label: 'Pass', className: 'bg-surface border border-danger-line text-danger-fg hover:bg-danger-bg', run: () => onGig({ status: 'rejected' }) })
+    if (status !== 'passed') {
+      buttons.push({ label: 'Pass', className: 'bg-surface border border-danger-line text-danger-fg hover:bg-danger-bg', run: () => onGig({ status: 'passed' }) })
     }
     buttons.push({ label: 'Archive', className: 'bg-surface border border-line-strong text-body hover:bg-sunken', run: () => onGig({ status: 'archived' }) })
   }
@@ -287,7 +290,7 @@ function Detail({
                 <span className="font-semibold">
                   {fee.amount != null ? `${fee.currency} ${fee.amount.toLocaleString()}` : 'Paid entry'}
                 </span>{' '}
-                <span className="text-muted">— needs your approval before anything is submitted</span>
+                <span className="text-muted">— nothing goes out until you say so</span>
               </>
             ) : (
               <span className="text-body">No entry fee</span>

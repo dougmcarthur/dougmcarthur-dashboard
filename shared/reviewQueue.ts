@@ -6,7 +6,7 @@
  * about what needs a decision.
  *
  *
- * The queue deliberately does NOT key off `status = 'pending_review'`. In
+ * The queue deliberately does NOT key off the status column alone. In
  * production not one gig carries that status, not one sync target carries
  * `draft_ready`, and not one promo draft carries `draft` — so the Overview
  * page's "Needs review" section is permanently empty even though most rows
@@ -20,6 +20,7 @@
  * than quietly resolved in favour of either side.
  */
 
+import { normaliseGigStatus, isGigSettled, hasBeenSubmitted } from './gigStatus'
 import type { GigOpportunity, SyncTarget, PromoDraft } from './types'
 import { decisionFor, type Decision } from './decisionCopy'
 import {
@@ -128,8 +129,15 @@ function snoozeState(
 /** No snooze columns to consult — promo drafts, and anything else without them. */
 const NO_SNOOZE: SnoozeState = { until: null, active: false, wokenByChange: false, daysUntil: null }
 
-/** Statuses that mean the workflow believes this item is finished. */
-const GIG_DONE = new Set(['submitted', 'archived'])
+/**
+ * Statuses that mean the workflow believes this item is finished.
+ *
+ * For gigs this is now a question about *phase*, not a list of strings: an
+ * application has gone out once the row is past phase 3, whatever happened to
+ * it afterwards. See shared/gigStatus.ts.
+ */
+const gigClaimsDone = (status: string): boolean =>
+  hasBeenSubmitted(status) || normaliseGigStatus(status) === 'archived'
 const SYNC_DONE = new Set(['pitched', 'sent', 'confirmed', 'declined', 'archived'])
 
 const FLAG_WEIGHT: Record<FlagId, number> = {
@@ -152,7 +160,7 @@ function flagsFor(
   deadline: ParsedDeadline,
 ): ReviewFlag[] {
   const flags: ReviewFlag[] = []
-  const claimsDone = kind === 'gig' ? GIG_DONE.has(status) : kind === 'sync' ? SYNC_DONE.has(status) : false
+  const claimsDone = kind === 'gig' ? gigClaimsDone(status) : kind === 'sync' ? SYNC_DONE.has(status) : false
 
   if (claimsDone && parsed.submissionState === 'not_submitted') {
     flags.push({
@@ -298,10 +306,16 @@ export function buildReviewQueue(input: {
 
 /**
  * Statuses that mean nobody owes this item anything further. Wider than
- * *_DONE above, which answers a different question: a rejected gig is settled,
- * but a rejected gig whose note says "not submitted" is not a contradiction.
+ * `gigClaimsDone` above, which answers a different question: a passed gig is
+ * settled, but a passed gig whose note says "not submitted" is not a
+ * contradiction.
+ *
+ * `submitted` counts as settled here even though it is not terminal — the ball
+ * is with the organiser, and a queue that keeps surfacing applications you are
+ * waiting on is a queue you stop reading.
  */
-const GIG_SETTLED = new Set(['submitted', 'archived', 'rejected'])
+const gigSettled = (status: string): boolean =>
+  isGigSettled(status) || hasBeenSubmitted(status)
 const SYNC_SETTLED = new Set(['pitched', 'sent', 'confirmed', 'declined', 'archived'])
 
 /** Deadline horizon for the time-critical strip. Matches the due_soon flag. */
@@ -363,7 +377,7 @@ function settled(item: ReviewItem): boolean {
   // A snoozed item is settled for now by the only measure these blocks care
   // about: it is not something to act on today.
   if (item.snooze.active) return true
-  if (item.kind === 'gig') return GIG_SETTLED.has(item.status)
+  if (item.kind === 'gig') return gigSettled(item.status)
   if (item.kind === 'sync') return SYNC_SETTLED.has(item.status)
   return item.status !== 'draft'
 }

@@ -11,11 +11,13 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { api, type GigOpportunity, type GigStatus } from '../api'
+import { GIG_STATUSES, GIG_STATUS_META, normaliseGigStatus } from '../../../shared/gigStatus'
 import { StatusBadge } from '../components/StatusBadge'
 import { Chevron } from '../components/Chevron'
 import { SkeletonTable } from '../components/Skeleton'
 
-const GIG_STATUSES: GigStatus[] = ['pending_review', 'approved', 'submitted', 'rejected', 'archived']
+// The pipeline order, from shared/gigStatus.ts, so the picker and the Worker
+// can never disagree about what a status is or what it means.
 const SUBMISSION_METHODS = ['email', 'portal', 'form'] as const
 
 const col = createColumnHelper<GigOpportunity>()
@@ -65,7 +67,7 @@ const EMPTY_DRAFT: GigDraft = {
   name: '', type: '', organizer: '', deadline: '',
   feeAmount: '', feeCurrency: 'USD', paid: false,
   submissionMethod: '', audienceSize: '', genreFitScore: '',
-  fitRationale: '', url: '', status: 'pending_review',
+  fitRationale: '', url: '', status: 'discovered',
 }
 
 function CreateGigForm({ onDone }: { onDone: () => void }) {
@@ -172,7 +174,11 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Status</label>
           <select value={draft.status} onChange={(e) => set('status', e.target.value as GigStatus)} className={INPUT}>
-            {GIG_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+            {GIG_STATUSES.map((s) => (
+              <option key={s} value={s} title={GIG_STATUS_META[s].meaning}>
+                {GIG_STATUS_META[s].label}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -354,13 +360,13 @@ function GigDetail({
         )}
       </div>
       <div className="flex gap-2 flex-wrap pt-1">
-        {gig.status === 'approved' && (
+        {normaliseGigStatus(gig.status) === 'shortlisted' && (
           <button disabled={isPatching} onClick={() => onStatusChange('submitted')}
             className="text-xs px-3 py-1.5 rounded-md bg-info-fg text-accent-fg hover:brightness-110 disabled:opacity-40 transition-colors">
-            Mark Submitted
+            Applied
           </button>
         )}
-        {gig.status === 'approved' && (
+        {normaliseGigStatus(gig.status) === 'shortlisted' && (
           <button disabled={isPatching} onClick={() => onStatusChange('archived')}
             className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken disabled:opacity-40 transition-colors">
             Archive
@@ -479,7 +485,7 @@ export function GigsPage() {
     }),
     col.accessor('status', {
       header: 'Status',
-      cell: (info) => <StatusBadge status={info.getValue()} />,
+      cell: (info) => <StatusBadge status={info.getValue()} kind="gig" />,
     }),
     col.display({
       id: 'actions',
@@ -488,25 +494,25 @@ export function GigsPage() {
         const row = info.row.original
         return (
           <div className="flex gap-1 justify-end">
-            {row.status === 'pending_review' && (
+            {normaliseGigStatus(row.status) === 'discovered' && (
               <>
                 <button disabled={isPatching}
-                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'approved' } })}
+                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'shortlisted' } })}
                   className="text-xs px-2.5 py-1 rounded-md bg-success-bg text-success-fg hover:bg-success-bg disabled:opacity-40 transition-colors">
-                  Approve
+                  Will apply
                 </button>
                 <button disabled={isPatching}
-                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'rejected' } })}
+                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'passed' } })}
                   className="text-xs px-2.5 py-1 rounded-md bg-danger-bg text-danger-fg hover:bg-danger-bg disabled:opacity-40 transition-colors">
-                  Reject
+                  Pass
                 </button>
               </>
             )}
-            {row.status === 'approved' && (
+            {normaliseGigStatus(row.status) === 'shortlisted' && (
               <button disabled={isPatching}
                 onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'submitted' } })}
                 className="text-xs px-2.5 py-1 rounded-md bg-info-bg text-info-fg hover:bg-info-bg disabled:opacity-40 transition-colors">
-                Mark Submitted
+                Applied
               </button>
             )}
             <button disabled={deleteMutation.isPending}
@@ -547,7 +553,11 @@ export function GigsPage() {
         <div className="flex gap-2 items-center">
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER_INPUT}>
             <option value="">All statuses</option>
-            {GIG_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+            {GIG_STATUSES.map((s) => (
+              <option key={s} value={s} title={GIG_STATUS_META[s].meaning}>
+                {GIG_STATUS_META[s].label}
+              </option>
+            ))}
           </select>
           <input
             placeholder="Search by name…"

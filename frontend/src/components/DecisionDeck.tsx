@@ -35,11 +35,14 @@ function ActionIcon({ name }: { name: 'check' | 'x' }) {
 
 /** An intent means the same thing everywhere; the status it maps to does not. */
 const STATUS_BY_INTENT: Record<ReviewItem['kind'], Record<DecisionIntent, string>> = {
+  // `approve` on a gig means "I will apply" and nothing more — see
+  // shared/gigStatus.ts. `pass` is *your* no, which is why it maps to
+  // `passed` and never to `declined`.
   gig: {
     confirm_sent: 'submitted',
-    reopen: 'approved',
-    approve: 'approved',
-    pass: 'rejected',
+    reopen: 'shortlisted',
+    approve: 'shortlisted',
+    pass: 'passed',
     archive: 'archived',
     publish: 'submitted',
   },

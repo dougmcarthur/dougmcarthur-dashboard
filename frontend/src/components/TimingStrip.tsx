@@ -102,13 +102,13 @@ export function TimingStrip({
             <Row
               key={`reminder-${r.id}`}
               title={r.gigName ?? `${r.entityType} #${r.entityId}`}
-              meta={`${shortDate(r.scheduledFor)} · follow-up — did this get submitted?`}
+              meta={`${shortDate(r.scheduledFor)} · did the application go in?`}
               tone={days < 0 ? BAND_STYLE.overdue : BAND_STYLE.due_soon}
               right={countdown(days < 0 ? 'overdue' : 'due_soon', days)}
               onClick={() => onNav('gigs')}
             >
               <span className="flex gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                {r.gigStatus === 'approved' && (
+                {(r.gigStatus === 'shortlisted' || r.gigStatus === 'preparing') && (
                   <button
                     onClick={() => onSubmitted(r)}
                     className="text-xs px-2 py-0.5 rounded-md bg-info-bg text-info-fg hover:bg-info-bg transition-colors"
