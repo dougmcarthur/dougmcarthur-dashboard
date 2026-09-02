@@ -394,7 +394,7 @@ export interface QueueSummary {
   health: DataHealth
 }
 
-function settled(item: ReviewItem): boolean {
+export function isSettled(item: ReviewItem): boolean {
   // A snoozed item is settled for now by the only measure these blocks care
   // about: it is not something to act on today.
   if (item.snooze.active) return true
@@ -430,7 +430,7 @@ export function summariseQueue(
   const timing: TimingRow[] = []
 
   for (const item of items) {
-    if (settled(item)) continue
+    if (isSettled(item)) continue
     const { date, daysUntil: days, opensAt, opensInDays, exact } = item.deadline
 
     if (date && days !== null && days <= DUE_SOON_DAYS) {
@@ -454,7 +454,7 @@ export function summariseQueue(
   timing.sort((a, b) => BAND_ORDER[a.band] - BAND_ORDER[b.band] || a.daysUntil - b.daysUntil)
 
   const openEnded = items.filter(
-    (i) => !settled(i) && i.deadline.date === null && i.deadline.opensAt === null && discovery(i) !== null,
+    (i) => !isSettled(i) && i.deadline.date === null && i.deadline.opensAt === null && discovery(i) !== null,
   )
 
   // The two findings need different populations, which is easy to get wrong.
@@ -468,7 +468,7 @@ export function summariseQueue(
   // deferring a decision does not make a contradictory status correct.
   const conflicts = items.filter((i) => i.flags.some((f) => f.id === 'conflict')).length
   const proseDeadlines = items.filter(
-    (i) => (!settled(i) || i.snooze.active) && i.deadline.raw !== null && !i.deadline.exact,
+    (i) => (!isSettled(i) || i.snooze.active) && i.deadline.raw !== null && !i.deadline.exact,
   ).length
   const orphanedReminders = extra.orphanedReminders ?? 0
 
@@ -497,6 +497,29 @@ export function summariseQueue(
   }
 }
 
+/**
+ * Is this item still waiting on a decision from you?
+ *
+ * Exported because the weekly digest has to ask the same question. It used to
+ * ask its own version, so the email could promise rows the Review screen then
+ * refused to show — a link to "3 drafted but never sent" landing on a filter
+ * that had already excluded all three.
+ *
+ * A decision already made is not a decision outstanding: a passed gig keeps
+ * every flag it had, because flags are parsed from a note that does not change
+ * when you say no.
+ *
+ * A conflict is the deliberate exception, and the reason this is not a plain
+ * `!isSettled` gate: a conflict *is* the claim that the status is wrong, so
+ * trusting that status to exclude the item would hide the one case where the
+ * status cannot be trusted.
+ */
+export function awaitingDecision(item: ReviewItem): boolean {
+  if (item.snooze.active) return false
+  if (item.flags.some((f) => f.id === 'conflict')) return true
+  return !isSettled(item) && item.flags.some((f) => f.id !== 'vague_deadline')
+}
+
 export function matchesFilter(item: ReviewItem, filter: ReviewFilter): boolean {
   // One gate, ahead of every predicate: a snoozed item is absent from the
   // whole app except the view that exists to show it. Putting this in each
@@ -508,17 +531,7 @@ export function matchesFilter(item: ReviewItem, filter: ReviewFilter): boolean {
     case 'all':
       return true
     case 'needs':
-      // A decision already made is not a decision outstanding. This used to ask
-      // only whether the item carried flags — and a passed gig keeps every flag
-      // it had, because those are parsed from a note that does not change when
-      // you say no. So anything you had already decided sat here forever.
-      //
-      // A conflict is the exception, and the reason this is not a plain
-      // `!settled` gate: a conflict *is* the claim that the status is wrong, so
-      // trusting that status to exclude the item would hide the one case where
-      // the status cannot be trusted.
-      if (item.flags.some((f) => f.id === 'conflict')) return true
-      return !settled(item) && item.flags.some((f) => f.id !== 'vague_deadline')
+      return awaitingDecision(item)
     case 'conflict':
       return item.flags.some((f) => f.id === 'conflict')
     case 'blocked':

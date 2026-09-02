@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildDigest, fingerprint, type PriorReport } from '../shared/digest'
-import { buildReviewQueue } from '../shared/reviewQueue'
+import { buildReviewQueue, matchesFilter } from '../shared/reviewQueue'
 import type { GigOpportunity, SyncTarget } from '../shared/types'
 
 const TODAY = '2026-08-25'
@@ -445,5 +445,51 @@ describe('buildDigest — rollup wording', () => {
     const filler = [live(310, 'A'), live(311, 'B'), live(312, 'C'), live(313, 'D'), live(314, 'E')]
     const d = digest({ gigs: filler, sync: [sync({ id: 315, name: 'Quiet' })] })
     expect(d.rollups.find((r) => r.id === 'idle_sync')?.label).toBe('is a sync target sitting where it was pitched')
+  })
+})
+
+describe('rollup links land somewhere real', () => {
+  it('leaves a decided row out of the digest entirely', () => {
+    // A gig you passed on keeps every flag it had, because flags are parsed
+    // from a note that does not change when you say no. It used to be counted
+    // under "drafted but never sent" and linked to a Review filter that would
+    // then refuse to show it.
+    const open = [1, 2, 3, 4, 5, 6].map((n) =>
+      gig({ id: 400 + n, name: `Open ${n}`, fitNotes: 'Submission status: NOT submitted.' }),
+    )
+    const passed = gig({
+      id: 499, name: 'Passed on', status: 'passed',
+      fitNotes: 'Submission status: NOT submitted.',
+    })
+
+    const withPassed = digest({ gigs: [...open, passed] })
+    const without = digest({ gigs: open })
+
+    const counted = (d: ReturnType<typeof digest>) =>
+      d.focus.length + d.rollups.reduce((n, r) => n + r.count, 0)
+
+    // Adding a decided row changes nothing about the email.
+    expect(counted(withPassed)).toBe(counted(without))
+    expect(withPassed.focus.map((f) => f.title)).not.toContain('Passed on')
+  })
+
+  it('agrees with matchesFilter for every bucket it links to', () => {
+    const items = queue({
+      gigs: [
+        gig({ id: 310, name: 'A', fitNotes: 'Submission status: NOT submitted.' }),
+        gig({ id: 311, name: 'B', paid: 1, fee: '$40' }),
+        gig({
+          id: 312, name: 'Decided', status: 'passed',
+          fitNotes: 'Submission status: NOT submitted.',
+        }),
+      ],
+    })
+    const d = buildDigest({ items, prior: [], today: TODAY })
+    for (const r of d.rollups) {
+      const filter = r.href.replace('#review/', '')
+      if (filter === 'all') continue
+      const shown = items.filter((i) => matchesFilter(i, filter as never)).length
+      expect(shown, `${r.label} → ${r.href}`).toBeGreaterThanOrEqual(r.count)
+    }
   })
 })

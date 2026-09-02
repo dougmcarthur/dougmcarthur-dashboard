@@ -45,6 +45,25 @@ export interface DraftedMessage {
 }
 
 /**
+ * Third-person verb forms, and what they become after "you".
+ *
+ * An explicit map rather than stripping a trailing "s": that rule turned
+ * "decides" into "decid" and "chooses" into "choos", because the stems end in
+ * "e". Spelling is not derivable by suffix arithmetic.
+ */
+const VERB_TO_SECOND_PERSON: Record<string, string> = {
+  picks: 'pick', chooses: 'choose', reviews: 'review', decides: 'decide',
+  wants: 'want', needs: 'need', has: 'have', is: 'are', was: 'were',
+  prefers: 'prefer', plans: 'plan', submits: 'submit', sends: 'send',
+  approves: 'approve', confirms: 'confirm', plays: 'play', plans_to: 'plan to',
+}
+
+/** Both apostrophes: the notes contain typographic ones as well as ASCII. */
+const APOS = "['\u2019]"
+
+const NAME = '(?:Doug McArthur|Doug|the artist)'
+
+/**
  * Rewrites the artist's name out of note prose and into the second person.
  *
  * The notes were written *about* one person by agents told his name, so they
@@ -52,23 +71,48 @@ export interface DraftedMessage {
  * is Doug, is the app talking about him in the third person, and shown to
  * anyone else would be a stranger's name in their dashboard.
  *
+ * Pronouns are rewritten **per sentence, and only in sentences that named
+ * him**. "his call" in a sentence about Doug means yours; "his deadline" in a
+ * sentence about a festival organiser does not, and rewriting that would put
+ * words in a stranger's mouth.
+ *
  * The stored text is left alone; this only changes what reaches the screen, so
  * "Show original note" still shows what was actually written.
  */
 export function depersonalise(text: string): string {
-  return text
-    // Possessives first — "Doug's review" must not become "you's review".
-    .replace(/\b(?:Doug McArthur|Doug)'s\b/gi, 'your')
-    .replace(/\bthe artist's\b/gi, 'your')
-    // Then the bare name as a subject or object.
-    .replace(/\b(?:Doug McArthur|Doug)\b/g, 'you')
-    .replace(/\bthe artist\b/gi, 'you')
-    // "Recommend you picks" / "you should" style repairs left by the above.
-    .replace(/\byou (picks|chooses|reviews|decides|wants|needs)\b/g, (_m, verb: string) =>
-      `you ${verb.replace(/e?s$/, '')}`,
+  // Split on sentence ends, keeping the delimiters, so each clause can be
+  // judged on whether it is about the artist.
+  const parts = text.split(/(?<=[.!?])(\s+)/)
+
+  const rewritten = parts.map((part) => {
+    const named = new RegExp(`\\b${NAME}\\b`, 'i').test(part)
+    if (!named) return part
+
+    let out = part
+      // Possessives first, or "Doug's" becomes "you's".
+      .replace(new RegExp(`\\b${NAME}${APOS}s\\b`, 'gi'), 'your')
+      .replace(new RegExp(`\\b${NAME}\\b`, 'gi'), 'you')
+      // Only now, and only here, the third-person pronouns that referred to him.
+      .replace(new RegExp(`\\bhimself\\b`, 'gi'), 'yourself')
+      .replace(new RegExp(`\\bhis\\b`, 'gi'), 'your')
+      .replace(new RegExp(`\\bhim\\b`, 'gi'), 'you')
+      .replace(new RegExp(`\\bhe\\b`, 'g'), 'you')
+
+    // "you picks" -> "you pick".
+    out = out.replace(/\byou (\w+)\b/gi, (m, verb: string) => {
+      const fixed = VERB_TO_SECOND_PERSON[verb.toLowerCase()]
+      return fixed ? `${m.slice(0, m.length - verb.length)}${fixed}` : m
+    })
+
+    return out
+  })
+
+  // Capitalise "you" wherever it now opens a sentence — not just the first.
+  return rewritten
+    .join('')
+    .replace(/(^|[.!?]\s+)(you|your|yourself)\b/g, (_m, lead: string, w: string) =>
+      `${lead}${w[0].toUpperCase()}${w.slice(1)}`,
     )
-    // A sentence that began with the name now begins lowercase.
-    .replace(/^you\b/, 'You')
 }
 
 export type SubmissionState = 'not_submitted' | 'submitted' | 'unknown'

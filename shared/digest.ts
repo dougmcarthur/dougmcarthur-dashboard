@@ -13,6 +13,7 @@
  */
 
 import type { FlagId, ReviewItem } from './reviewQueue'
+import { awaitingDecision } from './reviewQueue'
 
 export type DigestGroupId = 'new' | 'actionable' | 'changed' | 'stale'
 
@@ -293,8 +294,19 @@ export function buildDigest(input: {
 
   // The queue arrives sorted by score, so "most important" is just the first
   // few that can actually be acted on today.
-  const live = input.items.filter((i) => !i.snooze.active)
-  const focus = live.filter(actionableNow).slice(0, FOCUS_LIMIT)
+  //
+  // The digest reports more than the Review queue does: alongside what needs
+  // deciding, it names the idle piles, which carry no flags at all and are the
+  // shape of the backlog. So this is not simply `awaitingDecision`.
+  //
+  // What it must not do is count a *decided* row under a flag bucket, because
+  // every such line deep-links into a Review filter that would then refuse to
+  // show it — an email promising rows that are not there when you arrive. A
+  // gig you passed on keeps its flags, so that is exactly what used to happen.
+  const live = input.items.filter(
+    (i) => awaitingDecision(i) || (!i.snooze.active && i.flags.length === 0),
+  )
+  const focus = live.filter((i) => awaitingDecision(i) && actionableNow(i)).slice(0, FOCUS_LIMIT)
   const inFocus = new Set(focus.map((i) => i.key))
 
   // Everything the top five did not name, counted once each under its most

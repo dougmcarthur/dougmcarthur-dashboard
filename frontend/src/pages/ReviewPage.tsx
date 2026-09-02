@@ -143,7 +143,18 @@ function Detail({
   const sync = item.source.kind === 'sync' ? item.source.row : null
   const promo = item.source.kind === 'promo' ? item.source.row : null
 
-  const draftedFieldsText = parsed.draftedFields
+  // Field values are *answers*, not commentary — "Contact Name: Doug McArthur"
+  // is the text that goes on the festival's form, and rewriting it to
+  // "Contact Name: you" would put the wrong thing on the clipboard.
+  //
+  // `needsDoug` is exactly the flag for the other case: a value that is a
+  // placeholder saying he still has to supply something. Those are the app
+  // talking, so those are the ones rewritten.
+  const draftedFields = parsed.draftedFields.map((f) =>
+    f.needsDoug ? { ...f, value: depersonalise(f.value) } : f,
+  )
+
+  const draftedFieldsText = draftedFields
     .map((f) => (f.label ? `${f.label}: ${f.value}` : f.value))
     .join('\n')
 
@@ -154,9 +165,11 @@ function Detail({
   const states = item.flags.filter((f) => f.kind === 'state')
 
   // Anything already rendered as its own fact at the top would be said twice
-  // as a chip.
-  const SHOWN_AS_FACT = new Set(['overdue', 'due_soon', 'paid'])
+  // as a chip — and "Deadline not a real date" beside a deadline that now
+  // shows the prose underneath it was saying the same thing in two voices.
+  const SHOWN_AS_FACT = new Set(['overdue', 'due_soon', 'paid', 'vague_deadline', 'window'])
   const warningChips = warnings.filter((f) => !SHOWN_AS_FACT.has(f.id))
+  const stateChips = states.filter((f) => !SHOWN_AS_FACT.has(f.id))
 
   const needsYou = [
     ...parsed.alerts.map((a) => ({ text: depersonalise(a.text), severity: a.severity })),
@@ -174,14 +187,24 @@ function Detail({
       ? depersonalise(parsed.submissionNote)
       : null
 
-  const facts: Array<{ label: string; value: React.ReactNode; tone?: 'plain' | 'urgent' | 'cost' }> = []
-  if (deadline.raw) {
+  const facts: Array<{
+    label: string
+    value: React.ReactNode
+    tone?: 'plain' | 'urgent' | 'cost'
+    note?: string | null
+  }> = []
+
+  if (deadline.raw || deadline.date) {
     facts.push({
       label: 'Deadline',
       tone: deadline.daysUntil !== null && deadline.daysUntil <= 14 ? 'urgent' : 'plain',
+      // 26 of 34 gig rows hold prose here. Where a date was recovered from it,
+      // the prose is kept underneath rather than dropped — the recovery is a
+      // reading, and "Nov 20" alone claims a certainty the column does not have.
+      note: deadline.exact ? deadline.note : (deadline.raw ?? deadline.note),
       value: (
         <>
-          {deadline.date ? shortDate(deadline.date) : 'not a real date'}
+          {deadline.date ? shortDate(deadline.date) : 'No date given'}
           {deadline.daysUntil !== null && (
             <span className="ml-1.5 font-normal text-muted">
               {deadline.daysUntil < 0
@@ -195,10 +218,29 @@ function Detail({
       ),
     })
   }
-  if (fee.raw || fee.payout) {
+
+  if (deadline.opensAt) {
+    facts.push({
+      label: 'Window opens',
+      value: (
+        <>
+          {shortDate(deadline.opensAt)}
+          {deadline.opensInDays !== null && deadline.opensInDays > 0 && (
+            <span className="ml-1.5 font-normal text-muted">in {deadline.opensInDays}d</span>
+          )}
+        </>
+      ),
+    })
+  }
+
+  // Gated on `required` as well as `raw`: the fee can come from the `paid`
+  // column with no text at all, and this used to leave a paid application with
+  // nothing on the pane mentioning money once the chip was suppressed.
+  if (fee.required || fee.raw || fee.payout) {
     facts.push({
       label: 'Entry fee',
       tone: fee.required ? 'cost' : 'plain',
+      note: fee.raw,
       value: fee.required
         ? fee.amount != null
           ? `${fee.currency} ${fee.amount.toLocaleString()}`
@@ -216,7 +258,7 @@ function Detail({
           <div className="flex items-center gap-2 mb-1.5">
             <KindTag kind={item.kind} />
             <StatusBadge status={item.status} kind={item.kind === 'gig' ? 'gig' : undefined} />
-            {states.map((f) => (
+            {stateChips.map((f) => (
               <span key={f.id} className="text-xs text-muted">
                 {f.label}
               </span>
@@ -291,7 +333,7 @@ function Detail({
 
       {parsed.summary && (
         <Section title={item.kind === 'gig' ? 'Why it fits' : 'Background'}>
-          <p className="text-sm leading-relaxed text-body">{parsed.summary}</p>
+          <p className="text-sm leading-relaxed text-body">{depersonalise(parsed.summary)}</p>
           {parsed.tracks.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {parsed.tracks.map((track) => (
@@ -325,7 +367,9 @@ function Detail({
                 ))}
               </div>
             )}
-            {parsed.requirements.length > 0 && <BulletList items={parsed.requirements} />}
+            {parsed.requirements.length > 0 && (
+              <BulletList items={parsed.requirements.map(depersonalise)} />
+            )}
             {parsed.links.length > 0 && (
               <div className="flex flex-col gap-1">
                 {parsed.links.map((link) => (
@@ -341,17 +385,17 @@ function Detail({
 
       {parsed.timing.length > 0 && (
         <Section title="Timing notes">
-          <BulletList items={parsed.timing} />
+          <BulletList items={parsed.timing.map(depersonalise)} />
         </Section>
       )}
 
-      {parsed.draftedFields.length > 0 && (
+      {draftedFields.length > 0 && (
         <Section
           title="Drafted application values"
-          count={parsed.draftedFields.length}
+          count={draftedFields.length}
           action={<CopyButton text={draftedFieldsText} label="Copy all" />}
         >
-          <FieldTable fields={parsed.draftedFields} />
+          <FieldTable fields={draftedFields} />
         </Section>
       )}
 
@@ -390,13 +434,13 @@ function Detail({
 
       {parsed.dealTerms.length > 0 && (
         <Section title="Deal terms" count={parsed.dealTerms.length}>
-          <BulletList items={parsed.dealTerms} />
+          <BulletList items={parsed.dealTerms.map(depersonalise)} />
         </Section>
       )}
 
       {parsed.provenance.length > 0 && (
         <Section title="Where this came from" count={parsed.provenance.length}>
-          <BulletList items={parsed.provenance} />
+          <BulletList items={parsed.provenance.map(depersonalise)} />
         </Section>
       )}
 

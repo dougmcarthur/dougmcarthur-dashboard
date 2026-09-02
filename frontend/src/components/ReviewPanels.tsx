@@ -46,13 +46,19 @@ export function Section({
 export function FactRow({
   facts,
 }: {
-  facts: Array<{ label: string; value: ReactNode; tone?: 'plain' | 'urgent' | 'cost' }>
+  facts: Array<{
+    label: string
+    value: ReactNode
+    tone?: 'plain' | 'urgent' | 'cost'
+    /** What the column actually held, when the value above is a reading of it. */
+    note?: string | null
+  }>
 }) {
   if (facts.length === 0) return null
   return (
     <dl className="flex flex-wrap gap-x-8 gap-y-2.5">
       {facts.map((f) => (
-        <div key={f.label} className="min-w-0">
+        <div key={f.label} className="min-w-0 max-w-full">
           <dt className="text-[0.68rem] font-bold uppercase tracking-[0.11em] text-faint">
             {f.label}
           </dt>
@@ -67,6 +73,13 @@ export function FactRow({
           >
             {f.value}
           </dd>
+          {/* A date recovered from prose must not look as certain as one the
+              column actually held — the prose goes underneath it. */}
+          {f.note && (
+            <p className="mt-0.5 max-w-[32ch] text-xs font-normal leading-snug text-muted">
+              {f.note}
+            </p>
+          )}
         </div>
       ))}
     </dl>
