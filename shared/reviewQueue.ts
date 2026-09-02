@@ -47,10 +47,21 @@ export type FlagId =
   | 'window'
   | 'vague_deadline'
 
+/**
+ * Whether a flag describes *where the item is* or *what is wrong with it*.
+ *
+ * The detail pane was showing both as identical chips, so "Not submitted yet"
+ * (a state, and the normal one) sat beside "Flagged issue" (a problem) looking
+ * equally alarming. They are different questions and belong in different places
+ * on screen.
+ */
+export type FlagKind = 'state' | 'warning'
+
 export interface ReviewFlag {
   id: FlagId
   label: string
   severity: AlertSeverity
+  kind: FlagKind
 }
 
 export type ReviewSource =
@@ -167,41 +178,49 @@ function flagsFor(
       id: 'conflict',
       label: `Status says "${status.replace(/_/g, ' ')}", note says not submitted`,
       severity: 'danger',
+      kind: 'warning',
     })
   } else if (parsed.submissionState === 'not_submitted') {
-    flags.push({ id: 'not_submitted', label: 'Not submitted yet', severity: 'warn' })
+    // A state, not a warning: almost everything in the queue is unsubmitted,
+    // and colouring the normal case as a problem is how a queue stops meaning
+    // anything.
+    flags.push({ id: 'not_submitted', label: 'Not submitted', severity: 'info', kind: 'state' })
   }
 
   if (deadline.daysUntil !== null) {
     if (deadline.daysUntil < 0) {
-      flags.push({ id: 'overdue', label: `Deadline passed ${Math.abs(deadline.daysUntil)}d ago`, severity: 'danger' })
+      flags.push({ id: 'overdue', label: `Deadline passed ${Math.abs(deadline.daysUntil)}d ago`, severity: 'danger', kind: 'warning' })
     } else if (deadline.daysUntil <= 14) {
       flags.push({
         id: 'due_soon',
         label: deadline.daysUntil === 0 ? 'Due today' : `Due in ${deadline.daysUntil}d`,
         severity: deadline.daysUntil <= 3 ? 'danger' : 'warn',
+        kind: 'warning',
       })
     }
   }
   if (deadline.raw && !deadline.exact) {
-    flags.push({ id: 'vague_deadline', label: 'Deadline not a real date', severity: 'info' })
+    flags.push({ id: 'vague_deadline', label: 'Deadline not a real date', severity: 'info', kind: 'state' })
   }
 
   if (parsed.alerts.some((a) => a.severity === 'danger')) {
-    flags.push({ id: 'issue', label: 'Flagged issue', severity: 'danger' })
+    flags.push({ id: 'issue', label: 'Flagged issue', severity: 'danger', kind: 'warning' })
   }
   if (parsed.blockers.length > 0 || parsed.draftedFields.some((f) => f.needsDoug)) {
-    flags.push({ id: 'blocked', label: 'Blocked on you', severity: 'warn' })
+    flags.push({ id: 'blocked', label: 'Needs you', severity: 'warn', kind: 'warning' })
   }
   if (fee.required) {
     flags.push({
       id: 'paid',
-      label: fee.amount ? `Costs ${fee.currency} ${fee.amount.toLocaleString()}` : 'Costs money',
+      // Named for the amount where there is one. "Costs money" told you nothing
+      // the fee line below it did not already say.
+      label: fee.amount ? `${fee.currency} ${fee.amount.toLocaleString()} to enter` : 'Entry fee',
       severity: 'warn',
+      kind: 'warning',
     })
   }
   if (parsed.timing.length > 0) {
-    flags.push({ id: 'window', label: 'Window opens later', severity: 'info' })
+    flags.push({ id: 'window', label: 'Window opens later', severity: 'info', kind: 'state' })
   }
 
   return flags
@@ -273,7 +292,9 @@ function promoItem(row: PromoDraft): Omit<ReviewItem, 'decision'> {
     url: null,
     note: null,
     parsed, fee, deadline,
-    flags: row.status === 'draft' ? [{ id: 'not_submitted', label: 'Unapproved draft', severity: 'warn' }] : [],
+    flags: row.status === 'draft'
+      ? [{ id: 'not_submitted' as const, label: 'Not published', severity: 'info' as const, kind: 'state' as const }]
+      : [],
     score: row.status === 'draft' ? FLAG_WEIGHT.not_submitted : 0,
     snooze: NO_SNOOZE,
     source: { kind: 'promo', row },
@@ -487,7 +508,17 @@ export function matchesFilter(item: ReviewItem, filter: ReviewFilter): boolean {
     case 'all':
       return true
     case 'needs':
-      return item.flags.some((f) => f.id !== 'vague_deadline')
+      // A decision already made is not a decision outstanding. This used to ask
+      // only whether the item carried flags — and a passed gig keeps every flag
+      // it had, because those are parsed from a note that does not change when
+      // you say no. So anything you had already decided sat here forever.
+      //
+      // A conflict is the exception, and the reason this is not a plain
+      // `!settled` gate: a conflict *is* the claim that the status is wrong, so
+      // trusting that status to exclude the item would hide the one case where
+      // the status cannot be trusted.
+      if (item.flags.some((f) => f.id === 'conflict')) return true
+      return !settled(item) && item.flags.some((f) => f.id !== 'vague_deadline')
     case 'conflict':
       return item.flags.some((f) => f.id === 'conflict')
     case 'blocked':

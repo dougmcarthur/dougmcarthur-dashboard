@@ -68,7 +68,8 @@ describe('buildReviewQueue — flags from the note and columns', () => {
       gigs: [gig({ id: 3, name: 'CFMA 2027', paid: 1, fee: '$85 CAD first entry' })],
     })
     const paid = item.flags.find((f) => f.id === 'paid')
-    expect(paid?.label).toBe('Costs CAD 85')
+    // Named for the amount. "Costs money" repeated what the fee line said.
+    expect(paid?.label).toBe('CAD 85 to enter')
   })
 
   it('marks a prose deadline as not a real date', () => {

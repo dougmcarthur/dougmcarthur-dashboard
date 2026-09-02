@@ -42,7 +42,7 @@ function IntegrationCards() {
             <p className="text-xs text-muted">Missing secrets:</p>
             <div className="flex flex-wrap gap-1">
               {data?.calendarMissingSecrets.map((s) => (
-                <code key={s} className="text-xs bg-sunken text-body px-1.5 py-0.5 rounded font-mono">{s}</code>
+                <code key={s} className="text-xs bg-sunken text-body px-1.5 py-0.5 rounded">{s}</code>
               ))}
             </div>
             <p className="text-xs text-muted">
@@ -65,7 +65,7 @@ function IntegrationCards() {
             <p className="text-xs text-muted">Missing secrets:</p>
             <div className="flex flex-wrap gap-1">
               {data?.gmailMissingSecrets.map((s) => (
-                <code key={s} className="text-xs bg-sunken text-body px-1.5 py-0.5 rounded font-mono">{s}</code>
+                <code key={s} className="text-xs bg-sunken text-body px-1.5 py-0.5 rounded">{s}</code>
               ))}
             </div>
             <p className="text-xs text-muted">
@@ -123,7 +123,7 @@ function CalendarStatus() {
             {data?.calendarMissingSecrets.map((s) => (
               <code
                 key={s}
-                className="text-xs bg-sunken text-body px-2 py-1 rounded font-mono"
+                className="text-xs bg-sunken text-body px-2 py-1 rounded"
               >
                 {s}
               </code>
@@ -182,7 +182,7 @@ function DocEditor({
         ) : (
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-ink truncate">{doc.title}</p>
-            <p className="text-xs text-muted font-mono">{doc.id}</p>
+            <p className="text-xs text-muted">{doc.id}</p>
           </div>
         )}
         <div className="flex gap-2 shrink-0">
@@ -230,7 +230,7 @@ function DocEditor({
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={10}
-          className="w-full px-4 py-3 text-sm font-mono text-body leading-relaxed resize-y focus:outline-none"
+          className="w-full px-4 py-3 text-sm text-body leading-relaxed resize-y focus:outline-none"
         />
       ) : (
         <div className="px-4 py-3">
@@ -318,7 +318,7 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
           onChange={(e) => setContent(e.target.value)}
           rows={6}
           placeholder="Paste or type the content here…"
-          className={`${INPUT_CLASS} font-mono resize-y`}
+          className={`${INPUT_CLASS} resize-y`}
         />
       </div>
       <div className="flex gap-2">

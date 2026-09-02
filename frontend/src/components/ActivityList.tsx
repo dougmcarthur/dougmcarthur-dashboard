@@ -59,7 +59,7 @@ export function ActivityList({ runs, onNav }: { runs: TaskRun[]; onNav: (page: s
                 ) : (
                   <span className="w-4 shrink-0" aria-hidden="true" />
                 )}
-                <span className="font-mono text-xs text-body truncate">{run.taskId}</span>
+                <span className="text-xs text-body truncate">{run.taskId}</span>
                 <span className="ml-auto text-xs text-muted tabular-nums shrink-0">
                   {run.itemsAdded ? `+${run.itemsAdded}` : ''}
                 </span>

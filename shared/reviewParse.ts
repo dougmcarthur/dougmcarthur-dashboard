@@ -44,6 +44,33 @@ export interface DraftedMessage {
   body: string
 }
 
+/**
+ * Rewrites the artist's name out of note prose and into the second person.
+ *
+ * The notes were written *about* one person by agents told his name, so they
+ * read "do not submit without Doug's review" — which, shown to the person who
+ * is Doug, is the app talking about him in the third person, and shown to
+ * anyone else would be a stranger's name in their dashboard.
+ *
+ * The stored text is left alone; this only changes what reaches the screen, so
+ * "Show original note" still shows what was actually written.
+ */
+export function depersonalise(text: string): string {
+  return text
+    // Possessives first — "Doug's review" must not become "you's review".
+    .replace(/\b(?:Doug McArthur|Doug)'s\b/gi, 'your')
+    .replace(/\bthe artist's\b/gi, 'your')
+    // Then the bare name as a subject or object.
+    .replace(/\b(?:Doug McArthur|Doug)\b/g, 'you')
+    .replace(/\bthe artist\b/gi, 'you')
+    // "Recommend you picks" / "you should" style repairs left by the above.
+    .replace(/\byou (picks|chooses|reviews|decides|wants|needs)\b/g, (_m, verb: string) =>
+      `you ${verb.replace(/e?s$/, '')}`,
+    )
+    // A sentence that began with the name now begins lowercase.
+    .replace(/^you\b/, 'You')
+}
+
 export type SubmissionState = 'not_submitted' | 'submitted' | 'unknown'
 export type SubmissionMethod = 'email' | 'form' | 'portal' | 'dm' | null
 
@@ -128,7 +155,12 @@ const RE = {
   submissionStatus: /^Submission status\s*[:—-]\s*(.+)$/i,
   notSubmitted: /\b(?:not submitted|not sent|not started|application not filled|nothing to fill out)\b/i,
 
-  blocker: /needs Doug\b|not on file\b|left blank|left unselected|intentionally left|Doug should\b|Recommend\w* Doug\b|pending Doug'?s\b|needs Doug'?s\b|requires Doug'?s\b|best left to Doug\b|his call\b|Doug'?s decision\b|for Doug to (?:pick|choose|review|decide)|best left to Doug/i,
+  // The artist's own name appears throughout the stored notes, because the
+  // research agents that wrote them were told who they were writing for. The
+  // name has to stay matchable — that is what the data says — but a second,
+  // name-free alternation means rows written for anyone else still parse. See
+  // `depersonalise` for why the name never reaches the screen.
+  blocker: /needs (?:Doug|the artist)\b|not on file\b|left blank|left unselected|intentionally left|(?:Doug|the artist) should\b|Recommend\w* (?:Doug|the artist)\b|pending (?:Doug|the artist)'?s?\b|needs (?:Doug|the artist)'?s\b|requires (?:Doug|the artist)'?s\b|best left to (?:Doug|the artist)\b|(?:his|her|their) call\b|(?:Doug|the artist)'?s decision\b|for (?:Doug|the artist) to (?:pick|choose|review|decide)|awaiting (?:your|artist) (?:review|approval|decision)|your (?:review|approval|say-so)\b/i,
 
   // Deliberately narrow: broad tokens like "submission window" also appear in
   // ordinary agency blurbs, which would drag the whole description in here.

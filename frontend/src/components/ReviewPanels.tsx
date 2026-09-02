@@ -1,45 +1,100 @@
 import { useState, type ReactNode } from 'react'
 import type { NoteAlert, DraftedField } from '../../../shared/reviewParse'
 import type { ReviewFlag, ReviewKind } from '../../../shared/reviewQueue'
+import type { AlertSeverity } from '../../../shared/reviewParse'
 
-export type PanelTone = 'neutral' | 'danger' | 'warn' | 'info' | 'accent'
-
-const PANEL_TONES: Record<PanelTone, { box: string; head: string }> = {
-  neutral: { box: 'bg-surface border-line', head: 'text-muted' },
-  danger: { box: 'bg-danger-bg border-danger-line', head: 'text-danger-fg' },
-  warn: { box: 'bg-warn-bg border-warn-line', head: 'text-warn-fg' },
-  info: { box: 'bg-info-bg/60 border-info-line', head: 'text-info-fg' },
-  accent: { box: 'bg-cat-violet-bg/50 border-cat-violet-line', head: 'text-cat-violet-fg' },
-}
-
-/** One titled container. Every parsed fact type gets its own. */
-export function Panel({
+/**
+ * A section of the detail pane.
+ *
+ * Deliberately *not* a box. The pane used to be ten bordered, separately
+ * tinted panels stacked on one another — boxes inside a box inside a card —
+ * which made every section shout equally and none of them read as related.
+ * One surface, and hierarchy carried by type and a hairline rule instead.
+ */
+export function Section({
   title,
-  tone = 'neutral',
   count,
   action,
   children,
 }: {
   title: string
-  tone?: PanelTone
   count?: number
   action?: ReactNode
   children: ReactNode
 }) {
-  const styles = PANEL_TONES[tone]
   return (
-    <section className={`rounded-lg border ${styles.box}`}>
-      <header className="flex items-center justify-between gap-3 px-4 pt-3 pb-2">
-        <h3 className={`text-xs font-semibold uppercase tracking-wider ${styles.head}`}>
+    <section className="pt-5">
+      <header className="flex items-center justify-between gap-3 border-b border-line pb-1.5 mb-3">
+        <h3 className="text-[0.68rem] font-bold uppercase tracking-[0.11em] text-faint">
           {title}
           {count !== undefined && count > 0 && (
-            <span className="ml-2 font-normal opacity-60">{count}</span>
+            <span className="ml-1.5 font-semibold text-muted">{count}</span>
           )}
         </h3>
         {action}
       </header>
-      <div className="px-4 pb-4">{children}</div>
+      {children}
     </section>
+  )
+}
+
+/**
+ * The two or three numbers a decision actually turns on, at the top where they
+ * belong. A deadline is the single most load-bearing fact about an opportunity
+ * and it used to sit two thirds of the way down, inside a box, inside a panel.
+ */
+export function FactRow({
+  facts,
+}: {
+  facts: Array<{ label: string; value: ReactNode; tone?: 'plain' | 'urgent' | 'cost' }>
+}) {
+  if (facts.length === 0) return null
+  return (
+    <dl className="flex flex-wrap gap-x-8 gap-y-2.5">
+      {facts.map((f) => (
+        <div key={f.label} className="min-w-0">
+          <dt className="text-[0.68rem] font-bold uppercase tracking-[0.11em] text-faint">
+            {f.label}
+          </dt>
+          <dd
+            className={`mt-0.5 text-sm font-semibold tabular-nums ${
+              f.tone === 'urgent'
+                ? 'text-danger-fg'
+                : f.tone === 'cost'
+                  ? 'text-warn-fg'
+                  : 'text-ink'
+            }`}
+          >
+            {f.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+/**
+ * Things standing between you and a decision.
+ *
+ * One list with a rule down its side, rather than two separately tinted panels
+ * ("Flags & known issues" above "Blocked on you") saying much the same thing in
+ * different colours.
+ */
+export function NeedsYou({ items }: { items: Array<{ text: string; severity?: AlertSeverity }> }) {
+  if (items.length === 0) return null
+  return (
+    <ul className="space-y-2 border-l-2 border-danger-line pl-3.5">
+      {items.map((it, i) => (
+        <li
+          key={i}
+          className={`text-sm leading-relaxed ${
+            it.severity === 'danger' ? 'text-ink' : 'text-body'
+          }`}
+        >
+          {it.text}
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -103,33 +158,6 @@ export function KindTag({ kind }: { kind: ReviewKind }) {
   )
 }
 
-export function AlertList({ alerts }: { alerts: NoteAlert[] }) {
-  return (
-    <ul className="space-y-2">
-      {alerts.map((alert, i) => (
-        <li
-          key={i}
-          className={`rounded-md border px-3 py-2 text-sm leading-relaxed ${
-            alert.severity === 'danger'
-              ? 'bg-surface border-danger-line text-danger-fg'
-              : alert.severity === 'warn'
-              ? 'bg-surface border-warn-line text-warn-fg'
-              : 'bg-surface border-line text-body'
-          }`}
-        >
-          {alert.flaggedAt && (
-            <span className="mr-2 rounded bg-sunken px-1.5 py-0.5 text-[10px] font-mono text-muted">
-              {alert.flaggedAt}
-            </span>
-          )}
-          {alert.text}
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-/** The drafted application values, as a copyable label/value table. */
 export function FieldTable({ fields }: { fields: DraftedField[] }) {
   return (
     <dl className="divide-y divide-line rounded-md border border-line bg-surface">
@@ -171,19 +199,30 @@ export function BulletList({ items, tone = 'gray' }: { items: string[]; tone?: '
 }
 
 /** Collapsible original note, so the parse never hides the source text. */
+/**
+ * The note exactly as stored, folded away.
+ *
+ * Everything above it is the app's reading of this text — parsed, classified,
+ * and rewritten into the second person — so the original has to stay reachable
+ * for when the reading looks wrong. A disclosure row rather than a box, to
+ * match the rest of the pane.
+ */
 export function RawNote({ note }: { note: string }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="rounded-lg border border-dashed border-line bg-surface">
+    <div className="pt-5">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-4 py-2.5 text-xs font-medium text-muted hover:text-body transition-colors"
+        aria-expanded={open}
+        className="flex w-full items-center justify-between border-b border-line pb-1.5 text-[0.68rem] font-bold uppercase tracking-[0.11em] text-faint hover:text-muted transition-colors"
       >
-        <span>{open ? 'Hide' : 'Show'} original note text</span>
-        <span className="font-mono">{note.length} chars</span>
+        <span>{open ? 'Hide' : 'Show'} original note</span>
+        <span className="tabular-nums font-semibold normal-case tracking-normal">
+          {note.length} chars
+        </span>
       </button>
       {open && (
-        <pre className="whitespace-pre-wrap break-words border-t border-line px-4 py-3 text-xs leading-relaxed text-body font-sans">
+        <pre className="mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted font-sans">
           {note}
         </pre>
       )}

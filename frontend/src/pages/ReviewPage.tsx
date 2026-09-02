@@ -7,16 +7,17 @@ import { PitchDiff } from '../components/PitchDiff'
 import { SnoozeMenu } from '../components/SnoozeMenu'
 import { shortDate } from '../format'
 import {
-  Panel, CopyButton, FlagChip, KindTag, AlertList, FieldTable, BulletList, RawNote,
+  Section, FactRow, NeedsYou, CopyButton, FlagChip, KindTag, FieldTable, BulletList, RawNote,
 } from '../components/ReviewPanels'
 import type { ReviewItem, ReviewFilter } from '../../../shared/reviewQueue'
 import { normaliseGigStatus } from '../../../shared/gigStatus'
+import { depersonalise } from '../../../shared/reviewParse'
 
 const FILTERS: Array<{ id: ReviewFilter; label: string }> = [
   { id: 'needs', label: 'Needs a decision' },
   { id: 'conflict', label: 'Conflicts' },
-  { id: 'blocked', label: 'Blocked on you' },
-  { id: 'paid', label: 'Costs money' },
+  { id: 'blocked', label: 'Needs you' },
+  { id: 'paid', label: 'Entry fee' },
   { id: 'timing', label: 'Timing' },
   { id: 'snoozed', label: 'Snoozed' },
   { id: 'all', label: 'Everything' },
@@ -146,272 +147,150 @@ function Detail({
     .map((f) => (f.label ? `${f.label}: ${f.value}` : f.value))
     .join('\n')
 
-  return (
-    <div className="space-y-4">
-      {/* Identity + decision */}
-      <div className="rounded-xl border border-line bg-surface shadow-card p-5 space-y-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <KindTag kind={item.kind} />
-              <StatusBadge status={item.status} />
-            </div>
-            <h2 className="text-lg font-semibold text-ink leading-snug">{item.title}</h2>
-            <p className="text-sm text-muted mt-0.5">
-              {item.subtitle}
-              {parsed.location && <span> · {parsed.location}</span>}
-            </p>
-          </div>
-          {item.url && (
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noreferrer"
-              className="shrink-0 text-xs px-3 py-1.5 rounded-md border border-line-strong text-info-fg hover:bg-info-bg transition-colors"
-            >
-              Open source ↗
-            </a>
+  // Warnings only. States ("Not submitted") describe where the item is and
+  // belong beside the status; mixing them into the same row of chips made the
+  // ordinary case look like a problem.
+  const warnings = item.flags.filter((f) => f.kind === 'warning')
+  const states = item.flags.filter((f) => f.kind === 'state')
+
+  // Anything already rendered as its own fact at the top would be said twice
+  // as a chip.
+  const SHOWN_AS_FACT = new Set(['overdue', 'due_soon', 'paid'])
+  const warningChips = warnings.filter((f) => !SHOWN_AS_FACT.has(f.id))
+
+  const needsYou = [
+    ...parsed.alerts.map((a) => ({ text: depersonalise(a.text), severity: a.severity })),
+    ...parsed.blockers.map((b) => ({ text: depersonalise(b) })),
+    ...parsed.draftedFields
+      .filter((f) => f.needsDoug)
+      .map((f) => ({ text: depersonalise(f.label ? `${f.label} — ${f.value}` : f.value) })),
+  ]
+
+  // The submission note is often the same sentence the blocker parser already
+  // pulled out ("Application not filled — pending your review"), so showing
+  // both printed it twice on the same screen.
+  const submissionNote =
+    parsed.submissionNote && !needsYou.some((n) => n.text === depersonalise(parsed.submissionNote!))
+      ? depersonalise(parsed.submissionNote)
+      : null
+
+  const facts: Array<{ label: string; value: React.ReactNode; tone?: 'plain' | 'urgent' | 'cost' }> = []
+  if (deadline.raw) {
+    facts.push({
+      label: 'Deadline',
+      tone: deadline.daysUntil !== null && deadline.daysUntil <= 14 ? 'urgent' : 'plain',
+      value: (
+        <>
+          {deadline.date ? shortDate(deadline.date) : 'not a real date'}
+          {deadline.daysUntil !== null && (
+            <span className="ml-1.5 font-normal text-muted">
+              {deadline.daysUntil < 0
+                ? `${Math.abs(deadline.daysUntil)}d ago`
+                : deadline.daysUntil === 0
+                  ? 'today'
+                  : `in ${deadline.daysUntil}d`}
+            </span>
           )}
-        </div>
+        </>
+      ),
+    })
+  }
+  if (fee.raw || fee.payout) {
+    facts.push({
+      label: 'Entry fee',
+      tone: fee.required ? 'cost' : 'plain',
+      value: fee.required
+        ? fee.amount != null
+          ? `${fee.currency} ${fee.amount.toLocaleString()}`
+          : 'Required'
+        : 'Free',
+    })
+  }
+  if (fee.payout) facts.push({ label: 'Pays', value: fee.payout })
 
-        {item.flags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {item.flags.map((f) => <FlagChip key={f.id} flag={f} />)}
+  return (
+    // One card, one background. Every section below is a heading and a rule.
+    <div className="rounded-xl border border-line bg-surface shadow-card p-5 divide-y divide-transparent">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1.5">
+            <KindTag kind={item.kind} />
+            <StatusBadge status={item.status} kind={item.kind === 'gig' ? 'gig' : undefined} />
+            {states.map((f) => (
+              <span key={f.id} className="text-xs text-muted">
+                {f.label}
+              </span>
+            ))}
           </div>
-        )}
-
-        {/* A snooze is stated where the item is, with the way out beside it.
-            The whole point of the Snoozed view is that deferring is visible
-            and reversible rather than a quiet disappearance. */}
-        {item.snooze.active && (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-info-line bg-info-bg/50 px-3 py-2">
-            <p className="text-xs text-info-fg">
-              Snoozed until <span className="font-semibold">{shortDate(item.snooze.until!)}</span>
-              {item.snooze.daysUntil !== null && (
-                <span className="text-info-fg"> · {item.snooze.daysUntil}d away</span>
-              )}
-            </p>
-            <button
-              onClick={() => onSnooze(null)}
-              disabled={isSaving}
-              className="shrink-0 text-xs px-2.5 py-1 rounded-md border border-info-line bg-surface text-info-fg hover:bg-info-bg disabled:opacity-40 transition-colors"
-            >
-              Bring it back now
-            </button>
-          </div>
-        )}
-
-        {item.snooze.wokenByChange && (
-          <p className="rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg leading-relaxed">
-            This was snoozed until {shortDate(item.snooze.until!)}, but it changed
-            afterwards — so it came back early rather than sitting on a decision
-            made about different facts.
+          <h2 className="text-lg font-semibold text-ink leading-snug">{item.title}</h2>
+          <p className="text-sm text-muted mt-0.5">
+            {item.subtitle}
+            {parsed.location && <span> · {parsed.location}</span>}
           </p>
-        )}
-
-        <div className="pt-1 border-t border-line">
-          <div className="pt-3 flex flex-wrap items-center gap-2">
-            <DecisionBar item={item} onGig={onGig} onSync={onSync} onPromo={onPromo} isSaving={isSaving} />
-            {item.kind !== 'promo' && !item.snooze.active && (
-              <SnoozeMenu item={item} onPick={(until) => onSnooze(until)} disabled={isSaving} />
-            )}
-          </div>
         </div>
+        {item.url && (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            className="shrink-0 text-xs px-3 py-1.5 rounded-md border border-line-strong text-info-fg hover:bg-info-bg transition-colors"
+          >
+            Open listing ↗
+          </a>
+        )}
       </div>
 
-      {/* Flagged issues pulled out of the note */}
-      {parsed.alerts.length > 0 && (
-        <Panel title="Flags & known issues" tone="danger" count={parsed.alerts.length}>
-          <AlertList alerts={parsed.alerts} />
-        </Panel>
+      {/* The facts a decision turns on, before anything else. */}
+      {facts.length > 0 && (
+        <div className="mt-4">
+          <FactRow facts={facts} />
+        </div>
       )}
 
-      {/* Waiting on Doug */}
-      {(parsed.blockers.length > 0 || parsed.draftedFields.some((f) => f.needsDoug)) && (
-        <Panel title="Blocked on you" tone="warn">
-          <BulletList
-            tone="amber"
-            items={[
-              ...parsed.blockers,
-              ...parsed.draftedFields
-                .filter((f) => f.needsDoug)
-                .map((f) => `${f.label || 'Field'} — ${f.value}`),
-            ]}
-          />
-        </Panel>
+      {warningChips.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {warningChips.map((f) => <FlagChip key={f.id} flag={f} />)}
+        </div>
       )}
 
-      {/* Timing */}
-      {(deadline.raw || parsed.timing.length > 0) && (
-        <Panel title="Timing" tone={deadline.daysUntil !== null && deadline.daysUntil <= 14 ? 'warn' : 'neutral'}>
-          {deadline.raw && (
-            <div className="mb-3 rounded-md border border-line bg-surface px-3 py-2">
-              <div className="flex items-baseline gap-3">
-                <span className="text-xs font-medium text-muted w-20 shrink-0">Deadline</span>
-                <span className="text-sm text-ink">
-                  {deadline.date ?? 'no date found'}
-                  {deadline.daysUntil !== null && (
-                    <span
-                      className={`ml-2 text-xs font-semibold ${
-                        deadline.daysUntil < 0
-                          ? 'text-danger-fg'
-                          : deadline.daysUntil <= 7
-                          ? 'text-cat-orange-fg'
-                          : 'text-muted'
-                      }`}
-                    >
-                      {deadline.daysUntil < 0
-                        ? `${Math.abs(deadline.daysUntil)}d ago`
-                        : deadline.daysUntil === 0
-                        ? 'today'
-                        : `in ${deadline.daysUntil}d`}
-                    </span>
-                  )}
-                </span>
-              </div>
-              {!deadline.exact && (
-                <p className="mt-1.5 text-xs text-muted leading-relaxed">
-                  <span className="text-warn-fg font-medium">Stored as prose, not a date:</span>{' '}
-                  “{deadline.raw}”
-                </p>
-              )}
-            </div>
-          )}
-          {parsed.timing.length > 0 && <BulletList items={parsed.timing} />}
-        </Panel>
-      )}
-
-      {/* Cost */}
-      {(fee.raw || fee.payout) && (
-        <Panel title="Cost to enter" tone={fee.required ? 'warn' : 'neutral'}>
-          <p className="text-sm text-ink">
-            {fee.required ? (
-              <>
-                <span className="font-semibold">
-                  {fee.amount != null ? `${fee.currency} ${fee.amount.toLocaleString()}` : 'Paid entry'}
-                </span>{' '}
-                <span className="text-muted">— nothing goes out until you say so</span>
-              </>
-            ) : (
-              <span className="text-body">No entry fee</span>
-            )}
+      {item.snooze.active && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-info-line bg-info-bg/50 px-3 py-2">
+          <p className="text-xs text-info-fg">
+            Snoozed until <span className="font-semibold">{shortDate(item.snooze.until!)}</span>
+            {item.snooze.daysUntil !== null && <span> · {item.snooze.daysUntil}d away</span>}
           </p>
-          {fee.payout && <p className="mt-1 text-sm text-success-fg">Pays out: {fee.payout}</p>}
-          {fee.raw && <p className="mt-1.5 text-xs text-muted">Raw: “{fee.raw}”</p>}
-        </Panel>
+          <button
+            onClick={() => onSnooze(null)}
+            disabled={isSaving}
+            className="shrink-0 text-xs px-2.5 py-1 rounded-md border border-info-line bg-surface text-info-fg hover:bg-info-bg disabled:opacity-40 transition-colors"
+          >
+            Bring it back now
+          </button>
+        </div>
       )}
 
-      {/* How to submit */}
-      {(parsed.submissionMethod || parsed.requirements.length > 0 || parsed.contactEmails.length > 0 || parsed.links.length > 0) && (
-        <Panel title="How to submit" tone="info">
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-1.5">
-              {parsed.submissionMethod && (
-                <span className="rounded-md border border-info-line bg-surface px-2.5 py-1 text-xs text-info-fg capitalize">
-                  via {parsed.submissionMethod}
-                </span>
-              )}
-              {parsed.submissionState !== 'unknown' && (
-                <span className="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-body">
-                  {parsed.submissionState === 'not_submitted' ? 'Not submitted' : 'Submitted'}
-                </span>
-              )}
-            </div>
-
-            {parsed.submissionNote && (
-              <p className="text-sm text-body leading-relaxed">{parsed.submissionNote}</p>
-            )}
-
-            {parsed.contactEmails.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {parsed.contactEmails.map((email) => (
-                  <span key={email} className="inline-flex items-center gap-1.5 rounded-md border border-line bg-surface px-2 py-1">
-                    <a href={`mailto:${email}`} className="text-xs font-mono text-info-fg hover:underline">{email}</a>
-                    <CopyButton text={email} />
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {parsed.requirements.length > 0 && (
-              <div>
-                <p className="mb-1.5 text-xs font-medium text-muted">Requirements</p>
-                <BulletList items={parsed.requirements} />
-              </div>
-            )}
-
-            {parsed.links.length > 0 && (
-              <div className="flex flex-col gap-1">
-                {parsed.links.map((link) => (
-                  <a key={link} href={link} target="_blank" rel="noreferrer" className="truncate text-xs text-info-fg hover:underline">
-                    {link}
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-        </Panel>
+      {item.snooze.wokenByChange && (
+        <p className="mt-3 text-xs text-warn-fg leading-relaxed">
+          Snoozed until {shortDate(item.snooze.until!)}, but it changed afterwards — so it came
+          back early rather than sitting on a decision made about different facts.
+        </p>
       )}
 
-      {/* Drafted application values */}
-      {parsed.draftedFields.length > 0 && (
-        <Panel
-          title="Drafted application values"
-          tone="accent"
-          count={parsed.draftedFields.length}
-          action={<CopyButton text={draftedFieldsText} label="Copy all" />}
-        >
-          <FieldTable fields={parsed.draftedFields} />
-        </Panel>
+      <div className="mt-4 pt-4 border-t border-line flex flex-wrap items-center gap-2">
+        <DecisionBar item={item} onGig={onGig} onSync={onSync} onPromo={onPromo} isSaving={isSaving} />
+        {item.kind !== 'promo' && !item.snooze.active && (
+          <SnoozeMenu item={item} onPick={(until) => onSnooze(until)} disabled={isSaving} />
+        )}
+      </div>
+
+      {needsYou.length > 0 && (
+        <Section title="Needs you" count={needsYou.length}>
+          <NeedsYou items={needsYou} />
+        </Section>
       )}
 
-      {/* Drafted outreach message */}
-      {parsed.draftedMessage && (
-        <Panel
-          title={`Drafted message${parsed.draftedMessage.channel ? ` — ${parsed.draftedMessage.channel}` : ''}`}
-          tone="accent"
-          action={<CopyButton text={parsed.draftedMessage.body} />}
-        >
-          <p className="whitespace-pre-wrap rounded-md border border-cat-violet-line bg-surface p-3 text-sm leading-relaxed text-ink">
-            {parsed.draftedMessage.body}
-          </p>
-        </Panel>
-      )}
-
-      {/* Sync pitch draft + what actually went out */}
-      {sync?.pitchDraft && (
-        <Panel title="Pitch draft" tone="accent" action={<CopyButton text={sync.pitchDraft} />}>
-          <p className="whitespace-pre-wrap rounded-md border border-cat-violet-line bg-surface p-3 text-sm leading-relaxed text-ink">
-            {sync.pitchDraft}
-          </p>
-          {sync.pitchSent && (
-            <div className="mt-3">
-              <p className="mb-1.5 text-xs font-medium text-muted">Changes in what was actually sent</p>
-              <PitchDiff draft={sync.pitchDraft} sent={sync.pitchSent} />
-            </div>
-          )}
-        </Panel>
-      )}
-
-      {/* Promo copy */}
-      {promo && (
-        <Panel title="Draft copy" tone="accent" action={<CopyButton text={promo.content} />}>
-          <p className="whitespace-pre-wrap rounded-md border border-cat-teal-line bg-surface p-3 text-sm leading-relaxed text-ink">
-            {promo.content}
-          </p>
-        </Panel>
-      )}
-
-      {/* Deal terms */}
-      {parsed.dealTerms.length > 0 && (
-        <Panel title="Deal terms" count={parsed.dealTerms.length}>
-          <BulletList items={parsed.dealTerms} />
-        </Panel>
-      )}
-
-      {/* Narrative remainder */}
       {parsed.summary && (
-        <Panel title={item.kind === 'gig' ? 'Why it fits' : 'Background'}>
+        <Section title={item.kind === 'gig' ? 'Why it fits' : 'Background'}>
           <p className="text-sm leading-relaxed text-body">{parsed.summary}</p>
           {parsed.tracks.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -422,14 +301,103 @@ function Detail({
               ))}
             </div>
           )}
-        </Panel>
+        </Section>
       )}
 
-      {/* Where the contact came from */}
+      {(parsed.submissionMethod || parsed.requirements.length > 0 || parsed.contactEmails.length > 0 || parsed.links.length > 0 || submissionNote) && (
+        <Section title="How to submit">
+          <div className="space-y-3">
+            {parsed.submissionMethod && (
+              <p className="text-sm text-body">
+                <span className="text-muted">Via</span> <span className="text-ink capitalize">{parsed.submissionMethod}</span>
+              </p>
+            )}
+            {submissionNote && (
+              <p className="text-sm text-body leading-relaxed">{submissionNote}</p>
+            )}
+            {parsed.contactEmails.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {parsed.contactEmails.map((email) => (
+                  <span key={email} className="inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1">
+                    <a href={`mailto:${email}`} className="text-xs text-info-fg hover:underline">{email}</a>
+                    <CopyButton text={email} />
+                  </span>
+                ))}
+              </div>
+            )}
+            {parsed.requirements.length > 0 && <BulletList items={parsed.requirements} />}
+            {parsed.links.length > 0 && (
+              <div className="flex flex-col gap-1">
+                {parsed.links.map((link) => (
+                  <a key={link} href={link} target="_blank" rel="noreferrer" className="truncate text-xs text-info-fg hover:underline">
+                    {link}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {parsed.timing.length > 0 && (
+        <Section title="Timing notes">
+          <BulletList items={parsed.timing} />
+        </Section>
+      )}
+
+      {parsed.draftedFields.length > 0 && (
+        <Section
+          title="Drafted application values"
+          count={parsed.draftedFields.length}
+          action={<CopyButton text={draftedFieldsText} label="Copy all" />}
+        >
+          <FieldTable fields={parsed.draftedFields} />
+        </Section>
+      )}
+
+      {parsed.draftedMessage && (
+        <Section
+          title={`Drafted message${parsed.draftedMessage.channel ? ` — ${parsed.draftedMessage.channel}` : ''}`}
+          action={<CopyButton text={parsed.draftedMessage.body} />}
+        >
+          <p className="whitespace-pre-wrap rounded-md bg-sunken p-3 text-sm leading-relaxed text-ink">
+            {parsed.draftedMessage.body}
+          </p>
+        </Section>
+      )}
+
+      {sync?.pitchDraft && (
+        <Section title="Pitch draft" action={<CopyButton text={sync.pitchDraft} />}>
+          <p className="whitespace-pre-wrap rounded-md bg-sunken p-3 text-sm leading-relaxed text-ink">
+            {sync.pitchDraft}
+          </p>
+          {sync.pitchSent && (
+            <div className="mt-3">
+              <p className="mb-1.5 text-xs font-medium text-muted">Changes in what was actually sent</p>
+              <PitchDiff draft={sync.pitchDraft} sent={sync.pitchSent} />
+            </div>
+          )}
+        </Section>
+      )}
+
+      {promo && (
+        <Section title="Draft copy" action={<CopyButton text={promo.content} />}>
+          <p className="whitespace-pre-wrap rounded-md bg-sunken p-3 text-sm leading-relaxed text-ink">
+            {promo.content}
+          </p>
+        </Section>
+      )}
+
+      {parsed.dealTerms.length > 0 && (
+        <Section title="Deal terms" count={parsed.dealTerms.length}>
+          <BulletList items={parsed.dealTerms} />
+        </Section>
+      )}
+
       {parsed.provenance.length > 0 && (
-        <Panel title="Source & provenance" count={parsed.provenance.length}>
+        <Section title="Where this came from" count={parsed.provenance.length}>
           <BulletList items={parsed.provenance} />
-        </Panel>
+        </Section>
       )}
 
       {item.note && <RawNote note={item.note} />}
@@ -530,7 +498,7 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
           {filter === 'snoozed'
             ? `${visible.length} snoozed`
             : `${visible.length} of ${counts?.all ?? 0} items`}{' '}
-          · <kbd className="font-mono">j</kbd>/<kbd className="font-mono">k</kbd> to move
+          · <kbd className="font-semibold">j</kbd>/<kbd className="font-semibold">k</kbd> to move
         </p>
       </div>
 

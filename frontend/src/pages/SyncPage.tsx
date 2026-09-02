@@ -84,7 +84,7 @@ function CreateSyncForm({ onDone }: { onDone: () => void }) {
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-muted mb-1">Pitch draft</label>
-          <textarea rows={4} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} placeholder="Dear…" className={`${INPUT} resize-y font-mono`} />
+          <textarea rows={4} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} placeholder="Dear…" className={`${INPUT} resize-y`} />
         </div>
       </div>
       <div className="flex gap-2 pt-1">
@@ -153,7 +153,7 @@ function EditSyncPanel({
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-muted mb-1">Pitch draft</label>
-          <textarea rows={6} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} className={`${INPUT} resize-y font-mono`} />
+          <textarea rows={6} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} className={`${INPUT} resize-y`} />
         </div>
       </div>
       <div className="flex gap-2">
