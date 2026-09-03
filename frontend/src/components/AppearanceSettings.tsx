@@ -6,6 +6,7 @@ import {
   type TextSize,
   type ThemeChoice,
 } from '../appearance'
+import { Button } from './ui/Button'
 
 /**
  * The appearance panel.
@@ -122,13 +123,13 @@ export function AppearanceSettings() {
             Saved in this browser only — the dashboard itself is unchanged for anyone else.
           </p>
         </div>
-        <button
+        <Button variant="neutral"
           type="button"
           onClick={reset}
-          className="shrink-0 text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors"
+          className="shrink-0"
         >
           Reset
-        </button>
+        </Button>
       </div>
 
       <Field

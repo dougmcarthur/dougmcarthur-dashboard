@@ -3,11 +3,11 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { api } from '../api'
 import { StatusBadge } from '../components/StatusBadge'
 import { SkeletonList } from '../components/Skeleton'
+import { FILTER } from '../components/ui/Field'
+import { Button } from '../components/ui/Button'
 
 const PAGE_SIZE = 50
 
-const FILTER_INPUT =
-  'text-sm border border-line-strong rounded-md px-3 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition'
 
 export function TaskRunsPage() {
   const [offset, setOffset] = useState(0)
@@ -54,7 +54,7 @@ export function TaskRunsPage() {
               value={task}
               onChange={(e) => setTask(e.target.value)}
               aria-label="Filter by task"
-              className={FILTER_INPUT}
+              className={FILTER}
             >
               <option value="">All tasks</option>
               {facets.tasks.map((t) => (
@@ -67,7 +67,7 @@ export function TaskRunsPage() {
               value={status}
               onChange={(e) => setStatus(e.target.value)}
               aria-label="Filter by status"
-              className={FILTER_INPUT}
+              className={FILTER}
             >
               <option value="">All statuses</option>
               {facets.statuses.map((s) => (
@@ -76,12 +76,11 @@ export function TaskRunsPage() {
             </select>
           )}
           {filtered && (
-            <button
+            <Button variant="neutral"
               onClick={() => { setTask(''); setStatus('') }}
-              className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors"
             >
               Clear
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -133,25 +132,23 @@ export function TaskRunsPage() {
       )}
 
       <div className="flex items-center justify-between">
-        <button
+        <Button variant="neutral"
           onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
           disabled={offset === 0 || isFetching}
-          className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken disabled:opacity-40 transition-colors"
         >
           ← Newer
-        </button>
+        </Button>
         <p className="text-xs text-muted tabular-nums">
           {total === 0
             ? 'No runs'
             : `${offset + 1}–${offset + runs.length} of ${total}${filtered ? ' matching' : ''}`}
         </p>
-        <button
+        <Button variant="neutral"
           onClick={() => setOffset((o) => o + PAGE_SIZE)}
           disabled={offset + runs.length >= total || isFetching}
-          className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken disabled:opacity-40 transition-colors"
         >
           Older →
-        </button>
+        </Button>
       </div>
     </div>
   )

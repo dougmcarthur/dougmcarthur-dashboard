@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type ReferenceDoc } from '../api'
 import { AppearanceSettings } from '../components/AppearanceSettings'
 import { DigestSettingsCard } from '../components/DigestSettingsCard'
+import { FIELD } from '../components/ui/Field'
+import { Button } from '../components/ui/Button'
 
-const INPUT_CLASS =
-  'w-full text-sm border border-line-strong rounded-md px-3 py-2 bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition'
 
 // ── Integration status card ───────────────────────────────────────────────────
 
@@ -188,28 +188,27 @@ function DocEditor({
         <div className="flex gap-2 shrink-0">
           {editing ? (
             <>
-              <button
+              <Button variant="primary"
                 onClick={handleSave}
                 disabled={isSaving}
-                className="text-xs px-3 py-1.5 rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40 transition-colors"
+                
               >
                 Save
-              </button>
-              <button
+              </Button>
+              <Button variant="neutral"
                 onClick={handleCancel}
-                className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors"
+                
               >
                 Cancel
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
+              <Button variant="neutral"
                 onClick={() => setEditing(true)}
-                className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors"
               >
                 Edit
-              </button>
+              </Button>
               <button
                 onClick={() => {
                   if (confirm(`Delete "${doc.title}"?`)) onDelete(doc.id)
@@ -297,7 +296,7 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
             value={id}
             onChange={(e) => setId(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
             placeholder="bio"
-            className={INPUT_CLASS}
+            className={FIELD}
             autoFocus
           />
         </div>
@@ -307,7 +306,7 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Artist Bio"
-            className={INPUT_CLASS}
+            className={FIELD}
           />
         </div>
       </div>
@@ -318,23 +317,21 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
           onChange={(e) => setContent(e.target.value)}
           rows={6}
           placeholder="Paste or type the content here…"
-          className={`${INPUT_CLASS} resize-y`}
+          className={`${FIELD} resize-y`}
         />
       </div>
       <div className="flex gap-2">
-        <button
+        <Button variant="primary"
           onClick={() => createMutation.mutate()}
           disabled={!id || !title || createMutation.isPending}
-          className="text-xs px-3 py-1.5 rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40 transition-colors"
         >
           Create
-        </button>
-        <button
+        </Button>
+        <Button variant="neutral"
           onClick={() => setOpen(false)}
-          className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   )

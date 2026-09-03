@@ -15,6 +15,8 @@ import { GIG_STATUSES, GIG_STATUS_META, normaliseGigStatus } from '../../../shar
 import { StatusBadge } from '../components/StatusBadge'
 import { Chevron } from '../components/Chevron'
 import { SkeletonTable } from '../components/Skeleton'
+import { FIELD, FILTER } from '../components/ui/Field'
+import { Button } from '../components/ui/Button'
 
 // The pipeline order, from shared/gigStatus.ts, so the picker and the Worker
 // can never disagree about what a status is or what it means.
@@ -31,8 +33,6 @@ const TYPE_COLORS: Record<string, string> = {
   conference: 'bg-cat-rose-bg text-cat-rose-fg',
 }
 
-const INPUT = 'w-full text-sm border border-line-strong rounded-md px-2.5 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition'
-const FILTER_INPUT = 'text-sm border border-line-strong rounded-md px-3 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition'
 
 function TypeChip({ type }: { type: string }) {
   const color = TYPE_COLORS[type.toLowerCase()] ?? 'bg-sunken text-body'
@@ -116,35 +116,35 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
         <div className="col-span-2 grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-muted mb-1">Name *</label>
-            <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="SXSW 2027" className={INPUT} autoFocus />
+            <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="SXSW 2027" className={FIELD} autoFocus />
           </div>
           <div>
             <label className="block text-xs font-medium text-muted mb-1">Type *</label>
-            <input value={draft.type} onChange={(e) => set('type', e.target.value)} placeholder="festival, showcase, venue…" className={INPUT} />
+            <input value={draft.type} onChange={(e) => set('type', e.target.value)} placeholder="festival, showcase, venue…" className={FIELD} />
           </div>
         </div>
 
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Organizer</label>
-          <input value={draft.organizer} onChange={(e) => set('organizer', e.target.value)} placeholder="SXSW LLC" className={INPUT} />
+          <input value={draft.organizer} onChange={(e) => set('organizer', e.target.value)} placeholder="SXSW LLC" className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Deadline</label>
-          <input type="date" value={draft.deadline} onChange={(e) => set('deadline', e.target.value)} className={INPUT} />
+          <input type="date" value={draft.deadline} onChange={(e) => set('deadline', e.target.value)} className={FIELD} />
         </div>
 
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Fee amount</label>
           <div className="flex gap-1.5">
-            <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={`${INPUT} w-20 shrink-0`}>
+            <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={`${FIELD} w-20 shrink-0`}>
               {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
             </select>
-            <input type="number" min="0" value={draft.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} placeholder="0" className={INPUT} />
+            <input type="number" min="0" value={draft.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} placeholder="0" className={FIELD} />
           </div>
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Submit via</label>
-          <select value={draft.submissionMethod} onChange={(e) => set('submissionMethod', e.target.value)} className={INPUT}>
+          <select value={draft.submissionMethod} onChange={(e) => set('submissionMethod', e.target.value)} className={FIELD}>
             <option value="">—</option>
             {SUBMISSION_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
@@ -152,11 +152,11 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
 
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Audience size</label>
-          <input type="number" min="0" value={draft.audienceSize} onChange={(e) => set('audienceSize', e.target.value)} placeholder="500" className={INPUT} />
+          <input type="number" min="0" value={draft.audienceSize} onChange={(e) => set('audienceSize', e.target.value)} placeholder="500" className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Fit score (1–5)</label>
-          <select value={draft.genreFitScore} onChange={(e) => set('genreFitScore', e.target.value)} className={INPUT}>
+          <select value={draft.genreFitScore} onChange={(e) => set('genreFitScore', e.target.value)} className={FIELD}>
             <option value="">—</option>
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
@@ -164,16 +164,16 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
 
         <div className="col-span-2">
           <label className="block text-xs font-medium text-muted mb-1">Why it fits</label>
-          <textarea rows={3} value={draft.fitRationale} onChange={(e) => set('fitRationale', e.target.value)} placeholder="Describe the fit…" className={`${INPUT} resize-none`} />
+          <textarea rows={3} value={draft.fitRationale} onChange={(e) => set('fitRationale', e.target.value)} placeholder="Describe the fit…" className={`${FIELD} resize-none`} />
         </div>
 
         <div>
           <label className="block text-xs font-medium text-muted mb-1">URL</label>
-          <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} placeholder="https://…" className={INPUT} />
+          <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} placeholder="https://…" className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Status</label>
-          <select value={draft.status} onChange={(e) => set('status', e.target.value as GigStatus)} className={INPUT}>
+          <select value={draft.status} onChange={(e) => set('status', e.target.value as GigStatus)} className={FIELD}>
             {GIG_STATUSES.map((s) => (
               <option key={s} value={s} title={GIG_STATUS_META[s].meaning}>
                 {GIG_STATUS_META[s].label}
@@ -189,16 +189,16 @@ function CreateGigForm({ onDone }: { onDone: () => void }) {
       </label>
 
       <div className="flex gap-2 pt-1">
-        <button
+        <Button variant="primary"
           onClick={() => createMutation.mutate()}
           disabled={!draft.name || !draft.type || createMutation.isPending}
-          className="text-sm px-4 py-1.5 rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40 transition-colors"
+          className="px-4"
         >
           {createMutation.isPending ? 'Adding…' : 'Add gig'}
-        </button>
-        <button onClick={onDone} className="text-sm px-4 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors">
+        </Button>
+        <Button variant="neutral" onClick={onDone} className="px-4">
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -256,54 +256,54 @@ function EditGigPanel({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Name</label>
-          <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={INPUT} />
+          <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Type</label>
-          <input value={draft.type} onChange={(e) => set('type', e.target.value)} className={INPUT} />
+          <input value={draft.type} onChange={(e) => set('type', e.target.value)} className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Organizer</label>
-          <input value={draft.organizer} onChange={(e) => set('organizer', e.target.value)} className={INPUT} />
+          <input value={draft.organizer} onChange={(e) => set('organizer', e.target.value)} className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Deadline</label>
-          <input type="date" value={draft.deadline} onChange={(e) => set('deadline', e.target.value)} className={INPUT} />
+          <input type="date" value={draft.deadline} onChange={(e) => set('deadline', e.target.value)} className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Fee</label>
           <div className="flex gap-1.5">
-            <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={`${INPUT} w-20 shrink-0`}>
+            <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={`${FIELD} w-20 shrink-0`}>
               {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
             </select>
-            <input type="number" min="0" value={draft.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} className={INPUT} />
+            <input type="number" min="0" value={draft.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} className={FIELD} />
           </div>
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Submit via</label>
-          <select value={draft.submissionMethod} onChange={(e) => set('submissionMethod', e.target.value)} className={INPUT}>
+          <select value={draft.submissionMethod} onChange={(e) => set('submissionMethod', e.target.value)} className={FIELD}>
             <option value="">—</option>
             {SUBMISSION_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Audience size</label>
-          <input type="number" min="0" value={draft.audienceSize} onChange={(e) => set('audienceSize', e.target.value)} className={INPUT} />
+          <input type="number" min="0" value={draft.audienceSize} onChange={(e) => set('audienceSize', e.target.value)} className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Fit score (1–5)</label>
-          <select value={draft.genreFitScore} onChange={(e) => set('genreFitScore', e.target.value)} className={INPUT}>
+          <select value={draft.genreFitScore} onChange={(e) => set('genreFitScore', e.target.value)} className={FIELD}>
             <option value="">—</option>
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-muted mb-1">Why it fits</label>
-          <textarea rows={3} value={draft.fitRationale} onChange={(e) => set('fitRationale', e.target.value)} className={`${INPUT} resize-none`} />
+          <textarea rows={3} value={draft.fitRationale} onChange={(e) => set('fitRationale', e.target.value)} className={`${FIELD} resize-none`} />
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-muted mb-1">URL</label>
-          <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} className={INPUT} />
+          <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} className={FIELD} />
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm text-body cursor-pointer">
@@ -311,12 +311,12 @@ function EditGigPanel({
         Paid gig
       </label>
       <div className="flex gap-2 pt-1">
-        <button onClick={handleSave} disabled={isSaving} className="text-xs px-3 py-1.5 rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40 transition-colors">
+        <Button variant="primary" onClick={handleSave} disabled={isSaving} >
           {isSaving ? 'Saving…' : 'Save'}
-        </button>
-        <button onClick={onCancel} className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors">
+        </Button>
+        <Button variant="neutral" onClick={onCancel} >
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -367,15 +367,14 @@ function GigDetail({
           </button>
         )}
         {normaliseGigStatus(gig.status) === 'shortlisted' && (
-          <button disabled={isPatching} onClick={() => onStatusChange('archived')}
-            className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken disabled:opacity-40 transition-colors">
+          <Button variant="neutral" disabled={isPatching} onClick={() => onStatusChange('archived')}>
             Archive
-          </button>
+          </Button>
         )}
-        <button onClick={onEdit}
-          className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors">
+        <Button variant="neutral" onClick={onEdit}
+          >
           Edit details
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -496,24 +495,21 @@ export function GigsPage() {
           <div className="flex gap-1 justify-end">
             {normaliseGigStatus(row.status) === 'discovered' && (
               <>
-                <button disabled={isPatching}
-                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'shortlisted' } })}
-                  className="text-xs px-2.5 py-1 rounded-md bg-success-bg text-success-fg hover:bg-success-bg disabled:opacity-40 transition-colors">
+                <Button variant="good" size="sm" disabled={isPatching}
+                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'shortlisted' } })}>
                   Will apply
-                </button>
-                <button disabled={isPatching}
-                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'passed' } })}
-                  className="text-xs px-2.5 py-1 rounded-md bg-danger-bg text-danger-fg hover:bg-danger-bg disabled:opacity-40 transition-colors">
+                </Button>
+                <Button variant="danger" size="sm" disabled={isPatching}
+                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'passed' } })}>
                   Pass
-                </button>
+                </Button>
               </>
             )}
             {normaliseGigStatus(row.status) === 'shortlisted' && (
-              <button disabled={isPatching}
-                onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'submitted' } })}
-                className="text-xs px-2.5 py-1 rounded-md bg-info-bg text-info-fg hover:bg-info-bg disabled:opacity-40 transition-colors">
+              <Button variant="info" size="sm" disabled={isPatching}
+                onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'submitted' } })}>
                 Applied
-              </button>
+              </Button>
             )}
             <button disabled={deleteMutation.isPending}
               onClick={() => { if (confirm(`Delete "${row.name}"?`)) deleteMutation.mutate(row.id) }}
@@ -551,7 +547,7 @@ export function GigsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-ink">Gig Opportunities</h1>
         <div className="flex gap-2 items-center">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER_INPUT}>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER}>
             <option value="">All statuses</option>
             {GIG_STATUSES.map((s) => (
               <option key={s} value={s} title={GIG_STATUS_META[s].meaning}>
@@ -563,7 +559,7 @@ export function GigsPage() {
             placeholder="Search by name…"
             value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
             onChange={(e) => table.getColumn('name')?.setFilterValue(e.target.value)}
-            className={`${FILTER_INPUT} w-44`}
+            className={`${FILTER} w-44`}
           />
           <button
             onClick={() => { setShowCreate((v) => !v) }}

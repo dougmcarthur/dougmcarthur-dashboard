@@ -4,6 +4,8 @@ import { api, type PromoDraft } from '../api'
 import { StatusBadge } from '../components/StatusBadge'
 import { Chevron } from '../components/Chevron'
 import { SkeletonList } from '../components/Skeleton'
+import { FILTER } from '../components/ui/Field'
+import { Button } from '../components/ui/Button'
 
 /** "2026-09" is a key, not a label. */
 function monthLabel(m: string): string {
@@ -16,8 +18,6 @@ function monthLabel(m: string): string {
   })
 }
 
-const FILTER_INPUT =
-  'text-sm border border-line-strong rounded-md px-3 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition'
 
 export function PromoDraftsPage() {
   const qc = useQueryClient()
@@ -85,7 +85,7 @@ export function PromoDraftsPage() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               aria-label="Filter by status"
-              className={FILTER_INPUT}
+              className={FILTER}
             >
               <option value="">All statuses</option>
               {statuses.map((s) => (
@@ -98,7 +98,7 @@ export function PromoDraftsPage() {
               value={monthFilter}
               onChange={(e) => setMonthFilter(e.target.value)}
               aria-label="Filter by month"
-              className={FILTER_INPUT}
+              className={FILTER}
             >
               <option value="">All months</option>
               {months.map((m) => (
@@ -107,12 +107,11 @@ export function PromoDraftsPage() {
             </select>
           )}
           {filtered && (
-            <button
+            <Button variant="neutral"
               onClick={() => { setStatusFilter(''); setMonthFilter('') }}
-              className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors"
             >
               Clear
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -139,16 +138,15 @@ export function PromoDraftsPage() {
                   <div className="flex items-center gap-2 shrink-0">
                     <StatusBadge status={draft.status} />
                     {draft.status === 'draft' && (
-                      <button
+                      <Button variant="good" size="sm"
                         disabled={patchMutation.isPending}
                         onClick={(e) => {
                           e.stopPropagation()
                           patchMutation.mutate({ id: draft.id, body: { status: 'published' } })
                         }}
-                        className="text-xs px-2.5 py-1 rounded-md bg-success-bg text-success-fg hover:bg-success-bg disabled:opacity-40 transition-colors"
                       >
                         Publish
-                      </button>
+                      </Button>
                     )}
                     <button
                       disabled={deleteMutation.isPending}

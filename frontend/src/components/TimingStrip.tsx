@@ -1,5 +1,6 @@
 import type { DueReminder, TimingRow } from '../api'
 import { shortDate } from '../format'
+import { Button } from './ui/Button'
 
 /**
  * Block C — everything with a date attached to it, in one list.
@@ -109,20 +110,18 @@ export function TimingStrip({
             >
               <span className="flex gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                 {(r.gigStatus === 'shortlisted' || r.gigStatus === 'preparing') && (
-                  <button
+                  <Button variant="info" size="sm"
                     onClick={() => onSubmitted(r)}
-                    className="text-xs px-2 py-0.5 rounded-md bg-info-bg text-info-fg hover:bg-info-bg transition-colors"
                   >
                     Sent
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button variant="quiet" size="sm"
                   onClick={() => onDismiss(r.id)}
                   disabled={dismissing}
-                  className="text-xs px-2 py-0.5 rounded-md border border-line text-muted hover:bg-sunken disabled:opacity-40 transition-colors"
                 >
                   Dismiss
-                </button>
+                </Button>
               </span>
             </Row>
           )

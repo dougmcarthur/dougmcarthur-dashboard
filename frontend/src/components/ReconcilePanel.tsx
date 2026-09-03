@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type ReconcilePreview, type ReconcileResult } from '../api'
 import { StatusBadge } from './StatusBadge'
 import { PitchDiff } from './PitchDiff'
+import { Button } from './ui/Button'
 
 type LearnChoice = 'keep' | 'learn'
 
@@ -202,10 +203,10 @@ export function ReconcilePanel({ onClose }: { onClose: () => void }) {
       <div className="p-5 space-y-5">
         {/* Run button */}
         {!preview && (
-          <button
+          <Button variant="primary"
             onClick={runPreview}
             disabled={isLoading}
-            className="flex items-center gap-2 text-sm px-4 py-2 rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40 transition-colors"
+            className="flex items-center gap-2 px-4 py-2"
           >
             {isLoading ? (
               <>
@@ -218,7 +219,7 @@ export function ReconcilePanel({ onClose }: { onClose: () => void }) {
             ) : (
               'Check Gmail sent folder'
             )}
-          </button>
+          </Button>
         )}
 
         {error && (
@@ -282,15 +283,15 @@ export function ReconcilePanel({ onClose }: { onClose: () => void }) {
             {/* Apply bar */}
             {selected.size > 0 && (
               <div className="flex items-center gap-3 pt-2 border-t border-line">
-                <button
+                <Button variant="primary"
                   onClick={() => applyMutation.mutate()}
                   disabled={applyMutation.isPending}
-                  className="text-sm px-4 py-1.5 rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40 transition-colors"
+                  className="px-4"
                 >
                   {applyMutation.isPending
                     ? 'Applying…'
                     : `Apply ${selected.size} update${selected.size !== 1 ? 's' : ''}`}
-                </button>
+                </Button>
                 <p className="text-xs text-muted">
                   {Array.from(selected)
                     .filter((id) => learnChoices[id] === 'learn')

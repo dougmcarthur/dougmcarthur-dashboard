@@ -5,11 +5,11 @@ import { StatusBadge } from '../components/StatusBadge'
 import { Chevron } from '../components/Chevron'
 import { SkeletonList } from '../components/Skeleton'
 import { ReconcilePanel } from '../components/ReconcilePanel'
+import { FIELD, FILTER } from '../components/ui/Field'
+import { Button } from '../components/ui/Button'
 
 const SYNC_STATUSES: SyncStatus[] = ['draft_ready', 'pitched', 'confirmed', 'declined', 'archived']
 
-const INPUT = 'w-full text-sm border border-line-strong rounded-md px-2.5 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition'
-const FILTER_INPUT = 'text-sm border border-line-strong rounded-md px-3 py-1.5 bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition'
 
 type SyncDraft = {
   name: string; agencyType: string; contactEmail: string; contactRole: string
@@ -54,47 +54,47 @@ function CreateSyncForm({ onDone }: { onDone: () => void }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Name *</label>
-          <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="Epitaph Records" className={INPUT} autoFocus />
+          <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="Epitaph Records" className={FIELD} autoFocus />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Agency type</label>
-          <input value={draft.agencyType} onChange={(e) => set('agencyType', e.target.value)} placeholder="label, library, supervisor…" className={INPUT} />
+          <input value={draft.agencyType} onChange={(e) => set('agencyType', e.target.value)} placeholder="label, library, supervisor…" className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Contact email</label>
-          <input type="email" value={draft.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} placeholder="sync@label.com" className={INPUT} />
+          <input type="email" value={draft.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} placeholder="sync@label.com" className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Contact role</label>
-          <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} placeholder="A&R, Sync Supervisor…" className={INPUT} />
+          <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} placeholder="A&R, Sync Supervisor…" className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Confirm via</label>
-          <input value={draft.confirmationMethod} onChange={(e) => set('confirmationMethod', e.target.value)} placeholder="email, phone, portal…" className={INPUT} />
+          <input value={draft.confirmationMethod} onChange={(e) => set('confirmationMethod', e.target.value)} placeholder="email, phone, portal…" className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Initial status</label>
-          <select value={draft.status} onChange={(e) => set('status', e.target.value as SyncStatus)} className={INPUT}>
+          <select value={draft.status} onChange={(e) => set('status', e.target.value as SyncStatus)} className={FIELD}>
             {SYNC_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-muted mb-1">Notes</label>
-          <textarea rows={2} value={draft.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Context about this target…" className={`${INPUT} resize-none`} />
+          <textarea rows={2} value={draft.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Context about this target…" className={`${FIELD} resize-none`} />
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-muted mb-1">Pitch draft</label>
-          <textarea rows={4} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} placeholder="Dear…" className={`${INPUT} resize-y`} />
+          <textarea rows={4} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} placeholder="Dear…" className={`${FIELD} resize-y`} />
         </div>
       </div>
       <div className="flex gap-2 pt-1">
-        <button onClick={() => createMutation.mutate()} disabled={!draft.name || createMutation.isPending}
-          className="text-sm px-4 py-1.5 rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40 transition-colors">
+        <Button variant="primary" onClick={() => createMutation.mutate()} disabled={!draft.name || createMutation.isPending}
+          className="px-4">
           {createMutation.isPending ? 'Adding…' : 'Add target'}
-        </button>
-        <button onClick={onDone} className="text-sm px-4 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors">
+        </Button>
+        <Button variant="neutral" onClick={onDone} className="px-4">
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -129,35 +129,35 @@ function EditSyncPanel({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Name</label>
-          <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={INPUT} />
+          <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Agency type</label>
-          <input value={draft.agencyType} onChange={(e) => set('agencyType', e.target.value)} className={INPUT} />
+          <input value={draft.agencyType} onChange={(e) => set('agencyType', e.target.value)} className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Contact email</label>
-          <input type="email" value={draft.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} className={INPUT} />
+          <input type="email" value={draft.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Contact role</label>
-          <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} className={INPUT} />
+          <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} className={FIELD} />
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-muted mb-1">Confirm via</label>
-          <input value={draft.confirmationMethod} onChange={(e) => set('confirmationMethod', e.target.value)} className={INPUT} />
+          <input value={draft.confirmationMethod} onChange={(e) => set('confirmationMethod', e.target.value)} className={FIELD} />
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-muted mb-1">Notes</label>
-          <textarea rows={3} value={draft.notes} onChange={(e) => set('notes', e.target.value)} className={`${INPUT} resize-none`} />
+          <textarea rows={3} value={draft.notes} onChange={(e) => set('notes', e.target.value)} className={`${FIELD} resize-none`} />
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-muted mb-1">Pitch draft</label>
-          <textarea rows={6} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} className={`${INPUT} resize-y`} />
+          <textarea rows={6} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} className={`${FIELD} resize-y`} />
         </div>
       </div>
       <div className="flex gap-2">
-        <button onClick={() => onSave({
+        <Button variant="primary" onClick={() => onSave({
           name: draft.name,
           agencyType: draft.agencyType || null,
           contactEmail: draft.contactEmail || null,
@@ -165,13 +165,12 @@ function EditSyncPanel({
           confirmationMethod: draft.confirmationMethod || null,
           notes: draft.notes || null,
           pitchDraft: draft.pitchDraft || null,
-        })} disabled={isSaving}
-          className="text-xs px-3 py-1.5 rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40 transition-colors">
+        })} disabled={isSaving}>
           {isSaving ? 'Saving…' : 'Save'}
-        </button>
-        <button onClick={onCancel} className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors">
+        </Button>
+        <Button variant="neutral" onClick={onCancel} >
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -204,9 +203,9 @@ function SyncDetail({ target, onEdit }: { target: SyncTarget; onEdit: () => void
       {!target.notes && !target.pitchDraft && !target.confirmationMethod && (
         <p className="text-xs text-muted">No additional details.</p>
       )}
-      <button onClick={onEdit} className="text-xs px-3 py-1.5 rounded-md border border-line-strong text-body hover:bg-sunken transition-colors">
+      <Button variant="neutral" onClick={onEdit} >
         Edit details
-      </button>
+      </Button>
     </div>
   )
 }
@@ -265,7 +264,7 @@ export function SyncPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-ink">Sync Targets</h1>
         <div className="flex gap-2 items-center">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER_INPUT}>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER}>
             <option value="">All statuses</option>
             {SYNC_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
@@ -318,24 +317,21 @@ export function SyncPage() {
                   <div className="flex items-center gap-2 shrink-0">
                     <StatusBadge status={target.status} />
                     {target.status === 'draft_ready' && (
-                      <button disabled={isPatching}
-                        onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'pitched' } }) }}
-                        className="text-xs px-2.5 py-1 rounded-md bg-info-bg text-info-fg hover:bg-info-bg disabled:opacity-40 transition-colors">
+                      <Button variant="info" size="sm" disabled={isPatching}
+                        onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'pitched' } }) }}>
                         Mark Pitched
-                      </button>
+                      </Button>
                     )}
                     {target.status === 'pitched' && (
                       <>
-                        <button disabled={isPatching}
-                          onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'confirmed' } }) }}
-                          className="text-xs px-2.5 py-1 rounded-md bg-success-bg text-success-fg hover:bg-success-bg disabled:opacity-40 transition-colors">
+                        <Button variant="good" size="sm" disabled={isPatching}
+                          onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'confirmed' } }) }}>
                           Confirmed
-                        </button>
-                        <button disabled={isPatching}
-                          onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'declined' } }) }}
-                          className="text-xs px-2.5 py-1 rounded-md bg-danger-bg text-danger-fg hover:bg-danger-bg disabled:opacity-40 transition-colors">
+                        </Button>
+                        <Button variant="danger" size="sm" disabled={isPatching}
+                          onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'declined' } }) }}>
                           Declined
-                        </button>
+                        </Button>
                       </>
                     )}
                     <button disabled={deleteMutation.isPending}

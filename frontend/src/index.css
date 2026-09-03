@@ -56,12 +56,14 @@
 
   /* clay */
   --c-danger-bg: #241715;
+  --c-danger-bg-hover: #30201c;
   --c-danger-line: #4a2c23;
   --c-danger-fg: #d99a86;
   --c-danger-solid: #b4573f;
 
   /* green */
   --c-success-bg: #15221a;
+  --c-success-bg-hover: #1d2f23;
   --c-success-line: #2b4430;
   --c-success-fg: #8fc98a;
   --c-success-solid: #4f9a54;
@@ -73,6 +75,7 @@
 
   /* info is not a hue — links take the green, surfaces stay neutral */
   --c-info-bg: #1d1f1b;
+  --c-info-bg-hover: #252822;
   --c-info-line: #282b26;
   --c-info-fg: #8fc98a;
 
@@ -120,11 +123,13 @@
   --c-accent-soft: #eaf2ea;
 
   --c-danger-bg: #fdf3f0;
+  --c-danger-bg-hover: #f8e4dd;
   --c-danger-line: #ecc9bc;
   --c-danger-fg: #a4432f;
   --c-danger-solid: #a4432f;
 
   --c-success-bg: #eef5ee;
+  --c-success-bg-hover: #e0ece0;
   --c-success-line: #c5dcc5;
   --c-success-fg: #2c6134;
   --c-success-solid: #35703d;
@@ -134,6 +139,7 @@
   --c-warn-fg: #a4432f;
 
   --c-info-bg: #f7f8f5;
+  --c-info-bg-hover: #eceee7;
   --c-info-line: #dfe2db;
   --c-info-fg: #35703d;
 
