@@ -78,67 +78,6 @@ function IntegrationCards() {
   )
 }
 
-// kept for reference by the old import chain — replaced by IntegrationCards above
-function CalendarStatus() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['health'],
-    queryFn: api.health,
-    staleTime: 60_000,
-  })
-
-  return (
-    <div className="bg-surface border border-line rounded-xl shadow-card p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-ink">Google Calendar</h2>
-        {!isLoading && (
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              data?.calendarConfigured
-                ? 'bg-success-bg text-success-fg'
-                : 'bg-warn-bg text-warn-fg'
-            }`}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                data?.calendarConfigured ? 'bg-success-solid' : 'bg-warn-fg'
-              }`}
-            />
-            {data?.calendarConfigured ? 'Connected' : 'Not configured'}
-          </span>
-        )}
-      </div>
-
-      {isLoading ? (
-        <div className="h-4 bg-sunken rounded animate-pulse w-48" />
-      ) : data?.calendarConfigured ? (
-        <p className="text-sm text-muted">
-          Approving gigs with deadlines will create Calendar events automatically.
-        </p>
-      ) : (
-        <div className="space-y-2">
-          <p className="text-sm text-muted">
-            Set these Worker secrets to enable Calendar sync:
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {data?.calendarMissingSecrets.map((s) => (
-              <code
-                key={s}
-                className="text-xs bg-sunken text-body px-2 py-1 rounded"
-              >
-                {s}
-              </code>
-            ))}
-          </div>
-          <p className="text-xs text-muted">
-            See <code className="bg-sunken px-1 rounded">docs/google-calendar-setup.md</code> for
-            the step-by-step setup.
-          </p>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Reference doc editor ─────────────────────────────────────────────────────
 
 function DocEditor({

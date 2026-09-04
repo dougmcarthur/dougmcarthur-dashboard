@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import type { NoteAlert, DraftedField } from '../../../shared/reviewParse'
+import type { DraftedField } from '../../../shared/reviewParse'
 import type { ReviewFlag, ReviewKind } from '../../../shared/reviewQueue'
 import type { AlertSeverity } from '../../../shared/reviewParse'
 
