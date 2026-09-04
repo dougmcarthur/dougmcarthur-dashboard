@@ -67,7 +67,42 @@ offers. Narrowing them is a claim the data does not support.
 
 **Deadlines are often prose.** 26 of 34 gig rows hold things like "None —
 rolling artist roster intake" in `deadline`. Anything wanting a real date must
-go through `splitDeadline`, which returns null rather than guessing.
+go through `splitDeadline`, which returns null rather than guessing. Where a
+date *is* recovered from prose, show the prose too — a recovered date must not
+look as certain as one the column actually held.
+
+**The queue never reads the clock.** `buildReviewQueue({ today })` threads that
+date all the way through, including into `parseDeadline` and `daysUntil`. Do
+not reach for `new Date()` in queue, digest or flag logic; take the date as an
+argument.
+
+This was half-true for a long time and cost a deploy: `today` reached the
+snooze maths while `daysUntil` read the real clock, so a fixture asserting a
+row was "due soon" passed until real time crossed its deadline, then failed in
+CI on an unrelated change. Same inputs must mean the same thing on every run.
+
+**One predicate decides what needs a decision.** `awaitingDecision` in
+`shared/reviewQueue.ts` is used by the Review filter *and* the weekly digest.
+They answered separately once, and the email counted rows under a bucket whose
+link the page then refused to show. The digest still reports more than the
+queue — the idle piles carry no flags and are the shape of the backlog — but
+anything it counts under a *flag* bucket has to be something the filter will
+show.
+
+**Note prose names the artist.** The research agents wrote "pending Doug's
+review", so `depersonalise` rewrites the name into the second person on the way
+to the screen; the stored text is untouched. Two rules it must keep: pronouns
+are only rewritten inside sentences that named him, or "his deadline" in a
+sentence about an organiser becomes yours; and drafted field *values* are
+exempt, because "Contact Name: Doug McArthur" is the answer that goes on the
+form, not the app talking.
+
+**Buttons and inputs come from `components/ui/`.** `Button` takes a variant
+named for meaning (`primary`, `neutral`, `quiet`, `good`, `danger`, `info`),
+`Field` exports `FIELD` and `FILTER`. Fourteen hand-rolled button strings and
+five copies of the input string preceded them, and eight of those buttons set
+`hover:bg-X` while already painted `bg-X` — a hover that rendered as none.
+`test/uiConsistency.test.ts` fails if either comes back.
 
 ## Testing
 
@@ -78,3 +113,12 @@ environment. `npm run typecheck` covers both the Worker and the frontend.
 Screenshots verify design, not geometry. A chart whose bars all had width 0
 passed visual review twice — probe computed styles when layout correctness
 matters.
+
+Fixtures use dates relative to their own `TODAY`, never to the real clock. A
+suite that passes today and fails tomorrow is worse than one that fails now,
+because it fails in CI on somebody else's change. `TZ=Pacific/Auckland npm test`
+is a cheap check: it runs a day ahead.
+
+Some mistakes typecheck and render, so they need source-level tests rather than
+behavioural ones — see `test/uiConsistency.test.ts`, which reads the JSX and
+fails on a dead hover state or a re-declared input class.
