@@ -15,14 +15,15 @@ const TODAY = '2026-08-25'
 const OK: HealthInput = { calendarConfigured: true, gmailConfigured: true, emailConfigured: true }
 
 /**
- * Deadlines relative to the real clock.
+ * Deadlines relative to the fixture's own TODAY.
  *
- * `buildReviewQueue({ today })` injects into snooze boundaries only —
- * `parseDeadline` reads the real date — so a fixed deadline in a fixture drifts
- * a day further overdue every day. These offsets stay put.
+ * These used to be relative to the *real* clock, because `parseDeadline` read
+ * it directly while `buildReviewQueue({ today })` injected only snooze maths.
+ * That seam is closed — `today` reaches the deadline maths now — so a fixture
+ * date means the same thing on every run, which is the point of a fixture.
  */
 const dayOffset = (n: number) => {
-  const d = new Date()
+  const d = new Date(`${TODAY}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
 }

@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { daysUntil } from '../shared/reviewParse'
+import { buildReviewQueue } from '../shared/reviewQueue'
 import {
   parseNote,
   parseFee,
@@ -438,5 +440,39 @@ describe('parseNote — empty input', () => {
     expect(parsed.isPlain).toBe(true)
     expect(parsed.summary).toBe('')
     expect(parsed.alerts).toEqual([])
+  })
+})
+
+describe('the queue does not depend on when you run it', () => {
+  it('gives the same daysUntil for a fixed date whatever the real clock says', () => {
+    // The failure this guards was a deploy: a fixture written when 2026-09-03
+    // was "due soon" started reporting overdue the day real time passed it,
+    // because parseDeadline read the clock while buildReviewQueue took a
+    // `today`. Same inputs must mean the same thing on every run.
+    expect(daysUntil('2026-09-03', '2026-08-25')).toBe(9)
+    expect(daysUntil('2026-08-20', '2026-08-25')).toBe(-5)
+    expect(daysUntil('2026-08-25', '2026-08-25')).toBe(0)
+  })
+
+  it('threads that date all the way into the built queue', () => {
+    const at = (today: string) =>
+      buildReviewQueue({
+        gigs: [
+          {
+            id: 1, name: 'Fixed', type: 'festival', organizer: null, submissionMethod: null,
+            audienceSize: null, genreFitScore: null, deadline: '2026-09-03', deadlineNote: null,
+            opensAt: null, feeAmount: null, feeCurrency: 'CAD', fee: null, paid: 0,
+            fitNotes: null, fitRationale: null, url: null, status: 'discovered',
+            googleEventId: null, snoozedUntil: null, snoozedAt: null,
+            discoveredAt: '2026-07-01', updatedAt: '2026-08-01',
+          },
+        ],
+        today,
+      })[0]
+
+    expect(at('2026-08-25').deadline.daysUntil).toBe(9)
+    // A month later the same row is overdue — and says so because it was told
+    // the date, not because the process happened to run then.
+    expect(at('2026-10-01').deadline.daysUntil).toBe(-28)
   })
 })

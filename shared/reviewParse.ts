@@ -226,10 +226,25 @@ const RE = {
 }
 
 /** Whole days from today to `dateStr`; negative when it has passed. */
-export function daysUntil(dateStr: string): number {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return Math.round((new Date(`${dateStr}T00:00:00`).getTime() - today.getTime()) / 86400_000)
+/**
+ * Days from `today` to `dateStr`, both plain YYYY-MM-DD.
+ *
+ * `today` is a parameter rather than a read of the clock so the queue can be
+ * built deterministically. It used to read `new Date()` unconditionally while
+ * `buildReviewQueue` accepted a `today` for its snooze maths — so a fixture
+ * with a fixed deadline silently changed meaning as real time passed, and a
+ * test written when a date was "due soon" failed the day it went overdue.
+ * That is exactly what happened, in CI, on a deploy.
+ */
+export function daysUntil(dateStr: string, today?: string): number {
+  const from = today
+    ? new Date(`${today.slice(0, 10)}T00:00:00`)
+    : (() => {
+        const d = new Date()
+        d.setHours(0, 0, 0, 0)
+        return d
+      })()
+  return Math.round((new Date(`${dateStr}T00:00:00`).getTime() - from.getTime()) / 86400_000)
 }
 
 /**
@@ -379,7 +394,7 @@ export function splitDeadline(raw: string | null): DeadlineSplit {
  */
 export function parseDeadline(
   raw: string | null,
-  columns: { note?: string | null; opensAt?: string | null } = {},
+  columns: { note?: string | null; opensAt?: string | null; today?: string } = {},
 ): ParsedDeadline {
   const text = raw?.trim() ?? ''
   const split = splitDeadline(text)
@@ -395,10 +410,10 @@ export function parseDeadline(
     raw: text || null,
     date: split.date,
     exact: /^\d{4}-\d{2}-\d{2}$/.test(text),
-    daysUntil: split.date ? daysUntil(split.date) : null,
+    daysUntil: split.date ? daysUntil(split.date, columns.today) : null,
     note,
     opensAt,
-    opensInDays: opensAt ? daysUntil(opensAt) : null,
+    opensInDays: opensAt ? daysUntil(opensAt, columns.today) : null,
   }
 }
 

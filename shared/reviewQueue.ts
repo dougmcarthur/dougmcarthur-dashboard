@@ -236,7 +236,11 @@ function score(flags: ReviewFlag[], deadline: ParsedDeadline): number {
 function gigItem(row: GigOpportunity, today: string): Omit<ReviewItem, 'decision'> {
   const parsed = parseNote(row.fitRationale ?? row.fitNotes)
   const fee = parseFee(row.fee, row.paid)
-  const deadline = parseDeadline(row.deadline, { note: row.deadlineNote, opensAt: row.opensAt })
+  const deadline = parseDeadline(row.deadline, {
+    note: row.deadlineNote,
+    opensAt: row.opensAt,
+    today,
+  })
   const flags = flagsFor('gig', row.status, parsed, fee, deadline)
 
   return {
