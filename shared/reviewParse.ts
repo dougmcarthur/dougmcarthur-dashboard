@@ -521,15 +521,23 @@ function parseDraftedFields(block: string): { fields: DraftedField[]; trailing: 
     }
 
     if (!match) {
-      fields.push({ label: '', value: text, needsDoug: RE.blocker.test(text) })
+      // `needsDoug` is decided *before* the rewrite: the blocker regex matches
+      // the name, which the rewrite is about to remove.
+      const needsDoug = RE.blocker.test(text)
+      fields.push({ label: '', value: needsDoug ? depersonalise(text) : text, needsDoug })
       continue
     }
 
     const value = match[2].trim()
+    // A value is an *answer* unless it is a placeholder saying he still has to
+    // supply something. "Contact Name: Doug McArthur" is what goes on the
+    // festival's form; rewriting it to "you" puts the wrong text on the
+    // clipboard. Only the placeholders are the app talking.
+    const needsDoug = RE.blocker.test(value)
     fields.push({
       label: match[1].trim(),
-      value,
-      needsDoug: RE.blocker.test(value),
+      value: needsDoug ? depersonalise(value) : value,
+      needsDoug,
     })
   }
 
@@ -688,23 +696,33 @@ export function parseNote(note: string | null | undefined): ParsedNote {
 
   const summary = summaryParts.join(' ').replace(/\s{2,}/g, ' ').trim()
 
+  // Depersonalised here, once, rather than at each screen that renders it.
+  //
+  // The first attempt did this at the call sites in the Review detail pane —
+  // and the Overview deck, which builds its own sentence from `blockers[0]`,
+  // went on saying "needs Doug's review" for another day. Any consumer that
+  // gets this object gets prose in the second person; none of them has to
+  // remember. `item.note` still carries the original for "Show original note".
+  //
+  // Field *values* are the exception and are handled in `draftedFields` above:
+  // an answer that is his name is the answer that goes on the form.
   return {
-    alerts,
+    alerts: alerts.map((a) => ({ ...a, text: depersonalise(a.text) })),
     submissionState,
-    submissionNote,
+    submissionNote: submissionNote ? depersonalise(submissionNote) : submissionNote,
     submissionMethod,
-    requirements,
+    requirements: requirements.map(depersonalise),
     contactEmails,
     links,
     draftedFields,
     draftedMessage,
-    blockers,
-    timing,
-    dealTerms,
+    blockers: blockers.map(depersonalise),
+    timing: timing.map(depersonalise),
+    dealTerms: dealTerms.map(depersonalise),
     tracks,
-    provenance,
+    provenance: provenance.map(depersonalise),
     location,
-    summary,
+    summary: depersonalise(summary),
     isPlain:
       alerts.length === 0 && requirements.length === 0 && blockers.length === 0 &&
       timing.length === 0 && dealTerms.length === 0 && draftedFields.length === 0 &&

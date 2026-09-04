@@ -337,7 +337,11 @@ describe('parseNote — money and warnings', () => {
 
   it('extracts a *** delimited warning that is not a sentence', () => {
     const parsed = parseNote(ISC)
-    expect(parsed.alerts[0].text).toBe("PAID — entry fee required ($25/song) — requires Doug's approval before submitting")
+    // Second person: parseNote depersonalises the prose it returns, so no
+    // screen has to remember to. The source note says "requires Doug's".
+    expect(parsed.alerts[0].text).toBe(
+      'PAID — entry fee required ($25/song) — requires your approval before submitting',
+    )
     expect(parsed.alerts[0].severity).toBe('danger')
   })
 
@@ -388,7 +392,8 @@ describe('parseNote — timing windows', () => {
 
   it('still records that nobody has filled the application in', () => {
     expect(parsed.submissionState).toBe('not_submitted')
-    expect(parsed.blockers.join(' ')).toContain("pending Doug's review")
+    expect(parsed.blockers.join(' ')).toContain('pending your review')
+    expect(parsed.blockers.join(' ')).not.toMatch(/Doug/)
   })
 
   it('reads a location off the note', () => {
@@ -430,7 +435,7 @@ describe('parseNote — awkward real-world shapes', () => {
   })
 
   it('treats a "Recommend Doug …" fix-up as a blocker', () => {
-    expect(parseNote(MARMOSET).blockers.join(' ')).toContain('Recommend Doug manually retype')
+    expect(parseNote(MARMOSET).blockers.join(' ')).toContain('Recommend you manually retype')
   })
 })
 

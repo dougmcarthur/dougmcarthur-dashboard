@@ -7,7 +7,6 @@ import {
 } from '../../components/ReviewPanels'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../api'
 import type { ReviewItem } from '../../../../shared/reviewQueue'
-import { depersonalise } from '../../../../shared/reviewParse'
 import { DecisionBar } from './DecisionBar'
 
 /**
@@ -36,16 +35,9 @@ export function Detail({
   const sync = item.source.kind === 'sync' ? item.source.row : null
   const promo = item.source.kind === 'promo' ? item.source.row : null
 
-  // Field values are *answers*, not commentary — "Contact Name: Doug McArthur"
-  // is the text that goes on the festival's form, and rewriting it to
-  // "Contact Name: you" would put the wrong thing on the clipboard.
-  //
-  // `needsDoug` is exactly the flag for the other case: a value that is a
-  // placeholder saying he still has to supply something. Those are the app
-  // talking, so those are the ones rewritten.
-  const draftedFields = parsed.draftedFields.map((f) =>
-    f.needsDoug ? { ...f, value: depersonalise(f.value) } : f,
-  )
+  // Already in the second person: parseNote rewrites the prose it produces,
+  // and leaves answer values alone. See shared/reviewParse.ts.
+  const draftedFields = parsed.draftedFields
 
   const draftedFieldsText = draftedFields
     .map((f) => (f.label ? `${f.label}: ${f.value}` : f.value))
@@ -65,19 +57,19 @@ export function Detail({
   const stateChips = states.filter((f) => !SHOWN_AS_FACT.has(f.id))
 
   const needsYou = [
-    ...parsed.alerts.map((a) => ({ text: depersonalise(a.text), severity: a.severity })),
-    ...parsed.blockers.map((b) => ({ text: depersonalise(b) })),
+    ...parsed.alerts.map((a) => ({ text: a.text, severity: a.severity })),
+    ...parsed.blockers.map((b) => ({ text: b })),
     ...parsed.draftedFields
       .filter((f) => f.needsDoug)
-      .map((f) => ({ text: depersonalise(f.label ? `${f.label} — ${f.value}` : f.value) })),
+      .map((f) => ({ text: f.label ? `${f.label} — ${f.value}` : f.value })),
   ]
 
   // The submission note is often the same sentence the blocker parser already
   // pulled out ("Application not filled — pending your review"), so showing
   // both printed it twice on the same screen.
   const submissionNote =
-    parsed.submissionNote && !needsYou.some((n) => n.text === depersonalise(parsed.submissionNote!))
-      ? depersonalise(parsed.submissionNote)
+    parsed.submissionNote && !needsYou.some((n) => n.text === parsed.submissionNote)
+      ? parsed.submissionNote
       : null
 
   const facts: Array<{
@@ -226,7 +218,7 @@ export function Detail({
 
       {parsed.summary && (
         <Section title={item.kind === 'gig' ? 'Why it fits' : 'Background'}>
-          <p className="text-sm leading-relaxed text-body">{depersonalise(parsed.summary)}</p>
+          <p className="text-sm leading-relaxed text-body">{parsed.summary}</p>
           {parsed.tracks.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {parsed.tracks.map((track) => (
@@ -261,7 +253,7 @@ export function Detail({
               </div>
             )}
             {parsed.requirements.length > 0 && (
-              <BulletList items={parsed.requirements.map(depersonalise)} />
+              <BulletList items={parsed.requirements} />
             )}
             {parsed.links.length > 0 && (
               <div className="flex flex-col gap-1">
@@ -278,7 +270,7 @@ export function Detail({
 
       {parsed.timing.length > 0 && (
         <Section title="Timing notes">
-          <BulletList items={parsed.timing.map(depersonalise)} />
+          <BulletList items={parsed.timing} />
         </Section>
       )}
 
@@ -327,13 +319,13 @@ export function Detail({
 
       {parsed.dealTerms.length > 0 && (
         <Section title="Deal terms" count={parsed.dealTerms.length}>
-          <BulletList items={parsed.dealTerms.map(depersonalise)} />
+          <BulletList items={parsed.dealTerms} />
         </Section>
       )}
 
       {parsed.provenance.length > 0 && (
         <Section title="Where this came from" count={parsed.provenance.length}>
-          <BulletList items={parsed.provenance.map(depersonalise)} />
+          <BulletList items={parsed.provenance} />
         </Section>
       )}
 

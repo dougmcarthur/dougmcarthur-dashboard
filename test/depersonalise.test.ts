@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { depersonalise } from '../shared/reviewParse'
+import { depersonalise, parseNote } from '../shared/reviewParse'
 
 /**
  * The notes were written about one person by agents who knew his name, so they
@@ -88,5 +88,48 @@ describe('what must NOT be depersonalised', () => {
     // waiting on the artist. "Contact Name: You" on a festival form would be
     // the wrong text on the clipboard.
     expect(depersonalise('Doug McArthur')).toBe('You')
+  })
+})
+
+describe('the rewrite happens at the parser, not at each screen', () => {
+  // The real production note, verbatim: it carries both cases at once — a
+  // Contact Name whose value *is* his name, and a Contact Phone whose value is
+  // a placeholder saying he still has to supply it.
+  const NOTE =
+    'Submission status: NOT submitted. Single-page intake form at the URL. ' +
+    'Drafted field values for Doug to copy in himself: Artist type: I am an artist; ' +
+    'Contact Name: Doug McArthur; Email: doug@dougmcarthur.net; ' +
+    'Contact Phone: needs Doug, not on file; Country: Canada. ' +
+    "Application not filled — pending Doug's review."
+
+  const parsed = parseNote(NOTE)
+
+  it('leaves no trace of the name in any prose field it returns', () => {
+    // Fixing this per-screen is what let the Overview deck go on saying
+    // "needs Doug's review" for a day after the Review pane was fixed.
+    const prose = [
+      parsed.summary,
+      parsed.submissionNote ?? '',
+      ...parsed.blockers,
+      ...parsed.alerts.map((a) => a.text),
+      ...parsed.requirements,
+      ...parsed.timing,
+      ...parsed.dealTerms,
+      ...parsed.provenance,
+    ].join(' | ')
+    expect(prose).not.toMatch(/\bDoug\b/)
+  })
+
+  it('keeps his name where it is the answer, not the app talking', () => {
+    const contact = parsed.draftedFields.find((f) => f.label === 'Contact Name')
+    expect(contact?.value).toBe('Doug McArthur')
+    expect(contact?.needsDoug).toBe(false)
+  })
+
+  it('rewrites a drafted value that is a placeholder rather than an answer', () => {
+    const phone = parsed.draftedFields.find((f) => f.label === 'Contact Phone')
+    expect(phone?.needsDoug).toBe(true)
+    expect(phone?.value).not.toMatch(/\bDoug\b/)
+    expect(phone?.value).toBe('needs you, not on file')
   })
 })

@@ -85,7 +85,11 @@ describe('decision copy — the sentence names the decision', () => {
     const item = first({
       gigs: [gig({ id: 5, name: 'Sofar', fitNotes: 'Doug should pick the video and submit himself when ready.' })],
     })
-    expect(item.decision.rationale).toMatch(/^Waiting on you: doug should pick the video/)
+    // The Overview deck builds its sentence from the same parsed prose the
+    // Review pane shows, and went on naming him for a day after that pane was
+    // fixed — which is why the rewrite moved into the parser.
+    expect(item.decision.rationale).toMatch(/^Waiting on you: you should pick the video/)
+    expect(item.decision.rationale).not.toMatch(/Doug/)
   })
 
   it('reads differently for an unapproved promo draft than an approved one', () => {
