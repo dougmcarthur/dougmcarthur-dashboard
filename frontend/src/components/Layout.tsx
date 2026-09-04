@@ -120,7 +120,7 @@ export function Layout({
                 <ThemeIcon dark={resolved === 'dark'} />
               </button>
 
-              <div ref={menuRef}>
+              <div className="relative" ref={menuRef}>
                 <button
                   type="button"
                   onClick={() => setMenuOpen((o) => !o)}
@@ -137,7 +137,7 @@ export function Layout({
                   <nav
                     id="mobile-nav"
                     aria-label="More"
-                    className="absolute right-3 mt-2 w-48 rounded-xl border border-line bg-surface shadow-pop p-1"
+                    className="absolute right-0 top-full mt-2 w-48 z-40 rounded-xl border border-line bg-surface shadow-pop p-1"
                   >
                     {/* Below md the main destinations have nowhere else to go. */}
                     <span className="md:hidden">
