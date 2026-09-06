@@ -271,6 +271,25 @@ So, without exception:
 A is the only part that is a correction rather than a feature, which is why it
 goes first and alone.
 
+### Salvaged from the abandoned prototype
+
+`claude/gig-reviews-submission-9e9fvr` built a version of steps C and D against
+a schema that no longer exists. Two of its modules were pure and are now on
+`main` ahead of the step that will call them — `src/lib/formParser.ts` and
+`src/lib/questionKinds.ts` — because a reviewed, tested parser is worth more
+than the branch it was stranded on. Nothing imports them yet; step D does.
+
+Its `submissionWindow.ts` was **not** taken. `windowState` answers the same
+question `opensInDays` in `shared/reviewQueue.ts` already answers, and a second
+predicate for one question is the mistake that put the digest and the Review
+filter out of step. Its prep-run helpers read `prepStatus`, `prepAttempts` and
+`prepUpdatedAt`, columns this schema does not have; they belong with the
+migration that adds them, not before it.
+
+Everything else there — the answer engine, the discovery run, the Tailwind
+rebuild — predates the status vocabulary and reads better as a reference than
+as a patch.
+
 [gaf]: https://analysisfunction.civilservice.gov.uk/policy-store/an-introductory-guide-to-mcda/
 [km]: https://www.1000minds.com/decision-making/what-is-mcdm-mcda
 [cfm]: https://cfmusicians.afm.org/services/u-s-work-permits
