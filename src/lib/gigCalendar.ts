@@ -6,6 +6,7 @@ import {
 } from './googleCalendar'
 import { normaliseGigStatus } from '../../shared/gigStatus'
 import { splitDeadline } from '../../shared/reviewParse'
+import { showSpan } from '../../shared/performance'
 import type { Env } from '../types'
 
 /**
@@ -104,9 +105,16 @@ export async function syncGigCalendar(
   const patch: CalendarPatch = {}
   const description = describe(row)
 
+  // The show can run for several days; the two chores are a single date each.
+  const span = wantsShowEvent(row.status)
+    ? showSpan(row.performanceStart, row.performanceEnd)
+    : null
+
   const wanted: Array<{
     field: keyof CalendarPatch
     date: string | null
+    /** Google's exclusive all-day end. Null for a one-day entry. */
+    endDateExclusive: string | null
     summary: string
     /** Lead time for the pop-up, in minutes. */
     reminderMinutes: number
@@ -114,12 +122,14 @@ export async function syncGigCalendar(
     {
       field: 'opensEventId',
       date: wantsApplicationReminders(row.status) ? dateOf(row.opensAt) : null,
+      endDateExclusive: null,
       summary: `Applications open — ${row.name}`,
       reminderMinutes: 0,
     },
     {
       field: 'googleEventId',
       date: wantsApplicationReminders(row.status) ? dateOf(row.deadline) : null,
+      endDateExclusive: null,
       summary: `Apply by — ${row.name}`,
       // A week, not a day. A deadline you learn about the night before is a
       // deadline you miss; an application needs materials assembled.
@@ -127,7 +137,10 @@ export async function syncGigCalendar(
     },
     {
       field: 'showEventId',
-      date: wantsShowEvent(row.status) ? row.performanceStart : null,
+      // `showSpan` returns null for a half-filled or backwards pair, so a bad
+      // edit removes the entry rather than writing a nonsense one.
+      date: span?.start ?? null,
+      endDateExclusive: span?.endExclusive ?? null,
       // No prefix and no emoji. This one is the show.
       summary: row.name,
       reminderMinutes: 24 * 60,
@@ -143,11 +156,16 @@ export async function syncGigCalendar(
           summary: w.summary,
           description,
           date: w.date,
+          endDateExclusive: w.endDateExclusive ?? undefined,
           reminderMinutes: w.reminderMinutes,
         })
         patch[w.field] = event.id
       } else if (w.date && existing) {
-        await updateCalendarEvent(env, existing, { summary: w.summary, date: w.date })
+        await updateCalendarEvent(env, existing, {
+          summary: w.summary,
+          date: w.date,
+          endDateExclusive: w.endDateExclusive ?? undefined,
+        })
       } else if (!w.date && existing) {
         await deleteCalendarEvent(env, existing)
         patch[w.field] = null

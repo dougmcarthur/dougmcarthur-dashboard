@@ -62,9 +62,9 @@ Three kinds of entry, and only the last one is a gig:
 2. **`Apply by — {name}`** on `deadline`, 7 days ahead as well. This is what the
    current event was really for; it just needed to say so.
 3. **`{name}`** on the performance dates — written **only** at `booked`, never
-   before. This needs `performance_start` / `performance_end` columns, which do
-   not exist yet, because until now nothing in the app knew when you would
-   actually play.
+   before. `performance_start` / `performance_end` arrived in migration 0008
+   and became settable in step B; a run of several days is one entry spanning
+   them, not one entry per day.
 
 Entries 1 and 2 belong to a calendar you can hide. A month of deadlines mixed
 into the calendar you check before saying yes to dinner is its own problem.
@@ -259,8 +259,8 @@ So, without exception:
 
 | | Work | Why here |
 |---|---|---|
-| A | Status vocabulary, migration, calendar reframe | The app is actively misleading until this lands |
-| B | Performance dates; `booked` writes a real calendar event | Completes the calendar story |
+| A | Status vocabulary, migration, calendar reframe | **Done.** The app was actively misleading until this landed |
+| B | Performance dates; `booked` writes a real calendar event | **Done.** Completes the calendar story |
 | C | Artist database + EPK assembly | Everything in phases 3–5 draws on it |
 | D | Phase 3: form pre-fill, draft emails, materials checklist | Needs C |
 | E | Phase 4: Gmail follow-up classification | Independent of C/D; can run in parallel |

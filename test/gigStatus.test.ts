@@ -5,6 +5,8 @@ import {
   hasBeenSubmitted,
   GIG_STATUS_META,
   GIG_STATUSES,
+  nextGigStatuses,
+  isGigTransitionAllowed,
 } from '../shared/gigStatus'
 
 describe('the rename', () => {
@@ -221,5 +223,83 @@ describe('what the calendar is allowed to say', () => {
     await expect(
       syncGigCalendar(env, row({ status: 'shortlisted', name: 'BOOM' })),
     ).resolves.toBeTruthy()
+  })
+})
+
+describe('the moves the pipeline offers', () => {
+  it('covers every status, so a new one cannot be added without deciding this', () => {
+    for (const s of GIG_STATUSES) {
+      expect(Array.isArray(nextGigStatuses(s)), s).toBe(true)
+    }
+  })
+
+  it('never offers a move to a status that does not exist', () => {
+    const known = new Set<string>(GIG_STATUSES)
+    for (const s of GIG_STATUSES) {
+      for (const to of nextGigStatuses(s)) expect(known.has(to), `${s} -> ${to}`).toBe(true)
+    }
+  })
+
+  it('never offers a move to itself', () => {
+    for (const s of GIG_STATUSES) expect(nextGigStatuses(s)).not.toContain(s)
+  })
+
+  /**
+   * The one that matters. `declined` is their word; if you turn down an
+   * invitation that is `withdrawn`. Offering the wrong one would let a
+   * mis-click record that you were rejected from a festival that wanted you —
+   * and a settled row is not something you go back and re-read.
+   */
+  it('cannot get from invited to declined', () => {
+    expect(nextGigStatuses('invited')).not.toContain('declined')
+    expect(nextGigStatuses('invited')).toContain('withdrawn')
+    expect(isGigTransitionAllowed('invited', 'declined')).toBe(false)
+  })
+
+  it('lets you change your mind before anything is sent, and calls it passing', () => {
+    expect(isGigTransitionAllowed('shortlisted', 'passed')).toBe(true)
+    expect(isGigTransitionAllowed('preparing', 'passed')).toBe(true)
+    // After it has gone out they have seen it, so pulling out is withdrawing.
+    expect(isGigTransitionAllowed('submitted', 'passed')).toBe(false)
+    expect(isGigTransitionAllowed('submitted', 'withdrawn')).toBe(true)
+  })
+
+  it('offers only archiving out of a terminal status', () => {
+    for (const s of GIG_STATUSES.filter((x) => GIG_STATUS_META[x].terminal && x !== 'archived')) {
+      expect(nextGigStatuses(s), s).toEqual(['archived'])
+    }
+    expect(nextGigStatuses('archived')).toEqual([])
+  })
+
+  it('refuses to skip the follow-up phase entirely', () => {
+    // A row arriving on `booked` straight from `submitted` is claiming an
+    // invitation that never happened. The research agents PATCH this too.
+    expect(isGigTransitionAllowed('submitted', 'booked')).toBe(false)
+    expect(isGigTransitionAllowed('invited', 'booked')).toBe(true)
+  })
+
+  it('treats re-stating the current status as a no-op, not a transition', () => {
+    // An ordinary field edit sends the whole row back, status included.
+    for (const s of GIG_STATUSES) expect(isGigTransitionAllowed(s, s), s).toBe(true)
+  })
+
+  it('reads legacy spellings on both sides before deciding', () => {
+    // `approved` is `shortlisted`, so this is the ordinary "I applied" move.
+    expect(isGigTransitionAllowed('approved', 'submitted')).toBe(true)
+    // And `sent` is `submitted`, so this is the no-op above under an old name.
+    expect(isGigTransitionAllowed('sent', 'submitted')).toBe(true)
+  })
+
+  it('reaches every non-legacy status from discovered', () => {
+    // A status nothing can reach is a status the app cannot record. Walked
+    // rather than asserted, so adding an unreachable one fails here.
+    const seen = new Set<string>(['discovered'])
+    const queue = ['discovered']
+    while (queue.length) {
+      for (const to of nextGigStatuses(queue.shift()!)) {
+        if (!seen.has(to)) { seen.add(to); queue.push(to) }
+      }
+    }
+    expect([...GIG_STATUSES].filter((s) => !seen.has(s))).toEqual([])
   })
 })

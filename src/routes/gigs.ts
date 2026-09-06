@@ -5,7 +5,13 @@ import { eq, and, desc } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, reminders } from '../db/schema'
 import { syncGigCalendar, removeGigCalendar, type GigRow } from '../lib/gigCalendar'
-import { normaliseGigStatus, isGigSettled } from '../../shared/gigStatus'
+import {
+  normaliseGigStatus,
+  isGigSettled,
+  isGigTransitionAllowed,
+  gigStatusMeta,
+} from '../../shared/gigStatus'
+import { performanceDateProblem } from '../../shared/performance'
 import { splitDeadline } from '../../shared/reviewParse'
 import type { Env } from '../types'
 
@@ -27,6 +33,11 @@ const GigInsertSchema = z.object({
   fitRationale: z.string().optional(),
   url: z.string().url().optional().or(z.literal('')),
   status: z.string().optional(),
+  // When you are actually on stage. Plain dates, never prose: unlike `deadline`
+  // these are typed in from an agreement, so a value that is not a date is a
+  // mistake rather than something to recover a date from.
+  performanceStart: z.string().nullable().optional(),
+  performanceEnd: z.string().nullable().optional(),
 })
 
 const GigPatchSchema = GigInsertSchema.partial()
@@ -62,6 +73,9 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
   const b = c.req.valid('json')
   const ts = new Date().toISOString()
 
+  const dateProblem = performanceDateProblem(b.performanceStart, b.performanceEnd)
+  if (dateProblem) return c.json({ error: dateProblem }, 400)
+
   const result = await db
     .insert(gigOpportunities)
     .values({
@@ -79,6 +93,8 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
       paid: b.paid ? 1 : 0,
       fitRationale: b.fitRationale ?? null,
       url: b.url || null,
+      performanceStart: b.performanceStart ?? null,
+      performanceEnd: b.performanceEnd ?? null,
       // Normalised on the way in: the research agents that POST here still
       // send `approved`, and a row should land in the right column rather
       // than carrying a word the pipeline no longer uses.
@@ -125,6 +141,32 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
   // storing a value nothing else recognises. See shared/gigStatus.ts.
   const newStatus = normaliseGigStatus(b.status ?? before.status)
   if (b.status !== undefined) updates.status = newStatus
+
+  // The pipeline is a shape, not a free-for-all. Refused here rather than only
+  // in the picker, because the research agents PATCH this route too and a row
+  // arriving on `booked` without ever having been `invited` is a claim the
+  // follow-up phase never made. `isGigTransitionAllowed` treats a status equal
+  // to the one already stored as a no-op, so an ordinary field edit that echoes
+  // the current status still goes through.
+  if (!isGigTransitionAllowed(before.status, newStatus)) {
+    return c.json(
+      {
+        error:
+          `A gig that is ${gigStatusMeta(before.status).label.toLowerCase()} ` +
+          `cannot move straight to ${gigStatusMeta(newStatus).label.toLowerCase()}.`,
+      },
+      400,
+    )
+  }
+
+  // Checked against the merged row: a PATCH that sets only the end date has to
+  // be read against the start already stored, or every partial edit would look
+  // like an end without a start.
+  const dateProblem = performanceDateProblem(
+    b.performanceStart !== undefined ? b.performanceStart : before.performanceStart,
+    b.performanceEnd !== undefined ? b.performanceEnd : before.performanceEnd,
+  )
+  if (dateProblem) return c.json({ error: dateProblem }, 400)
 
   // Both sides normalised, or a legacy row would look like it was changing
   // every time it was touched: `approved` -> `shortlisted` is a rename, not a

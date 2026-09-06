@@ -209,3 +209,60 @@ export function hasBeenSubmitted(raw: string | null | undefined): boolean {
   const phase = GIG_STATUS_META[normaliseGigStatus(raw)].phase
   return phase === 'follow_up' || phase === 'show' || normaliseGigStatus(raw) === 'submitted'
 }
+
+/**
+ * The moves offered from a given status.
+ *
+ * A map rather than something derived from `phase`, because the interesting
+ * entries are the ones the phase order would get wrong. Two in particular:
+ *
+ *  - From `invited` there is no route to `declined`. Declining is *their* verb.
+ *    Turning down an invitation is `withdrawn`, and offering the other word
+ *    would let one mis-click record that you were rejected from a festival that
+ *    wanted you.
+ *  - `passed` stays reachable from `shortlisted` and `preparing`. Changing your
+ *    mind before anything is sent is still you passing, not you withdrawing —
+ *    they never saw it either way.
+ *
+ * Terminal statuses offer `archived` and nothing else: undoing one is an edit,
+ * not a transition, and pretending otherwise invites a row to be walked
+ * backwards into a state its history contradicts.
+ */
+const NEXT: Record<GigStatus, GigStatus[]> = {
+  discovered: ['shortlisted', 'passed'],
+  shortlisted: ['preparing', 'submitted', 'passed', 'expired'],
+  passed: ['archived'],
+  preparing: ['submitted', 'passed', 'expired'],
+  submitted: ['acknowledged', 'info_requested', 'invited', 'declined', 'withdrawn', 'expired'],
+  acknowledged: ['info_requested', 'invited', 'declined', 'withdrawn', 'expired'],
+  info_requested: ['acknowledged', 'invited', 'declined', 'withdrawn'],
+  // Not `declined`. See above.
+  invited: ['booked', 'withdrawn'],
+  declined: ['archived'],
+  booked: ['withdrawn', 'archived'],
+  expired: ['archived'],
+  withdrawn: ['archived'],
+  archived: [],
+}
+
+export function nextGigStatuses(raw: string | null | undefined): GigStatus[] {
+  return NEXT[normaliseGigStatus(raw)]
+}
+
+/**
+ * Is this a move the pipeline offers?
+ *
+ * The API validates against this so a hand-made request cannot put a row into a
+ * state the UI would then have no way to explain — landing a gig on `booked`
+ * without it ever having been `invited`, say.
+ */
+export function isGigTransitionAllowed(
+  from: string | null | undefined,
+  to: string | null | undefined,
+): boolean {
+  const a = normaliseGigStatus(from)
+  const b = normaliseGigStatus(to)
+  // Re-stating the status a row already has is a no-op, not a transition; a
+  // PATCH that sets other columns should not have to omit it.
+  return a === b || NEXT[a].includes(b)
+}

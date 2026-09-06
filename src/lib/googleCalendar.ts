@@ -38,6 +38,17 @@ export interface CalendarEventInput {
   summary: string
   description?: string
   date: string // ISO date string YYYY-MM-DD
+  /**
+   * Exclusive end for a multi-day entry, as Google wants it: a festival on the
+   * 10th to the 12th passes 2027-07-13. Omit for a single day.
+   *
+   * Single-day entries deliberately keep sending `end.date === start.date`,
+   * which is what has been in production since the first calendar event and is
+   * what Google renders as one day. That is not what the docs describe, so it
+   * is left exactly as it is rather than "corrected" from here, where there is
+   * no way to try it against the real API.
+   */
+  endDateExclusive?: string
   reminderMinutes?: number // default: 1 day before = 1440
 }
 
@@ -57,7 +68,7 @@ export async function createCalendarEvent(
     summary: input.summary,
     description: input.description ?? '',
     start: { date: input.date },
-    end: { date: input.date },
+    end: { date: input.endDateExclusive ?? input.date },
     reminders: {
       useDefault: false,
       overrides: [
@@ -100,7 +111,9 @@ export async function updateCalendarEvent(
   if (input.description !== undefined) body.description = input.description
   if (input.date) {
     body.start = { date: input.date }
-    body.end = { date: input.date }
+    // Always sent alongside the start, so shortening a run from three nights to
+    // one moves the end back instead of leaving the old span in place.
+    body.end = { date: input.endDateExclusive ?? input.date }
   }
 
   const res = await fetch(

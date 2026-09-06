@@ -3,6 +3,7 @@ import {  type GigOpportunity } from '../../api'
 import { FIELD } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
 import { SUBMISSION_METHODS } from './constants'
+import { performanceDateProblem } from '../../../../shared/performance'
 
 /** Editing an existing row in place, inside its expanded table row. */
 export function EditGigPanel({
@@ -21,6 +22,9 @@ export function EditGigPanel({
     type: gig.type,
     organizer: gig.organizer ?? '',
     deadline: gig.deadline ?? '',
+    opensAt: gig.opensAt ?? '',
+    performanceStart: gig.performanceStart ?? '',
+    performanceEnd: gig.performanceEnd ?? '',
     feeAmount: gig.feeAmount?.toString() ?? '',
     feeCurrency: gig.feeCurrency ?? 'USD',
     paid: Boolean(gig.paid),
@@ -33,12 +37,23 @@ export function EditGigPanel({
   const set = (k: keyof typeof draft, v: string | boolean) =>
     setDraft((d) => ({ ...d, [k]: v }))
 
+  // The API refuses a bad pair too; this is so you find out while the field is
+  // still under your cursor rather than after a round trip.
+  const dateProblem = performanceDateProblem(
+    draft.performanceStart || null,
+    draft.performanceEnd || null,
+  )
+
   function handleSave() {
+    if (dateProblem) return
     onSave({
       name: draft.name,
       type: draft.type,
       organizer: draft.organizer || null,
       deadline: draft.deadline || null,
+      opensAt: draft.opensAt || null,
+      performanceStart: draft.performanceStart || null,
+      performanceEnd: draft.performanceEnd || null,
       feeAmount: draft.feeAmount ? parseFloat(draft.feeAmount) : null,
       feeCurrency: draft.feeCurrency,
       paid: draft.paid ? 1 : 0,
@@ -68,6 +83,10 @@ export function EditGigPanel({
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Deadline</label>
           <input type="date" value={draft.deadline} onChange={(e) => set('deadline', e.target.value)} className={FIELD} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">Applications open</label>
+          <input type="date" value={draft.opensAt} onChange={(e) => set('opensAt', e.target.value)} className={FIELD} />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Fee</label>
@@ -104,13 +123,36 @@ export function EditGigPanel({
           <label className="block text-xs font-medium text-muted mb-1">URL</label>
           <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} className={FIELD} />
         </div>
+
+        {/*
+          Separated and captioned, because these are the only dates on this
+          form that mean a stage. The deadline above is a chore; these are the
+          show, and they are the only ones the calendar writes as an event.
+        */}
+        <div className="col-span-2 pt-1">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wide">Performance dates</p>
+          <p className="text-xs text-faint mt-0.5">
+            When you are on stage. Goes on your calendar once this is booked, and not before.
+          </p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">First day</label>
+          <input type="date" value={draft.performanceStart} onChange={(e) => set('performanceStart', e.target.value)} className={FIELD} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">Last day <span className="text-faint font-normal">— if it runs more than one</span></label>
+          <input type="date" value={draft.performanceEnd} onChange={(e) => set('performanceEnd', e.target.value)} className={FIELD} />
+        </div>
+        {dateProblem && (
+          <p className="col-span-2 text-xs text-danger-fg">{dateProblem}</p>
+        )}
       </div>
       <label className="flex items-center gap-2 text-sm text-body cursor-pointer">
         <input type="checkbox" checked={draft.paid} onChange={(e) => set('paid', e.target.checked)} className="rounded border-line-strong" />
         Paid gig
       </label>
       <div className="flex gap-2 pt-1">
-        <Button variant="primary" onClick={handleSave} disabled={isSaving} >
+        <Button variant="primary" onClick={handleSave} disabled={isSaving || dateProblem !== null} >
           {isSaving ? 'Saving…' : 'Save'}
         </Button>
         <Button variant="neutral" onClick={onCancel} >

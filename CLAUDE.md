@@ -61,6 +61,22 @@ because a run finishing is not recoverable from current state. Dismissing a
 condition lasts a day; dismissing an event is permanent. See
 `docs/notifications-plan.md` and `shared/notifications.ts`.
 
+**The pipeline is a shape, not a free-for-all.** `nextGigStatuses` in
+`shared/gigStatus.ts` says which moves a status offers, and the PATCH route
+refuses anything else — the research agents PATCH that route too. The entry
+worth knowing: **there is no route from `invited` to `declined`.** Declining is
+their verb; turning down an invitation is `withdrawn`. One mis-click should not
+be able to record that you were rejected from a festival that wanted you.
+
+**Performance dates are typed, not parsed.** `performance_start` /
+`performance_end` are the only dates that mean a stage, and unlike `deadline`
+they never hold prose — they come off an agreement, so a value that is not a
+date is a mistake rather than something to recover a date from.
+`shared/performance.ts` validates them and builds the calendar span; a bad pair
+makes `showSpan` return null, which the reconcile reads as "remove the entry"
+rather than writing a wrong one. Google's all-day `end.date` is exclusive, which
+is why the field is called `endDateExclusive` at every layer.
+
 **Status columns are not a closed set.** `shared/types.ts` types them as
 `string` deliberately — production rows carry values outside every union the UI
 offers. Narrowing them is a claim the data does not support.

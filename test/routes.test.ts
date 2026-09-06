@@ -90,4 +90,42 @@ describe('API route registration', () => {
     expect(body.calendarConfigured).toBe(false)
     expect(body.gmailConfigured).toBe(false)
   })
+
+  // The gig create route validates performance dates before it touches D1, so
+  // these are reachable with no database binding.
+  it('POST /api/gigs refuses a performance that ends before it starts', async () => {
+    const res = await app.request(
+      '/api/gigs',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Sawdust City Folk Festival',
+          type: 'festival',
+          performanceStart: '2027-07-12',
+          performanceEnd: '2027-07-10',
+        }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: string }
+    expect(body.error).toMatch(/ends before it starts/)
+  })
+
+  it('POST /api/gigs refuses a performance date that is not a date', async () => {
+    // `deadline` is allowed to hold prose and 26 production rows do; these two
+    // columns are not, which is the distinction worth guarding.
+    const res = await app.request(
+      '/api/gigs',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Sawdust City Folk Festival',
+          type: 'festival',
+          performanceStart: 'second weekend in July',
+        }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: string }
+    expect(body.error).toMatch(/must be a date/)
+  })
+
 })
