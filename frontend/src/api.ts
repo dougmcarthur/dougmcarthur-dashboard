@@ -30,6 +30,42 @@ export interface ReviewQueue {
   summary: QueueSummary
 }
 
+export type {
+  ArtistAsset,
+  AssetKind,
+  AssetHealth,
+  Epk,
+  EpkAudience,
+} from '../../shared/artistAssets'
+
+import type { ArtistAsset, AssetHealth, Epk, EpkAudience } from '../../shared/artistAssets'
+
+/** An asset with the freshness the server worked out, which the UI never recomputes. */
+export type ArtistAssetWithHealth = ArtistAsset & { health: AssetHealth }
+
+export interface ArtistAssetPage {
+  items: ArtistAssetWithHealth[]
+  total: number
+  /** Counted over everything, not the filtered view. */
+  needsReview: number
+  unreviewed: number
+}
+
+export interface ArtistAssetInput {
+  kind: string
+  label: string
+  value?: string | null
+  questionKind?: string | null
+  variant?: string | null
+  credit?: string | null
+  usageRights?: string | null
+  reviewBy?: string | null
+  source?: string | null
+  notes?: string | null
+  sortOrder?: number
+  archived?: boolean
+}
+
 export interface ReconcileResult {
   id: number
   name: string
@@ -229,6 +265,21 @@ export const api = {
   reminders: {
     dismiss: (id: number) =>
       apiFetch<{ id: number }>(`/reminders/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }),
+  },
+  /** The artist database — see shared/artistAssets.ts. */
+  artist: {
+    list: (params?: { kind?: string }) => {
+      const qs = params?.kind ? `?kind=${encodeURIComponent(params.kind)}` : ''
+      return apiFetch<ArtistAssetPage>(`/artist${qs}`)
+    },
+    epk: (audience: EpkAudience) => apiFetch<Epk>(`/artist/epk?audience=${audience}`),
+    create: (body: ArtistAssetInput) =>
+      apiFetch<{ id: number }>('/artist', { method: 'POST', body: JSON.stringify(body) }),
+    patch: (id: number, body: Partial<ArtistAssetInput>) =>
+      apiFetch<ArtistAsset>(`/artist/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    /** Still good: pushes the review date out by the kind's own interval. */
+    reviewed: (id: number) => apiFetch<ArtistAsset>(`/artist/${id}/reviewed`, { method: 'POST' }),
+    delete: (id: number) => apiFetch<{ ok: boolean }>(`/artist/${id}`, { method: 'DELETE' }),
   },
   referenceDocs: {
     list: () => apiFetch<ReferenceDoc[]>('/reference-docs'),

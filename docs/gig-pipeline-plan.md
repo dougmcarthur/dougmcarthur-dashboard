@@ -127,6 +127,17 @@ Two things it must do that a folder of files cannot:
 - **Assemble.** An EPK is a *view* over this, generated per opportunity —
   folk festival and a sync agency want different cuts of the same material.
 
+Both of those are built (`shared/artistAssets.ts`, migration 0009, the Artist
+page). Each asset also carries the `question_kind` it answers, which is the
+join to `shared/questionKinds.ts` and therefore to step D: `GET
+/api/artist/answer?label=…` takes a form field's label and returns the asset
+that answers it at that length.
+
+What is **not** built is the sourcing. Assets are entered by hand or POSTed by
+the research agents; nothing yet reads the three reference docs in D1, Google
+Drive, or the website. That is the next cut of this step, and it wants an
+extraction pass rather than more schema.
+
 ## 7. Weighing opportunities
 
 You asked how to weigh factors that are hard to quantify. The research answer
@@ -261,7 +272,7 @@ So, without exception:
 |---|---|---|
 | A | Status vocabulary, migration, calendar reframe | **Done.** The app was actively misleading until this landed |
 | B | Performance dates; `booked` writes a real calendar event | **Done.** Completes the calendar story |
-| C | Artist database + EPK assembly | Everything in phases 3–5 draws on it |
+| C | Artist database + EPK assembly | **Done** apart from sourcing. Everything in phases 3–5 draws on it |
 | D | Phase 3: form pre-fill, draft emails, materials checklist | Needs C |
 | E | Phase 4: Gmail follow-up classification | Independent of C/D; can run in parallel |
 | F | Cost model + swing-weight elicitation + scoring | Needs enough rows to elicit weights against a real range |

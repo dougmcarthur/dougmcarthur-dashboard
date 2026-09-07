@@ -128,4 +128,62 @@ describe('API route registration', () => {
     expect(body.error).toMatch(/must be a date/)
   })
 
+
+  // Same shape as the /api/sync/reconcile guard above: `epk` and `kinds` are
+  // words that a `/:id` route would happily swallow.
+  it('GET /api/artist/epk reaches the EPK handler, not an id lookup', async () => {
+    const res = await app.request('/api/artist/epk?audience=nonsense', {}, emptyEnv)
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: string; allowed: string[] }
+    expect(body.error).toContain('nonsense')
+    expect(body.allowed).toContain('festival')
+  })
+
+  it('GET /api/artist/kinds answers from the shared vocabulary with no database', async () => {
+    const res = await app.request('/api/artist/kinds', {}, emptyEnv)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { kinds: string[]; audiences: string[] }
+    expect(body.kinds).toContain('bio')
+    expect(body.audiences).toEqual(['festival', 'sync', 'press'])
+  })
+
+  it('GET /api/artist/answer needs a field label before it will do anything', async () => {
+    const res = await app.request('/api/artist/answer', {}, emptyEnv)
+    expect(res.status).toBe(400)
+  })
+
+  it('GET /api/artist/answer says so plainly when it does not recognise the question', async () => {
+    // Reached without D1 because an unclassified field has nothing to look up.
+    const res = await app.request(
+      '/api/artist/answer?label=Do%20you%20have%20a%20valid%20passport%3F',
+      {},
+      emptyEnv,
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { questionKind: string | null }
+    expect(body.questionKind).toBeNull()
+  })
+
+  it('POST /api/artist refuses a question kind the app does not know', async () => {
+    const res = await app.request(
+      '/api/artist',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'bio', label: 'Long bio', questionKind: 'favourite_colour' }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: string }
+    expect(body.error).toContain('favourite_colour')
+  })
+
+  it('POST /api/artist refuses a review date that is not a date', async () => {
+    const res = await app.request(
+      '/api/artist',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'bio', label: 'Long bio', reviewBy: 'next spring' }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
 })

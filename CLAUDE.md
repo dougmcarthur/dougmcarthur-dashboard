@@ -81,6 +81,20 @@ is why the field is called `endDateExclusive` at every layer.
 `string` deliberately — production rows carry values outside every union the UI
 offers. Narrowing them is a claim the data does not support.
 
+**The artist database expires on purpose.** Every row in `artist_assets`
+carries a `review_by`, seeded from its kind when one is not given —  six months
+for a follower count, two years for a press photo. `assetHealth` in
+`shared/artistAssets.ts` reads that against a `today` it is handed, never the
+clock. `unreviewed` is a separate state from `overdue` on purpose: "this
+lapsed" and "nobody ever claimed this was checked" are different conversations.
+Separately from any date, an asset can be *broken* — a press photo with no
+photographer credit is unusable the day it is added.
+
+**An EPK is a view, not a document.** `assembleEpk` cuts the same library
+differently per audience and reports what is stale or missing inside it. A file
+exported in March cannot tell you its photo credit went missing in April, which
+is the whole reason this is assembled on read.
+
 **Deadlines are often prose.** 26 of 34 gig rows hold things like "None —
 rolling artist roster intake" in `deadline`. Anything wanting a real date must
 go through `splitDeadline`, which returns null rather than guessing. Where a

@@ -4,6 +4,7 @@ import { useHashRoute } from './hooks/useHashRoute'
 import { OverviewPage } from './pages/OverviewPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { GigsPage } from './pages/GigsPage'
+import { ArtistPage } from './pages/ArtistPage'
 import { SyncPage } from './pages/SyncPage'
 import { PromoDraftsPage } from './pages/PromoDraftsPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -18,6 +19,7 @@ export default function App() {
         {page === 'overview' && <OverviewPage onNav={navigate} />}
         {page === 'review' && <ReviewPage initialFilter={arg} />}
         {page === 'gigs' && <GigsPage />}
+        {page === 'artist' && <ArtistPage />}
         {page === 'sync' && <SyncPage />}
         {page === 'promo' && <PromoDraftsPage />}
         {page === 'runs' && <TaskRunsPage />}

@@ -70,6 +70,32 @@ export const referenceDocs = sqliteTable('reference_docs', {
   updatedAt: text('updated_at').notNull(),
 })
 
+/**
+ * The artist database. See migration 0009 and shared/artistAssets.ts.
+ *
+ * `reviewBy` and `questionKind` are the two columns that make this more than a
+ * folder: one says when an asset stops being trustworthy, the other says which
+ * canonical application question it answers.
+ */
+export const artistAssets = sqliteTable('artist_assets', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  kind: text('kind').notNull(),
+  label: text('label').notNull(),
+  value: text('value'),
+  questionKind: text('question_kind'),
+  variant: text('variant'),
+  charCount: integer('char_count'),
+  credit: text('credit'),
+  usageRights: text('usage_rights'),
+  reviewBy: text('review_by'),
+  source: text('source'),
+  notes: text('notes'),
+  sortOrder: integer('sort_order').default(0),
+  archived: integer('archived').default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
 export const taskRuns = sqliteTable('task_runs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   taskId: text('task_id').notNull(),
@@ -146,6 +172,7 @@ export type GigOpportunity = typeof gigOpportunities.$inferSelect
 export type SyncTarget = typeof syncTargets.$inferSelect
 export type PromoDraft = typeof promoDrafts.$inferSelect
 export type ReferenceDoc = typeof referenceDocs.$inferSelect
+export type ArtistAsset = typeof artistAssets.$inferSelect
 export type TaskRun = typeof taskRuns.$inferSelect
 export type Reminder = typeof reminders.$inferSelect
 export type DigestReport = typeof digestReports.$inferSelect

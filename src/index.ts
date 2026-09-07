@@ -8,6 +8,7 @@ import gigs from './routes/gigs'
 import sync from './routes/sync'
 import promo from './routes/promo'
 import reference from './routes/reference'
+import artist from './routes/artist'
 import taskRuns from './routes/taskRuns'
 import reminders from './routes/reminders'
 import health from './routes/health'
@@ -33,6 +34,7 @@ app.route('/api/gigs', gigs)
 app.route('/api/sync/reconcile', syncReconcile)
 app.route('/api/sync', sync)
 app.route('/api/promo', promo)
+app.route('/api/artist', artist)
 app.route('/api/reference-docs', reference)
 app.route('/api/task-runs', taskRuns)
 app.route('/api/reminders', reminders)

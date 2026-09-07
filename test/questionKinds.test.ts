@@ -4,7 +4,7 @@ import {
   classifyQuestion,
   kindByKey,
   targetLength,
-} from '../src/lib/questionKinds'
+} from '../shared/questionKinds'
 
 /**
  * The list is ordered, and that order is the whole design: the first kind whose

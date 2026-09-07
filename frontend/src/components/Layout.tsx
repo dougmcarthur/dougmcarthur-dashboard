@@ -6,6 +6,7 @@ const NAV_LINKS = [
   { id: 'overview', label: 'Overview' },
   { id: 'review', label: 'Review' },
   { id: 'gigs', label: 'Gigs' },
+  { id: 'artist', label: 'Artist' },
   { id: 'sync', label: 'Sync' },
   { id: 'promo', label: 'Promo' },
 ]
