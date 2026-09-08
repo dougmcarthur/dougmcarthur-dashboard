@@ -15,7 +15,13 @@
  * reopen" say what happens; OK/Cancel make you reconstruct it.
  */
 
-import type { ReviewItem, FlagId } from './reviewQueue'
+import type { ReviewItem, ReviewKind, FlagId } from './reviewQueue'
+import {
+  type GigStatus,
+  normaliseGigStatus,
+  nextGigStatuses,
+  gigStatusMeta,
+} from './gigStatus'
 
 /** Everything the copy needs — an item before its own sentence is attached. */
 export type DecisionInput = Omit<ReviewItem, 'decision'>
@@ -27,6 +33,14 @@ export type DecisionIntent =
   | 'pass'
   | 'archive'
   | 'publish'
+  // Phase 4 and the ways out of it. These exist because the card used to offer
+  // moves the pipeline refuses: an overdue shortlisted gig was offered
+  // "Archive", which `nextGigStatuses` does not allow, so the one button on
+  // the card that named the obvious outcome returned a 400.
+  | 'expire'
+  | 'withdraw'
+  | 'book'
+  | 'prepare'
 
 export interface DecisionAction {
   label: string
@@ -38,13 +52,26 @@ export interface DecisionAction {
 export interface Decision {
   /** One sentence naming the decision. Never empty. */
   rationale: string
-  /** Exactly two: the affirmative outcome and the negative one. */
-  actions: [DecisionAction, DecisionAction]
+  /**
+   * The affirmative outcome and the negative one — two, normally.
+   *
+   * One where the pipeline offers only one legal move, and none where it
+   * offers none at all (an archived row has nowhere to go). Never a button
+   * whose move `isGigTransitionAllowed` would refuse: a card that offers a
+   * decision the API rejects is worse than a card that offers nothing, because
+   * it looks like it worked.
+   */
+  actions: DecisionAction[]
 }
 
 /** Flags that can drive the copy, most decisive first. */
 const PRECEDENCE: FlagId[] = [
   'conflict',
+  'reply_due',
+  // Ahead of `overdue`, which is not a mistake. A deadline in the past on a
+  // row you already submitted is expected and says nothing; the overdue copy
+  // would tell you it "was never submitted", which for these rows is false.
+  'no_reply',
   'overdue',
   'paid',
   'issue',
@@ -82,21 +109,156 @@ function listFields(labels: string[]): string {
   return `your ${joined}`
 }
 
-const GIG_ACTIONS: Record<string, [DecisionAction, DecisionAction]> = {
+/**
+ * What an intent means as a status.
+ *
+ * This lived in the Overview deck, in the browser, with no knowledge of
+ * `nextGigStatuses` — which is how the deck came to deal cards whose only
+ * buttons the API refuses. Resolving the intent here means the copy and the
+ * legality check read the same table.
+ */
+export const GIG_STATUS_BY_INTENT: Record<DecisionIntent, GigStatus> = {
+  confirm_sent: 'submitted',
+  reopen: 'shortlisted',
+  approve: 'shortlisted',
+  pass: 'passed',
+  archive: 'archived',
+  publish: 'submitted',
+  expire: 'expired',
+  withdraw: 'withdrawn',
+  book: 'booked',
+  prepare: 'preparing',
+}
+
+/**
+ * How a move is named on a button.
+ *
+ * Not `GIG_STATUS_META[s].label`, which names the *state* a row lands in.
+ * "Archived" is where you end up; "Archive" is what you are about to do, and a
+ * button has to say the second one. Exported because the Review pane builds
+ * its bar from the same moves.
+ */
+export const GIG_MOVE_LABEL: Partial<Record<GigStatus, string>> = {
+  shortlisted: 'Will apply',
+  preparing: 'Start preparing',
+  submitted: 'Applied',
+  booked: 'Confirm the booking',
+  passed: 'Pass',
+  expired: 'Window closed',
+  withdrawn: 'Withdraw',
+  archived: 'Archive',
+}
+
+const INTENT_BY_GIG_STATUS = {
+  shortlisted: 'approve',
+  preparing: 'prepare',
+  submitted: 'confirm_sent',
+  booked: 'book',
+  passed: 'pass',
+  expired: 'expire',
+  withdrawn: 'withdraw',
+  archived: 'archive',
+} as const satisfies Partial<Record<GigStatus, DecisionIntent>>
+
+/**
+ * Which legal move is worth a button when the preferred one is not available,
+ * affirmative first and negative second.
+ *
+ * `acknowledged`, `info_requested`, `invited` and `declined` are absent on
+ * purpose: those record what the *organiser* did, and a one-click button that
+ * writes down their rejection is not a decision you should be able to make by
+ * reflex on the Overview page.
+ */
+const LADDER: Record<'go' | 'no', GigStatus[]> = {
+  go: ['booked', 'submitted', 'preparing', 'shortlisted'],
+  no: ['expired', 'withdrawn', 'passed', 'archived'],
+}
+
+export function gigMoveAction(to: GigStatus, tone: 'go' | 'no'): DecisionAction | null {
+  const intent = INTENT_BY_GIG_STATUS[to as keyof typeof INTENT_BY_GIG_STATUS]
+  const label = GIG_MOVE_LABEL[to]
+  return intent && label ? { label, intent, tone } : null
+}
+
+/**
+ * Drop every proposed action the pipeline would refuse, and top the pair back
+ * up from whatever it does allow.
+ *
+ * A same-status target counts as refused even though the API treats it as a
+ * no-op: "Keep for next cycle" on an already-shortlisted gig wrote nothing,
+ * changed nothing, and dealt the identical card straight back.
+ */
+function gigActions(
+  kind: ReviewKind,
+  status: string,
+  preferred: DecisionAction[],
+): DecisionAction[] {
+  if (kind === 'gig') return legaliseGig(status, preferred)
+  // Sync targets and promo drafts take a free-form status, so nothing here is
+  // illegal — but a table may list alternates for the gig side, and a card is
+  // one affirmative and one negative. Take the first of each.
+  return (['go', 'no'] as const)
+    .map((tone) => preferred.find((a) => a.tone === tone))
+    .filter((a): a is DecisionAction => a !== undefined)
+}
+
+function legaliseGig(status: string, preferred: DecisionAction[]): DecisionAction[] {
+  const moves = new Set<GigStatus>(nextGigStatuses(status))
+  const out: DecisionAction[] = []
+
+  for (const tone of ['go', 'no'] as const) {
+    const kept = preferred.find((a) => a.tone === tone && moves.has(GIG_STATUS_BY_INTENT[a.intent]))
+    if (kept) {
+      out.push(kept)
+      continue
+    }
+    const fallback = LADDER[tone].find((s) => moves.has(s))
+    const action = fallback ? gigMoveAction(fallback, tone) : null
+    if (action) out.push(action)
+  }
+
+  return out
+}
+
+/**
+ * Proposed actions per situation, affirmative first.
+ *
+ * More than one `go` is allowed and is not a mistake: `legaliseGig` takes the
+ * first whose move the row's status actually offers, so a label that names the
+ * *meaning* of the decision can survive a change in which status carries it.
+ * "Approve the spend" on a discovered gig means shortlisting it; on one you
+ * already shortlisted it means starting the application. Same sentence, same
+ * button, different move.
+ */
+const GIG_ACTIONS: Record<string, DecisionAction[]> = {
   sent_check: [
     { label: 'It went out', intent: 'confirm_sent', tone: 'go' },
     { label: 'Not sent — reopen', intent: 'reopen', tone: 'no' },
   ],
   spend: [
     { label: 'Approve the spend', intent: 'approve', tone: 'go' },
+    { label: 'Approve the spend', intent: 'prepare', tone: 'go' },
     { label: 'Pass', intent: 'pass', tone: 'no' },
   ],
+  // "Keep for next cycle" used to sit here as `approve`, which on an
+  // already-shortlisted gig set the status it already had: nothing was
+  // written and the same card came straight back. `expire` is the move the
+  // pipeline actually offers, and it is what happened.
   close_out: [
-    { label: 'Keep for next cycle', intent: 'approve', tone: 'go' },
-    { label: 'Archive', intent: 'archive', tone: 'no' },
+    { label: 'Applied', intent: 'confirm_sent', tone: 'go' },
+    { label: 'Window closed', intent: 'expire', tone: 'no' },
   ],
+  invitation: [
+    { label: 'Confirm the booking', intent: 'book', tone: 'go' },
+    { label: 'Withdraw', intent: 'withdraw', tone: 'no' },
+  ],
+  // One action, and it is the negative one. There is no status that means
+  // "chased" — following up is an email — so the affirmative path off this
+  // card is the snooze beside it, which is why the sentence names it.
+  give_up: [{ label: 'Never heard back', intent: 'expire', tone: 'no' }],
   go_no: [
-    { label: 'Approve', intent: 'approve', tone: 'go' },
+    { label: 'Will apply', intent: 'approve', tone: 'go' },
+    { label: 'Start preparing', intent: 'prepare', tone: 'go' },
     { label: 'Pass', intent: 'pass', tone: 'no' },
   ],
 }
@@ -109,6 +271,11 @@ const PROMO_ACTIONS: [DecisionAction, DecisionAction] = [
 const SYNC_SENT_CHECK: [DecisionAction, DecisionAction] = [
   { label: 'It went out', intent: 'confirm_sent', tone: 'go' },
   { label: 'Not sent — reopen', intent: 'reopen', tone: 'no' },
+]
+
+const SYNC_PITCH: [DecisionAction, DecisionAction] = [
+  { label: 'Worth pitching', intent: 'approve', tone: 'go' },
+  { label: 'Let it go', intent: 'pass', tone: 'no' },
 ]
 
 const SYNC_PICK: [DecisionAction, DecisionAction] = [
@@ -148,11 +315,63 @@ export function decisionFor(item: DecisionInput): Decision {
         : blocker
         ? ` ${upperFirst(condense(blocker, 90))}`
         : ''
+      if (kind === 'sync') {
+        return {
+          rationale:
+            `Marked ${status.replace(/_/g, ' ')} in the tracker, but the note says it was never ` +
+            `actually sent.${extra} Did this go out?`,
+          actions: SYNC_SENT_CHECK,
+        }
+      }
+      // No buttons, deliberately. The gig pipeline has no reverse gear —
+      // `submitted` cannot walk back to `shortlisted`, because undoing a
+      // transition is an edit, not a move (see shared/gigStatus.ts). The card
+      // used to offer "Not sent — reopen" anyway, and it returned a 400 every
+      // time. Naming the contradiction and sending you to the row is the only
+      // thing here that is true.
       return {
         rationale:
           `Marked ${status.replace(/_/g, ' ')} in the tracker, but the note says it was never ` +
-          `actually sent.${extra} Did this go out?`,
-        actions: kind === 'sync' ? SYNC_SENT_CHECK : GIG_ACTIONS.sent_check,
+          `actually sent.${extra} One of the two is wrong, and fixing it is an edit rather ` +
+          `than a decision — open it and correct whichever side is.`,
+        actions: [],
+      }
+    }
+
+    case 'reply_due': {
+      if (normaliseGigStatus(status) === 'invited') {
+        return {
+          rationale:
+            'They want you. Nothing is booked until the agreement is signed, so this is the ' +
+            'confirmation — and turning it down is you withdrawing, not them declining.',
+          actions: gigActions(kind, status, GIG_ACTIONS.invitation),
+        }
+      }
+      // No buttons. The answer to a question is an email, and there is no
+      // status that means "replied" — recording what came back is the next
+      // decision, not this one. This is the state the plan called out as the
+      // one that stalls if nobody notices, so the card exists to make it
+      // impossible not to.
+      return {
+        rationale:
+          'They asked a question, and nothing moves until you answer it. Answering is a ' +
+          'reply in your mail, not a button here — open it, send the answer, then record ' +
+          'whatever comes back.',
+        actions: [],
+      }
+    }
+
+    case 'no_reply': {
+      const { days, exact } = item.silence ?? { days: 0, exact: true }
+      const sent = normaliseGigStatus(status) === 'acknowledged'
+        ? 'They confirmed they had it'
+        : 'It went out'
+      return {
+        rationale:
+          `${sent} ${exact ? '' : 'about '}${days} days ago and nothing has come back. ` +
+          `Chasing is an email rather than a button — send one and snooze this, or write ` +
+          `it off if the answer was never coming.`,
+        actions: gigActions(kind, status, GIG_ACTIONS.give_up),
       }
     }
 
@@ -160,9 +379,9 @@ export function decisionFor(item: DecisionInput): Decision {
       const days = Math.abs(deadline.daysUntil ?? 0)
       return {
         rationale:
-          `The deadline passed ${days} ${days === 1 ? 'day' : 'days'} ago and it was never ` +
-          `submitted. Nothing more can happen this cycle — keep it for the next one or archive it.`,
-        actions: GIG_ACTIONS.close_out,
+          `The deadline passed ${days} ${days === 1 ? 'day' : 'days'} ago and nothing was ` +
+          `submitted. Either it went out and the tracker never heard, or the window closed on it.`,
+        actions: gigActions(kind, status, GIG_ACTIONS.close_out),
       }
     }
 
@@ -172,7 +391,7 @@ export function decisionFor(item: DecisionInput): Decision {
         rationale:
           `Costs ${cost} to enter, so nobody can submit it without your say-so. ` +
           `Approving here is approving the spend.`,
-        actions: GIG_ACTIONS.spend,
+        actions: gigActions(kind, status, GIG_ACTIONS.spend),
       }
     }
 
@@ -183,7 +402,7 @@ export function decisionFor(item: DecisionInput): Decision {
       const isDuplicate = /already exists|duplicate|two independent/i.test(detail)
       return {
         rationale: isDuplicate ? `${detail} Pick one to send.` : detail,
-        actions: isDuplicate && kind === 'sync' ? SYNC_PICK : GIG_ACTIONS.go_no,
+        actions: isDuplicate && kind === 'sync' ? SYNC_PICK : gigActions(kind, status, GIG_ACTIONS.go_no),
       }
     }
 
@@ -194,7 +413,7 @@ export function decisionFor(item: DecisionInput): Decision {
           days === 0
             ? 'The deadline is today and nothing has been submitted yet.'
             : `Due in ${days} ${days === 1 ? 'day' : 'days'} and nothing has been submitted yet.`,
-        actions: GIG_ACTIONS.go_no,
+        actions: gigActions(kind, status, GIG_ACTIONS.go_no),
       }
     }
 
@@ -205,7 +424,7 @@ export function decisionFor(item: DecisionInput): Decision {
           : blocker
           ? `Waiting on you: ${lowerFirst(condense(blocker))}`
           : 'This is waiting on something only you can supply.',
-        actions: GIG_ACTIONS.go_no,
+        actions: gigActions(kind, status, GIG_ACTIONS.go_no),
       }
     }
 
@@ -213,7 +432,7 @@ export function decisionFor(item: DecisionInput): Decision {
       const how = parsed.submissionMethod ? ` It goes out by ${parsed.submissionMethod}.` : ''
       return {
         rationale: `Drafted but never sent.${how} Decide whether it is worth doing.`,
-        actions: GIG_ACTIONS.go_no,
+        actions: gigActions(kind, status, GIG_ACTIONS.go_no),
       }
     }
 
@@ -224,14 +443,14 @@ export function decisionFor(item: DecisionInput): Decision {
       if (kind === 'sync') {
         return {
           rationale: 'A sync target with nothing outstanding on it. Worth pitching, or let it go?',
-          actions: GIG_ACTIONS.go_no,
+          actions: SYNC_PITCH,
         }
       }
       const what = item.subtitle ? lowerFirst(condense(item.subtitle, 60)) : 'opportunity'
       const where = parsed.location ? ` in ${parsed.location}` : ''
       return {
         rationale: `A ${what}${where} with no deadline forcing the issue. Worth doing, or not?`,
-        actions: GIG_ACTIONS.go_no,
+        actions: gigActions(kind, status, GIG_ACTIONS.go_no),
       }
     }
   }

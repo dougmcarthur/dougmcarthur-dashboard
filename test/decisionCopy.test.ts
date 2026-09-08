@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildReviewQueue } from '../shared/reviewQueue'
+import { GIG_STATUS_BY_INTENT } from '../shared/decisionCopy'
+import { isGigTransitionAllowed, normaliseGigStatus } from '../shared/gigStatus'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../shared/types'
 
 function gig(o: Partial<GigOpportunity> & { id: number; name: string }): GigOpportunity {
@@ -38,7 +40,20 @@ describe('decision copy — the sentence names the decision', () => {
       })],
     })
     expect(item.decision.rationale).toContain('Marked submitted in the tracker')
-    expect(item.decision.rationale).toMatch(/Did this go out\?$/)
+    // No buttons. A conflict only arises once a gig claims to be sent, and the
+    // pipeline has no route back from `submitted` — the old pair offered
+    // "Not sent — reopen", which the PATCH route refused every single time.
+    expect(item.decision.rationale).toMatch(/an edit rather than a decision/)
+    expect(item.decision.actions).toEqual([])
+  })
+
+  it('still asks a sync target whether it went out — sync has no pipeline shape', () => {
+    const item = first({
+      sync: [sync({
+        id: 30, name: 'Marmoset', status: 'pitched',
+        fitNotes: undefined, notes: 'Submission status: NOT submitted.',
+      })],
+    })
     expect(item.decision.actions.map((a) => a.label)).toEqual(['It went out', 'Not sent — reopen'])
   })
 
@@ -55,7 +70,66 @@ describe('decision copy — the sentence names the decision', () => {
       gigs: [gig({ id: 3, name: 'Passed', deadline: '2026-01-01' })],
     })
     expect(item.decision.rationale).toMatch(/deadline passed \d+ days ago/)
-    expect(item.decision.actions.map((a) => a.label)).toEqual(['Keep for next cycle', 'Archive'])
+    // Was ['Keep for next cycle', 'Archive']. The first set the status the row
+    // already had — nothing was written and the identical card came straight
+    // back — and `shortlisted → archived` is not a move the pipeline offers,
+    // so the second returned a 400. `expired` is what actually happened.
+    expect(item.decision.actions.map((a) => a.label)).toEqual(['Applied', 'Window closed'])
+  })
+
+  it('names the silence, and does not claim a sent application was never sent', () => {
+    const item = first({
+      gigs: [gig({
+        id: 50, name: 'Home Routes', status: 'submitted',
+        // A past deadline on a row you already submitted raises `overdue`,
+        // whose copy reads "nothing was submitted" — false here, and the
+        // reason `no_reply` outranks it in the precedence list.
+        deadline: '2026-06-01', submittedAt: '2026-05-20',
+      })],
+    })
+    expect(item.decision.rationale).toMatch(/^It went out \d+ days ago and nothing has come back\./)
+    expect(item.decision.rationale).not.toContain('nothing was submitted')
+    // Chasing is an email. The affirmative path off this card is the snooze
+    // beside it, which is why the sentence names it rather than a button.
+    expect(item.decision.rationale).toContain('snooze this')
+    expect(item.decision.actions.map((a) => a.label)).toEqual(['Never heard back'])
+  })
+
+  it('says they confirmed receipt when that is what happened', () => {
+    const item = first({
+      gigs: [gig({ id: 51, name: 'CFMA', status: 'acknowledged', submittedAt: '2026-04-01' })],
+    })
+    expect(item.decision.rationale).toMatch(/^They confirmed they had it \d+ days ago/)
+  })
+
+  it('marks the count as approximate when the send date was never recorded', () => {
+    const item = first({
+      gigs: [gig({
+        id: 52, name: 'Legacy row', status: 'submitted',
+        submittedAt: null, updatedAt: '2026-05-01',
+      })],
+    })
+    expect(item.decision.rationale).toMatch(/It went out about \d+ days ago/)
+  })
+
+  it('puts an unanswered invitation at the top and offers the two real outs', () => {
+    const item = first({
+      gigs: [gig({ id: 40, name: 'Winnipeg Folk Festival', status: 'invited' })],
+    })
+    expect(item.flags[0].id).toBe('reply_due')
+    expect(item.decision.rationale).toContain('withdrawing, not them declining')
+    // Never `declined`: turning down an invitation is your verb, not theirs.
+    expect(item.decision.actions.map((a) => a.label)).toEqual(['Confirm the booking', 'Withdraw'])
+  })
+
+  it('tells you to answer a question rather than offering a button that cannot', () => {
+    const item = first({
+      gigs: [gig({ id: 41, name: 'Folk Alliance', status: 'info_requested' })],
+    })
+    expect(item.decision.rationale).toContain('nothing moves until you answer')
+    // A lone red "Withdraw" under "they asked a question" is a hazard, and
+    // there is no status that means "replied".
+    expect(item.decision.actions).toEqual([])
   })
 
   it('tells you to pick one when two pitches went to the same inbox', () => {
@@ -108,6 +182,17 @@ describe('decision copy — invariants that hold for every item', () => {
       gig({ id: 12, name: 'Paid', paid: 1, fee: '$55 + processing' }),
       gig({ id: 13, name: 'Overdue', deadline: '2026-02-02' }),
       gig({ id: 14, name: 'Vague', deadline: 'rolling, no deadline' }),
+      // One row per phase, so the legality invariant is exercised against
+      // every shape of `nextGigStatuses` rather than just the review phase.
+      gig({ id: 21, name: 'Fresh', status: 'discovered' }),
+      gig({ id: 22, name: 'Preparing', status: 'preparing', paid: 1, fee: '$40' }),
+      gig({ id: 23, name: 'Acknowledged', status: 'acknowledged' }),
+      gig({ id: 24, name: 'Asked', status: 'info_requested' }),
+      gig({ id: 25, name: 'Invited', status: 'invited' }),
+      gig({ id: 26, name: 'Booked', status: 'booked' }),
+      gig({ id: 27, name: 'Declined', status: 'declined' }),
+      gig({ id: 28, name: 'Expired out', status: 'expired', deadline: '2026-01-05' }),
+      gig({ id: 29, name: 'Silent', status: 'submitted', submittedAt: '2026-01-10' }),
     ],
     sync: [
       sync({ id: 15, name: 'Plain agency', notes: 'Chicago-based boutique sync agency.' }),
@@ -126,8 +211,37 @@ describe('decision copy — invariants that hold for every item', () => {
     for (const i of items) expect(i.decision.rationale.trim().length).toBeGreaterThan(0)
   })
 
-  it('always produces exactly two actions', () => {
-    for (const i of items) expect(i.decision.actions).toHaveLength(2)
+  it('never offers a gig a move the pipeline would refuse', () => {
+    // The invariant that replaced "always exactly two actions". Two was never
+    // the property worth holding: the deck and the Review bar both rendered a
+    // fixed pair regardless of status, and the PATCH route validates against
+    // `nextGigStatuses`, so a card at `submitted` offered three buttons that
+    // all returned 400. A card with one action, or none, is honest; a card
+    // with two the API rejects is not.
+    for (const i of items) {
+      if (i.kind !== 'gig') continue
+      for (const a of i.decision.actions) {
+        const to = GIG_STATUS_BY_INTENT[a.intent]
+        expect(
+          isGigTransitionAllowed(i.status, to),
+          `${i.title} (${normaliseGigStatus(i.status)}) offers "${a.label}" → ${to}`,
+        ).toBe(true)
+        // A move to the status the row already holds is legal but writes
+        // nothing, so the card returns unchanged. That is the bug, not a fix.
+        expect(to).not.toBe(normaliseGigStatus(i.status))
+      }
+    }
+  })
+
+  it('offers at most one affirmative and one negative', () => {
+    for (const i of items) {
+      // Promo drafts are the exception, and an old one: approving copy and
+      // marking it published are both affirmative, and a promo draft has no
+      // negative outcome — you do not reject your own caption.
+      if (i.kind === 'promo') continue
+      expect(i.decision.actions.filter((a) => a.tone === 'go').length).toBeLessThanOrEqual(1)
+      expect(i.decision.actions.filter((a) => a.tone === 'no').length).toBeLessThanOrEqual(1)
+    }
   })
 
   it('never leaves a raw flag id or template hole in the copy', () => {

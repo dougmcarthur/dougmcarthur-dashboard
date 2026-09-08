@@ -125,6 +125,10 @@ function actionableNow(item: ReviewItem): boolean {
  */
 const BUCKET_ORDER: Array<{ flag: FlagId; one: string; many: string; filter: string }> = [
   { flag: 'conflict', one: 'contradicts its own status', many: 'contradict their own status', filter: 'conflict' },
+  { flag: 'reply_due', one: 'is waiting on a reply from you', many: 'are waiting on a reply from you', filter: 'reply' },
+  // Above `overdue` for the same reason `decisionCopy` puts it there: on a row
+  // you already sent, a deadline in the past is expected and says nothing.
+  { flag: 'no_reply', one: 'has gone unanswered for six weeks or more', many: 'have gone unanswered for six weeks or more', filter: 'waiting' },
   { flag: 'overdue', one: 'is past its deadline', many: 'are past their deadline', filter: 'timing' },
   { flag: 'paid', one: 'costs money to enter', many: 'cost money to enter', filter: 'paid' },
   { flag: 'issue', one: 'has a flagged problem', many: 'have a flagged problem', filter: 'needs' },

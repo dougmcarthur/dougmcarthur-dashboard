@@ -17,7 +17,8 @@ import type { Env } from '../types'
  * no production row carries, and the two could not agree.
  *
  * Query params:
- *   filter  needs | conflict | blocked | paid | timing | snoozed | all  (default: all)
+ *   filter  needs | reply | conflict | blocked | paid | timing | waiting | snoozed | all
+ *           (default: all)
  *   limit   cap the number of items returned; counts always cover everything
  *
  * `counts` and `summary` are computed over the whole queue regardless of
@@ -32,7 +33,17 @@ import type { Env } from '../types'
  */
 const review = new Hono<{ Bindings: Env }>()
 
-const FILTERS: ReviewFilter[] = ['needs', 'conflict', 'blocked', 'paid', 'timing', 'snoozed', 'all']
+const FILTERS: ReviewFilter[] = [
+  'needs',
+  'reply',
+  'conflict',
+  'blocked',
+  'paid',
+  'timing',
+  'waiting',
+  'snoozed',
+  'all',
+]
 
 function isFilter(value: string | undefined): value is ReviewFilter {
   return value !== undefined && (FILTERS as string[]).includes(value)

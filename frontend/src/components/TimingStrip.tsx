@@ -1,5 +1,6 @@
 import type { DueReminder, TimingRow } from '../api'
 import { shortDate } from '../format'
+import { isGigTransitionAllowed } from '../../../shared/gigStatus'
 import { Button } from './ui/Button'
 
 /**
@@ -56,8 +57,20 @@ function Row({
 }) {
   return (
     <div
+      // `role="button"` rather than a real <button>: the reminder rows nest
+      // their own buttons inside, and a button inside a button is invalid
+      // markup that browsers resolve by dropping one of them.
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-sunken transition-colors"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-sunken transition-colors
+                 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
     >
       <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${tone.dot}`} aria-hidden="true" />
       <div className="min-w-0 flex-1">
@@ -109,7 +122,11 @@ export function TimingStrip({
               onClick={() => onNav('gigs')}
             >
               <span className="flex gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                {(r.gigStatus === 'shortlisted' || r.gigStatus === 'preparing') && (
+                {/* Asked, not listed. The two statuses happened to be right,
+                    but a hand-kept list beside a route that validates against
+                    `nextGigStatuses` is a 400 waiting for a new status. */}
+                {isGigTransitionAllowed(r.gigStatus, 'submitted') &&
+                  r.gigStatus !== 'submitted' && (
                   <Button variant="info" size="sm"
                     onClick={() => onSubmitted(r)}
                   >
@@ -139,7 +156,7 @@ export function TimingStrip({
             }`}
             tone={BAND_STYLE[row.band]}
             right={countdown(row.band, row.daysUntil)}
-            onClick={() => onNav('review')}
+            onClick={() => onNav(`review/${row.key}`)}
           />
         ))}
       </div>
