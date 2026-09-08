@@ -18,14 +18,12 @@ this repo works through and the place to look before starting anything.
 | 1 · Research & collect | Research agents POST rows; the Review queue ranks them | **built** |
 | 2 · Present & review | Overview deck, Review screen, snooze, weekly digest, notifications | **built** |
 | 3 · Apply & track | Form pre-fill, materials checklist, draft email | **built** |
-| 4 · Post-submission | Reading the organiser's reply | **not built** |
+| 4 · Post-submission | Reading the organiser's reply out of Gmail | **built** |
 | 5 · Pre-show | Agreements and logistics | **not built** |
 
-Phase 4 is next, and it is what makes the far half of the pipeline reachable:
-`acknowledged`, `info_requested`, `invited` and `declined` are states only an
-organiser's reply can justify, and nothing reads received mail yet. Until then
-`submissionSilence` measures how long an application has gone unanswered, which
-is honest about the gap without closing it.
+Next is the cost model and the swing-weight scoring in §7 of the plan, which is
+blocked on the elicitation rather than on code — the five questions have to be
+answered once by the person whose taste is being encoded.
 
 Two debts sit outside the phases. The artist database has no **sourcing** —
 assets are entered by hand. And `shared/reviewParse.ts` re-derives structured
@@ -46,7 +44,8 @@ facts out of prose on every read because migration 0001's columns were never
   Promo, Settings, History.
 - **Integrations** — Google Calendar (three kinds of entry, reconciled against
   a gig's state — see [The gig pipeline](#the-gig-pipeline)), Gmail
-  (`readonly`, reconciling sent pitches against sync targets), and Cloudflare
+  (`readonly`, reconciling sent pitches against sync targets and reading
+  organisers' replies to applications), and Cloudflare
   Email Service for the weekly digest. All degrade gracefully when their
   secrets aren't set — see `GET /api/health` to check what's configured.
 
@@ -90,6 +89,7 @@ All routes are under `/api`; anything else falls through to static assets.
 | `/api/reference-docs` | Reference documents (CRUD) |
 | `/api/reminders` | List/patch reminders; `POST /dismiss` to clear an entity's pending reminders |
 | `/api/task-runs` | Log + list automated task runs |
+| `/api/replies` | Replies found in the mail; `POST /scan`, `POST /:id/accept`, `POST /:id/dismiss` |
 | `/api/notifications` | The bell feed; `POST /read`, `POST /dismiss` |
 | `/api/health` | Which Google/Gmail secrets are configured |
 
@@ -185,6 +185,40 @@ means try again.
 Reading a form on a `shortlisted` gig moves it to `preparing`, because staging
 answers *is* starting the application. See
 [`docs/application-prep-plan.md`](docs/application-prep-plan.md).
+
+## Reading the reply — phase 4
+
+`POST /api/replies/scan` searches the mailbox for answers to the applications
+that are out, reads what each one says, and proposes. Nothing it finds moves a
+row on its own.
+
+**Replies almost never come from the festival's domain.** Of eight real ones in
+this mailbox, one did; the rest came from Wufoo, Jotform, a portal, a parent
+organisation and two personal gmail addresses. So matching is on the event's
+**name** in the subject or body — including abbreviations, because organisers
+write FOTR, FDV and "Road to BOW" — with the domain as a corroborator. The
+quoted form receipt underneath a reply is often the only place the event is
+named, which is why matching reads the whole body and classification reads only
+the top post.
+
+**Confirm once, then remember.** Accepting a match binds the sender address and
+the thread to that gig, so an unrelated domain costs one judgement rather than
+a permanent problem.
+
+**Every rejection opens by thanking you for applying**, so all four readings
+are scored and the strongest wins, with `unclear` when two are close. The
+sentence that decided it is stored verbatim and quoted on screen — a reading
+you cannot check is a reading you should not trust. Two things the real mail
+taught: rejections mostly avoid the word "unfortunately", and a conditional
+("if you don't hear from us by June…") is an acknowledgement carrying a date,
+not a rejection.
+
+**How far back it looks** is derived, not fixed: to just before the oldest
+application still waiting, plus a fortnight, clamped to 30–1095 days. Spam and
+trash are searched — a rejection auto-filed as spam is the exact silence this
+phase exists to break — and the row says when a message was found there.
+
+See [`docs/reply-matching-plan.md`](docs/reply-matching-plan.md).
 
 ## The artist database
 

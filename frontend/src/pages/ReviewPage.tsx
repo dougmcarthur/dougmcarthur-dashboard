@@ -5,6 +5,7 @@ import { SkeletonList } from '../components/Skeleton'
 import type { ReviewFilter } from '../../../shared/reviewQueue'
 import { QueueRow } from './review/QueueRow'
 import { Detail } from './review/Detail'
+import { ReplyInbox } from '../components/ReplyInbox'
 
 /**
  * The filters, and why they are worded the way they are.
@@ -166,6 +167,13 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
           · <kbd className="font-semibold">j</kbd>/<kbd className="font-semibold">k</kbd> to move
         </p>
       </div>
+
+      {/*
+        Above the filters, because a reply is news and the queue is state. The
+        `reply` filter beside it answers the other half — those are the rows
+        where they have already moved and you have not moved back.
+      */}
+      <ReplyInbox />
 
       <div className="flex flex-wrap gap-1.5">
         {FILTERS.map((f) => {

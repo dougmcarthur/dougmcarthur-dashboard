@@ -100,6 +100,61 @@ export interface ApplicationRead extends Application {
   read: { status: string; note: string | null; fields: number }
 }
 
+/** Phase 4 — see shared/replyClassify.ts and shared/replyMatch.ts. */
+export type { ReplyClass, Classification } from '../../shared/replyClassify'
+export { REPLY_CLASS_LABELS } from '../../shared/replyClassify'
+export type { MatchSignal, MatchConfidence } from '../../shared/replyMatch'
+
+import type { MatchSignal, MatchConfidence } from '../../shared/replyMatch'
+
+export interface ReplyCandidateSummary {
+  gigId: number
+  gigName: string
+  score: number
+  confidence: MatchConfidence
+  signals: MatchSignal[]
+}
+
+export interface GigReply {
+  id: number
+  gmailMessageId: string
+  gmailThreadId: string
+  gigId: number | null
+  fromAddress: string
+  fromName: string | null
+  subject: string | null
+  snippet: string | null
+  receivedAt: string
+  inSpam: boolean
+  classification: string
+  classLabel: string
+  classConfidence: string | null
+  /** The organiser's own sentence. Never a paraphrase. */
+  evidence: string | null
+  proposedStatus: string | null
+  matchScore: number
+  matchSignals: ReplyCandidateSummary[]
+  matchAmbiguous: boolean
+  resolution: string | null
+  gig: { id: number; name: string | null; status: string | null } | null
+}
+
+export interface ReplyFeed {
+  items: GigReply[]
+  unresolved: number
+}
+
+/** What a scan asked for, and how far back it reached. */
+export interface ReplyScanResult {
+  queries: string[]
+  windowDays: number
+  oldestSubmission: string | null
+  gigCount: number
+  found: number
+  stored: number
+  skipped: number
+}
+
 export interface ReconcileResult {
   id: number
   name: string
@@ -336,6 +391,24 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(body),
       }),
+  },
+  /**
+   * Replies found in the mailbox. Note what is missing: nothing here changes a
+   * gig's status. Accepting a reply records the judgement and remembers the
+   * sender; moving the row is `gigs.patch`, which is the one place that owns
+   * what a transition means.
+   */
+  replies: {
+    list: (params?: { resolved?: boolean }) =>
+      apiFetch<ReplyFeed>(`/replies${params?.resolved ? '?resolved=true' : ''}`),
+    scan: () => apiFetch<ReplyScanResult>('/replies/scan', { method: 'POST' }),
+    accept: (id: number, body: { gigId?: number; remember?: boolean } = {}) =>
+      apiFetch<{ id: number; gigId: number; gigName: string; currentStatus: string; proposedStatus: string | null; remembered: boolean }>(
+        `/replies/${id}/accept`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    dismiss: (id: number) =>
+      apiFetch<{ id: number; resolution: string }>(`/replies/${id}/dismiss`, { method: 'POST' }),
   },
   referenceDocs: {
     list: () => apiFetch<ReferenceDoc[]>('/reference-docs'),

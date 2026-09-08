@@ -142,6 +142,54 @@ export const applicationFields = sqliteTable('application_fields', {
   updatedAt: text('updated_at').notNull(),
 })
 
+/**
+ * Replies found in the mailbox, and how each was read. See migration 0012 and
+ * shared/replyClassify.ts.
+ *
+ * Every row is a proposal. `proposedStatus` is what the reading *would* do;
+ * nothing acts on it until a person accepts, because a wrong auto-transition
+ * tells you that you were rejected when you were not.
+ */
+export const gigReplies = sqliteTable('gig_replies', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  gmailMessageId: text('gmail_message_id').notNull(),
+  gmailThreadId: text('gmail_thread_id').notNull(),
+  /** Null while nothing matched, or while two gigs matched equally well. */
+  gigId: integer('gig_id'),
+  fromAddress: text('from_address').notNull(),
+  fromName: text('from_name'),
+  subject: text('subject'),
+  snippet: text('snippet'),
+  receivedAt: text('received_at').notNull(),
+  inSpam: integer('in_spam').default(0),
+  classification: text('classification').notNull().default('unclear'),
+  classConfidence: text('class_confidence'),
+  /** The organiser's own sentence, verbatim. */
+  evidence: text('evidence'),
+  proposedStatus: text('proposed_status'),
+  matchScore: integer('match_score').default(0),
+  matchSignals: text('match_signals'),
+  matchAmbiguous: integer('match_ambiguous').default(0),
+  resolution: text('resolution'),
+  resolvedAt: text('resolved_at'),
+  createdAt: text('created_at').notNull(),
+})
+
+/**
+ * Who writes about which opportunity, learned by confirmation.
+ *
+ * The answer to the problem that makes phase 4 hard: replies almost never come
+ * from the festival's own domain, so the first match is worked out from the
+ * event's name and every one after it is a lookup.
+ */
+export const gigCorrespondents = sqliteTable('gig_correspondents', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  gigId: integer('gig_id').notNull(),
+  kind: text('kind').notNull(), // 'address' | 'thread'
+  value: text('value').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
 export const taskRuns = sqliteTable('task_runs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   taskId: text('task_id').notNull(),
@@ -220,6 +268,8 @@ export type PromoDraft = typeof promoDrafts.$inferSelect
 export type ReferenceDoc = typeof referenceDocs.$inferSelect
 export type ArtistAsset = typeof artistAssets.$inferSelect
 export type ApplicationFieldRow = typeof applicationFields.$inferSelect
+export type GigReplyRow = typeof gigReplies.$inferSelect
+export type GigCorrespondentRow = typeof gigCorrespondents.$inferSelect
 export type TaskRun = typeof taskRuns.$inferSelect
 export type Reminder = typeof reminders.$inferSelect
 export type DigestReport = typeof digestReports.$inferSelect
