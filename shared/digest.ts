@@ -125,6 +125,9 @@ function actionableNow(item: ReviewItem): boolean {
  */
 const BUCKET_ORDER: Array<{ flag: FlagId; one: string; many: string; filter: string }> = [
   { flag: 'conflict', one: 'contradicts its own status', many: 'contradict their own status', filter: 'conflict' },
+  // Above the reply and the deadline buckets: those are things you can still
+  // do something about this week. A visa lead time that has run out is not.
+  { flag: 'visa_risk', one: 'may not leave time for a US work permit', many: 'may not leave time for a US work permit', filter: 'timing' },
   { flag: 'reply_due', one: 'is waiting on a reply from you', many: 'are waiting on a reply from you', filter: 'reply' },
   // Above `overdue` for the same reason `decisionCopy` puts it there: on a row
   // you already sent, a deadline in the past is expected and says nothing.

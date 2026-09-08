@@ -23,6 +23,7 @@
 import { normaliseGigStatus, isGigSettled, hasBeenSubmitted, awaitsYourReply } from './gigStatus'
 import type { GigOpportunity, SyncTarget, PromoDraft } from './types'
 import { decisionFor, type Decision } from './decisionCopy'
+import { visaLead } from './gigCost'
 import {
   parseNote,
   parseFee,
@@ -38,6 +39,7 @@ export type ReviewKind = 'gig' | 'sync' | 'promo'
 
 export type FlagId =
   | 'conflict'
+  | 'visa_risk'
   | 'reply_due'
   | 'no_reply'
   | 'overdue'
@@ -166,6 +168,11 @@ const SYNC_DONE = new Set(['pitched', 'sent', 'confirmed', 'declined', 'archived
 
 const FLAG_WEIGHT: Record<FlagId, number> = {
   conflict: 100,
+  // Above every deadline, below only a row that contradicts itself. A P-2
+  // takes ninety days and no amount of wanting it changes that, so a short
+  // lead time is a fact about whether the opportunity is possible at all —
+  // which is a different class of thing from a deadline you can still meet.
+  visa_risk: 97,
   // Above every deadline. An unanswered invitation or question is the only
   // thing in the queue where somebody outside is waiting on a reply, and a
   // deadline you miss costs you one opportunity where silence here costs you
@@ -248,9 +255,30 @@ function flagsFor(
   fee: ParsedFee,
   deadline: ParsedDeadline,
   silence: SubmissionSilence | null,
+  // The row itself, for the questions no parsed shape answers. Null for
+  // everything that is not a gig.
+  gig: GigOpportunity | null,
+  today: string,
 ): ReviewFlag[] {
   const flags: ReviewFlag[] = []
   const claimsDone = kind === 'gig' ? gigClaimsDone(status) : kind === 'sync' ? SYNC_DONE.has(status) : false
+
+  // A hard constraint rather than a cost. The plan's rule: an application
+  // whose deadline sits inside ninety days of a paid US performance is
+  // flagged whatever it scores, because the paperwork cannot be hurried.
+  if (gig) {
+    const lead = visaLead(gig, today)
+    if (lead && lead.short) {
+      flags.push({
+        id: 'visa_risk',
+        label: lead.certain
+          ? `P-2 needs ${lead.requirement.leadTimeDays} days; ${lead.daysAvailable} available`
+          : `US date, ${lead.daysAvailable} days out — showcase or paid?`,
+        severity: lead.certain ? 'danger' : 'warn',
+        kind: 'warning',
+      })
+    }
+  }
 
   // Phase 4, where they moved and you have not moved back. Named for what is
   // owed rather than for the status, because the two statuses owe different
@@ -351,7 +379,7 @@ function gigItem(row: GigOpportunity, today: string): Omit<ReviewItem, 'decision
     today,
   })
   const silence = submissionSilence(row, today)
-  const flags = flagsFor('gig', row.status, parsed, fee, deadline, silence)
+  const flags = flagsFor('gig', row.status, parsed, fee, deadline, silence, row, today)
 
   return {
     key: `gig-${row.id}`,
@@ -374,7 +402,7 @@ function syncItem(row: SyncTarget, today: string): Omit<ReviewItem, 'decision'> 
   const parsed = parseNote(row.notes)
   const fee = parseFee(null, 0)
   const deadline = parseDeadline(null)
-  const flags = flagsFor('sync', row.status, parsed, fee, deadline, null)
+  const flags = flagsFor('sync', row.status, parsed, fee, deadline, null, null, today)
 
   return {
     key: `sync-${row.id}`,
@@ -654,6 +682,11 @@ export function awaitingDecision(item: ReviewItem): boolean {
   // stops being true: nothing will arrive to change the row, so waiting for
   // the queue to raise it on its own means waiting forever.
   if (item.flags.some((f) => f.id === 'no_reply')) return true
+  // The third, and the only one that is about a date in the future rather
+  // than a row's history. A visa lead time is a constraint the pipeline
+  // cannot satisfy later: once a submitted application's show is inside
+  // ninety days, "wait and see" has already made the decision.
+  if (item.flags.some((f) => f.id === 'visa_risk')) return true
   return !isSettled(item) && item.flags.some((f) => f.id !== 'vague_deadline')
 }
 
@@ -676,7 +709,9 @@ export function matchesFilter(item: ReviewItem, filter: ReviewFilter): boolean {
     case 'paid':
       return item.flags.some((f) => f.id === 'paid')
     case 'timing':
-      return item.flags.some((f) => f.id === 'overdue' || f.id === 'due_soon' || f.id === 'window')
+      return item.flags.some(
+        (f) => f.id === 'overdue' || f.id === 'due_soon' || f.id === 'window' || f.id === 'visa_risk',
+      )
     case 'reply':
       return item.flags.some((f) => f.id === 'reply_due')
     case 'waiting':

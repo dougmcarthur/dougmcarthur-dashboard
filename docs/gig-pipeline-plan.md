@@ -275,7 +275,7 @@ So, without exception:
 | C | Artist database + EPK assembly | **Done** apart from sourcing. Everything in phases 3–5 draws on it |
 | D | Phase 3: form pre-fill, draft emails, materials checklist | **Done.** Migration 0011, `shared/application.ts`, and the panel on the gig row. See [application-prep-plan.md](./application-prep-plan.md) |
 | E | Phase 4: Gmail follow-up classification | **Done.** Migration 0012, `shared/replyMatch.ts` + `shared/replyClassify.ts`. See [reply-matching-plan.md](./reply-matching-plan.md) |
-| F | Cost model + swing-weight elicitation + scoring | **Next.** Needs enough rows to elicit weights against a real range |
+| F | Cost model + swing-weight elicitation + scoring | **Half built.** The cost side is in — migration 0013, `shared/gigCost.ts`. The scoring side waits on the elicitation |
 | G | Preference learning and calibration | Needs F, and needs decisions logged *with* their scores |
 | H | Phase 5: agreement templates | Last, because it is the rarest event |
 
@@ -299,14 +299,38 @@ match binds the sender for good. See
 What is left of the phase: `info_requested` is recognised but the answer is not
 drafted, and the scan runs when you press the button rather than on the cron.
 
-**F — cost and scoring.** Blocked on nothing technical; blocked on the
-elicitation. Swing weighting only works against the real range, so the five
-questions in §7 have to be answered once by the person whose taste is being
-encoded. The cost side can be built ahead of that: the travel bands, the
-lodging bands, and the P-2 rule, which is the one worth having on its own —
-a 90-day visa lead time is a hard constraint, not a number, and an application
-whose deadline sits inside 90 days of a paid US performance should be flagged
-whatever it scores.
+**F — cost and scoring. Half built.** The cost side needed nothing from
+anybody and is in: migration 0013, `shared/gigCost.ts`, a panel on the gig
+row, and the P-2 rule as a queue flag. It produces a **denominator and
+nothing else** — no `value`, no `efficiency`, no blended number anywhere, and
+`test/uiConsistency.test.ts` fails if one appears on screen. That restraint is
+the whole reason it could ship early: a cost is a fact, and a score would have
+been five weights invented on somebody's behalf.
+
+Three judgements it settled along the way:
+
+- **A missing input is never a zero.** No `nights` leaves lodging and per diem
+  out of the sum and puts a sentence in `unknowns`; it does not become a day
+  trip. Zero nights is a real answer some rows have, and an estimate that
+  cannot tell the two apart reports a cheap gig.
+- **A guessed band is labelled as guessed.** `travel_band` and `lodging_tier`
+  are set by hand; when they are null the band is inferred from the prose
+  location and every surface says so — the same rule a deadline recovered from
+  prose follows.
+- **The visa lead time counts from the deadline, not from today.** You cannot
+  file a performer's petition before somebody has agreed you are performing,
+  and nobody agrees before applications close. So a show 150 days out with a
+  deadline 100 days out has fifty days for a ninety-day permit, and the flag
+  says so. It is `visa_risk`, weighted above every deadline and below only a
+  self-contradicting row, and it is the third explicit exception in
+  `awaitingDecision` — the only one about a date ahead rather than a row's
+  history.
+
+**What is still waiting on you.** The swing-weight elicitation in §7: five
+questions, answered once against the real range of what is in the list, and
+the weights come out normalised. Until those exist there is a cost and no
+value, which is a usable half — "this one is $2,400" is worth knowing on its
+own — but it is not the model.
 
 **G — preference learning.** Needs F, and needs decisions logged *with* the
 score they were made against. 34 decisions is not enough to fit anything, which

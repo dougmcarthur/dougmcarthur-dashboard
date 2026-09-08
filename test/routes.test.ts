@@ -110,6 +110,30 @@ describe('API route registration', () => {
     expect(body.error).toMatch(/ends before it starts/)
   })
 
+  it('POST /api/gigs refuses a travel band that is not one of the four', async () => {
+    // `country` and `location` are free text on purpose — the research agents
+    // write prose and `normaliseCountry` reads it. The bands are not: they
+    // index a table of costs, and a value outside it would silently drop the
+    // travel line out of the estimate.
+    const res = await app.request(
+      '/api/gigs',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Treefort', type: 'festival', travelBand: 'teleport' }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('POST /api/gigs refuses a negative number of nights', async () => {
+    const res = await app.request(
+      '/api/gigs',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Treefort', type: 'festival', nights: -1 }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
   it('POST /api/gigs refuses a performance date that is not a date', async () => {
     // `deadline` is allowed to hold prose and 26 production rows do; these two
     // columns are not, which is the distinction worth guarding.

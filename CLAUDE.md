@@ -272,6 +272,29 @@ which owns what a transition means. Two calls is the correct number — they can
 be wrong independently, and a wrong auto-transition tells you that you were
 rejected when you were not. See `docs/reply-matching-plan.md`.
 
+**A cost is a denominator, never a criterion.** `shared/gigCost.ts` estimates
+what a trip costs and stops there. It returns no `value`, no `efficiency` and
+no blended score, because the swing weights that would produce one have not
+been elicited and inventing them is worse than not having them — and because a
+single number is how you apply to something that scored 78 without noticing it
+costs $4,000. Two rules the module holds throughout: every figure is a
+**range**, since `$1,847` is a lie with a decimal place; and **a missing input
+is never a zero** — no `nights` leaves lodging out of the sum and names it in
+`unknowns` rather than becoming a day trip. A band nobody set is inferred from
+the prose location and labelled as guessed, the same treatment a deadline
+recovered from prose gets. See `docs/gig-pipeline-plan.md` §7.
+
+**The visa lead time counts from the deadline, not from today.** A Canadian
+musician doing a paid US performance needs a P-2: about $800 and ninety days.
+You cannot file for a performer before somebody has agreed you are performing,
+and nobody agrees before applications close — so a show 150 days out whose
+deadline is 100 days out has *fifty* days, not 150. `visaLead` measures it that
+way and `visa_risk` is the flag, weighted above every deadline: a deadline can
+still be met, and paperwork that takes ninety days cannot be hurried. An
+unstated `performance_kind` keeps the ninety days rather than resolving to the
+free answer, and says it is asking rather than asserting — the cheap
+resolution is how you find out with sixty days left.
+
 **Deadlines are often prose.** 26 of 34 gig rows hold things like "None —
 rolling artist roster intake" in `deadline`. Anything wanting a real date must
 go through `splitDeadline`, which returns null rather than guessing. Where a

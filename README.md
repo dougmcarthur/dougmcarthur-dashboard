@@ -21,9 +21,13 @@ this repo works through and the place to look before starting anything.
 | 4 · Post-submission | Reading the organiser's reply out of Gmail | **built** |
 | 5 · Pre-show | Agreements and logistics | **not built** |
 
-Next is the cost model and the swing-weight scoring in §7 of the plan, which is
-blocked on the elicitation rather than on code — the five questions have to be
-answered once by the person whose taste is being encoded.
+Phase F, the weighing model, is **half built**. The cost half is in — what a
+trip costs, banded and always as a range, plus the P-2 lead time as a queue
+flag (see [What a trip costs](#what-a-trip-costs) below). The scoring half is
+blocked on the elicitation rather than on code: the five swing-weight questions
+in §7 of the plan have to be answered once by the person whose taste is being
+encoded, and until they are there is deliberately **no score anywhere** — a
+cost and no value is a usable half, an invented value is not.
 
 Two debts sit outside the phases. The artist database has no **sourcing** —
 assets are entered by hand. And `shared/reviewParse.ts` re-derives structured
@@ -220,6 +224,50 @@ phase exists to break — and the row says when a message was found there.
 
 See [`docs/reply-matching-plan.md`](docs/reply-matching-plan.md).
 
+## What a trip costs
+
+`shared/gigCost.ts`, migration 0013, and the panel under a gig row. Assembled
+on read, never stored — a number cached in March cannot tell you the nights
+changed in April.
+
+**Cost is a denominator, not a criterion.** The module estimates money and
+stops. It returns no `value`, no `efficiency`, no blended score, and
+`test/uiConsistency.test.ts` fails if one reaches the screen. Adding cost to
+audience and brand and summing them lets a big crowd outvote a $3,000 trip,
+which is not how a budget works; and a single number is how you apply to
+something that scored 78 without noticing what it costs.
+
+Three rules it holds throughout:
+
+| Rule | Why |
+| --- | --- |
+| Every figure is a **range** | `$1,400–2,300` is honest; `$1,847` is a lie with a decimal place |
+| A missing input is **never a zero** | No `nights` leaves lodging and per diem out of the sum and names the gap. Zero nights is a real answer some rows have; null is not |
+| A guessed band says it guessed | `travel_band` and `lodging_tier` are set by hand; when null they are inferred from the prose location and labelled — the same treatment a deadline recovered from prose gets |
+
+The inputs are on the gig's edit panel: where, country, how you get there,
+nights away, room, whether it is a showcase or a paid booking, and anything
+they pay you. All optional; a half-filled section gives a partial estimate with
+its gaps on screen.
+
+### The P-2, which is a constraint rather than a cost
+
+A Canadian musician doing a **paid** US performance needs a P-2 — roughly
+USD 510 to USCIS plus CAD 120 in CFM administration, and **ninety days of lead
+time**. A showcase or conference may enter as a B-1 business visitor, which
+costs nothing. The same festival is $0 or about $800 on that one fact, which is
+why `performance_kind` is a column rather than an assumption, and why leaving
+it unstated keeps the ninety days instead of quietly resolving to the free
+answer.
+
+The lead time is counted **from the deadline, not from today**: you cannot file
+for a performer before somebody has agreed you are performing, and nobody
+agrees before applications close. A show 150 days out whose deadline is 100
+days out has fifty days, and `visa_risk` says so. The flag outranks every
+deadline — a deadline can still be met — and is the third explicit exception in
+`awaitingDecision`, so it surfaces even on a row the queue would otherwise call
+settled.
+
 ## The artist database
 
 `#artist` holds everything a booking manager could ask for — bios at several
@@ -384,7 +432,10 @@ its *types*, so none of the note parser ships to the browser (it is
 `import type` throughout; the client bundle is ~11 kB smaller for it). The
 vocabulary modules are the deliberate exception: a screen offering a gig
 transition has to ask `nextGigStatuses` which ones exist rather than keeping
-its own list.
+its own list. `shared/gigCost.ts` is the second: the cost panel is assembled
+in the browser from the row it already has, and a duplicate set of travel
+bands living in `frontend/` is exactly the drift this directory exists to
+prevent.
 
 Keep it that way. Anything added to `shared/` must run in a Worker: no DOM,
 no React, no Node built-ins. And if a screen needs to know what requires a
