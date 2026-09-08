@@ -26,7 +26,7 @@
     "zod": "^3.25.64"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250620.0",
+    "@cloudflare/workers-types": "^5.20260908.1",
     "@tanstack/react-query": "^5.80.7",
     "@tanstack/react-table": "^8.21.3",
     "@types/react": "^19.1.8",
@@ -41,6 +41,6 @@
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "vitest": "^4.1.10",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.129.1"
   }
 }

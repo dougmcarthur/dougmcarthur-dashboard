@@ -94,9 +94,17 @@ door proves nothing and adds a way for a good deploy to go red. `wrangler
 deployments status` is the last step instead: it asks Cloudflare what is
 serving traffic rather than inferring it from an exit code.
 
-`wrangler` is pinned at 4.105.0. 4.129+ requires `@cloudflare/workers-types@^5`
-against the `^4` this repo holds, so bumping it is a types major and its own
-piece of work — not a fix for the above, which is server-side.
+`wrangler` is at 4.129.1 and `@cloudflare/workers-types` at 5. They move
+together — 4.129 peers on `^5`, so bumping one alone fails to resolve. The
+types major turned out to cost nothing here: nothing this Worker names changed,
+which is worth knowing mainly so the next bump is not put off on the assumption
+that it will hurt. Neither was a fix for the flake above, which is server-side.
+
+The one behaviour CI genuinely depends on, and which nothing in the repo would
+catch if it changed, is that `d1 migrations apply` answers its own confirmation
+prompt when stdin is not a terminal — `🤖 Using fallback value in
+non-interactive context: yes`. There is no `--yes` flag to fall back on. Check
+that line still appears in the run log after a wrangler bump.
 
 ## Conventions worth knowing before changing things
 
