@@ -274,8 +274,8 @@ So, without exception:
 | B | Performance dates; `booked` writes a real calendar event | **Done.** Completes the calendar story |
 | C | Artist database + EPK assembly | **Done** apart from sourcing. Everything in phases 3–5 draws on it |
 | D | Phase 3: form pre-fill, draft emails, materials checklist | **Done.** Migration 0011, `shared/application.ts`, and the panel on the gig row. See [application-prep-plan.md](./application-prep-plan.md) |
-| E | Phase 4: Gmail follow-up classification | **Next.** Independent of C/D; the pipeline's last unreachable states are on its far side |
-| F | Cost model + swing-weight elicitation + scoring | Needs enough rows to elicit weights against a real range |
+| E | Phase 4: Gmail follow-up classification | **Done.** Migration 0012, `shared/replyMatch.ts` + `shared/replyClassify.ts`. See [reply-matching-plan.md](./reply-matching-plan.md) |
+| F | Cost model + swing-weight elicitation + scoring | **Next.** Needs enough rows to elicit weights against a real range |
 | G | Preference learning and calibration | Needs F, and needs decisions logged *with* their scores |
 | H | Phase 5: agreement templates | Last, because it is the rarest event |
 
@@ -287,15 +287,17 @@ goes first and alone.
 Four steps of the eight, plus two things that belong to no step because they
 are debts rather than features.
 
-**E — Phase 4, the follow-up cycle.** The next one to build, and the one that
-makes the rest of the pipeline reachable: `acknowledged`, `info_requested`,
-`invited` and `declined` are all states only an organiser's reply can justify,
-and nothing reads received mail. `submissionSilence` measures the wait, which
-is the honest thing to do while nobody is reading the answers, but it is
-measuring a gap rather than closing it. §5 has the four things to recognise and
-the rule they turn on: **classification proposes, it never transitions.** The
-Gmail token is already `readonly` and the reconciler already reads sent mail —
-this extends the same machinery to the inbox.
+**E — Phase 4, the follow-up cycle. Built.** The four states an organiser's
+reply justifies are now reachable. One correction to §5 worth carrying
+forward: it said replies would be matched "by organiser domain and thread",
+and against the real mailbox that rule holds for one reply in eight. Matching
+is on the event's *name* — including abbreviations, and including the name in
+a quoted form receipt — with the domain as a corroborator, and a confirmed
+match binds the sender for good. See
+[reply-matching-plan.md](./reply-matching-plan.md).
+
+What is left of the phase: `info_requested` is recognised but the answer is not
+drafted, and the scan runs when you press the button rather than on the cron.
 
 **F — cost and scoring.** Blocked on nothing technical; blocked on the
 elicitation. Swing weighting only works against the real range, so the five

@@ -233,6 +233,45 @@ form on it — retrying is pointless, this one is filled in by hand) from `faile
 (a timeout, a 403 — worth another go, and the HTTP status is kept because 403
 and 404 are different stories).
 
+**A reply is matched by name, not by domain.** Of eight real organiser replies
+in this mailbox exactly one came from the festival's own domain; the rest came
+from Wufoo, Jotform, a portal, a parent organisation and two personal gmail
+addresses. `shared/replyMatch.ts` scores the event's *name* in the subject or
+body — full name with punctuation squashed, most distinctive word, and
+abbreviations including of part of the name (FOTR, FDV, "Road to BOW") — with
+the domain as a corroborator worth less than the name. Names are tokenised two
+ways on purpose: without splitting camel case, so "LieLow" stays one
+distinctive token rather than `lie` + `low`; and with splitting it, so
+"BreakOut West" yields BOW. Getting that backwards loses LieLow entirely, which
+is how it was found.
+
+**Matching reads the whole body; classification reads only the top post.** The
+quoted form receipt underneath a reply is often the only place the event is
+named — LieLow's rejection has the festival nowhere in its subject — and it is
+never the organiser's answer. Two questions, two texts.
+
+**Confirm once, then remember.** Accepting a match writes the sender address
+and the thread into `gig_correspondents`, and bindings are decisive rather than
+ranked against guesses. That is what makes an unrelated sender domain a
+one-time cost. When two gigs match equally well the reply is stored with no gig
+attached: naming one would invent the answer the matcher just said it lacked.
+
+**Every rejection opens by thanking you for applying.** So `classifyReply`
+scores all four readings and takes the strongest, returning `unclear` when two
+are close — a first-match rule that checked acknowledgement early would file
+every rejection under it. Two more things the real mail taught: rejections
+mostly avoid "unfortunately" ("we won't be moving forward", "was not
+selected"), and a conditional — "if you don't hear from us by June, it means we
+weren't able to make it work" — is an acknowledgement carrying a date, not a
+rejection. The deciding sentence is stored verbatim; a reading you cannot check
+is a reading you should not trust.
+
+**The reply router never writes a status.** Accepting binds the correspondent
+and records the judgement, and stops; moving the row is `PATCH /api/gigs/:id`,
+which owns what a transition means. Two calls is the correct number — they can
+be wrong independently, and a wrong auto-transition tells you that you were
+rejected when you were not. See `docs/reply-matching-plan.md`.
+
 **Deadlines are often prose.** 26 of 34 gig rows hold things like "None —
 rolling artist roster intake" in `deadline`. Anything wanting a real date must
 go through `splitDeadline`, which returns null rather than guessing. Where a

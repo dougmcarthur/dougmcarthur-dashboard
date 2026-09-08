@@ -228,4 +228,33 @@ describe('API route registration', () => {
     expect(res.status).toBe(400)
   })
 
+  // Phase 4. The scan needs Gmail, and says so before it touches D1 — the same
+  // shape as the sync reconciler, and reachable with no bindings at all.
+  it('POST /api/replies/scan says Gmail is not configured before reading anything', async () => {
+    const res = await app.request('/api/replies/scan', { method: 'POST' }, emptyEnv)
+    expect(res.status).toBe(503)
+    const body = (await res.json()) as { error: string; missing: string[] }
+    expect(body.error).toBe('Gmail not configured')
+    expect(body.missing).toContain('GMAIL_REFRESH_TOKEN')
+  })
+
+  it('accepting a reply needs a reply id that is an id', async () => {
+    const res = await app.request(
+      '/api/replies/0/accept',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('accepting a reply refuses a gig id that is not one', async () => {
+    const res = await app.request(
+      '/api/replies/3/accept',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gigId: 'the folk festival' }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
 })
