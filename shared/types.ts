@@ -62,6 +62,26 @@ export interface GigOpportunity {
   /** ISO datetime you are actually on stage. Only set once `booked`. */
   performanceStart?: string | null
   performanceEnd?: string | null
+  /**
+   * What the trip costs, and the paperwork that gates it — migration 0013.
+   * All optional, all read through `shared/gigCost.ts`, which never defaults
+   * a missing one silently: an estimate that could not count its lodging says
+   * so rather than reporting a cheap gig.
+   */
+  location?: string | null
+  /** CA | US | other. The visa rule turns on this and nothing else. */
+  country?: string | null
+  /** drive | regional | transcontinental | international. Guessed when null. */
+  travelBand?: string | null
+  /** none | standard | major. Guessed when null. */
+  lodgingTier?: string | null
+  /** Nights away. 0 is a real answer; null is not. */
+  nights?: number | null
+  /** showcase | paid. Unstated means unanswered, never "showcase". */
+  performanceKind?: string | null
+  /** What they pay you, CAD. `feeAmount` is what you pay them. */
+  stipendAmount?: number | null
+  guaranteeAmount?: number | null
   /** Calendar id for the "apply by" deadline reminder. */
   googleEventId: string | null
   /** Calendar id for the "applications open" reminder. */

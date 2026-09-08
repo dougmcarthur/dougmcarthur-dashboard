@@ -43,6 +43,19 @@ const GigInsertSchema = z.object({
   // mistake rather than something to recover a date from.
   performanceStart: z.string().nullable().optional(),
   performanceEnd: z.string().nullable().optional(),
+  // Cost inputs — migration 0013. The enums are narrow because these are the
+  // values `shared/gigCost.ts` bands against; `location` and `country` are
+  // free text because the research agents write prose and a code they would
+  // have to be taught is a code they will get wrong. `country` is normalised
+  // on read rather than here, so a row POSTed as "Canada" still costs.
+  location: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  travelBand: z.enum(['drive', 'regional', 'transcontinental', 'international']).nullable().optional(),
+  lodgingTier: z.enum(['none', 'standard', 'major']).nullable().optional(),
+  nights: z.number().int().min(0).nullable().optional(),
+  performanceKind: z.enum(['showcase', 'paid']).nullable().optional(),
+  stipendAmount: z.number().nonnegative().nullable().optional(),
+  guaranteeAmount: z.number().nonnegative().nullable().optional(),
 })
 
 const GigPatchSchema = GigInsertSchema.partial()
@@ -101,6 +114,14 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
       applicationUrl: b.applicationUrl ?? null,
       performanceStart: b.performanceStart ?? null,
       performanceEnd: b.performanceEnd ?? null,
+      location: b.location ?? null,
+      country: b.country ?? null,
+      travelBand: b.travelBand ?? null,
+      lodgingTier: b.lodgingTier ?? null,
+      nights: b.nights ?? null,
+      performanceKind: b.performanceKind ?? null,
+      stipendAmount: b.stipendAmount ?? null,
+      guaranteeAmount: b.guaranteeAmount ?? null,
       // Normalised on the way in: the research agents that POST here still
       // send `approved`, and a row should land in the right column rather
       // than carrying a word the pipeline no longer uses.

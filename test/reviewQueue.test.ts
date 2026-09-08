@@ -673,3 +673,65 @@ describe('the no-reply nudge', () => {
     expect(items.map((i) => i.title)).toEqual(['Ancient', 'Middling', 'Recent'])
   })
 })
+
+describe('the visa lead time, which is a constraint rather than a cost', () => {
+  const at = (o: Partial<GigOpportunity>) =>
+    on({ gigs: [gig({ id: 1, name: 'Treefort', ...o })] })[0]
+
+  const inDays = (n: number) =>
+    new Date(Date.parse(`${TODAY}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
+
+  it('flags a paid US date the paperwork cannot reach in time', () => {
+    const flag = at({
+      country: 'US', performanceKind: 'paid', deadline: inDays(30), performanceStart: inDays(80),
+    }).flags.find((f) => f.id === 'visa_risk')
+
+    expect(flag).toBeDefined()
+    expect(flag?.severity).toBe('danger')
+    expect(flag?.kind).toBe('warning')
+  })
+
+  it('does not flag one with room, or one that needs no permit', () => {
+    expect(at({
+      country: 'US', performanceKind: 'paid', deadline: inDays(30), performanceStart: inDays(300),
+    }).flags.find((f) => f.id === 'visa_risk')).toBeUndefined()
+
+    expect(at({
+      country: 'CA', performanceKind: 'paid', deadline: inDays(30), performanceStart: inDays(60),
+    }).flags.find((f) => f.id === 'visa_risk')).toBeUndefined()
+
+    expect(at({
+      country: 'US', performanceKind: 'showcase', deadline: inDays(30), performanceStart: inDays(60),
+    }).flags.find((f) => f.id === 'visa_risk')).toBeUndefined()
+  })
+
+  it('asks rather than asserts when nobody has said showcase or paid', () => {
+    const flag = at({ country: 'US', performanceStart: inDays(40) }).flags.find((f) => f.id === 'visa_risk')
+    expect(flag?.severity).toBe('warn')
+    expect(flag?.label).toMatch(/showcase or paid/)
+  })
+
+  it('outranks every deadline, because a deadline can still be met', () => {
+    const item = at({
+      country: 'US', performanceKind: 'paid', deadline: inDays(-5), performanceStart: inDays(60),
+    })
+    expect(item.flags[0].id).toBe('visa_risk')
+    expect(item.score).toBeGreaterThan(
+      at({ country: 'CA', deadline: inDays(-5) }).score,
+    )
+  })
+
+  it('needs a decision even on a row the queue would otherwise call settled', () => {
+    // The third explicit exception in `awaitingDecision`, and the only one
+    // about a date ahead rather than a row's history: once a submitted
+    // application's show is inside ninety days, waiting has already decided.
+    const item = at({
+      status: 'submitted', submittedAt: `${TODAY}T09:00:00.000Z`,
+      country: 'US', performanceKind: 'paid', performanceStart: inDays(60),
+    })
+    expect(isSettled(item)).toBe(true)
+    expect(awaitingDecision(item)).toBe(true)
+    expect(matchesFilter(item, 'needs')).toBe(true)
+    expect(matchesFilter(item, 'timing')).toBe(true)
+  })
+})

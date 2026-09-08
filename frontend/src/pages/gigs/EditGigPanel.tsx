@@ -4,6 +4,7 @@ import { FIELD } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
 import { SUBMISSION_METHODS } from './constants'
 import { performanceDateProblem } from '../../../../shared/performance'
+import { TRAVEL_BANDS, LODGING_TIERS } from '../../../../shared/gigCost'
 
 /** Editing an existing row in place, inside its expanded table row. */
 export function EditGigPanel({
@@ -33,6 +34,14 @@ export function EditGigPanel({
     genreFitScore: gig.genreFitScore?.toString() ?? '',
     fitRationale: gig.fitRationale ?? gig.fitNotes ?? '',
     url: gig.url ?? '',
+    location: gig.location ?? '',
+    country: gig.country ?? '',
+    travelBand: gig.travelBand ?? '',
+    lodgingTier: gig.lodgingTier ?? '',
+    nights: gig.nights?.toString() ?? '',
+    performanceKind: gig.performanceKind ?? '',
+    stipendAmount: gig.stipendAmount?.toString() ?? '',
+    guaranteeAmount: gig.guaranteeAmount?.toString() ?? '',
   })
   const set = (k: keyof typeof draft, v: string | boolean) =>
     setDraft((d) => ({ ...d, [k]: v }))
@@ -62,6 +71,16 @@ export function EditGigPanel({
       genreFitScore: draft.genreFitScore ? parseInt(draft.genreFitScore) : null,
       fitRationale: draft.fitRationale || null,
       url: draft.url || null,
+      location: draft.location || null,
+      country: draft.country || null,
+      travelBand: (draft.travelBand as GigOpportunity['travelBand']) || null,
+      lodgingTier: (draft.lodgingTier as GigOpportunity['lodgingTier']) || null,
+      // Empty means "not answered" and null carries that; 0 nights is a real
+      // answer and has to survive, which `|| null` on a number would not.
+      nights: draft.nights === '' ? null : parseInt(draft.nights),
+      performanceKind: (draft.performanceKind as GigOpportunity['performanceKind']) || null,
+      stipendAmount: draft.stipendAmount ? parseFloat(draft.stipendAmount) : null,
+      guaranteeAmount: draft.guaranteeAmount ? parseFloat(draft.guaranteeAmount) : null,
     })
   }
 
@@ -146,10 +165,111 @@ export function EditGigPanel({
         {dateProblem && (
           <p className="col-span-2 text-xs text-danger-fg">{dateProblem}</p>
         )}
+
+        {/*
+          The cost inputs. Every one is optional and every one is allowed to
+          stay empty — `estimateGigCost` names what it could not count rather
+          than defaulting it, so a half-filled section produces a partial
+          estimate with its gaps on screen instead of a confident wrong number.
+        */}
+        <div className="col-span-2 pt-1">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wide">The trip</p>
+          <p className="text-xs text-faint mt-0.5">
+            What it costs to get there. Leave a band empty and it is guessed from the location, and
+            labelled as guessed.
+          </p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">Where</label>
+          <input
+            type="text" placeholder="Gimli, MB" value={draft.location}
+            onChange={(e) => set('location', e.target.value)} className={FIELD}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">Country</label>
+          <select value={draft.country} onChange={(e) => set('country', e.target.value)} className={FIELD}>
+            <option value="">—</option>
+            <option value="CA">Canada</option>
+            <option value="US">United States</option>
+            <option value="other">Somewhere else</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">Getting there</label>
+          <select value={draft.travelBand} onChange={(e) => set('travelBand', e.target.value)} className={FIELD}>
+            <option value="">Guess from the location</option>
+            {(Object.keys(TRAVEL_BANDS) as Array<keyof typeof TRAVEL_BANDS>).map((b) => (
+              <option key={b} value={b} title={TRAVEL_BANDS[b].note}>
+                {TRAVEL_BANDS[b].label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">
+            Nights away <span className="text-faint font-normal">— 0 if you sleep at home</span>
+          </label>
+          <input
+            type="number" min={0} value={draft.nights}
+            onChange={(e) => set('nights', e.target.value)} className={FIELD}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">Room</label>
+          <select value={draft.lodgingTier} onChange={(e) => set('lodgingTier', e.target.value)} className={FIELD}>
+            <option value="">Guess from the location</option>
+            {(Object.keys(LODGING_TIERS) as Array<keyof typeof LODGING_TIERS>).map((t) => (
+              <option key={t} value={t}>{LODGING_TIERS[t].label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">Showcase or paid booking</label>
+          <select
+            value={draft.performanceKind}
+            onChange={(e) => set('performanceKind', e.target.value)}
+            className={FIELD}
+          >
+            {/*
+              Empty is an open question, never a quiet "showcase". A US date
+              with this unanswered keeps the ninety-day lead time, because
+              resolving it in favour of the cheap answer is how you find out
+              about the P-2 with sixty days left.
+            */}
+            <option value="">Not said yet</option>
+            <option value="showcase">Showcase or conference</option>
+            <option value="paid">Paid booking</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">
+            Stipend <span className="text-faint font-normal">— CAD</span>
+          </label>
+          <input
+            type="number" min={0} value={draft.stipendAmount}
+            onChange={(e) => set('stipendAmount', e.target.value)} className={FIELD}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">
+            Guarantee <span className="text-faint font-normal">— CAD</span>
+          </label>
+          <input
+            type="number" min={0} value={draft.guaranteeAmount}
+            onChange={(e) => set('guaranteeAmount', e.target.value)} className={FIELD}
+          />
+        </div>
       </div>
       <label className="flex items-center gap-2 text-sm text-body cursor-pointer">
         <input type="checkbox" checked={draft.paid} onChange={(e) => set('paid', e.target.checked)} className="rounded border-line-strong" />
-        Paid gig
+        {/*
+          Not "Paid gig", which is what this said and is the opposite of what
+          the column means: `paid` is what *you* pay *them* to be considered.
+          The mislabel was survivable until `performance_kind` gave the word
+          "paid" a second meaning on the same form.
+        */}
+        Costs money to enter
       </label>
       <div className="flex gap-2 pt-1">
         <Button variant="primary" onClick={handleSave} disabled={isSaving || dateProblem !== null} >

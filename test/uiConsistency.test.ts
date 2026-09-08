@@ -114,3 +114,28 @@ describe('the application panel offers to copy, never to send', () => {
     expect(src).toContain('navigator.clipboard.writeText')
   })
 })
+
+describe('the cost panel shows a range, and never a blended score', () => {
+  const src = readFileSync('frontend/src/pages/gigs/CostPanel.tsx', 'utf8')
+
+  it('renders every figure through formatCostRange', () => {
+    // A midpoint on screen is the failure this whole module is shaped to
+    // avoid: `$1,847` is a lie with a decimal place. Any number reaching the
+    // page goes through the formatter that cannot print one.
+    expect(src).toContain('formatCostRange(estimate.net)')
+    expect(src).toContain('formatCostRange(line.amount)')
+  })
+
+  it('names no score, value or efficiency', () => {
+    // Step F's scoring half is not built. A panel that showed a single number
+    // beside the cost would be claiming five weights nobody has been asked
+    // for — and "both numbers are always shown" is the rule that stops a 78
+    // hiding a $4,000 trip. See docs/gig-pipeline-plan.md §7.
+    expect(src).not.toMatch(/\b(efficiency|weightedValue|totalScore)\b/)
+  })
+
+  it('marks a band it guessed rather than showing it as recorded', () => {
+    expect(src).toContain('line.inferred')
+    expect(src).toContain('estimate.unknowns')
+  })
+})

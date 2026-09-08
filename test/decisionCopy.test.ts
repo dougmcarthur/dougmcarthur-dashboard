@@ -31,6 +31,9 @@ const promo = (o: Partial<PromoDraft> & { id: number }): PromoDraft => ({
 
 const first = (input: Parameters<typeof buildReviewQueue>[0]) => buildReviewQueue(input)[0]
 
+/** `n` days from the real clock, for the block below that reads it. */
+const fromNow = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10)
+
 describe('decision copy — the sentence names the decision', () => {
   it('asks whether it actually went out when status and note disagree', () => {
     const item = first({
@@ -193,6 +196,17 @@ describe('decision copy — invariants that hold for every item', () => {
       gig({ id: 27, name: 'Declined', status: 'declined' }),
       gig({ id: 28, name: 'Expired out', status: 'expired', deadline: '2026-01-05' }),
       gig({ id: 29, name: 'Silent', status: 'submitted', submittedAt: '2026-01-10' }),
+      // Dates off the same clock this call reads, so the flag fires whenever
+      // the suite runs rather than only until the fixture goes stale.
+      gig({
+        id: 30, name: 'Short lead', country: 'US', performanceKind: 'paid',
+        performanceStart: fromNow(40),
+      }),
+      gig({ id: 31, name: 'Unsaid kind', country: 'US', performanceStart: fromNow(40) }),
+      gig({
+        id: 32, name: 'Short lead, already sent', status: 'submitted', submittedAt: '2026-01-10',
+        country: 'US', performanceKind: 'paid', performanceStart: fromNow(40),
+      }),
     ],
     sync: [
       sync({ id: 15, name: 'Plain agency', notes: 'Chicago-based boutique sync agency.' }),
@@ -256,5 +270,49 @@ describe('decision copy — invariants that hold for every item', () => {
       expect(i.decision.rationale[0]).toBe(i.decision.rationale[0].toUpperCase())
       expect(i.decision.rationale.trim()).toMatch(/[.?!]$/)
     }
+  })
+})
+
+describe('decision copy — the visa lead time', () => {
+  const TODAY = '2027-01-15'
+  const inDays = (n: number) =>
+    new Date(Date.parse(`${TODAY}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
+
+  const at = (o: Partial<GigOpportunity>) =>
+    buildReviewQueue({ gigs: [gig({ id: 1, name: 'Treefort', ...o })], today: TODAY })[0]
+
+  it('names the permit rather than the deadline it sits beside', () => {
+    const item = at({
+      country: 'US', performanceKind: 'paid',
+      deadline: inDays(-3), performanceStart: inDays(60),
+    })
+    // `overdue` is also flagged here. The card must not say "nothing was
+    // submitted" when what is actually wrong is that the date is unreachable.
+    expect(item.flags.some((f) => f.id === 'overdue')).toBe(true)
+    expect(item.decision.rationale).toMatch(/P-2/)
+    expect(item.decision.rationale).not.toMatch(/deadline passed/i)
+  })
+
+  it('asks the question instead of offering a decision, when the kind is unstated', () => {
+    const item = at({ country: 'US', performanceStart: inDays(40) })
+    expect(item.decision.rationale).toMatch(/showcase or a paid booking/)
+    expect(item.decision.actions).toEqual([])
+  })
+
+  it('calls pulling out of a sent application withdrawing, not declining', () => {
+    // Their verb, not yours. `submitted` offers `declined` as a legal move and
+    // a negative button reaching for it would record that a festival turned
+    // you down when what happened is that you could not get the paperwork.
+    const item = at({
+      status: 'submitted', submittedAt: `${TODAY}T09:00:00.000Z`,
+      country: 'US', performanceKind: 'paid', performanceStart: inDays(60),
+    })
+    expect(item.decision.rationale).toMatch(/P-2/)
+    expect(item.decision.actions.find((a) => a.tone === 'no')?.intent).toBe('withdraw')
+  })
+
+  it('offers passing, not withdrawing, before anything has gone in', () => {
+    const item = at({ country: 'US', performanceKind: 'paid', performanceStart: inDays(60) })
+    expect(item.decision.actions.find((a) => a.tone === 'no')?.intent).toBe('pass')
   })
 })

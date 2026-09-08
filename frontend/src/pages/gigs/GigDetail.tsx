@@ -8,6 +8,7 @@ import { formatPerformanceSpan } from '../../../../shared/performance'
 import { Button } from '../../components/ui/Button'
 import { Select } from '../../components/ui/Field'
 import { ApplicationPanel } from './ApplicationPanel'
+import { CostPanel } from './CostPanel'
 
 /**
  * The one-click moves worth having on the row itself, by the status you are on.
@@ -123,6 +124,14 @@ export function GigDetail({
         <Button variant="neutral" onClick={onEdit}>
           Edit details
         </Button>
+      </div>
+
+      {/*
+        The clock is read once, here, and handed down — `visaLead` takes the
+        date as an argument for the same reason the queue does.
+      */}
+      <div className="border-t border-line pt-4">
+        <CostPanel gig={gig} today={new Date().toISOString().slice(0, 10)} />
       </div>
 
       {applying && (

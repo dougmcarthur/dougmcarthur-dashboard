@@ -67,6 +67,10 @@ export interface Decision {
 /** Flags that can drive the copy, most decisive first. */
 const PRECEDENCE: FlagId[] = [
   'conflict',
+  // Second, because it is the only flag that can say the opportunity is not
+  // possible rather than not yet done. Every sentence below this one assumes
+  // the date is reachable.
+  'visa_risk',
   'reply_due',
   // Ahead of `overdue`, which is not a mistake. A deadline in the past on a
   // row you already submitted is expected and says nothing; the overdue copy
@@ -256,6 +260,17 @@ const GIG_ACTIONS: Record<string, DecisionAction[]> = {
   // "chased" — following up is an email — so the affirmative path off this
   // card is the snooze beside it, which is why the sentence names it.
   give_up: [{ label: 'Never heard back', intent: 'expire', tone: 'no' }],
+  // A permit that cannot be got in time is not a reason to invent a status.
+  // The affirmative is "do it anyway, knowing"; the negative is whichever move
+  // records pulling out — `withdrawn` once it has gone in, `passed` before.
+  // Ordered that way because turning down an invitation is your verb, and
+  // `declined` would say they turned you down.
+  visa: [
+    { label: 'Apply anyway', intent: 'approve', tone: 'go' },
+    { label: 'Apply anyway', intent: 'prepare', tone: 'go' },
+    { label: 'Withdraw', intent: 'withdraw', tone: 'no' },
+    { label: 'Pass', intent: 'pass', tone: 'no' },
+  ],
   go_no: [
     { label: 'Will apply', intent: 'approve', tone: 'go' },
     { label: 'Start preparing', intent: 'prepare', tone: 'go' },
@@ -335,6 +350,30 @@ export function decisionFor(item: DecisionInput): Decision {
           `actually sent.${extra} One of the two is wrong, and fixing it is an edit rather ` +
           `than a decision — open it and correct whichever side is.`,
         actions: [],
+      }
+    }
+
+    case 'visa_risk': {
+      const uncertain = item.flags.some((f) => f.id === 'visa_risk' && f.severity === 'warn')
+      if (uncertain) {
+        // No buttons. The missing thing is a fact about the booking, not a
+        // decision about the row, and a card that offered "Pass" here would
+        // be asking you to decide on the strength of the question itself.
+        return {
+          rationale:
+            'A US date, and nobody has said whether it is a showcase or a paid booking. ' +
+            'Showcase enters as a business visitor and costs nothing; paid needs a P-2, about ' +
+            '$800 and ninety days — and there is not ninety days here. Say which it is in ' +
+            'Edit details, then decide.',
+          actions: [],
+        }
+      }
+      return {
+        rationale:
+          'A paid US performance needs a P-2, and the ninety days it takes do not fit between ' +
+          'the deadline and the show. Applying is still your call; counting on the permit is ' +
+          'not. Ask the organiser about the dates before you spend the entry fee.',
+        actions: gigActions(kind, status, GIG_ACTIONS.visa),
       }
     }
 

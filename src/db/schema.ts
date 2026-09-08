@@ -48,6 +48,28 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   prepCheckedAt: text('prep_checked_at'),
   /** Why it could not be read, in a sentence, verbatim from the parser. */
   prepNote: text('prep_note'),
+  /**
+   * What the trip costs, and the paperwork that gates it. Migration 0013.
+   *
+   * `location` is prose because that is how the research agents write it;
+   * `country` is separate and coarse because the visa rule turns on that one
+   * fact. `travelBand` and `lodgingTier` are set by hand — `shared/gigCost.ts`
+   * guesses from `location` when they are null, and says that it guessed.
+   */
+  location: text('location'),
+  country: text('country'), // CA | US | other
+  travelBand: text('travel_band'), // drive | regional | transcontinental | international
+  lodgingTier: text('lodging_tier'), // none | standard | major
+  nights: integer('nights'), // 0 is a real answer; null is not
+  /**
+   * showcase | paid. The fact that decides whether a US date needs a P-2
+   * (about $800 and ninety days) or nothing at all. Nullable and treated as
+   * an open question, never as "showcase".
+   */
+  performanceKind: text('performance_kind'),
+  /** What they pay you. Distinct from `feeAmount`, which is what you pay them. */
+  stipendAmount: real('stipend_amount'),
+  guaranteeAmount: real('guarantee_amount'),
   snoozedUntil: text('snoozed_until'), // ISO date this comes back on its own
   snoozedAt: text('snoozed_at'), // when the snooze was set — see migration 0004
   discoveredAt: text('discovered_at').notNull(),

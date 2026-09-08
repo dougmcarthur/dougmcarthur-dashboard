@@ -503,3 +503,36 @@ describe('rollup links land somewhere real', () => {
     }
   })
 })
+
+describe('the visa bucket', () => {
+  const inDays = (n: number) =>
+    new Date(Date.parse(`${TODAY}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
+
+  const visaGig = gig({
+    id: 1, name: 'Treefort', status: 'submitted', submittedAt: `${TODAY}T09:00:00.000Z`,
+    country: 'US', performanceKind: 'paid', performanceStart: inDays(60),
+  })
+
+  // Five rows that outrank it, so the one under test is in the tail rather
+  // than in the focus five.
+  const crowd = [2, 3, 4, 5, 6].map((id) =>
+    gig({
+      id, name: `Contradiction ${id}`, status: 'submitted',
+      fitNotes: 'Submission status: NOT submitted.',
+    }),
+  )
+
+  it('counts a short lead time under a bucket whose filter will show it', () => {
+    const gigs = [visaGig, ...crowd]
+    const rollup = digest({ gigs }).rollups.find((r) => r.id === 'visa_risk')
+
+    expect(rollup?.count).toBe(1)
+    expect(rollup?.label).toMatch(/US work permit/)
+
+    // The rule the digest and the Review filter fell out of step over once:
+    // anything counted under a flag bucket has to be something the filter it
+    // links to will actually show.
+    const filter = rollup!.href.replace('#review/', '')
+    expect(queue({ gigs }).filter((i) => matchesFilter(i, filter as never)).length).toBeGreaterThanOrEqual(1)
+  })
+})
