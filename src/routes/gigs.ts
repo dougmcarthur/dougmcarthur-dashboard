@@ -33,6 +33,10 @@ const GigInsertSchema = z.object({
   paid: z.boolean().optional(),
   fitRationale: z.string().optional(),
   url: z.string().url().optional().or(z.literal('')),
+  // Where the form itself is, which is often not where the listing is. The
+  // research agents know this when they find the opportunity, so it is on the
+  // insert schema rather than only settable by the form reader.
+  applicationUrl: z.string().url().nullable().optional(),
   status: z.string().optional(),
   // When you are actually on stage. Plain dates, never prose: unlike `deadline`
   // these are typed in from an agreement, so a value that is not a date is a
@@ -94,6 +98,7 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
       paid: b.paid ? 1 : 0,
       fitRationale: b.fitRationale ?? null,
       url: b.url || null,
+      applicationUrl: b.applicationUrl ?? null,
       performanceStart: b.performanceStart ?? null,
       performanceEnd: b.performanceEnd ?? null,
       // Normalised on the way in: the research agents that POST here still

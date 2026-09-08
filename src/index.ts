@@ -9,6 +9,7 @@ import sync from './routes/sync'
 import promo from './routes/promo'
 import reference from './routes/reference'
 import artist from './routes/artist'
+import application from './routes/application'
 import taskRuns from './routes/taskRuns'
 import reminders from './routes/reminders'
 import health from './routes/health'
@@ -28,6 +29,10 @@ app.use('/api/*', cors())
 
 app.route('/api/overview', overview)
 app.route('/api/review', review)
+// NOTE: before '/api/gigs', for the same reason the reconcile router is
+// registered before '/api/sync' — a router mounted on a longer path has to be
+// offered the request first.
+app.route('/api/gigs/:id/application', application)
 app.route('/api/gigs', gigs)
 // NOTE: must be registered before '/api/sync' — otherwise the sync router's
 // GET '/:id' route matches '/reconcile' first and swallows this endpoint.

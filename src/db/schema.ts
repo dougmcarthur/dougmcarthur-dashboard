@@ -37,6 +37,17 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
    * migration 0010, which is why nothing may treat it as required.
    */
   submittedAt: text('submitted_at'),
+  /**
+   * Where the application form lives, when that is not the listing URL. The
+   * research agents fill `url` with the page they found it on, which is often
+   * an announcement rather than the form. See migration 0011.
+   */
+  applicationUrl: text('application_url'),
+  /** unread | ready | blocked | failed — whether the form has been read. */
+  prepStatus: text('prep_status'),
+  prepCheckedAt: text('prep_checked_at'),
+  /** Why it could not be read, in a sentence, verbatim from the parser. */
+  prepNote: text('prep_note'),
   snoozedUntil: text('snoozed_until'), // ISO date this comes back on its own
   snoozedAt: text('snoozed_at'), // when the snooze was set — see migration 0004
   discoveredAt: text('discovered_at').notNull(),
@@ -99,6 +110,34 @@ export const artistAssets = sqliteTable('artist_assets', {
   notes: text('notes'),
   sortOrder: integer('sort_order').default(0),
   archived: integer('archived').default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+/**
+ * The questions one application asks, and the answer staged against each.
+ * See migration 0011 and shared/application.ts.
+ *
+ * `answer_state` is the column that makes this more than a cache of somebody
+ * else's form: it separates "the app proposed this" from "you read it and said
+ * yes", which is the difference between an application and a pile of guesses.
+ */
+export const applicationFields = sqliteTable('application_fields', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  gigId: integer('gig_id').notNull(),
+  fieldKey: text('field_key').notNull(),
+  label: text('label').notNull(),
+  fieldType: text('field_type').notNull().default('text'),
+  /** JSON array for select/radio/checkbox. */
+  options: text('options'),
+  required: integer('required').default(0),
+  maxLength: integer('max_length'),
+  helpText: text('help_text'),
+  position: integer('position').default(0),
+  questionKind: text('question_kind'),
+  answer: text('answer'),
+  answerAssetId: integer('answer_asset_id'),
+  answerState: text('answer_state').notNull().default('empty'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 })
@@ -180,6 +219,7 @@ export type SyncTarget = typeof syncTargets.$inferSelect
 export type PromoDraft = typeof promoDrafts.$inferSelect
 export type ReferenceDoc = typeof referenceDocs.$inferSelect
 export type ArtistAsset = typeof artistAssets.$inferSelect
+export type ApplicationFieldRow = typeof applicationFields.$inferSelect
 export type TaskRun = typeof taskRuns.$inferSelect
 export type Reminder = typeof reminders.$inferSelect
 export type DigestReport = typeof digestReports.$inferSelect
