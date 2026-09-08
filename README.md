@@ -1,10 +1,36 @@
 # dougmcarthur-dashboard
 
-A private ops dashboard for Doug McArthur's music promotion — tracking gig
-opportunities, sync-licensing pitches, promo drafts, and the automated task
-runs that discover them. Runs entirely on Cloudflare: a Hono API on Workers,
+A private ops dashboard for Doug McArthur's music promotion — finding gig
+opportunities, deciding which to apply to, preparing the applications, and
+tracking the sync-licensing pitches, promo drafts and automated task runs
+alongside them. Runs entirely on Cloudflare: a Hono API on Workers,
 a D1 (SQLite) database, and a React frontend served as static assets from the
 same Worker. The live site sits behind Cloudflare Access.
+
+## Where things stand
+
+The gig pipeline is planned as five phases in
+[`docs/gig-pipeline-plan.md`](docs/gig-pipeline-plan.md), which is the roadmap
+this repo works through and the place to look before starting anything.
+
+| | | |
+| --- | --- | --- |
+| 1 · Research & collect | Research agents POST rows; the Review queue ranks them | **built** |
+| 2 · Present & review | Overview deck, Review screen, snooze, weekly digest, notifications | **built** |
+| 3 · Apply & track | Form pre-fill, materials checklist, draft email | **built** |
+| 4 · Post-submission | Reading the organiser's reply | **not built** |
+| 5 · Pre-show | Agreements and logistics | **not built** |
+
+Phase 4 is next, and it is what makes the far half of the pipeline reachable:
+`acknowledged`, `info_requested`, `invited` and `declined` are states only an
+organiser's reply can justify, and nothing reads received mail yet. Until then
+`submissionSilence` measures how long an application has gone unanswered, which
+is honest about the gap without closing it.
+
+Two debts sit outside the phases. The artist database has no **sourcing** —
+assets are entered by hand. And `shared/reviewParse.ts` re-derives structured
+facts out of prose on every read because migration 0001's columns were never
+**backfilled**; it is a stopgap that should be deleted rather than extended.
 
 ## Stack
 
@@ -16,27 +42,32 @@ same Worker. The live site sits behind Cloudflare Access.
   `src/db/schema.ts`; migrations in `migrations/`.
 - **Frontend** — React 19 + Vite, TanStack Query & Table, Tailwind. Hash-based
   routing (`frontend/src/`). Built to `dist/` and served via the Worker's
-  `ASSETS` binding. Screens: Overview, **Review**, Gigs, Sync, Promo, Log,
-  Settings.
-- **Integrations** — Google Calendar (gig deadlines synced on approval) and
-  Gmail (`readonly`, used to reconcile sent pitches against sync targets).
-  Both degrade gracefully when their secrets aren't set — see
-  `GET /api/health` to check what's configured.
+  `ASSETS` binding. Screens: Overview, **Review**, Gigs, **Artist**, Sync,
+  Promo, Settings, History.
+- **Integrations** — Google Calendar (three kinds of entry, reconciled against
+  a gig's state — see [The gig pipeline](#the-gig-pipeline)), Gmail
+  (`readonly`, reconciling sent pitches against sync targets), and Cloudflare
+  Email Service for the weekly digest. All degrade gracefully when their
+  secrets aren't set — see `GET /api/health` to check what's configured.
 
 ## Project layout
 
 ```
 src/
   index.ts            Worker entry — mounts all API routes, falls through to ASSETS
-  types.ts            Env bindings (DB, ASSETS, Google/Gmail secrets)
+  types.ts            Env bindings (DB, ASSETS, EMAIL, Google/Gmail secrets)
   db/                 Drizzle client + schema
-  routes/             One Hono router per resource (gigs, sync, promo, …)
-  lib/                googleCalendar.ts, gmail.ts (OAuth), mailer.ts, settings.ts
+  routes/             One Hono router per resource (gigs, artist, application, …)
+  lib/                Everything that touches the outside: googleCalendar.ts,
+                      gmail.ts, mailer.ts, gigCalendar.ts, formParser.ts,
+                      applicationPrep.ts, digestMail.ts, settings.ts
 frontend/             React + Vite app (its own tsconfig.frontend.json)
-shared/               Wire types, review-queue logic + digest content, imported by BOTH
-migrations/           D1 migrations (applied via wrangler)
-scripts/              One-off maintenance scripts (e.g. column backfill)
-docs/                 Setup guides + the notes-field audit
+shared/               Pure logic imported by BOTH: wire types, the review queue,
+                      digest content, the gig-status vocabulary, the artist
+                      database, application staging
+migrations/           D1 migrations (applied by CI before every deploy)
+scripts/              Maintenance + the local-database bootstrap
+docs/                 Setup guides, the notes-field audit, and the plans
 schema.sql            Snapshot of the original production schema (pre-migrations)
 ```
 
@@ -48,7 +79,9 @@ All routes are under `/api`; anything else falls through to static assets.
 | --- | --- |
 | `GET /api/overview` | Totals, the recent task-run log, and due reminders |
 | `GET /api/review` | The decision queue — what needs a decision, ranked, with per-filter counts and the Overview's `summary` (`?filter=`, `?limit=`) |
-| `/api/gigs` | Gig opportunities (CRUD). Approving with a deadline creates a Calendar event + pre-deadline reminder |
+| `/api/gigs` | Gig opportunities (CRUD). Status changes are validated against the pipeline and reconcile the calendar |
+| `/api/gigs/:id/application` | The application packet: `GET` it, `POST /prepare` to read the form, `PATCH /fields/:id` to stage an answer |
+| `/api/artist` | The artist database (CRUD), plus `GET /epk`, `GET /answer?label=…` and `POST /:id/reviewed` |
 | `/api/sync` | Sync-licensing targets (CRUD) |
 | `/api/sync/reconcile` | `GET` preview of sent-pitch matches from Gmail; `POST /apply` to write status/pitch updates |
 | `/api/promo` | Monthly promo drafts (CRUD) |
@@ -57,11 +90,147 @@ All routes are under `/api`; anything else falls through to static assets.
 | `/api/reference-docs` | Reference documents (CRUD) |
 | `/api/reminders` | List/patch reminders; `POST /dismiss` to clear an entity's pending reminders |
 | `/api/task-runs` | Log + list automated task runs |
+| `/api/notifications` | The bell feed; `POST /read`, `POST /dismiss` |
 | `/api/health` | Which Google/Gmail secrets are configured |
 
-> Route order matters: `/api/sync/reconcile` is registered **before**
-> `/api/sync` in `src/index.ts`, so the sync router's `/:id` handler doesn't
-> swallow it. Keep it that way when adding sub-routes.
+> Route order matters. `/api/sync/reconcile` is registered **before**
+> `/api/sync`, so the sync router's `/:id` handler doesn't swallow it, and
+> `/api/gigs/:id/application` before `/api/gigs` for the same reason. A router
+> mounted on the longer path has to be offered the request first — keep it that
+> way when adding sub-routes.
+
+## The gig pipeline
+
+Saying yes to an opportunity means **"I am going to apply."** It is not a
+booking, and nothing in the app is allowed to behave as though a date has been
+secured — it used to put a 🎵 on your calendar on the submission deadline,
+which on a phone is indistinguishable from a booked show. That sentence is the
+whole reframe, and the vocabulary in `shared/gigStatus.ts` exists to keep it
+true.
+
+Statuses are named so **the subject of the verb is never in doubt**:
+
+| Phase | States | Whose decision |
+| --- | --- | --- |
+| 1 · Research & collect | `discovered` | the app's |
+| 2 · Present & review | `shortlisted`, `passed` | **yours** |
+| 3 · Apply & track | `preparing`, `submitted` | yours |
+| 4 · Post-submission | `acknowledged`, `info_requested`, `invited`, `declined` | **theirs** |
+| 5 · Pre-show | `booked` | yours, once signed |
+
+Plus `expired` (the window closed while it sat there), `withdrawn` (you pulled
+out after applying) and `archived`.
+
+`approved` and `rejected` are gone. They caused a real misreading: `rejected`
+meant *you* passed, while every reader assumed a festival had turned you down.
+`normaliseGigStatus` maps the old spellings forward on read *and* on write, so
+the research agents outside this repo can keep POSTing them indefinitely.
+
+**The pipeline is a shape, not a free-for-all.** `nextGigStatuses` says which
+moves a status offers and `PATCH /api/gigs/:id` refuses anything else — the
+agents PATCH that route too. The entry worth knowing: **there is no route from
+`invited` to `declined`.** Declining is their verb; turning down an invitation
+is `withdrawn`. One mis-click should not record that you were rejected from a
+festival that wanted you.
+
+A screen never offers a move the pipeline refuses: both decision surfaces
+derive their buttons from `nextGigStatuses`, and `test/uiConsistency.test.ts`
+fails if either starts naming statuses inline again.
+
+### What the calendar is allowed to say
+
+Three kinds of entry, and only the last is a gig:
+
+1. **`Applications open — {name}`** on `opens_at`
+2. **`Apply by — {name}`** on the deadline, and again 7 days ahead
+3. **`{name}`** on the performance dates — written **only** at `booked`
+
+Entries are reconciled against the row's resulting state rather than fired by
+transitions, because a transition handler missed rows that arrived already
+shortlisted and happily updated events on rows you had passed on. Reconciling
+is idempotent, so a retried request cannot double up, and each entry fails
+independently — a Calendar outage costs one entry, never the status change.
+
+Performance dates are **typed, not parsed**: unlike `deadline` they come off an
+agreement, so a value that is not a date is a mistake rather than something to
+recover a date from. A bad pair makes `showSpan` return null, which the
+reconcile reads as "remove the entry" rather than writing a wrong one.
+
+## Applying — phase 3
+
+Once a gig is `shortlisted`, its row on the Gigs screen carries an application
+panel: the questions the form actually asks, with an answer staged against each
+from the artist database, a checklist of what has to be attached, and — for
+opportunities submitted by mail — a draft email.
+
+**It drafts; it never submits.** An application filed by automation is a good
+way to be blacklisted, so the output is text you copy into somebody else's
+form by hand. The buttons are *Copy* and *This one is right*; there is no
+*Send*, and `test/uiConsistency.test.ts` fails if one appears.
+
+**A suggestion is not an answer.** `answer_state` is a column apart from
+`answer`, because "the app proposed this" and "you read it and said yes" are
+different claims. The readiness line reports *answered* and *read* separately,
+and an application of unread suggestions reports itself as unfinished — which
+is the failure pre-fill introduces if nothing distinguishes them. Re-reading a
+form re-stages only the fields nobody has touched.
+
+Two smaller rules. An answer past the field's `maxLength` is the one problem
+rated `danger` with nothing else wrong, because a 150-character field truncates
+on paste, silently, mid-word — an empty box is at least honest about being
+empty. And a login wall is `blocked`, not `failed`: Submittable is a fact about
+the opportunity meaning "set aside an hour and an account", where a timeout
+means try again.
+
+Reading a form on a `shortlisted` gig moves it to `preparing`, because staging
+answers *is* starting the application. See
+[`docs/application-prep-plan.md`](docs/application-prep-plan.md).
+
+## The artist database
+
+`#artist` holds everything a booking manager could ask for — bios at several
+lengths, press photos with their credits, live video, the stage plot, the short
+facts a form wants — so no application starts from a blank page. Two things it
+does that a folder of files cannot:
+
+- **It expires.** Every asset carries a `review_by`, seeded from its kind when
+  none is given: six months for a follower count, a year for a bio or live
+  video, two years for a press photo. That is the order they actually rot in.
+  `unreviewed` is a state apart from `overdue`, because "this lapsed" and
+  "nobody ever claimed this was checked" are different conversations.
+  Separately from any date an asset can simply be *broken* — a press photo with
+  no photographer credit is unusable the day it is added.
+- **It assembles.** The EPK is a **view**, cut per audience — a sync agency
+  gets no stage plot and no set length, because nobody licensing a recording
+  needs to know how many vocal mics you take — and it reports what is stale or
+  missing *inside itself*. A file exported in March cannot tell you its photo
+  credit went missing in April.
+
+Each asset also carries the `question_kind` it answers, which is the join to
+the form parser and therefore to phase 3.
+
+What is **not** built is sourcing: assets are entered by hand or POSTed by the
+research agents. Nothing yet reads the reference docs in D1, Drive or the
+website.
+
+## Notifications
+
+A bell in the header, and **two mechanisms behind one API**.
+
+*Conditions* — a dead Calendar token, an item gone overdue, a reminder pointing
+at a deleted row — are derived on every read and never stored; only a per-key
+mark records what you have seen. They self-heal: reconnect Calendar and the
+notification is gone next read, with nothing needing to remember to delete it.
+*Events* — a run finishing, a digest sending — cannot be recovered from current
+state, so those get rows and a 30-day prune.
+
+Dismissal therefore means two different things on purpose: a dismissed
+condition returns tomorrow because it may still be true; a dismissed event is
+gone for good because it already happened.
+
+The badge counts unread, never unresolved — a badge that cannot reach zero
+teaches you to stop looking at it — and opening the pane marks nothing read.
+See [`docs/notifications-plan.md`](docs/notifications-plan.md).
 
 ## The Overview deck
 
@@ -73,9 +242,14 @@ Review screen and anything built later (a digest, a notification) describe the
 same item the same way instead of each inventing phrasing.
 
 Buttons carry an *intent* (`confirm_sent`, `approve`, `pass`, `archive`, …),
-not a status. `DecisionDeck` maps intent to the right status per entity type,
-because "pass" means `rejected` on a gig and `declined` on a sync target. Add
-a new intent in one place and every kind has to say what it means.
+not a status. Intents resolve to a status per entity type through
+`GIG_STATUS_BY_INTENT` in `shared/decisionCopy.ts`, beside the copy that
+decides which actions a card may offer — because "pass" means `passed` on a gig
+and `declined` on a sync target, and because a table in the browser is one
+nothing can check against the pipeline. `decisionFor` drops any action the
+row's status does not offer, including one whose target is the status the row
+already has: *"Keep for next cycle"* on an already-shortlisted gig wrote
+nothing and dealt the identical card straight back.
 
 ### On the clock
 
@@ -139,7 +313,8 @@ when they stay that way; a permanently clean health row is furniture.
 The Overview shows five runs, one line each, with the summary behind a
 disclosure — `ActivityList`. The summaries are three to five lines of agent
 prose apiece; inline they were the bulk of the page. Full history stays on the
-Log page.
+History screen (`#runs`), which filters by task and status server-side —
+narrowing one page of a paginated log would hide every failure on the others.
 
 ## The Review screen
 
@@ -167,11 +342,15 @@ Two things about it are worth knowing before changing it:
 
 ### `shared/` and why it exists
 
-`shared/` holds the wire types and the queue logic, and is included by both
-`tsconfig.json` and `tsconfig.frontend.json`. The Worker imports it for real —
-`GET /api/review` builds the queue — while the frontend imports only its
-*types*, so none of the parser ships to the browser (it is `import type`
-throughout; the client bundle is ~11 kB smaller for it).
+`shared/` holds the wire types, the review queue, the digest content, the gig
+status vocabulary, the artist database and application staging, and is included
+by both `tsconfig.json` and `tsconfig.frontend.json`. The Worker imports it for
+real — `GET /api/review` builds the queue — while the frontend imports mostly
+its *types*, so none of the note parser ships to the browser (it is
+`import type` throughout; the client bundle is ~11 kB smaller for it). The
+vocabulary modules are the deliberate exception: a screen offering a gig
+transition has to ask `nextGigStatuses` which ones exist rather than keeping
+its own list.
 
 Keep it that way. Anything added to `shared/` must run in a Worker: no DOM,
 no React, no Node built-ins. And if a screen needs to know what requires a
@@ -180,8 +359,8 @@ That duplication is exactly what this directory exists to prevent.
 
 ## The weekly digest
 
-A Cron Trigger (`0 13 * * 1` — Monday 08:00 Winnipeg, near enough) builds a
-digest and emails it. It is a **diff, not a report**: four groups — new since
+A Cron Trigger builds a digest and emails it. It is a **diff, not a report**:
+four groups — new since
 last time, now actionable, changed under you, going stale — each dropped when
 empty, and nothing sent at all when every group is.
 
@@ -199,6 +378,21 @@ strict rule would mention each once and hide the pile forever. They repeat on a
 
 Marks are written **after** a successful send. Marking first would let a failed
 send swallow a week of changes.
+
+### When it goes out
+
+The cron ticks **hourly** (`0 * * * *`) and `isDigestDue` decides whether the
+hour that just started is the one, because the day, hour and time zone live in
+`app_settings` where the Settings screen can change them without a deploy.
+
+That indirection fixes something a cron expression cannot: cron is UTC
+year-round, so a fixed hour drifted against Winnipeg every time the clocks
+changed. The zone is applied when the comparison is made instead. The rule is
+"on the configured day, at or after the configured hour, once per day" rather
+than an exact match, so a deploy landing on the hour or a trigger running late
+does not cost a whole week silently — and the once-per-day guard is what stops
+`>=` sending every hour until midnight, and what keeps the clocks going back
+from producing two sends.
 
 ### Sending
 
@@ -243,7 +437,7 @@ subject line, the group counts and every line, with **Send now** beside it.
 | --- | --- |
 | `GET /api/digest/preview` | What would be sent, plus why it would or would not send |
 | `POST /api/digest/send` | Send now. Refuses when there is nothing to report |
-| `PATCH /api/digest/settings` | On/off, recipient, sender |
+| `PATCH /api/digest/settings` | On/off, recipient, sender, day, hour, time zone |
 
 ## Local development
 
@@ -261,11 +455,19 @@ Copy `.dev.vars.example` to `.dev.vars` and fill in the Google/Gmail secrets
 for local integration testing (see `docs/google-calendar-setup.md` and
 `docs/gmail-setup.md`). `.dev.vars` is gitignored.
 
-First-time local DB setup:
+First-time local DB setup — this works from a clean checkout:
 
 ```bash
 npm run db:migrate:local
 ```
+
+It applies `schema.sql` first when the local database is empty, because
+migration 0001 opens with `ALTER TABLE gig_opportunities`: production was
+created from `schema.sql` by hand before anything went through the ledger, so
+remote has carried that baseline all along and only a fresh local database ever
+noticed. `scripts/bootstrap-local-db.mjs` does the check; it is a no-op once
+the baseline is there, and nothing about it reaches the remote database or its
+ledger.
 
 ## Database & migrations
 
@@ -274,8 +476,23 @@ Schema is defined in Drizzle (`src/db/schema.ts`). To change it:
 ```bash
 npm run db:generate          # generate a migration from schema changes
 npm run db:migrate:local     # apply to the local D1 instance
-npm run db:migrate:remote    # apply to production D1
+npm run db:migrate:remote    # apply to production D1 (rarely needed — see below)
 ```
+
+**Merging is what applies a migration.** CI runs
+`wrangler d1 migrations apply --remote` before every deploy, so the
+`d1_migrations` ledger stays honest without anyone remembering to keep it that
+way. Migrations 0006–0008 were applied by hand before that and had to be
+back-filled into the ledger afterwards; **never hand-run schema SQL against
+production**, because a statement applied outside the ledger is invisible to
+it and the next CI run re-runs the file and aborts on a duplicate column.
+
+**Migrations must be additive.** CI migrates *before* it deploys, so for the
+half-minute between those two steps the new schema runs under the
+currently-live Worker. Adding a column or a table is always safe that way;
+renaming a stored value is not, and is done as two deploys instead — teach the
+code to read both spellings, ship that, migrate the data later.
+`normaliseGigStatus` is what step one looks like.
 
 Migration 0004 adds `snoozed_until` and `snoozed_at` to `gig_opportunities`
 and `sync_targets`. No backfill — every existing row is simply not snoozed.
@@ -311,17 +528,40 @@ held anything beyond a date.
 
 ## Deploying
 
-Pushing to `main` deploys automatically — `.github/workflows/deploy.yml` runs
-typecheck, tests and the frontend build, then `wrangler deploy`. The Actions
-tab shows every deploy tied to its commit; the workflow can also be run
-manually from there.
+Pushing to `main` deploys automatically. `.github/workflows/deploy.yml` runs
+typecheck, the tests, the tests again a day ahead, the frontend build, then
+lists and applies pending D1 migrations, deploys, and reports which version
+went live. The Actions tab shows every deploy tied to its commit; the workflow
+can also be run manually from there.
+
+**Reading a red run.** `wrangler deploy` is three API calls — assets, Worker,
+triggers — and the Worker is live after the second, so a failure on the third
+means "deployed, cron schedule possibly not re-sent" rather than "nothing
+shipped". That third call has twice returned `Received a malformed response
+from the API`, which is Cloudflare handing wrangler an HTML error page instead
+of JSON. The step retries three times; the whole command is idempotent.
+
+Two other steps earn their shape. `d1 migrations list` retries, being a pure
+read — a flake there once took `main` down for a reason unrelated to the code.
+`d1 migrations apply` deliberately does **not**, because "try it again" is the
+wrong instinct about a write that may have half-landed.
+
+There is no HTTP smoke test on purpose: Access sits in front of the domain, so
+a runner only ever reaches the login redirect. `wrangler deployments status` is
+the last step instead — it asks Cloudflare what is serving traffic rather than
+inferring it from an exit code.
 
 It needs two repository secrets (Settings → Secrets and variables → Actions):
 
 | Secret | Value |
 | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | API token with **Account → Workers Scripts → Edit** and **Account → Account Settings → Read**, scoped to the account owning this Worker |
+| `CLOUDFLARE_API_TOKEN` | API token with **Workers Scripts → Edit**, **D1 → Edit** and **Account Settings → Read**, scoped to the account owning this Worker |
 | `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account ID |
+
+**D1 · Edit, not Read.** `wrangler d1 migrations list` hits the write-capable
+`/query` endpoint, so a read-scoped token fails with `code: 7403` — and because
+`wrangler deploy` never touches D1, that gap stays invisible until a migration
+step tries to use it.
 
 The job targets the `production` GitHub environment, so required reviewers or
 a wait timer can be added under Settings → Environments without editing the

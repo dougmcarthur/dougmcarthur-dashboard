@@ -274,7 +274,7 @@ So, without exception:
 | B | Performance dates; `booked` writes a real calendar event | **Done.** Completes the calendar story |
 | C | Artist database + EPK assembly | **Done** apart from sourcing. Everything in phases 3–5 draws on it |
 | D | Phase 3: form pre-fill, draft emails, materials checklist | **Done.** Migration 0011, `shared/application.ts`, and the panel on the gig row. See [application-prep-plan.md](./application-prep-plan.md) |
-| E | Phase 4: Gmail follow-up classification | Independent of C/D; can run in parallel |
+| E | Phase 4: Gmail follow-up classification | **Next.** Independent of C/D; the pipeline's last unreachable states are on its far side |
 | F | Cost model + swing-weight elicitation + scoring | Needs enough rows to elicit weights against a real range |
 | G | Preference learning and calibration | Needs F, and needs decisions logged *with* their scores |
 | H | Phase 5: agreement templates | Last, because it is the rarest event |
@@ -282,15 +282,58 @@ So, without exception:
 A is the only part that is a correction rather than a feature, which is why it
 goes first and alone.
 
+### What is left, and what each is waiting on
+
+Four steps of the eight, plus two things that belong to no step because they
+are debts rather than features.
+
+**E — Phase 4, the follow-up cycle.** The next one to build, and the one that
+makes the rest of the pipeline reachable: `acknowledged`, `info_requested`,
+`invited` and `declined` are all states only an organiser's reply can justify,
+and nothing reads received mail. `submissionSilence` measures the wait, which
+is the honest thing to do while nobody is reading the answers, but it is
+measuring a gap rather than closing it. §5 has the four things to recognise and
+the rule they turn on: **classification proposes, it never transitions.** The
+Gmail token is already `readonly` and the reconciler already reads sent mail —
+this extends the same machinery to the inbox.
+
+**F — cost and scoring.** Blocked on nothing technical; blocked on the
+elicitation. Swing weighting only works against the real range, so the five
+questions in §7 have to be answered once by the person whose taste is being
+encoded. The cost side can be built ahead of that: the travel bands, the
+lodging bands, and the P-2 rule, which is the one worth having on its own —
+a 90-day visa lead time is a hard constraint, not a number, and an application
+whose deadline sits inside 90 days of a paid US performance should be flagged
+whatever it scores.
+
+**G — preference learning.** Needs F, and needs decisions logged *with* the
+score they were made against. 34 decisions is not enough to fit anything, which
+§8 says at length; the useful output is disagreement with the stated weights,
+not a number.
+
+**H — Phase 5, agreement templates.** Last, and rightly: `booked` is the rarest
+transition in the pipeline and the one with the least to automate.
+
+**Sourcing the artist database.** Step C built the table, the expiry and the
+EPK; nothing fills it except hand entry and the research agents. The three
+reference docs are already in D1, and Drive and the website are reachable —
+this wants an extraction pass, not more schema. Phase 3 made the gap visible
+rather than closing it: every "Nothing on file answers this yet" in an
+application panel is this, named.
+
+**The notes backfill.** `shared/reviewParse.ts` is a stopgap that re-derives
+structured facts out of prose on every read, because migration 0001's columns
+were never backfilled. It is the oldest debt in the repo and the one with a
+written plan already — see [notes-field-audit.md](./notes-field-audit.md). The
+parser should be deleted, not extended.
+
 ### Salvaged from the abandoned prototype
 
 `claude/gig-reviews-submission-9e9fvr` built a version of steps C and D against
 a schema that no longer exists. Two of its modules were pure and are now on
 `main` ahead of the step that will call them — `src/lib/formParser.ts` and
 `src/lib/questionKinds.ts` — because a reviewed, tested parser is worth more
-than the branch it was stranded on. Nothing imports them yet; step D does.
-
-Both were taken up by step D: `formParser.ts` reads the form,
+than the branch it was stranded on. Both were taken up by step D: `formParser.ts` reads the form,
 `questionKinds.ts` says which canonical question each field is, and
 `shared/application.ts` joins them to the artist database.
 
