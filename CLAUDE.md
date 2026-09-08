@@ -136,6 +136,32 @@ differently per audience and reports what is stale or missing inside it. A file
 exported in March cannot tell you its photo credit went missing in April, which
 is the whole reason this is assembled on read.
 
+**The app drafts an application; it never submits one.** Phase 3 reads the
+form, stages an answer per field from the artist database and lists what has to
+be attached — and then stops, because an application filed by automation is a
+good way to be blacklisted. The output is text to copy. `ApplicationPanel` has
+Copy and *This one is right*, no Send, and `test/uiConsistency.test.ts` fails if
+a button appears claiming otherwise. See `docs/application-prep-plan.md`.
+
+**A suggestion is not an answer.** `answer_state` is a column apart from
+`answer` for the same reason `unreviewed` is a state apart from `overdue`: "the
+app proposed this" and "you read it and said yes" are different claims, and an
+application of twelve unread suggestions is the failure pre-fill introduces if
+nothing distinguishes them. The readiness line reports *answered* and *read*
+separately, and `sendable` needs the second. Re-reading a form re-stages only
+`empty` and `suggested` fields — your writing is never overwritten by a fetch.
+
+**An over-long answer is worse than an empty box.** A 150-character field
+truncates on paste, silently, mid-word, so an answer past `maxLength` is the one
+field problem rated `danger` with nothing else wrong. An empty box is at least
+honest about being empty.
+
+**A login wall is a fact about the opportunity, not an error.** `prep_status`
+splits `blocked` (Submittable, a JavaScript-rendered Typeform, a page with no
+form on it — retrying is pointless, this one is filled in by hand) from `failed`
+(a timeout, a 403 — worth another go, and the HTTP status is kept because 403
+and 404 are different stories).
+
 **Deadlines are often prose.** 26 of 34 gig rows hold things like "None —
 rolling artist roster intake" in `deadline`. Anything wanting a real date must
 go through `splitDeadline`, which returns null rather than guessing. Where a

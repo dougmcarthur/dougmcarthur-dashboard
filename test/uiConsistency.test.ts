@@ -91,3 +91,26 @@ describe('gig transitions are asked for, not listed', () => {
     expect(read('frontend/src/components/TimingStrip.tsx')).toContain('isGigTransitionAllowed')
   })
 })
+
+/**
+ * The application panel drafts; it never submits.
+ *
+ * An application filed by automation is a good way to be blacklisted, so
+ * phase 3's output is text you copy into somebody else's form by hand. That is
+ * a rule about what the *screen* offers as much as about what the Worker does:
+ * a button labelled "Submit" would be a promise the app has no intention of
+ * keeping, and the one that says "Copy" is the whole design.
+ */
+describe('the application panel offers to copy, never to send', () => {
+  const src = readFileSync('frontend/src/pages/gigs/ApplicationPanel.tsx', 'utf8')
+
+  it('has no button that claims to send the application', () => {
+    // Button labels, not prose: `>Submit<`, `>Send draft<`, `label="Submit"`.
+    const offenders = [...src.matchAll(/(?:>|label=")\s*(Submit|Send|Apply now)\b/g)].map((m) => m[1])
+    expect(offenders).toEqual([])
+  })
+
+  it('offers copying instead', () => {
+    expect(src).toContain('navigator.clipboard.writeText')
+  })
+})

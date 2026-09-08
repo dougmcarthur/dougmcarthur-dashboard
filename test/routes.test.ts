@@ -186,4 +186,46 @@ describe('API route registration', () => {
     expect(res.status).toBe(400)
   })
 
+  // The application router is mounted at '/api/gigs/:id/application', ahead of
+  // the gigs router — the same ordering the reconcile router needs. It reads
+  // `:id` off the mount path, so these prove both that it is reachable and
+  // that the id arrives, without a database: every case below is rejected
+  // before the handler touches D1.
+  it('the application router is reached, not swallowed by GET /api/gigs/:id', async () => {
+    const res = await app.request('/api/gigs/not-a-number/application', {}, emptyEnv)
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: string }
+    expect(body.error).toContain('gig id')
+  })
+
+  it('PATCH on an application field needs both ids to be ids', async () => {
+    const res = await app.request(
+      '/api/gigs/1/application/fields/0',
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answerState: 'approved' }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('PATCH on an application field refuses an answer state the app does not have', async () => {
+    const res = await app.request(
+      '/api/gigs/1/application/fields/2',
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answerState: 'nearly' }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('POST .../application/prepare refuses a form address that is not a URL', async () => {
+    const res = await app.request(
+      '/api/gigs/1/application/prepare',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: 'the festival website' }) },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
 })

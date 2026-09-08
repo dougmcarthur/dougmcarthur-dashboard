@@ -273,7 +273,7 @@ So, without exception:
 | A | Status vocabulary, migration, calendar reframe | **Done.** The app was actively misleading until this landed |
 | B | Performance dates; `booked` writes a real calendar event | **Done.** Completes the calendar story |
 | C | Artist database + EPK assembly | **Done** apart from sourcing. Everything in phases 3–5 draws on it |
-| D | Phase 3: form pre-fill, draft emails, materials checklist | Needs C |
+| D | Phase 3: form pre-fill, draft emails, materials checklist | **Done.** Migration 0011, `shared/application.ts`, and the panel on the gig row. See [application-prep-plan.md](./application-prep-plan.md) |
 | E | Phase 4: Gmail follow-up classification | Independent of C/D; can run in parallel |
 | F | Cost model + swing-weight elicitation + scoring | Needs enough rows to elicit weights against a real range |
 | G | Preference learning and calibration | Needs F, and needs decisions logged *with* their scores |
@@ -290,12 +290,18 @@ a schema that no longer exists. Two of its modules were pure and are now on
 `src/lib/questionKinds.ts` — because a reviewed, tested parser is worth more
 than the branch it was stranded on. Nothing imports them yet; step D does.
 
+Both were taken up by step D: `formParser.ts` reads the form,
+`questionKinds.ts` says which canonical question each field is, and
+`shared/application.ts` joins them to the artist database.
+
 Its `submissionWindow.ts` was **not** taken. `windowState` answers the same
 question `opensInDays` in `shared/reviewQueue.ts` already answers, and a second
 predicate for one question is the mistake that put the digest and the Review
 filter out of step. Its prep-run helpers read `prepStatus`, `prepAttempts` and
-`prepUpdatedAt`, columns this schema does not have; they belong with the
-migration that adds them, not before it.
+`prepUpdatedAt`, columns this schema did not have. Migration 0011 added
+`prep_status`, `prep_checked_at` and `prep_note` instead — no attempt counter,
+because the outcome that matters is *why* a read stopped rather than how many
+times it was tried, and a login wall is not something to retry at all.
 
 Everything else there — the answer engine, the discovery run, the Tailwind
 rebuild — predates the status vocabulary and reads better as a reference than

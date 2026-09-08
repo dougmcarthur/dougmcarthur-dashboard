@@ -66,6 +66,40 @@ export interface ArtistAssetInput {
   archived?: boolean
 }
 
+/** Phase 3 — see shared/application.ts. The Worker assembles this per read. */
+export type {
+  AnswerState,
+  ApplicationField,
+  PreparedField,
+  ChecklistItem,
+  Readiness,
+  FieldProblem,
+  PrepStatus,
+} from '../../shared/application'
+export type { EmailDraft, DraftGap } from '../../shared/applicationEmail'
+
+import type { ApplicationPacket } from '../../shared/application'
+import type { EmailDraft } from '../../shared/applicationEmail'
+
+export interface Application extends ApplicationPacket {
+  gig: {
+    id: number
+    name: string
+    status: string
+    submissionMethod: string | null
+    url: string | null
+    applicationUrl: string | null
+    deadline: string | null
+  }
+  /** Only for opportunities submitted by email — null everywhere else. */
+  email: EmailDraft | null
+}
+
+/** What a re-read of the form found, alongside the packet it produced. */
+export interface ApplicationRead extends Application {
+  read: { status: string; note: string | null; fields: number }
+}
+
 export interface ReconcileResult {
   id: number
   name: string
@@ -280,6 +314,28 @@ export const api = {
     /** Still good: pushes the review date out by the kind's own interval. */
     reviewed: (id: number) => apiFetch<ArtistAsset>(`/artist/${id}/reviewed`, { method: 'POST' }),
     delete: (id: number) => apiFetch<{ ok: boolean }>(`/artist/${id}`, { method: 'DELETE' }),
+  },
+  /**
+   * The application packet — the form's questions with an answer staged
+   * against each. Nothing here submits anything; see shared/application.ts.
+   */
+  application: {
+    get: (gigId: number) => apiFetch<Application>(`/gigs/${gigId}/application`),
+    /** Read (or re-read) the form. `url` is remembered on the gig row. */
+    prepare: (gigId: number, body: { url?: string } = {}) =>
+      apiFetch<ApplicationRead>(`/gigs/${gigId}/application/prepare`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    patchField: (
+      gigId: number,
+      fieldId: number,
+      body: { answer?: string | null; answerState?: string; useAssetId?: number | null },
+    ) =>
+      apiFetch<Application>(`/gigs/${gigId}/application/fields/${fieldId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
   },
   referenceDocs: {
     list: () => apiFetch<ReferenceDoc[]>('/reference-docs'),

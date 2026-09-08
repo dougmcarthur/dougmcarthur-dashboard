@@ -49,6 +49,16 @@ export interface GigOpportunity {
    * `updated_at` would have been a guess. See `submissionSilence`.
    */
   submittedAt?: string | null
+  /**
+   * Where the application form lives, when that is not `url`. Written by the
+   * form reader and settable by hand — see migration 0011.
+   */
+  applicationUrl?: string | null
+  /** unread | ready | blocked | failed. Whether the form has been read. */
+  prepStatus?: string | null
+  prepCheckedAt?: string | null
+  /** Why it could not be read, in a sentence. */
+  prepNote?: string | null
   /** ISO datetime you are actually on stage. Only set once `booked`. */
   performanceStart?: string | null
   performanceEnd?: string | null

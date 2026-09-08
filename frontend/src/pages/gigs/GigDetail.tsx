@@ -7,6 +7,7 @@ import {
 import { formatPerformanceSpan } from '../../../../shared/performance'
 import { Button } from '../../components/ui/Button'
 import { Select } from '../../components/ui/Field'
+import { ApplicationPanel } from './ApplicationPanel'
 
 /**
  * The one-click moves worth having on the row itself, by the status you are on.
@@ -38,6 +39,10 @@ export function GigDetail({
   const moves = nextGigStatuses(status)
   const quick = (QUICK[status] ?? []).filter((s) => moves.includes(s))
   const span = formatPerformanceSpan(gig.performanceStart, gig.performanceEnd)
+  // Phase 3's workspace, and only where phase 3 is the question. A discovered
+  // gig has not been decided on and a declined one cannot be applied to, so
+  // offering either a form reader is offering work that cannot land.
+  const applying = status === 'shortlisted' || meta.phase === 'apply'
 
   return (
     <div className="space-y-4 max-w-3xl">
@@ -119,6 +124,12 @@ export function GigDetail({
           Edit details
         </Button>
       </div>
+
+      {applying && (
+        <div className="border-t border-line pt-4">
+          <ApplicationPanel gigId={gig.id} />
+        </div>
+      )}
     </div>
   )
 }
