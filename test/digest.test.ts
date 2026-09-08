@@ -482,9 +482,19 @@ describe('rollup links land somewhere real', () => {
           id: 312, name: 'Decided', status: 'passed',
           fitNotes: 'Submission status: NOT submitted.',
         }),
+        // The two buckets added with the follow-up phase. Both link to filters
+        // that did not exist when this test was written, which is exactly the
+        // failure it guards: a rollup line promising rows the Review screen
+        // would then refuse to show.
+        gig({ id: 313, name: 'Invited', status: 'invited' }),
+        gig({ id: 314, name: 'Silent', status: 'submitted', submittedAt: '2026-05-01' }),
       ],
     })
     const d = buildDigest({ items, prior: [], today: TODAY })
+    // Nothing may fall through to the idle bucket by accident: a row with a
+    // real flag counted as "sitting where it was found" is a wrong sentence,
+    // not just a wrong link.
+    expect(d.rollups.map((r) => r.id)).not.toContain('idle_gig')
     for (const r of d.rollups) {
       const filter = r.href.replace('#review/', '')
       if (filter === 'all') continue

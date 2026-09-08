@@ -30,6 +30,13 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   performanceEnd: text('performance_end'),
   /** The pre-rename status, kept so a bad reading can be argued with. */
   legacyStatus: text('legacy_status'),
+  /**
+   * ISO datetime the application actually went out. Written once, on the
+   * transition into the submitted phase, and never cleared — it is a fact
+   * about the past. Null on every row that reached that phase before
+   * migration 0010, which is why nothing may treat it as required.
+   */
+  submittedAt: text('submitted_at'),
   snoozedUntil: text('snoozed_until'), // ISO date this comes back on its own
   snoozedAt: text('snoozed_at'), // when the snooze was set — see migration 0004
   discoveredAt: text('discovered_at').notNull(),

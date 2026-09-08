@@ -39,6 +39,7 @@ export type ReviewKind = 'gig' | 'sync' | 'promo'
 export type FlagId =
   | 'conflict'
   | 'reply_due'
+  | 'no_reply'
   | 'overdue'
   | 'due_soon'
   | 'issue'
@@ -86,6 +87,8 @@ export interface ReviewItem {
   score: number
   /** Deferral state. An active snooze hides the item from every filter but "snoozed". */
   snooze: SnoozeState
+  /** How long a sent application has gone unanswered. Null unless it was sent. */
+  silence: SubmissionSilence | null
   /** The sentence and buttons for this item — see decisionCopy.ts. */
   decision: Decision
   source: ReviewSource
@@ -169,6 +172,10 @@ const FLAG_WEIGHT: Record<FlagId, number> = {
   // the one they already said yes to.
   reply_due: 95,
   overdue: 90,
+  // Below a live deadline, above a fee. A silent application is real work
+  // that nothing else in the app will ever raise, but a deadline you can
+  // still meet is worth more than one you are chasing an answer on.
+  no_reply: 75,
   due_soon: 80,
   issue: 70,
   blocked: 55,
@@ -178,12 +185,69 @@ const FLAG_WEIGHT: Record<FlagId, number> = {
   vague_deadline: 10,
 }
 
+/**
+ * How long an application has been out, and how sure we are of the date.
+ *
+ * `submitted_at` is written on the way into the submitted phase (migration
+ * 0010), but every row that got there first carries a null and was
+ * deliberately not backfilled — `updated_at` would have been a guess, and a
+ * bad one, since any later edit to the row moves it forward and *shortens* the
+ * silence it reports.
+ *
+ * So the fallback is used but never disguised. `exact` is false when the date
+ * came from `updated_at`, and every surface that shows it says so — the same
+ * rule `deadline` follows when a date is recovered from prose: a recovered
+ * value must not look as certain as a recorded one.
+ *
+ * Returns null for anything that has not been sent. Nothing is silent that was
+ * never spoken.
+ */
+export interface SubmissionSilence {
+  /** ISO date the clock runs from. */
+  since: string
+  /** True when it came from `submitted_at` rather than from `updated_at`. */
+  exact: boolean
+  /** Whole days from `since` to `today`. Never negative. */
+  days: number
+}
+
+export function submissionSilence(
+  row: { status: string; submittedAt?: string | null; updatedAt: string },
+  today: string,
+): SubmissionSilence | null {
+  const status = normaliseGigStatus(row.status)
+  if (status !== 'submitted' && status !== 'acknowledged') return null
+
+  const recorded = row.submittedAt ?? null
+  const since = (recorded ?? row.updatedAt).slice(0, 10)
+  return {
+    since,
+    exact: recorded !== null,
+    // Clamped at zero: a row edited later today would otherwise read as
+    // negative days of silence, which is not a thing.
+    days: Math.max(0, -daysUntil(since, today)),
+  }
+}
+
+/**
+ * When silence starts being worth raising, and when it stops being a nudge.
+ *
+ * Festival and showcase panels commonly sit on applications for two to three
+ * months, so anything shorter than six weeks would fire on every row that is
+ * simply working as intended — and a nudge that is usually wrong is a nudge
+ * you learn to scroll past. Ninety days is where "still deciding" stops being
+ * the likeliest explanation.
+ */
+const NO_REPLY_DAYS = 45
+const NO_REPLY_STALE_DAYS = 90
+
 function flagsFor(
   kind: ReviewKind,
   status: string,
   parsed: ParsedNote,
   fee: ParsedFee,
   deadline: ParsedDeadline,
+  silence: SubmissionSilence | null,
 ): ReviewFlag[] {
   const flags: ReviewFlag[] = []
   const claimsDone = kind === 'gig' ? gigClaimsDone(status) : kind === 'sync' ? SYNC_DONE.has(status) : false
@@ -213,6 +277,23 @@ function flagsFor(
     // and colouring the normal case as a problem is how a queue stops meaning
     // anything.
     flags.push({ id: 'not_submitted', label: 'Not submitted', severity: 'info', kind: 'state' })
+  }
+
+  // Silence, which nothing else in the app can raise. An application sitting
+  // unanswered produces no note, no deadline and no status change — it is the
+  // one thing in the pipeline whose signal is the absence of a signal.
+  if (silence && silence.days >= NO_REPLY_DAYS) {
+    const stale = silence.days >= NO_REPLY_STALE_DAYS
+    flags.push({
+      id: 'no_reply',
+      // "about" carries the same weight it does on a recovered deadline: this
+      // count is from `updated_at` on any row submitted before migration 0010,
+      // and rounding that up into a confident number would be a small lie
+      // repeated on every visit.
+      label: `${silence.exact ? '' : 'About '}${silence.days} days, no reply`,
+      severity: stale ? 'danger' : 'warn',
+      kind: 'warning',
+    })
   }
 
   if (deadline.daysUntil !== null) {
@@ -269,10 +350,12 @@ function gigItem(row: GigOpportunity, today: string): Omit<ReviewItem, 'decision
     opensAt: row.opensAt,
     today,
   })
-  const flags = flagsFor('gig', row.status, parsed, fee, deadline)
+  const silence = submissionSilence(row, today)
+  const flags = flagsFor('gig', row.status, parsed, fee, deadline, silence)
 
   return {
     key: `gig-${row.id}`,
+    silence,
     kind: 'gig',
     id: row.id,
     title: row.name,
@@ -291,10 +374,11 @@ function syncItem(row: SyncTarget, today: string): Omit<ReviewItem, 'decision'> 
   const parsed = parseNote(row.notes)
   const fee = parseFee(null, 0)
   const deadline = parseDeadline(null)
-  const flags = flagsFor('sync', row.status, parsed, fee, deadline)
+  const flags = flagsFor('sync', row.status, parsed, fee, deadline, null)
 
   return {
     key: `sync-${row.id}`,
+    silence: null,
     kind: 'sync',
     id: row.id,
     title: row.name,
@@ -317,6 +401,7 @@ function promoItem(row: PromoDraft): Omit<ReviewItem, 'decision'> {
   return {
     key: `promo-${row.id}`,
     kind: 'promo',
+    silence: null,
     id: row.id,
     title: row.title,
     subtitle: row.month,
@@ -354,7 +439,16 @@ export function buildReviewQueue(input: {
     // Copy is attached here rather than in each *Item builder so there is
     // exactly one place where an item and its sentence are joined.
     .map((item) => ({ ...item, decision: decisionFor(item) }))
-    .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))
+    // Silence breaks ties rather than feeding `score`, which is banded: the
+    // bands sit ten apart and an extra nine points of urgency could jump one.
+    // As a tie-break it does the one job it is for — ordering the "waiting on
+    // them" list longest-silent first, where nothing else distinguishes rows.
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        (b.silence?.days ?? 0) - (a.silence?.days ?? 0) ||
+        a.title.localeCompare(b.title),
+    )
 }
 
 /**
@@ -553,6 +647,13 @@ export function summariseQueue(
 export function awaitingDecision(item: ReviewItem): boolean {
   if (item.snooze.active) return false
   if (item.flags.some((f) => f.id === 'conflict')) return true
+  // The second exception, and for the same reason as the first. `isSettled`
+  // calls a sent application settled — correctly, since the ball is with the
+  // organiser and a queue that nags you about every one of those is a queue
+  // you stop reading. But silence past `NO_REPLY_DAYS` is the case where that
+  // stops being true: nothing will arrive to change the row, so waiting for
+  // the queue to raise it on its own means waiting forever.
+  if (item.flags.some((f) => f.id === 'no_reply')) return true
   return !isSettled(item) && item.flags.some((f) => f.id !== 'vague_deadline')
 }
 

@@ -43,6 +43,12 @@ export interface GigOpportunity {
   status: string
   /** The pre-rename value, where there was one. See migration 0008. */
   legacyStatus?: string | null
+  /**
+   * ISO datetime the application went out. Null on rows that reached the
+   * submitted phase before migration 0010 — never backfilled, because
+   * `updated_at` would have been a guess. See `submissionSilence`.
+   */
+  submittedAt?: string | null
   /** ISO datetime you are actually on stage. Only set once `booked`. */
   performanceStart?: string | null
   performanceEnd?: string | null

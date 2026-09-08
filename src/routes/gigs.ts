@@ -10,6 +10,7 @@ import {
   isGigSettled,
   isGigTransitionAllowed,
   gigStatusMeta,
+  hasBeenSubmitted,
 } from '../../shared/gigStatus'
 import { performanceDateProblem } from '../../shared/performance'
 import { splitDeadline } from '../../shared/reviewParse'
@@ -99,6 +100,11 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
       // send `approved`, and a row should land in the right column rather
       // than carrying a word the pipeline no longer uses.
       status: normaliseGigStatus(b.status),
+      // The research agents POST rows at whatever status they found them in.
+      // One arriving already submitted has been sent, and `ts` is the closest
+      // thing to a send date that will ever exist for it — better than the
+      // null that would otherwise make it invisible to the no-reply nudge.
+      submittedAt: hasBeenSubmitted(normaliseGigStatus(b.status)) ? ts : null,
       discoveredAt: ts,
       updatedAt: ts,
     })
@@ -172,6 +178,15 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
   // every time it was touched: `approved` -> `shortlisted` is a rename, not a
   // transition, and must not fire the reminders that a real one does.
   const statusChanging = newStatus !== normaliseGigStatus(before.status)
+
+  // Stamped on the way into the submitted phase, and only if nothing is there
+  // already: a row that goes `submitted → acknowledged → invited` was sent
+  // once, and re-stamping at each step would reset the silence counter every
+  // time the organiser replied — which is precisely backwards. Never cleared
+  // on the way out either. It is a fact about the past, not a state.
+  if (statusChanging && hasBeenSubmitted(newStatus) && !before.submittedAt) {
+    updates.submittedAt = updates.updatedAt
+  }
 
   // The calendar is reconciled against the row's resulting state rather than
   // driven by the transition. Transition handlers missed a row that arrived

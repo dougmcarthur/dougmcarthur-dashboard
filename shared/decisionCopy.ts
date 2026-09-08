@@ -68,6 +68,10 @@ export interface Decision {
 const PRECEDENCE: FlagId[] = [
   'conflict',
   'reply_due',
+  // Ahead of `overdue`, which is not a mistake. A deadline in the past on a
+  // row you already submitted is expected and says nothing; the overdue copy
+  // would tell you it "was never submitted", which for these rows is false.
+  'no_reply',
   'overdue',
   'paid',
   'issue',
@@ -248,6 +252,10 @@ const GIG_ACTIONS: Record<string, DecisionAction[]> = {
     { label: 'Confirm the booking', intent: 'book', tone: 'go' },
     { label: 'Withdraw', intent: 'withdraw', tone: 'no' },
   ],
+  // One action, and it is the negative one. There is no status that means
+  // "chased" — following up is an email — so the affirmative path off this
+  // card is the snooze beside it, which is why the sentence names it.
+  give_up: [{ label: 'Never heard back', intent: 'expire', tone: 'no' }],
   go_no: [
     { label: 'Will apply', intent: 'approve', tone: 'go' },
     { label: 'Start preparing', intent: 'prepare', tone: 'go' },
@@ -350,6 +358,20 @@ export function decisionFor(item: DecisionInput): Decision {
           'reply in your mail, not a button here — open it, send the answer, then record ' +
           'whatever comes back.',
         actions: [],
+      }
+    }
+
+    case 'no_reply': {
+      const { days, exact } = item.silence ?? { days: 0, exact: true }
+      const sent = normaliseGigStatus(status) === 'acknowledged'
+        ? 'They confirmed they had it'
+        : 'It went out'
+      return {
+        rationale:
+          `${sent} ${exact ? '' : 'about '}${days} days ago and nothing has come back. ` +
+          `Chasing is an email rather than a button — send one and snooze this, or write ` +
+          `it off if the answer was never coming.`,
+        actions: gigActions(kind, status, GIG_ACTIONS.give_up),
       }
     }
 

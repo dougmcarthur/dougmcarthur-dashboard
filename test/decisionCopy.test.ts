@@ -77,6 +77,41 @@ describe('decision copy — the sentence names the decision', () => {
     expect(item.decision.actions.map((a) => a.label)).toEqual(['Applied', 'Window closed'])
   })
 
+  it('names the silence, and does not claim a sent application was never sent', () => {
+    const item = first({
+      gigs: [gig({
+        id: 50, name: 'Home Routes', status: 'submitted',
+        // A past deadline on a row you already submitted raises `overdue`,
+        // whose copy reads "nothing was submitted" — false here, and the
+        // reason `no_reply` outranks it in the precedence list.
+        deadline: '2026-06-01', submittedAt: '2026-05-20',
+      })],
+    })
+    expect(item.decision.rationale).toMatch(/^It went out \d+ days ago and nothing has come back\./)
+    expect(item.decision.rationale).not.toContain('nothing was submitted')
+    // Chasing is an email. The affirmative path off this card is the snooze
+    // beside it, which is why the sentence names it rather than a button.
+    expect(item.decision.rationale).toContain('snooze this')
+    expect(item.decision.actions.map((a) => a.label)).toEqual(['Never heard back'])
+  })
+
+  it('says they confirmed receipt when that is what happened', () => {
+    const item = first({
+      gigs: [gig({ id: 51, name: 'CFMA', status: 'acknowledged', submittedAt: '2026-04-01' })],
+    })
+    expect(item.decision.rationale).toMatch(/^They confirmed they had it \d+ days ago/)
+  })
+
+  it('marks the count as approximate when the send date was never recorded', () => {
+    const item = first({
+      gigs: [gig({
+        id: 52, name: 'Legacy row', status: 'submitted',
+        submittedAt: null, updatedAt: '2026-05-01',
+      })],
+    })
+    expect(item.decision.rationale).toMatch(/It went out about \d+ days ago/)
+  })
+
   it('puts an unanswered invitation at the top and offers the two real outs', () => {
     const item = first({
       gigs: [gig({ id: 40, name: 'Winnipeg Folk Festival', status: 'invited' })],
@@ -157,6 +192,7 @@ describe('decision copy — invariants that hold for every item', () => {
       gig({ id: 26, name: 'Booked', status: 'booked' }),
       gig({ id: 27, name: 'Declined', status: 'declined' }),
       gig({ id: 28, name: 'Expired out', status: 'expired', deadline: '2026-01-05' }),
+      gig({ id: 29, name: 'Silent', status: 'submitted', submittedAt: '2026-01-10' }),
     ],
     sync: [
       sync({ id: 15, name: 'Plain agency', notes: 'Chicago-based boutique sync agency.' }),

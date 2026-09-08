@@ -1,0 +1,23 @@
+-- Migration: record when an application actually went out.
+--
+-- The Review screen can list what is out with an organiser, but not how long
+-- it has been out — and "applied, heard nothing" is only actionable with a
+-- number attached. Nothing in the table held that date: `updated_at` moves on
+-- every edit, and `discovered_at` is when the research found it.
+--
+-- Deliberately NOT backfilled. `updated_at` is the only candidate and it is
+-- the wrong answer — for a row submitted in January and edited in February it
+-- reports a month of silence instead of two. Guessing here would produce a
+-- nudge that under-reports exactly when it matters most, and a column that
+-- means "when it was sent" on new rows and "roughly, maybe" on old ones.
+--
+-- Existing post-submission rows therefore keep a NULL, and `submissionSilence`
+-- in shared/reviewQueue.ts falls back to `updated_at` for them and marks the
+-- result inexact — the same treatment `deadline` gets when a date is recovered
+-- from prose. A recovered date must not look as certain as a recorded one.
+--
+-- Additive, so the currently-live Worker reads the new schema fine during the
+-- half-minute between the migrate and the deploy: it selects * and ignores a
+-- column it does not know about.
+
+ALTER TABLE gig_opportunities ADD COLUMN submitted_at TEXT;

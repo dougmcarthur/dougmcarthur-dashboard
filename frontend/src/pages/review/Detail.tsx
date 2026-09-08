@@ -31,7 +31,7 @@ export function Detail({
   onSnooze: (until: string | null) => void
   isSaving: boolean
 }) {
-  const { parsed, fee, deadline } = item
+  const { parsed, fee, deadline, silence } = item
   const sync = item.source.kind === 'sync' ? item.source.row : null
   const promo = item.source.kind === 'promo' ? item.source.row : null
 
@@ -52,7 +52,7 @@ export function Detail({
   // Anything already rendered as its own fact at the top would be said twice
   // as a chip — and "Deadline not a real date" beside a deadline that now
   // shows the prose underneath it was saying the same thing in two voices.
-  const SHOWN_AS_FACT = new Set(['overdue', 'due_soon', 'paid', 'vague_deadline', 'window'])
+  const SHOWN_AS_FACT = new Set(['overdue', 'due_soon', 'paid', 'vague_deadline', 'window', 'no_reply'])
   const warningChips = warnings.filter((f) => !SHOWN_AS_FACT.has(f.id))
   const stateChips = states.filter((f) => !SHOWN_AS_FACT.has(f.id))
 
@@ -99,6 +99,33 @@ export function Detail({
                   : `in ${deadline.daysUntil}d`}
             </span>
           )}
+        </>
+      ),
+    })
+  }
+
+  // Shown whenever the row has been sent, not only once the silence is worth
+  // flagging: "sent 9 days ago" is the answer to the question this pane is
+  // being asked, and a fact that only appears when it is bad news trains you
+  // to read its absence as "no data" rather than "fine".
+  if (silence) {
+    facts.push({
+      label: 'Sent',
+      // Read off the flag rather than re-deriving the threshold. A second copy
+      // of "45" in the browser is a second thing to forget when it changes.
+      tone: item.flags.some((f) => f.id === 'no_reply') ? 'urgent' : 'plain',
+      // The whole reason `exact` exists. On a row that reached the submitted
+      // phase before migration 0010 there is no send date, so this counts from
+      // the last time the row changed — which can only under-report. Saying so
+      // is cheaper than a number you have to go and verify.
+      note: silence.exact ? null : 'Counted from the last change to the row — the send date was never recorded',
+      value: (
+        <>
+          {silence.exact ? '' : 'about '}
+          {shortDate(silence.since)}
+          <span className="ml-1.5 font-normal text-muted">
+            {silence.days === 0 ? 'today' : `${silence.days}d ago`}
+          </span>
         </>
       ),
     })

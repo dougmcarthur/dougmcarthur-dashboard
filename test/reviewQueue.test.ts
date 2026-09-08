@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { buildReviewQueue, matchesFilter, summariseQueue } from '../shared/reviewQueue'
+import {
+  buildReviewQueue,
+  matchesFilter,
+  summariseQueue,
+  isSettled,
+  awaitingDecision,
+} from '../shared/reviewQueue'
 import type { GigOpportunity, SyncTarget } from '../shared/types'
 
 // Minimal rows in the shape the API returns. Notes are trimmed from real
@@ -554,5 +560,116 @@ describe('the follow-up phase, and who is waiting on whom', () => {
       today: TODAY,
     })
     expect(items[0].title).toBe('Invited')
+  })
+})
+
+/**
+ * Silence — the only signal in the pipeline that is an absence.
+ *
+ * An unanswered application produces no note, no status change and no
+ * deadline. Nothing in the queue could raise it until `submitted_at` existed
+ * to measure from (migration 0010).
+ */
+describe('submissionSilence — how long it has been out, and how sure we are', () => {
+  const at = (o: Partial<GigOpportunity>) =>
+    buildReviewQueue({ gigs: [gig({ id: 1, name: 'Home Routes', status: 'submitted', ...o })], today: TODAY })[0]
+
+  it('counts from the recorded send date and says so', () => {
+    const item = at({ submittedAt: '2026-07-26', updatedAt: '2026-08-20' })
+    expect(item.silence).toMatchObject({ since: '2026-07-26', exact: true, days: 30 })
+  })
+
+  it('falls back to the last change, and never claims that was the send date', () => {
+    // Every row that reached this phase before migration 0010 carries a null.
+    // The fallback can only under-report — a row sent in July and edited in
+    // August reads as five days of silence, not thirty — which is the safe
+    // direction for a nudge, but only if nothing shows it as certain.
+    const item = at({ submittedAt: null, updatedAt: '2026-08-20' })
+    expect(item.silence).toMatchObject({ since: '2026-08-20', exact: false, days: 5 })
+  })
+
+  it('is null for anything that was never sent', () => {
+    for (const status of ['discovered', 'shortlisted', 'preparing', 'passed']) {
+      expect(at({ status, submittedAt: null }).silence).toBeNull()
+    }
+  })
+
+  it('keeps counting once they acknowledge it — a receipt is not an answer', () => {
+    expect(at({ status: 'acknowledged', submittedAt: '2026-07-01' }).silence?.days).toBe(55)
+  })
+
+  it('stops at a booking or a rejection — the silence ended', () => {
+    for (const status of ['invited', 'declined', 'booked', 'withdrawn']) {
+      expect(at({ status, submittedAt: '2026-01-01' }).silence).toBeNull()
+    }
+  })
+
+  it('never reports negative days for a row touched later today', () => {
+    expect(at({ submittedAt: `${TODAY}T09:00:00.000Z` }).silence?.days).toBe(0)
+  })
+})
+
+describe('the no-reply nudge', () => {
+  const silentFor = (days: number, o: Partial<GigOpportunity> = {}) => {
+    const since = new Date(`${TODAY}T00:00:00Z`)
+    since.setUTCDate(since.getUTCDate() - days)
+    return buildReviewQueue({
+      gigs: [gig({
+        id: 1, name: 'Home Routes', status: 'submitted',
+        submittedAt: since.toISOString().slice(0, 10), ...o,
+      })],
+      today: TODAY,
+    })[0]
+  }
+
+  it('says nothing before six weeks — panels routinely take that long', () => {
+    expect(silentFor(44).flags.map((f) => f.id)).not.toContain('no_reply')
+    expect(silentFor(45).flags.map((f) => f.id)).toContain('no_reply')
+  })
+
+  it('hardens past ninety days, where "still deciding" stops being likely', () => {
+    expect(silentFor(60).flags.find((f) => f.id === 'no_reply')?.severity).toBe('warn')
+    expect(silentFor(90).flags.find((f) => f.id === 'no_reply')?.severity).toBe('danger')
+  })
+
+  it('qualifies the count when it came from the last change to the row', () => {
+    const exact = silentFor(50)
+    const guessed = buildReviewQueue({
+      gigs: [gig({
+        id: 2, name: 'Old row', status: 'submitted',
+        submittedAt: null, updatedAt: '2026-06-01',
+      })],
+      today: TODAY,
+    })[0]
+    expect(exact.flags.find((f) => f.id === 'no_reply')?.label).toBe('50 days, no reply')
+    expect(guessed.flags.find((f) => f.id === 'no_reply')?.label).toMatch(/^About \d+ days, no reply$/)
+  })
+
+  it('reaches the queue even though a sent application counts as settled', () => {
+    // `isSettled` is right to call this settled — the ball is with the
+    // organiser. Silence is the case where waiting for the queue to raise it
+    // on its own means waiting forever, so it is an explicit exception.
+    const item = silentFor(60)
+    expect(isSettled(item)).toBe(true)
+    expect(awaitingDecision(item)).toBe(true)
+    expect(matchesFilter(item, 'needs')).toBe(true)
+    expect(matchesFilter(item, 'waiting')).toBe(true)
+  })
+
+  it('does not chase something you deferred yourself', () => {
+    const item = silentFor(60, { snoozedUntil: '2026-09-30', snoozedAt: '2026-08-20', updatedAt: '2026-08-20' })
+    expect(awaitingDecision(item)).toBe(false)
+  })
+
+  it('orders the waiting list longest-silent first', () => {
+    const items = buildReviewQueue({
+      gigs: [
+        gig({ id: 1, name: 'Recent', status: 'submitted', submittedAt: '2026-08-20' }),
+        gig({ id: 2, name: 'Ancient', status: 'submitted', submittedAt: '2026-01-04' }),
+        gig({ id: 3, name: 'Middling', status: 'submitted', submittedAt: '2026-07-20' }),
+      ],
+      today: TODAY,
+    }).filter((i) => matchesFilter(i, 'waiting'))
+    expect(items.map((i) => i.title)).toEqual(['Ancient', 'Middling', 'Recent'])
   })
 })

@@ -101,6 +101,16 @@ function Facts({ item }: { item: ReviewItem }) {
   if (item.deadline.opensAt) {
     facts.push({ label: 'Opens', value: shortDate(item.deadline.opensAt) })
   }
+  if (item.silence) {
+    facts.push({
+      // "About" where the count runs from `updated_at` rather than a recorded
+      // send date — see `submissionSilence`. The grid is the one place on this
+      // card where a number gets read without its sentence, so the qualifier
+      // has to travel with it.
+      label: item.silence.exact ? 'Silent for' : 'Silent for (approx)',
+      value: `${item.silence.days}d`,
+    })
+  }
   const fit = item.source.kind === 'gig' ? item.source.row.genreFitScore : null
   if (fit) facts.push({ label: 'Fit', value: `${fit}/5` })
 

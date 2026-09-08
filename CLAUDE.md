@@ -91,6 +91,24 @@ outranks every deadline. The Review screen has a **Waiting on them** filter for
 the other side of that line, because clicking "Applied" used to make a gig
 vanish from every filter but Everything.
 
+**Silence is a signal, and the only one that is an absence.** An unanswered
+application produces no note, no status change and no deadline, so nothing
+could raise it until `submitted_at` existed to measure from (migration 0010).
+`submissionSilence` in `shared/reviewQueue.ts` returns the days and an `exact`
+flag; past `NO_REPLY_DAYS` it becomes a `no_reply` flag, which is the second
+explicit exception in `awaitingDecision` — `isSettled` is right that a sent
+application is settled, and silence is the case where waiting for the queue to
+raise it on its own means waiting forever.
+
+`submitted_at` was **not backfilled**, on purpose. `updated_at` is the only
+candidate and it is the wrong answer: any later edit moves it forward, so a row
+sent in January and touched in February reports one month of silence instead of
+two. Rows that reached the phase before 0010 fall back to `updated_at` with
+`exact: false`, and every surface that shows the number says "about" — the same
+treatment a deadline gets when its date was recovered from prose. The fallback
+can only *under*-report, which is the safe direction for a nudge, but only
+while nothing displays it as certain.
+
 **Performance dates are typed, not parsed.** `performance_start` /
 `performance_end` are the only dates that mean a stage, and unlike `deadline`
 they never hold prose — they come off an agreement, so a value that is not a
