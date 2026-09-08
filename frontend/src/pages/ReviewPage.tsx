@@ -6,16 +6,55 @@ import type { ReviewFilter } from '../../../shared/reviewQueue'
 import { QueueRow } from './review/QueueRow'
 import { Detail } from './review/Detail'
 
-const FILTERS: Array<{ id: ReviewFilter; label: string }> = [
-  { id: 'needs', label: 'Needs a decision' },
-  { id: 'conflict', label: 'Conflicts' },
-  { id: 'blocked', label: 'Needs you' },
-  { id: 'paid', label: 'Entry fee' },
-  { id: 'timing', label: 'Timing' },
-  { id: 'snoozed', label: 'Snoozed' },
-  { id: 'all', label: 'Everything' },
+/**
+ * The filters, and why they are worded the way they are.
+ *
+ * "Needs a decision" and "Needs you" sat next to each other and read as the
+ * same sentence, which made the second one useless — it means the narrower
+ * thing, that a fact is missing before the application can be finished. And
+ * "Conflicts" read as a double-booking; it is a row whose status and note say
+ * opposite things.
+ *
+ * `hint` is the title text. A chip has room for two words and these
+ * distinctions are worth more than two words.
+ */
+const FILTERS: Array<{ id: ReviewFilter; label: string; hint: string }> = [
+  { id: 'needs', label: 'Needs a decision', hint: 'Everything waiting on a call from you.' },
+  {
+    id: 'reply',
+    label: 'Reply owed',
+    hint: 'They invited you or asked a question. Nothing moves until you answer.',
+  },
+  {
+    id: 'conflict',
+    label: 'Contradictions',
+    hint: 'The status and the note say opposite things about whether this was sent.',
+  },
+  {
+    id: 'blocked',
+    label: 'Missing details',
+    hint: 'The application cannot be finished until you supply something.',
+  },
+  { id: 'paid', label: 'Entry fee', hint: 'Costs money to enter, so it needs your say-so.' },
+  { id: 'timing', label: 'Timing', hint: 'A deadline is close or past, or a window opens soon.' },
+  {
+    id: 'waiting',
+    label: 'Waiting on them',
+    hint: 'Applied, and nothing has come back. Nothing is owed by you.',
+  },
+  { id: 'snoozed', label: 'Snoozed', hint: 'Deferred until a date you chose.' },
+  { id: 'all', label: 'Everything', hint: 'The whole queue, minus anything snoozed.' },
 ]
 
+
+/** What an empty queue means, which differs per filter and is worth saying. */
+const EMPTY: Partial<Record<ReviewFilter, string>> = {
+  snoozed: 'Nothing is snoozed. Deferred items wait here until their date, so none of them are hidden.',
+  reply: 'Nobody is waiting on a reply from you.',
+  waiting: 'Nothing is out with an organiser. Anything applied to has already come back.',
+  conflict: 'No row contradicts itself — every status agrees with its note.',
+  needs: 'Nothing needs a decision. Anything still open is waiting on a date, not on you.',
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -24,12 +63,17 @@ const isFilter = (v: string | null): v is ReviewFilter =>
 
 export function ReviewPage({ initialFilter }: { initialFilter?: string | null }) {
   const qc = useQueryClient()
-  // `#review/conflict` opens on that filter; an unknown segment falls back
-  // rather than showing an empty queue for a filter that does not exist.
+  // The route argument is either a filter (`#review/conflict`) or one item's
+  // key (`#review/gig-12`, which is what the Overview deck links to when you
+  // open a card). An item arrives on "Everything" rather than on a filter that
+  // might not contain it — landing on a queue that does not include the row
+  // you asked for is the one outcome a deep link must not have.
+  const arg = initialFilter ?? null
+  const deepLinked = arg !== null && !isFilter(arg) ? arg : null
   const [filter, setFilter] = useState<ReviewFilter>(
-    isFilter(initialFilter ?? null) ? (initialFilter as ReviewFilter) : 'needs',
+    isFilter(arg) ? arg : deepLinked ? 'all' : 'needs',
   )
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [selectedKey, setSelectedKey] = useState<string | null>(deepLinked)
 
   // The queue is built by the Worker (GET /api/review) so this screen and the
   // Overview share one definition of what needs a decision. Filtering happens
@@ -77,6 +121,15 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
   const isSaving =
     patchGig.isPending || patchSync.isPending || patchPromo.isPending || snooze.isPending
 
+  // The PATCH route refuses a move the pipeline does not offer, and this
+  // screen used to swallow the 400 whole: the button greyed, ungreyed, and
+  // nothing happened. The bar no longer *renders* an illegal move, so this
+  // should now only fire on a genuine failure — which is exactly when it needs
+  // to be visible.
+  const saveError = (patchGig.error ?? patchSync.error ?? patchPromo.error ?? snooze.error) as
+    | Error
+    | null
+
   // j / k step through the queue without leaving the keyboard.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -121,6 +174,7 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
           return (
             <button
               key={f.id}
+              title={f.hint}
               onClick={() => setFilter(f.id)}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 active ? 'bg-accent text-accent-fg' : 'bg-surface border border-line text-body hover:bg-sunken'
@@ -133,13 +187,17 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
         })}
       </div>
 
+      {saveError && (
+        <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-2.5 text-sm text-danger-fg">
+          That change was refused — {saveError.message}
+        </div>
+      )}
+
       {isLoading ? (
         <SkeletonList rows={6} />
       ) : visible.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface shadow-card px-4 py-12 text-center text-sm text-muted">
-          {filter === 'snoozed'
-            ? 'Nothing is snoozed. Deferred items wait here until their date, so none of them are hidden.'
-            : 'Nothing in this queue.'}
+          {EMPTY[filter] ?? 'Nothing in this queue.'}
         </p>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[19rem_minmax(0,1fr)]">

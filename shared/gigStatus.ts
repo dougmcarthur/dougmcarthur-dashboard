@@ -199,6 +199,24 @@ export function isGigSettled(raw: string | null | undefined): boolean {
 }
 
 /**
+ * Is the ball back in your court after they answered?
+ *
+ * `submitted` and `acknowledged` are waits — nothing is owed by you, and a
+ * queue that keeps surfacing applications you are waiting on is a queue you
+ * stop reading. `info_requested` and `invited` are the opposite: they are the
+ * two states where *they* have moved and nothing further happens until you
+ * move back.
+ *
+ * This exists because the queue treated the whole follow-up phase as settled,
+ * which meant `info_requested` — the state that exists precisely because it
+ * stalls if nobody notices — was the one state guaranteed to go unnoticed.
+ */
+export function awaitsYourReply(raw: string | null | undefined): boolean {
+  const s = normaliseGigStatus(raw)
+  return s === 'info_requested' || s === 'invited'
+}
+
+/**
  * Has an application actually gone out?
  *
  * Distinct from "settled". A shortlisted gig is unsettled *and* unsent; a

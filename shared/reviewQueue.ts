@@ -20,7 +20,7 @@
  * than quietly resolved in favour of either side.
  */
 
-import { normaliseGigStatus, isGigSettled, hasBeenSubmitted } from './gigStatus'
+import { normaliseGigStatus, isGigSettled, hasBeenSubmitted, awaitsYourReply } from './gigStatus'
 import type { GigOpportunity, SyncTarget, PromoDraft } from './types'
 import { decisionFor, type Decision } from './decisionCopy'
 import {
@@ -38,6 +38,7 @@ export type ReviewKind = 'gig' | 'sync' | 'promo'
 
 export type FlagId =
   | 'conflict'
+  | 'reply_due'
   | 'overdue'
   | 'due_soon'
   | 'issue'
@@ -90,7 +91,16 @@ export interface ReviewItem {
   source: ReviewSource
 }
 
-export type ReviewFilter = 'needs' | 'conflict' | 'blocked' | 'paid' | 'timing' | 'snoozed' | 'all'
+export type ReviewFilter =
+  | 'needs'
+  | 'conflict'
+  | 'reply'
+  | 'blocked'
+  | 'paid'
+  | 'timing'
+  | 'waiting'
+  | 'snoozed'
+  | 'all'
 
 export interface SnoozeState {
   /** ISO date this was deferred to, whether or not the snooze still holds. */
@@ -153,6 +163,11 @@ const SYNC_DONE = new Set(['pitched', 'sent', 'confirmed', 'declined', 'archived
 
 const FLAG_WEIGHT: Record<FlagId, number> = {
   conflict: 100,
+  // Above every deadline. An unanswered invitation or question is the only
+  // thing in the queue where somebody outside is waiting on a reply, and a
+  // deadline you miss costs you one opportunity where silence here costs you
+  // the one they already said yes to.
+  reply_due: 95,
   overdue: 90,
   due_soon: 80,
   issue: 70,
@@ -172,6 +187,19 @@ function flagsFor(
 ): ReviewFlag[] {
   const flags: ReviewFlag[] = []
   const claimsDone = kind === 'gig' ? gigClaimsDone(status) : kind === 'sync' ? SYNC_DONE.has(status) : false
+
+  // Phase 4, where they moved and you have not moved back. Named for what is
+  // owed rather than for the status, because the two statuses owe different
+  // things: one is a question to answer, the other an offer to accept.
+  if (kind === 'gig' && awaitsYourReply(status)) {
+    const invited = normaliseGigStatus(status) === 'invited'
+    flags.push({
+      id: 'reply_due',
+      label: invited ? 'They invited you — reply' : 'They asked a question',
+      severity: invited ? 'warn' : 'danger',
+      kind: 'warning',
+    })
+  }
 
   if (claimsDone && parsed.submissionState === 'not_submitted') {
     flags.push({
@@ -340,7 +368,11 @@ export function buildReviewQueue(input: {
  * waiting on is a queue you stop reading.
  */
 const gigSettled = (status: string): boolean =>
-  isGigSettled(status) || hasBeenSubmitted(status)
+  // `awaitsYourReply` first: `info_requested` and `invited` are inside the
+  // follow-up phase, so `hasBeenSubmitted` would otherwise file them under
+  // "waiting on the organiser" — which is exactly backwards. They are the two
+  // states where the organiser is waiting on you.
+  !awaitsYourReply(status) && (isGigSettled(status) || hasBeenSubmitted(status))
 const SYNC_SETTLED = new Set(['pitched', 'sent', 'confirmed', 'declined', 'archived'])
 
 /** Deadline horizon for the time-critical strip. Matches the due_soon flag. */
@@ -544,7 +576,37 @@ export function matchesFilter(item: ReviewItem, filter: ReviewFilter): boolean {
       return item.flags.some((f) => f.id === 'paid')
     case 'timing':
       return item.flags.some((f) => f.id === 'overdue' || f.id === 'due_soon' || f.id === 'window')
+    case 'reply':
+      return item.flags.some((f) => f.id === 'reply_due')
+    case 'waiting':
+      return isAwaitingThem(item)
   }
+}
+
+/**
+ * Sent, and nothing has come back.
+ *
+ * Not a flag, because nothing is wrong with it and nothing is owed by you —
+ * which is precisely why it needed a home. Clicking "Applied" used to make a
+ * gig vanish from every Review filter but "Everything", so the one question
+ * you cannot answer from this screen was the obvious one: what have I applied
+ * to and heard nothing about?
+ *
+ * `invited` and `info_requested` are deliberately excluded even though they
+ * are also post-submission: they are in `reply` instead, because there the
+ * silence is yours.
+ */
+export function isAwaitingThem(item: ReviewItem): boolean {
+  if (item.snooze.active) return false
+  if (item.kind === 'gig') {
+    // Named, not derived. `booked` is also post-submission and also unsettled,
+    // and it is the one status that is emphatically not a wait — the answer
+    // came back yes and the date is real.
+    const s = normaliseGigStatus(item.status)
+    return s === 'submitted' || s === 'acknowledged'
+  }
+  if (item.kind === 'sync') return item.status === 'pitched' || item.status === 'sent'
+  return false
 }
 
 export function countByFilter(items: ReviewItem[], filter: ReviewFilter): number {

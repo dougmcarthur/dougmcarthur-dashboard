@@ -68,6 +68,29 @@ worth knowing: **there is no route from `invited` to `declined`.** Declining is
 their verb; turning down an invitation is `withdrawn`. One mis-click should not
 be able to record that you were rejected from a festival that wanted you.
 
+**A screen never offers a move the pipeline refuses.** The PATCH route
+validates against `nextGigStatuses`, so a button naming a status is a claim
+about legality, and two decision surfaces made that claim wrong: the Review
+action bar offered a fixed *Will apply / Applied / Pass / Archive* whatever the
+row's status was — on a `submitted` gig all four returned 400, and an `invited`
+one had no way to record a booking — while the Overview deck resolved its
+intents through a table in the browser that nothing could check. Both now
+derive from `nextGigStatuses`, and `decisionFor` drops any action the row's
+status does not offer. A same-status target counts as refused too: *"Keep for
+next cycle"* on an already-shortlisted gig wrote nothing and dealt the
+identical card straight back. `test/uiConsistency.test.ts` fails if either
+surface starts naming statuses again.
+
+**Two statuses mean the ball is back with you.** `info_requested` and `invited`
+sit in the follow-up phase, so `hasBeenSubmitted` was filing them under
+"waiting on the organiser" and the queue treated the whole phase as settled —
+which meant `info_requested`, the state that exists *because* it stalls if
+nobody notices, was the one state guaranteed to go unnoticed. `awaitsYourReply`
+in `shared/gigStatus.ts` splits them out; they carry a `reply_due` flag that
+outranks every deadline. The Review screen has a **Waiting on them** filter for
+the other side of that line, because clicking "Applied" used to make a gig
+vanish from every filter but Everything.
+
 **Performance dates are typed, not parsed.** `performance_start` /
 `performance_end` are the only dates that mean a stage, and unlike `deadline`
 they never hold prose — they come off an agreement, so a value that is not a

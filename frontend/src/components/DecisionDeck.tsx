@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type GigOpportunity, type SyncTarget, type PromoDraft } from '../api'
 import type { ReviewItem } from '../../../shared/reviewQueue'
-import type { DecisionIntent } from '../../../shared/decisionCopy'
+import { GIG_STATUS_BY_INTENT, type DecisionIntent } from '../../../shared/decisionCopy'
 import { KindTag } from './ReviewPanels'
 import { SnoozeMenu } from './SnoozeMenu'
 import { shortDate } from '../format'
@@ -28,24 +28,23 @@ function ActionIcon({ name }: { name: 'check' | 'x' }) {
 /**
  * One decision at a time, with the rest of the stack showing behind it.
  *
- * Order and copy both come from the server (`GET /api/review`), so this deck
- * and the Review screen can never disagree about what matters or how to
- * describe it. Acting on a card, or skipping it, deals the next one.
+ * Order, copy and actions all come from the server (`GET /api/review`), so this
+ * deck and the Review screen can never disagree about what matters, how to
+ * describe it, or which moves are legal. Acting on a card, or skipping it,
+ * deals the next one.
  */
 
-/** An intent means the same thing everywhere; the status it maps to does not. */
+/**
+ * An intent means the same thing everywhere; the status it maps to does not.
+ *
+ * The gig column used to live here as a flat table, which is how the deck came
+ * to render buttons the API refuses — nothing in the browser consulted
+ * `nextGigStatuses`. The gig side now comes from `shared/decisionCopy.ts`,
+ * which is also what decides which actions a card is allowed to offer, so the
+ * button and its legality are read off one table.
+ */
 const STATUS_BY_INTENT: Record<ReviewItem['kind'], Record<DecisionIntent, string>> = {
-  // `approve` on a gig means "I will apply" and nothing more — see
-  // shared/gigStatus.ts. `pass` is *your* no, which is why it maps to
-  // `passed` and never to `declined`.
-  gig: {
-    confirm_sent: 'submitted',
-    reopen: 'shortlisted',
-    approve: 'shortlisted',
-    pass: 'passed',
-    archive: 'archived',
-    publish: 'submitted',
-  },
+  gig: GIG_STATUS_BY_INTENT,
   sync: {
     confirm_sent: 'pitched',
     reopen: 'draft_ready',
@@ -53,6 +52,10 @@ const STATUS_BY_INTENT: Record<ReviewItem['kind'], Record<DecisionIntent, string
     pass: 'declined',
     archive: 'archived',
     publish: 'pitched',
+    expire: 'archived',
+    withdraw: 'declined',
+    book: 'confirmed',
+    prepare: 'draft_ready',
   },
   promo: {
     confirm_sent: 'published',
@@ -61,6 +64,10 @@ const STATUS_BY_INTENT: Record<ReviewItem['kind'], Record<DecisionIntent, string
     pass: 'draft',
     archive: 'draft',
     publish: 'published',
+    expire: 'draft',
+    withdraw: 'draft',
+    book: 'published',
+    prepare: 'draft',
   },
 }
 
@@ -151,10 +158,21 @@ export function DecisionDeck({
 
   // Snooze goes through its own endpoint, not a status PATCH — the date and
   // the timestamp it is measured against have to be written together.
+  // A card dispatched optimistically has to come back if the write failed.
+  // Without this the deck ate the card and left a one-line error under a
+  // different item — the action looked like it had worked.
+  const unsettle = (key: string) =>
+    setSettled((prev) => {
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
+
   const snooze = useMutation({
     mutationFn: ({ target, until }: { target: ReviewItem; until: string }) =>
       api.snooze({ kind: target.kind as 'gig' | 'sync', id: target.id, until }),
     onSuccess: invalidate,
+    onError: (_e, vars) => unsettle(vars.target.key),
   })
 
   const patch = useMutation({
@@ -169,6 +187,7 @@ export function DecisionDeck({
       }
     },
     onSuccess: invalidate,
+    onError: (_e, vars) => unsettle(vars.target.key),
   })
 
   if (!item) {
@@ -245,6 +264,17 @@ export function DecisionDeck({
           <Facts item={item} />
 
           <div className="mt-4 pt-3 border-t border-line flex flex-wrap items-center gap-2">
+            {/* Some cards have no button, on purpose: a contradiction between
+                a status and a note is an edit, and an unanswered question is
+                an email. Saying so beats a button that would 400. */}
+            {decision.actions.length === 0 && (
+              <button
+                onClick={() => onNav(`review/${item.key}`)}
+                className="text-sm px-3.5 py-1.5 rounded-md font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-colors"
+              >
+                Open it
+              </button>
+            )}
             {decision.actions.map((a) => (
               <button
                 key={a.intent + a.label}
@@ -262,9 +292,12 @@ export function DecisionDeck({
               </button>
             ))}
             <button
-              onClick={() => onNav('review')}
-              title="Details"
-              aria-label="Details"
+              // The item key, not just the page: arriving on a queue of forty
+              // and hunting for the card you were just holding is the whole
+              // cost of leaving the deck.
+              onClick={() => onNav(`review/${item.key}`)}
+              title="Open it"
+              aria-label="Open it"
               className="grid place-items-center h-9 w-9 rounded-lg border border-line text-body hover:bg-sunken hover:text-ink transition-colors"
             >
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"

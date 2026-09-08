@@ -480,3 +480,79 @@ describe('summariseQueue — data health', () => {
     expect(health).toMatchObject({ orphanedReminders: 1, clean: false })
   })
 })
+
+/**
+ * Phase 4 — the half of the pipeline the queue could not see.
+ *
+ * `gigSettled` was `isGigSettled(status) || hasBeenSubmitted(status)`, and
+ * `hasBeenSubmitted` is true for the whole follow-up phase. So the two states
+ * where the organiser has moved and is waiting on *you* — `info_requested`,
+ * which the plan describes as "the one that stalls if nobody notices", and
+ * `invited` — were filed as settled and appeared in no filter but Everything.
+ */
+describe('the follow-up phase, and who is waiting on whom', () => {
+  const build = (status: string) =>
+    buildReviewQueue({ gigs: [gig({ id: 1, name: 'Winnipeg Folk Festival', status })], today: TODAY })[0]
+
+  it('raises a reply_due flag on an invitation and on a question', () => {
+    expect(build('invited').flags.map((f) => f.id)).toContain('reply_due')
+    expect(build('info_requested').flags.map((f) => f.id)).toContain('reply_due')
+  })
+
+  it('reads an unanswered question as more urgent than an invitation', () => {
+    const asked = build('info_requested').flags.find((f) => f.id === 'reply_due')
+    const invited = build('invited').flags.find((f) => f.id === 'reply_due')
+    expect(asked?.severity).toBe('danger')
+    expect(invited?.severity).toBe('warn')
+  })
+
+  it('puts both in "needs a decision", where they were absent entirely', () => {
+    for (const status of ['invited', 'info_requested']) {
+      expect(matchesFilter(build(status), 'needs')).toBe(true)
+      expect(matchesFilter(build(status), 'reply')).toBe(true)
+    }
+  })
+
+  it('leaves a plain wait alone — nothing is owed by you on a sent application', () => {
+    for (const status of ['submitted', 'acknowledged']) {
+      expect(matchesFilter(build(status), 'needs')).toBe(false)
+      expect(matchesFilter(build(status), 'reply')).toBe(false)
+      expect(matchesFilter(build(status), 'waiting')).toBe(true)
+    }
+  })
+
+  it('does not call a booked show a wait — the answer already came back', () => {
+    expect(matchesFilter(build('booked'), 'waiting')).toBe(false)
+    expect(matchesFilter(build('declined'), 'waiting')).toBe(false)
+    expect(matchesFilter(build('shortlisted'), 'waiting')).toBe(false)
+  })
+
+  it('counts a pitched sync target as out with them', () => {
+    const [item] = buildReviewQueue({ sync: [sync({ id: 2, name: 'Marmoset' })], today: TODAY })
+    expect(matchesFilter(item, 'waiting')).toBe(true)
+  })
+
+  it('keeps a snoozed invitation out of every filter but Snoozed', () => {
+    const [item] = buildReviewQueue({
+      gigs: [gig({
+        id: 3, name: 'Deferred', status: 'invited',
+        snoozedUntil: '2026-09-30', snoozedAt: '2026-08-01', updatedAt: '2026-08-01',
+      })],
+      today: TODAY,
+    })
+    expect(matchesFilter(item, 'reply')).toBe(false)
+    expect(matchesFilter(item, 'waiting')).toBe(false)
+    expect(matchesFilter(item, 'snoozed')).toBe(true)
+  })
+
+  it('outranks a deadline: an invitation you have not answered comes first', () => {
+    const items = buildReviewQueue({
+      gigs: [
+        gig({ id: 4, name: 'Due tomorrow', deadline: '2026-08-26' }),
+        gig({ id: 5, name: 'Invited', status: 'invited' }),
+      ],
+      today: TODAY,
+    })
+    expect(items[0].title).toBe('Invited')
+  })
+})
