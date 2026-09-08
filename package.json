@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply dougmcarthur-music-hq --local",
+    "db:bootstrap:local": "node scripts/bootstrap-local-db.mjs",
+    "db:migrate:local": "npm run db:bootstrap:local && wrangler d1 migrations apply dougmcarthur-music-hq --local",
     "db:migrate:remote": "wrangler d1 migrations apply dougmcarthur-music-hq --remote"
   },
   "dependencies": {

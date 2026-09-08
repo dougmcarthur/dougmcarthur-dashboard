@@ -17,6 +17,17 @@ the next CI run re-runs the file and aborts the batch on a duplicate column.
 back-filled into the ledger afterwards; `SELECT name FROM d1_migrations` is the
 check if anything looks off.
 
+`npm run db:migrate:local` works from a clean checkout. It did not until
+recently: migration 0001 opens with `ALTER TABLE gig_opportunities`, because
+production was created from `schema.sql` by hand before anything went through
+the ledger, so the remote database has carried that baseline all along and an
+empty local one died on `no such table` at the first file.
+`scripts/bootstrap-local-db.mjs` applies `schema.sql` first, and only when the
+baseline is missing — a check rather than rewriting that file's statements to
+be idempotent, since it is the verbatim record of what production looked like
+before 0001. No `0000` migration was introduced, so the remote ledger has
+nothing new to reconcile.
+
 `wrangler` cannot authenticate from a Claude Code session — the credentials
 live in GitHub Actions secrets and a remote session does not inherit them. That
 is now fine rather than an obstacle: merging is how a migration gets applied.
