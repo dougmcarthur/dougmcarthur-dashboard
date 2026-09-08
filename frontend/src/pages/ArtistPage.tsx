@@ -11,6 +11,7 @@ import { Button } from '../components/ui/Button'
 import { FILTER } from '../components/ui/Field'
 import { AssetRow } from './artist/AssetRow'
 import { AssetForm } from './artist/AssetForm'
+import { SourcePanel } from './artist/SourcePanel'
 
 const AUDIENCES: Array<{ id: EpkAudience; label: string; blurb: string }> = [
   { id: 'festival', label: 'Festival', blurb: 'Live video, stage plot, the practical facts.' },
@@ -127,6 +128,7 @@ export function ArtistPage() {
 
       {tab === 'library' ? (
         <div className="space-y-4">
+          <SourcePanel onDone={invalidate} />
           {adding && (
             <AssetForm
               onSave={(body) => create.mutate(body)}

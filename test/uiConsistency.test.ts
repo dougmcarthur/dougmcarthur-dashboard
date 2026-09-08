@@ -139,3 +139,28 @@ describe('the cost panel shows a range, and never a blended score', () => {
     expect(src).toContain('estimate.unknowns')
   })
 })
+
+describe('the source panel previews before it writes', () => {
+  const src = readFileSync('frontend/src/pages/artist/SourcePanel.tsx', 'utf8')
+
+  it('reads the preview endpoint before it can call the writing one', () => {
+    // Two calls, and the write is behind a button that only exists once the
+    // preview has come back. A "read the documents" button that inserted
+    // thirty rows on the first click would be the same mistake as an
+    // application panel with a Send button: the confirmation step is the
+    // feature, not the friction.
+    expect(src).toContain('api.artist.sourcePreview()')
+    expect(src).toContain('api.artist.source()')
+    const writeAt = src.indexOf('api.artist.source()')
+    const previewAt = src.indexOf('api.artist.sourcePreview()')
+    expect(previewAt).toBeLessThan(writeAt)
+  })
+
+  it('says what it could not file rather than only what it could', () => {
+    expect(src).toContain('data.skipped')
+  })
+
+  it('says out loud that nothing added here has been reviewed', () => {
+    expect(src).toMatch(/never reviewed/)
+  })
+})

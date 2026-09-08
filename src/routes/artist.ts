@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { eq, asc } from 'drizzle-orm'
 import { getDb } from '../db'
-import { artistAssets } from '../db/schema'
+import { artistAssets, referenceDocs } from '../db/schema'
 import {
   ASSET_KINDS,
   assembleEpk,
@@ -15,6 +15,7 @@ import {
   type EpkAudience,
 } from '../../shared/artistAssets'
 import { classifyQuestion, kindByKey, targetLength } from '../../shared/questionKinds'
+import { extractAll, type AssetProposal } from '../../shared/artistSource'
 import type { Env } from '../types'
 
 const artist = new Hono<{ Bindings: Env }>()
@@ -136,6 +137,72 @@ artist.get('/answer', async (c) => {
       .filter((a) => a.id !== answer?.id)
       .map((a) => ({ id: a.id, label: a.label, charCount: a.charCount ?? a.value?.length ?? 0 })),
   })
+})
+
+/**
+ * Filling the library from the documents that already describe him.
+ *
+ * `GET` proposes and `POST` writes, which is the same split the application
+ * panel has: you look at what it found before any of it lands. See
+ * shared/artistSource.ts for the three rules that decide what is extracted.
+ */
+async function propose(env: Env): Promise<{
+  proposals: AssetProposal[]
+  skipped: Array<{ heading: string; reason: string }>
+  existing: string[]
+}> {
+  const db = getDb(env.DB)
+  const docs = await db.select().from(referenceDocs).orderBy(asc(referenceDocs.id))
+  const { proposals, skipped } = extractAll(docs)
+
+  const rows = (await db.select().from(artistAssets)) as ArtistAsset[]
+  const known = new Set(rows.map((r) => r.source).filter((s): s is string => !!s))
+
+  return {
+    proposals: proposals.filter((p) => !known.has(p.source)),
+    skipped,
+    // Named so the report can say "6 already on file" rather than silently
+    // returning fewer proposals than the last run did.
+    existing: proposals.filter((p) => known.has(p.source)).map((p) => p.source),
+  }
+}
+
+artist.get('/source', async (c) => {
+  const { proposals, skipped, existing } = await propose(c.env)
+  return c.json({ proposals, skipped, existing, wouldAdd: proposals.length })
+})
+
+artist.post('/source', async (c) => {
+  const db = getDb(c.env.DB)
+  const { proposals, skipped, existing } = await propose(c.env)
+  const ts = new Date().toISOString()
+
+  for (const p of proposals) {
+    await db.insert(artistAssets).values({
+      kind: normaliseAssetKind(p.kind),
+      label: p.label,
+      value: p.value,
+      questionKind: p.questionKind,
+      variant: p.variant,
+      charCount: measure(p.value),
+      credit: null,
+      usageRights: null,
+      // Null, where a hand-added asset gets a date seeded from its kind. That
+      // difference is the point: adding an asset yourself is a claim that it
+      // is right, and a document saying so is not. Null reads as `unreviewed`
+      // — "nobody ever claimed this was checked" — which is a state this
+      // module already keeps apart from `overdue`.
+      reviewBy: null,
+      source: p.source,
+      notes: p.notes,
+      sortOrder: 0,
+      archived: 0,
+      createdAt: ts,
+      updatedAt: ts,
+    })
+  }
+
+  return c.json({ added: proposals.length, existing: existing.length, skipped })
 })
 
 artist.post('/', zValidator('json', AssetSchema), async (c) => {

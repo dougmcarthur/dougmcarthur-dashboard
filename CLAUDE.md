@@ -272,6 +272,29 @@ which owns what a transition means. Two calls is the correct number — they can
 be wrong independently, and a wrong auto-transition tells you that you were
 rejected when you were not. See `docs/reply-matching-plan.md`.
 
+**The artist database fills itself from the documents that already describe
+him.** `artist_assets` was empty in production from migration 0009 until
+`shared/artistSource.ts`, which is why every application panel said "Nothing
+on file answers this yet" — the facts were never missing, they sat in
+`reference_docs` and nothing read them. Three rules do the extraction and none
+of them reads a sentence: a `##` heading is a question (`classifyQuestion`
+maps it, the same function that maps a form field's label), a parenthetical in
+that heading is the `variant`, and a labelled URL on a line of its own is a
+link. Deliberately **not** a labelled URL inside a list item — a Spotify link
+under an album is about that album, and mining those would file six records
+under one question. A section it cannot file is named in `skipped`, never
+guessed at: prose parsing is what `reviewParse.ts` is, and that is the debt
+this repo is trying to delete rather than repeat.
+
+Everything sourced lands with **`review_by` null**, which reads as
+`unreviewed`. A hand-added asset gets a date seeded from its kind because
+adding one yourself is a claim it is right; a document saying so is not the
+same claim. `GET /api/artist/source` previews and `POST` writes, and
+`test/uiConsistency.test.ts` fails if the panel loses the preview step. The
+known false positive is pinned rather than patched: the writing style guide's
+"Voice in One Sentence" reads as a one-liner, which `classifyQuestion` is
+right to think and a human is right to archive.
+
 **A cost is a denominator, never a criterion.** `shared/gigCost.ts` estimates
 what a trip costs and stops there. It returns no `value`, no `efficiency` and
 no blended score, because the swing weights that would produce one have not

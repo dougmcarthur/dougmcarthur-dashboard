@@ -340,12 +340,24 @@ not a number.
 **H — Phase 5, agreement templates.** Last, and rightly: `booked` is the rarest
 transition in the pipeline and the one with the least to automate.
 
-**Sourcing the artist database.** Step C built the table, the expiry and the
-EPK; nothing fills it except hand entry and the research agents. The three
-reference docs are already in D1, and Drive and the website are reachable —
-this wants an extraction pass, not more schema. Phase 3 made the gap visible
-rather than closing it: every "Nothing on file answers this yet" in an
-application panel is this, named.
+**Sourcing the artist database. Built.** Step C built the table, the expiry
+and the EPK, and then nothing filled it — `artist_assets` was empty in
+production for five migrations, which is what every "Nothing on file answers
+this yet" in an application panel was reporting. The facts were never missing:
+they sit in `reference_docs`, which this app already stores and never read.
+
+`shared/artistSource.ts` extracts on three rules, none of which reads a
+sentence — a `##` heading is a question, a parenthetical in it is the variant,
+a labelled URL on its own line is a link. The restraint is the design: a
+fourth rule that pulled "Spotify 14 monthly listeners" out of a paragraph
+would be a regex per phrasing, which is `reviewParse.ts` again. Sections it
+cannot file are named rather than dropped, the same way phase 3 lists the
+questions it cannot answer.
+
+Everything sourced lands `unreviewed`. What is left of this: Drive and the
+website are still unread, and the press photos — the assets with the most
+expensive failure mode, since a photo with no credit is broken the day it is
+added — are not in any document and have to be entered by hand.
 
 **The notes backfill.** `shared/reviewParse.ts` is a stopgap that re-derives
 structured facts out of prose on every read, because migration 0001's columns
