@@ -46,6 +46,58 @@ A migration that errors is rolled back by wrangler with the previous one left
 applied, and the failed step stops the deploy — so a bad migration leaves old
 code against old schema, which is at least a consistent pair.
 
+## The deploy, and how to read a red run
+
+`.github/workflows/deploy.yml` on every push to `main`: typecheck, tests, tests
+again a day ahead, build, list migrations, apply them, deploy, report what went
+live. Six of the first 37 runs failed, and they fall into four kinds — worth
+knowing apart, because only one of them is still live and it is the one that
+looks most alarming.
+
+**A red run does not mean nothing shipped.** `wrangler deploy` is three API
+calls — upload the assets, upload the Worker, set the triggers — and the Worker
+is live after the second. Twice the third has failed on
+
+```
+No targets deployed for dougmcarthur-dashboard
+✘ [ERROR] Some triggers failed to deploy:
+    - Received a malformed response from the API
+```
+
+which is the Cloudflare API returning something wrangler cannot parse, usually
+an HTML error or block page instead of JSON. It says nothing about this
+repository, a re-run fixed it both times, and by the time it fires the deploy
+has *mostly succeeded*: what did not happen is the cron schedule being
+re-sent. The deploy step now retries three times, since the whole command is
+idempotent — re-uploading the same bundle and re-sending the same cron list
+converges. `Deployed … triggers` in the log is the line that says the third
+call landed; `No targets deployed` on its own is normal here, because
+`workers_dev = false` and the custom domain is attached in the dashboard rather
+than declared as a route.
+
+**"Show pending migrations" failing means the token, not the code.** `wrangler
+d1 migrations list` hits the write-capable `/query` endpoint, so a read-scoped
+token fails `code: 7403` — see above. It is a pure read, so it retries too;
+`migrations apply` deliberately does not, because "try it again" is the wrong
+instinct about a write that may have half-landed.
+
+**A test that passed locally and fails in CI is probably the clock.** The
+runners are UTC and this is written in Winnipeg, so a fixture with a hardcoded
+date can go stale in the hours between. That cost run 28. CI now runs the suite
+twice, the second time under `TZ=Pacific/Auckland`, so the check CLAUDE.md
+prescribes is no longer one anybody has to remember.
+
+**There is no HTTP smoke test, on purpose.** Cloudflare Access sits in front of
+`dashboard.dougmcarthur.net`, so a request from a runner gets the login
+redirect and never reaches the Worker. A check that can only ever see the front
+door proves nothing and adds a way for a good deploy to go red. `wrangler
+deployments status` is the last step instead: it asks Cloudflare what is
+serving traffic rather than inferring it from an exit code.
+
+`wrangler` is pinned at 4.105.0. 4.129+ requires `@cloudflare/workers-types@^5`
+against the `^4` this repo holds, so bumping it is a types major and its own
+piece of work — not a fix for the above, which is server-side.
+
 ## Conventions worth knowing before changing things
 
 **Statuses say who decided.** `shortlisted`/`passed` are the artist's

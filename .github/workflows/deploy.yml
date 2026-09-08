@@ -45,6 +45,15 @@ jobs:
       - name: Test
         run: npm test
 
+      # The runners are UTC and this repository is written in Winnipeg, so a
+      # fixture that is correct locally can be a day stale by the time CI reads
+      # it. That is not hypothetical — run 28 went red on a hardcoded deadline
+      # that had passed between the local run and the CI one, on a change that
+      # touched neither. CLAUDE.md prescribes this as the cheap local check;
+      # running it here means nobody has to remember.
+      - name: Test a day ahead
+        run: TZ=Pacific/Auckland npm test
+
       - name: Build frontend
         run: npm run build:ui
 
@@ -54,8 +63,18 @@ jobs:
       # Listing before applying costs a second and puts the pending set in the
       # run log, which is the only record of what a migration *was* once it has
       # been applied.
+      #
+      # Retried because it is a pure read and because a flake here is the one
+      # that stops a deploy having changed nothing — which is exactly the state
+      # main sat in during run 22.
       - name: Show pending migrations
-        run: npx wrangler d1 migrations list dougmcarthur-music-hq --remote
+        run: |
+          for attempt in 1 2 3; do
+            if npx wrangler d1 migrations list dougmcarthur-music-hq --remote; then exit 0; fi
+            echo "::warning::migrations list failed (attempt $attempt)"
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
+          done
+          exit 1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -75,6 +94,11 @@ jobs:
       # errors is rolled back with the previous one left applied — so a failure
       # here stops the deploy and leaves old code against old schema, which is
       # at least a consistent pair.
+      #
+      # Deliberately NOT retried, unlike the two steps either side of it. This
+      # is the one command in the workflow that writes schema, and "try it
+      # again" is the wrong instinct when a write has half-landed. A human
+      # reading the rollback message is cheaper than a loop guessing.
       - name: Apply D1 migrations
         run: npx wrangler d1 migrations apply dougmcarthur-music-hq --remote
         env:
@@ -84,8 +108,47 @@ jobs:
       # Calls wrangler directly rather than `npm run deploy`, which would
       # re-run typecheck and tests via predeploy. npx resolves the version
       # pinned in devDependencies, so CI and local deploys use the same one.
+      #
+      # Retried, because the deploy is three API calls in a trench coat —
+      # upload the assets, upload the Worker, set the triggers — and the last
+      # one has flaked twice on a Cloudflare-side error that says nothing about
+      # this repository:
+      #
+      #     No targets deployed for dougmcarthur-dashboard
+      #     ✘ [ERROR] Some triggers failed to deploy:
+      #         - Received a malformed response from the API
+      #
+      # That is the API returning something wrangler cannot parse, usually an
+      # HTML block or error page rather than JSON. It is worth knowing where in
+      # the sequence it lands: the Worker is already live by then, so the red X
+      # meant "deployed, cron schedule possibly not updated" rather than
+      # "nothing shipped". Re-running by hand fixed it both times, which is all
+      # this loop does — the whole command is idempotent, since re-uploading
+      # the same bundle and re-sending the same cron list converges on the same
+      # state.
       - name: Deploy to Cloudflare
-        run: npx wrangler deploy
+        run: |
+          for attempt in 1 2 3; do
+            if npx wrangler deploy; then exit 0; fi
+            echo "::warning::wrangler deploy failed (attempt $attempt)"
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 20)); fi
+          done
+          exit 1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # What is actually serving traffic, asked of Cloudflare rather than
+      # inferred from an exit code. Cheap, and it turns the run log into a
+      # record of which version each commit put live.
+      #
+      # There is no HTTP smoke test here on purpose. Cloudflare Access sits in
+      # front of dashboard.dougmcarthur.net, so an unauthenticated request from
+      # a runner gets the Access login redirect and never reaches the Worker —
+      # a check that can only ever see the front door would prove nothing while
+      # adding a way for a green deploy to go red.
+      - name: Confirm what is live
+        run: npx wrangler deployments status
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
