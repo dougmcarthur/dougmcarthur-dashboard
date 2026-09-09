@@ -444,6 +444,23 @@ Encoding is not `encodeURIComponent` alone: it leaves `!'()*` alone, which some
 clients read as delimiters and truncate on, and it writes a newline as `%0A`
 where the RFC wants `%0D%0A`.
 
+**The two handlers are judged separately**, which is the whole reason both are
+offered: measured on real pitch prose, `mailto` runs out at about **190 words**
+and Gmail carries roughly 450. A 200-word pitch therefore gets Copy and Gmail,
+with mailto hidden and named. Encoding costs about 1.45×, mostly newlines
+tripling.
+
+So `sync-pitch-research` is told to write **150 words**, and the reason given
+to it is the editorial one rather than the technical one: a cold pitch to a
+music supervisor is competing with a hundred others and the short one gets
+read. "Our URL encoder has a limit" is a bad reason to shorten a pitch and
+"supervisors do not read four paragraphs" is a good one, and they happen to
+land in the same place. The tool result feeds the word count back when a draft
+runs long, so the agent can correct on the *next* target in the same run rather
+than only on the next run. It is guidance, never a refusal — a hard reject at
+the API would let a URL encoding limit veto editorial judgement, and lose the
+draft on the way.
+
 **The app drafts an application; it never submits one.** Phase 3 reads the
 form, stages an answer per field from the artist database and lists what has to
 be attached — and then stops, because an application filed by automation is a

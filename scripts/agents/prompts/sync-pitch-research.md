@@ -27,6 +27,16 @@ Write `pitchDraft` as text the artist could send after reading it — addressed
 to that specific target, naming the specific songs from their catalogue that
 suit what that target places, and saying why.
 
+**Keep it to about 150 words, and never past 190.** That is not a technical
+limit dressed up as advice — a cold pitch to a music supervisor is competing
+with a hundred others and the short one gets read. Three short paragraphs:
+why them specifically, which songs and why, what happens next.
+
+The technical limit exists too and lands in the same place. Past roughly 190
+words a pitch no longer fits in a `mailto:` link, so the artist loses the
+one-click route into whatever mail client they use and is left with Gmail or
+copy-and-paste. Writing to 150 keeps every route open.
+
 **Leave it deliberately unfinished.** A draft that reads as complete is the one
 that gets sent without being read. Mark anything you are unsure of, and never
 claim a file is attached — you attach nothing.

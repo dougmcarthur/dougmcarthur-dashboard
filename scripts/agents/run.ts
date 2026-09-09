@@ -153,7 +153,11 @@ function toolsFor(agent: AgentId, cfg: ApiConfig, counter: { added: number }) {
     run: async (input) => {
       const result = await createSyncTarget(cfg, { ...input })
       if (result.created) counter.added++
-      return JSON.stringify(result)
+      // The length goes back to the agent rather than only into a prompt it
+      // read once at the start. A note it can act on for the *next* target in
+      // the same run beats a rule it has already drifted from — and the
+      // number is concrete where "keep it short" is not.
+      return JSON.stringify({ ...result, ...pitchLengthNote(input.pitchDraft) })
     },
   })
 
@@ -184,6 +188,26 @@ function toolsFor(agent: AgentId, cfg: ApiConfig, counter: { added: number }) {
       return [WEB_SEARCH, referenceDocs, existingSync, addSync]
     case 'monthly-promo-checkin':
       return [referenceDocs, existingGigs, existingSync, addPromo]
+  }
+}
+
+/**
+ * What to tell the agent about a pitch it just filed.
+ *
+ * Past roughly 190 words a pitch no longer fits in a `mailto:` link, so the
+ * artist loses the one-click route into whatever mail client they use. That
+ * is the lesser reason. The greater one is that a cold pitch competing with a
+ * hundred others gets read when it is short — see shared/mailto.ts for where
+ * the number comes from, and the prompt for why 150 rather than 190.
+ */
+function pitchLengthNote(pitch: string | undefined): { note?: string } {
+  if (!pitch) return {}
+  const words = pitch.trim().split(/\s+/).length
+  if (words <= 190) return {}
+  return {
+    note:
+      `This pitch is ${words} words. Past about 190 it no longer fits a mailto: link, ` +
+      `so the artist loses the one-click route into their mail client. Aim for 150 on the next one.`,
   }
 }
 
