@@ -225,7 +225,7 @@ async function main(): Promise<void> {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set')
 
   const cfg: ApiConfig = {
-    baseUrl: (process.env.SCOUT_API_URL ?? 'https://dashboard.dougmcarthur.net').replace(/\/$/, ''),
+    baseUrl: (process.env.SCOUT_API_URL ?? 'https://scout.sundogsmusic.ca').replace(/\/$/, ''),
     token,
     apply,
   }
