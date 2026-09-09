@@ -328,3 +328,15 @@ describe('the notes backfill router', () => {
     expect(res.status).not.toBe(404)
   })
 })
+
+describe('the artist freshness filter', () => {
+  // Validated against the same list the health states come from, before any
+  // database work, so it is reachable with no binding.
+  it('rejects a freshness the app does not have', async () => {
+    const res = await app.request('/api/artist?freshness=stale', {}, emptyEnv)
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: string; allowed: string[] }
+    expect(body.error).toContain('stale')
+    expect(body.allowed).toContain('unreviewed')
+  })
+})

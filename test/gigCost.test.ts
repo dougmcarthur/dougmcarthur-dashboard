@@ -207,15 +207,38 @@ describe('estimateGigCost', () => {
   })
 
   it('does not count a missing nights as zero nights', () => {
-    // Zero nights is a real answer some rows genuinely have. Null is not, and
-    // an estimate that quietly treats it as zero reports a cheap gig.
+    // The original concern, and it still holds: null must not quietly become
+    // a day trip. What changed is the alternative — a band's usual span,
+    // marked as guessed, rather than a gap where the lodging should be. All
+    // 34 production rows had a null here, so the gap was every row.
     const e = estimateGigCost(gig({ country: 'CA', travelBand: 'regional', nights: null }))
-    expect(e.lines.map((l) => l.id)).toEqual(['travel'])
-    expect(e.unknowns.join(' ')).toMatch(/Nights away is not set/)
+    expect(e.lines.map((l) => l.id)).toEqual(['travel', 'lodging', 'per_diem'])
+    expect(e.lines.find((l) => l.id === 'lodging')!.inferred).toBe(true)
+    expect(e.lines.find((l) => l.id === 'per_diem')!.inferred).toBe(true)
+    // Regional is 1–2 nights, so the low end is not a day trip.
+    expect(e.lines.find((l) => l.id === 'lodging')!.amount.low).toBeGreaterThan(0)
+    expect(e.anyInferred).toBe(true)
 
     const zero = estimateGigCost(gig({ country: 'CA', travelBand: 'regional', nights: 0 }))
+    // Stated wins, is exact, and is not marked as a guess.
     expect(zero.lines.map((l) => l.id)).toEqual(['travel', 'per_diem'])
+    expect(zero.lines.find((l) => l.id === 'per_diem')!.inferred).toBe(false)
     expect(zero.unknowns).toEqual([])
+  })
+
+  it('still reports a gap when there is no band to guess the nights from', () => {
+    const e = estimateGigCost(gig({ nights: null }))
+    expect(e.lines).toEqual([])
+    expect(e.unknowns.join(' ')).toMatch(/no travel band to guess it from/i)
+  })
+
+  it('widens the total rather than moving it when the nights are guessed', () => {
+    const guessed = estimateGigCost(gig({ country: 'CA', travelBand: 'drive', nights: null }))
+    const stated = estimateGigCost(gig({ country: 'CA', travelBand: 'drive', nights: 0 }))
+    // Drive is 0–1 nights, so the guess reaches down to the day trip and up
+    // past it. A span that only moved the number would be a different claim.
+    expect(guessed.net.low).toBe(stated.net.low)
+    expect(guessed.net.high).toBeGreaterThan(stated.net.high)
   })
 
   it('marks a band it had to guess', () => {

@@ -327,7 +327,14 @@ what a trip costs and stops there. It returns no `value`, no `efficiency` and
 no blended score, because the swing weights that would produce one have not
 been elicited and inventing them is worse than not having them — and because a
 single number is how you apply to something that scored 78 without noticing it
-costs $4,000. Two rules the module holds throughout: every figure is a
+costs $4,000.
+
+Nights are the one input inferred as a *range*: `NIGHTS_BY_BAND` gives a drive
+0–1 and an international 3–5, so a row nobody has edited still costs its
+lodging instead of reporting a gap — which was all 34 of them. That is not the
+silent default the module refuses; a guessed span widens the total rather than
+moving it, and it is marked inferred like every other guess. A stated `nights`
+still wins and is still exact. Two rules the module holds throughout: every figure is a
 **range**, since `$1,847` is a lie with a decimal place; and **a missing input
 is never a zero** — no `nights` leaves lodging out of the sum and names it in
 `unknowns` rather than becoming a day trip. A band nobody set is inferred from
@@ -416,6 +423,22 @@ are only rewritten inside sentences that named him, or "his deadline" in a
 sentence about an organiser becomes yours; and drafted field *values* are
 exempt, because "Contact Name: Doug McArthur" is the answer that goes on the
 form, not the app talking.
+
+**A bulk write previews first, and the shell that does it is shared.**
+`Disclosure` in `components/ui/` is the closed-row → open → preview → apply
+shape, extracted when the second copy appeared rather than the fourteenth.
+Both users write across every row of a table, and a bulk write you cannot look
+at first is one you find out about afterwards, so the shell makes the preview
+the path of least resistance for the next one. `test/uiConsistency.test.ts`
+fails if a third panel hand-rolls it, or if one calls its write endpoint
+before its preview.
+
+**A count you cannot reach is a number, not a signal.** The Artist page's
+"overdue" and "never reviewed" tallies are filters, because one sourcing run
+puts twenty-two assets in the second bucket and finding them meant scrolling
+the library for a grey badge. `GET /api/artist?freshness=` refuses a value it
+does not know rather than quietly showing everything — a filter that ignores
+you is how you conclude the library is fine.
 
 **Buttons and inputs come from `components/ui/`.** `Button` takes a variant
 named for meaning (`primary`, `neutral`, `quiet`, `good`, `danger`, `info`),

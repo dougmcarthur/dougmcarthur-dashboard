@@ -58,6 +58,26 @@ export const LODGING_TIERS: Record<LodgingTier, { label: string; perNight: CostR
 export const PER_DIEM: CostRange = { low: 55, high: 95 }
 
 /**
+ * How many nights a trip of each band usually takes, when nobody has said.
+ *
+ * A **range**, not a number, and that is what makes this honest rather than
+ * the silent default the module refuses everywhere else. Guessing "1 night"
+ * for a drive would decide between a day trip to Gimli and an overnight to
+ * Thunder Bay by picking one; `0–1` says the estimate does not know which,
+ * and the arithmetic already carries that all the way to the total.
+ *
+ * `nights` stated on the row still wins and is still exact. This only stops
+ * every row that has never been edited from reporting a travel-only cost with
+ * a gap where the lodging should be — which was all 34 of them.
+ */
+export const NIGHTS_BY_BAND: Record<TravelBand, { low: number; high: number }> = {
+  drive: { low: 0, high: 1 },
+  regional: { low: 1, high: 2 },
+  transcontinental: { low: 2, high: 3 },
+  international: { low: 3, high: 5 },
+}
+
+/**
  * The rate is why a US figure is a range even where the fee is fixed. Wide
  * enough to cover an ordinary year and narrow enough to be worth having; it
  * is a constant so that revising it is one edit rather than a search.
@@ -113,6 +133,12 @@ const less = (cost: CostRange, income: CostRange): CostRange => ({
 const scale = (r: CostRange, by: CostRange): CostRange => ({ low: r.low * by.low, high: r.high * by.high })
 
 const flat = (n: number): CostRange => ({ low: n, high: n })
+
+/** "2 nights", or "1\u20132 nights" where the span is a guess. */
+function describeNights(span: { low: number; high: number }, unit = 'night'): string {
+  const n = span.low === span.high ? `${span.low}` : `${span.low}\u2013${span.high}`
+  return `${n} ${unit}${span.low === 1 && span.high === 1 ? '' : 's'}`
+}
 
 const round = (r: CostRange): CostRange => ({ low: Math.round(r.low), high: Math.round(r.high) })
 
@@ -386,27 +412,42 @@ export function estimateGigCost(row: CostRow): CostEstimate {
     unknowns.push('No travel band, and nothing in the location to guess one from.')
   }
 
-  const nights = typeof row.nights === 'number' && row.nights >= 0 ? row.nights : null
+  const statedNights = typeof row.nights === 'number' && row.nights >= 0 ? row.nights : null
+  // Stated wins and is exact. Otherwise the band's usual span, as a range —
+  // see NIGHTS_BY_BAND for why a range rather than a number.
+  const nights: { low: number; high: number } | null =
+    statedNights !== null
+      ? { low: statedNights, high: statedNights }
+      : band
+      ? NIGHTS_BY_BAND[band]
+      : null
+  const nightsInferred = statedNights === null
+
   if (nights === null) {
-    unknowns.push('Nights away is not set, so lodging and per diem are not counted.')
-  } else if (nights > 0) {
+    unknowns.push('Nights away is not set, and there is no travel band to guess it from.')
+  } else if (nights.high > 0) {
     const statedTier = lodgingTierOf(row.lodgingTier)
     const tier = statedTier ?? inferLodgingTier(row.location, band)
     lines.push({
       id: 'lodging',
-      label: `${LODGING_TIERS[tier].label}, ${nights} night${nights === 1 ? '' : 's'}`,
-      amount: scale(LODGING_TIERS[tier].perNight, flat(nights)),
-      inferred: statedTier === null,
+      label: `${LODGING_TIERS[tier].label}, ${describeNights(nights)}`,
+      // The low end takes the fewest nights and the high end the most, so a
+      // guessed span widens the total rather than moving it.
+      amount: {
+        low: LODGING_TIERS[tier].perNight.low * nights.low,
+        high: LODGING_TIERS[tier].perNight.high * nights.high,
+      },
+      inferred: statedTier === null || nightsInferred,
     })
   }
 
   if (nights !== null) {
-    const days = nights + 1
+    const days = { low: nights.low + 1, high: nights.high + 1 }
     lines.push({
       id: 'per_diem',
-      label: `Food and ground, ${days} day${days === 1 ? '' : 's'}`,
-      amount: scale(PER_DIEM, flat(days)),
-      inferred: false,
+      label: `Food and ground, ${describeNights(days, 'day')}`,
+      amount: { low: PER_DIEM.low * days.low, high: PER_DIEM.high * days.high },
+      inferred: nightsInferred,
     })
   }
 

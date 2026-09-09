@@ -13,6 +13,7 @@ import {
   pickForLength,
   type ArtistAsset,
   type EpkAudience,
+  type Freshness,
 } from '../../shared/artistAssets'
 import { classifyQuestion, kindByKey, targetLength } from '../../shared/questionKinds'
 import { extractAll, type AssetProposal } from '../../shared/artistSource'
@@ -21,6 +22,7 @@ import type { Env } from '../types'
 const artist = new Hono<{ Bindings: Env }>()
 
 const AUDIENCES: EpkAudience[] = ['festival', 'sync', 'press']
+const FRESHNESS: Freshness[] = ['fresh', 'due_soon', 'overdue', 'unreviewed']
 
 const AssetSchema = z.object({
   kind: z.string().min(1),
@@ -56,6 +58,15 @@ function measure(value: string | null | undefined): number | null {
 }
 
 artist.get('/', async (c) => {
+  // Validated before any database work, so a bad filter costs a round trip
+  // rather than a query. Refused rather than ignored: a filter that silently
+  // shows everything when you ask for something it does not have is how you
+  // conclude the library is fine.
+  const freshness = c.req.query('freshness')
+  if (freshness && !FRESHNESS.includes(freshness as Freshness)) {
+    return c.json({ error: `Unknown freshness "${freshness}".`, allowed: FRESHNESS }, 400)
+  }
+
   const db = getDb(c.env.DB)
   const today = todayOf(c)
   const kind = c.req.query('kind')
@@ -65,7 +76,14 @@ artist.get('/', async (c) => {
     .from(artistAssets)
     .orderBy(asc(artistAssets.sortOrder), asc(artistAssets.label))) as ArtistAsset[]
 
-  const filtered = kind ? rows.filter((r) => normaliseAssetKind(r.kind) === normaliseAssetKind(kind)) : rows
+  // Freshness filters alongside the kind filter, because the counts below
+  // used to be a number you could read and not reach. Twenty-two assets
+  // landed `unreviewed` in one sourcing run, and finding them meant scrolling
+  // the library looking for a grey badge.
+  const byKind = kind ? rows.filter((r) => normaliseAssetKind(r.kind) === normaliseAssetKind(kind)) : rows
+  const filtered = freshness
+    ? byKind.filter((r) => !r.archived && assetHealth(r, today).freshness === freshness)
+    : byKind
 
   return c.json({
     items: filtered.map((r) => ({ ...r, health: assetHealth(r, today) })),

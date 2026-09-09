@@ -223,3 +223,32 @@ describe('the reply draft offers to copy, never to send', () => {
     expect(src).toContain('draft.approximate')
   })
 })
+
+describe('a panel that writes in bulk previews first', () => {
+  // Two of these were written hours apart and came out the same shape line
+  // for line. `Disclosure` is that shape, extracted at two copies rather than
+  // at fourteen — which is where `Button` got extracted from.
+  const BULK = [
+    'frontend/src/pages/artist/SourcePanel.tsx',
+    'frontend/src/components/NotesBackfillCard.tsx',
+  ]
+
+  it('uses the shared shell rather than a third hand-rolled one', () => {
+    for (const file of BULK) {
+      expect(readFileSync(file, 'utf8'), file).toContain('<Disclosure')
+    }
+  })
+
+  it('reads a preview before it can call the writing one', () => {
+    // The property the shell exists to keep: a bulk write you cannot look at
+    // first is one you find out about afterwards.
+    for (const file of BULK) {
+      const src = readFileSync(file, 'utf8')
+      const preview = src.search(/\.(?:preview|sourcePreview)\(\)/)
+      const write = src.search(/\.(?:apply|source)\(\)/)
+      expect(preview, file).toBeGreaterThan(-1)
+      expect(write, file).toBeGreaterThan(-1)
+      expect(preview, file).toBeLessThan(write)
+    }
+  })
+})
