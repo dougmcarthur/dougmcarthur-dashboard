@@ -329,6 +329,17 @@ been elicited and inventing them is worse than not having them — and because a
 single number is how you apply to something that scored 78 without noticing it
 costs $4,000.
 
+`local` is a band because its absence was not cosmetic. A show at Birds Hill
+Park — where the Winnipeg Folk Festival is held, half an hour out — priced as
+a **regional flight** at $450–850, and one in Winnipeg itself as a $120–400
+drive, because the four bands started at "drive" and the inference had no
+answer for home. Both errors run the same way: they make home-town gigs look
+expensive, for an artist whose stated goal is expanding *beyond* Winnipeg. A
+Manitoba address now bands as a drive at worst whether or not the town is on
+any list — the province is 1,200 km end to end and the far corner is still not
+a flight — and `NIGHTS_BY_BAND` gives `local` 0–0, because nobody books a
+hotel in the city they live in.
+
 Nights are the one input inferred as a *range*: `NIGHTS_BY_BAND` gives a drive
 0–1 and an international 3–5, so a row nobody has edited still costs its
 lodging instead of reporting a gap — which was all 34 of them. That is not the

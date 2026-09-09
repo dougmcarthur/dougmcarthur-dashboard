@@ -51,7 +51,7 @@ const GigInsertSchema = z.object({
   // on read rather than here, so a row POSTed as "Canada" still costs.
   location: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
-  travelBand: z.enum(['drive', 'regional', 'transcontinental', 'international']).nullable().optional(),
+  travelBand: z.enum(['local', 'drive', 'regional', 'transcontinental', 'international']).nullable().optional(),
   lodgingTier: z.enum(['none', 'standard', 'major']).nullable().optional(),
   nights: z.number().int().min(0).nullable().optional(),
   performanceKind: z.enum(['showcase', 'paid']).nullable().optional(),
