@@ -248,8 +248,13 @@ key-based sender can promise.
 
 It stops working the moment somebody else needs mail. An invited artist's
 address is not on the list, and adding each one by hand is a deploy per signup.
-Sending to a *verified destination address* is free on any plan; sending to an
-arbitrary recipient needs **Workers Paid and an onboarded sending domain**.
+
+**The gate is a domain, not a plan.** Sending to a verified destination is free
+on every plan and never touches the quota; sending to an arbitrary recipient
+needs the sending domain onboarded to Email Service, after which any recipient
+works immediately. This account is already on Workers Paid, so there is nothing
+to buy — the whole prerequisite is onboarding `sundogsmusic.ca`, which is also
+what would move the sender off `dougmcarthur.net`.
 
 So that onboarding is a prerequisite of step 4, not of anything before it —
 and the day it lands, the binding stops being the boundary. Whatever replaces

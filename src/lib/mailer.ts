@@ -10,11 +10,19 @@
  * `gmail.readonly` (docs/gmail-setup.md), and re-consenting it for `gmail.send`
  * to deliver one weekly email would widen what a leak costs for no gain.
  *
- * Billing, because it is easy to trip over: sending to an address that is a
- * *verified destination address* on the account is free on every plan and does
- * not touch the monthly quota. Sending to an arbitrary recipient requires
- * Workers Paid. Both the recipient and the sender are settings rather than
- * constants so that switching between those two worlds does not need a deploy.
+ * The gate is a domain, not a plan, which is easy to get backwards. Sending to
+ * a *verified destination address* is free on every plan and never touches the
+ * monthly quota or the daily limit. Sending to an **arbitrary** recipient
+ * needs the sending domain onboarded to Email Service — and once it is, any
+ * recipient works immediately, on the same plan as before. Upgrading buys
+ * nothing here; onboarding the domain buys everything.
+ *
+ * That is what the `allowed_destination_addresses` list in wrangler.toml is
+ * really tracking. It is a genuine boundary while this is one person's app,
+ * and it is the thing that has to go before an invited artist can ever be
+ * mailed a setup code — see docs/multi-tenant-plan.md. Both the recipient and
+ * the sender are settings rather than constants so that crossing that line
+ * does not need a code change.
  */
 
 import type { Env } from '../types'

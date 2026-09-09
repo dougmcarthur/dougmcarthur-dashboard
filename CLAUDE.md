@@ -259,10 +259,15 @@ database, against a **5 GB** free-tier allowance. And per-row gzip, which is
 how a column would actually store it, gets only **1.5×** on these strings
 (22,985 bytes of gig notes → 15,301): 672-byte values are too short for the
 dictionary to pay for itself, and base64-ing the result back into a TEXT
-column gives most of that back. It would also spend CPU on a 10 ms-per-request
-budget to decompress prose that `reviewParse` has to read on every queue
-build. The costs that bind here are **rows read** and **requests**, and
-compression moves neither. Retention is likewise already handled where it
+column gives most of that back. The costs that bind here are **rows read** and
+**requests**, and compression moves neither.
+
+The CPU half of that argument was overstated and is worth correcting rather
+than repeating: this account is on **Workers Paid**, where the limit is 30
+seconds per request by default and configurable to five minutes — not the free
+plan's 10 ms. Decompressing prose on every queue build would be affordable. It
+is still not worth doing, for the size reasons above, which are the ones that
+actually carry the decision. Retention is likewise already handled where it
 churns — `notification_events` and `notification_marks` both prune at 30 days,
 and no other table grows fast enough to have a policy worth writing.
 
