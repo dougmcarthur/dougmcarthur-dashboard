@@ -216,7 +216,10 @@ describe('the reply draft offers to copy, never to send', () => {
   })
 
   it('offers copying instead', () => {
-    expect(src).toContain('navigator.clipboard.writeText')
+    // Copying moved into DraftActions when the sync pitch needed the same
+    // three affordances. The rule did not move: this panel must still put a
+    // copy in reach, it just does it by mounting the shared shell.
+    expect(src).toContain('<DraftActions')
   })
 
   it('quotes the sentence each ask was read from', () => {
@@ -316,5 +319,46 @@ describe('the app is mounted behind the auth gate', () => {
 
   it('wraps App rather than sitting inside it', () => {
     expect(src).toMatch(/<AuthGate>[\s\S]*<App \/>[\s\S]*<\/AuthGate>/)
+  })
+})
+
+/**
+ * The shared draft actions copy and open; they never send.
+ *
+ * `ReplyDraftPanel` and the sync pitch both mount this, so the no-send rule
+ * that each of them used to carry alone now has one place to be broken and
+ * one place to be guarded. A `mailto:` or Gmail compose link is *not* a send —
+ * it opens a window with the person's own Send button in it, which is the same
+ * line this app has always stopped at.
+ */
+describe('the shared draft actions open a compose window, never send one', () => {
+  const src = readFileSync('frontend/src/components/DraftActions.tsx', 'utf8')
+
+  it('has no element that claims to send', () => {
+    const offenders = [
+      ...src.matchAll(/>\s*(Send|Submit)\b[^<]{0,24}</g),
+      ...src.matchAll(/label="\s*(Send|Submit)\b/g),
+    ].map((m) => m[1])
+    expect(offenders).toEqual([])
+  })
+
+  it('keeps copy available unconditionally', () => {
+    // Copy is the fallback that always works. It must never sit behind the
+    // same length test that withholds the compose links, or a long draft
+    // would leave nothing at all to do.
+    expect(src).toContain('navigator.clipboard.writeText')
+    expect(src).toMatch(/<Button[\s\S]{0,220}navigator\.clipboard\.writeText/)
+  })
+
+  it('renders a compose link only when the draft fits', () => {
+    // Over the ceiling a mailto click does nothing — no client, no error.
+    // Rendering the anchor anyway would be a button that lies about working.
+    expect(src).toContain('.filter((link) => link.href)')
+  })
+
+  it('says why a missing handler is missing', () => {
+    // A vanished button reads as a bug. A sentence reads as a fact.
+    expect(src).toContain('tooLong')
+    expect(src).toContain('unavailable')
   })
 })

@@ -379,6 +379,30 @@ differently per audience and reports what is stale or missing inside it. A file
 exported in March cannot tell you its photo credit went missing in April, which
 is the whole reason this is assembled on read.
 
+**A draft can open a compose window, and that is still not sending.**
+`shared/mailto.ts` builds a `mailto:` or Gmail-compose URL from a subject and
+body; `DraftActions` mounts Copy beside them wherever a draft is rendered —
+the reply draft and the sync pitch, which are the same shape and were the
+second copy, so the shell was extracted rather than written twice. A pre-filled
+compose window is not a send: the person's own Send button is still the last
+step, which is the line this app has always stopped at.
+
+The reason it is a module rather than a template is **length, and how it
+fails**. A `mailto:` URL past the platform ceiling does not truncate and does
+not error — on Windows the click does nothing at all. That is the same defect
+as the 150-character field that truncates mid-word on paste, so the length is
+measured *after* encoding and a draft that will not fit is not given a button
+that would lie about working; the screen names the handler and says why
+instead. Budgets are deliberately under the lowest credible figure —
+`mailto` 1,800, Gmail 4,000 — because being conservative costs a Copy button
+and being optimistic costs a click that does nothing. **Copy is never withheld**;
+it is the fallback that always works, and `test/uiConsistency.test.ts` fails if
+it ever sits behind the same length test.
+
+Encoding is not `encodeURIComponent` alone: it leaves `!'()*` alone, which some
+clients read as delimiters and truncate on, and it writes a newline as `%0A`
+where the RFC wants `%0D%0A`.
+
 **The app drafts an application; it never submits one.** Phase 3 reads the
 form, stages an answer per field from the artist database and lists what has to
 be attached — and then stops, because an application filed by automation is a
