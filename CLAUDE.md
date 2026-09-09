@@ -1,8 +1,22 @@
-# Music HQ
+# Sun Dogs Music Scout
 
 Cloudflare Worker (Hono) + D1 + a React/Vite/Tailwind dashboard, for one
 person's gig, sync and promo pipeline. Deployed by GitHub Actions on every push
 to `main`.
+
+**The name is a house mark plus a product name**, and the shape is deliberate:
+*Scout*, by *Sun Dogs Music*. The bare word attracts an aggressive rights
+holder — Scouting America litigates on a dilution theory, including against
+businesses in unrelated trades — so the product is never branded on "Scout"
+standing alone. Say Scout, write Sun Dogs Music Scout. "Music Scout" is
+avoided on purpose: in the trade that phrase means an A&R person who scouts
+*talent*, which is the reverse of what this does.
+
+Infrastructure identifiers still carry the old name — the D1 database is
+`dougmcarthur-music-hq` and the Worker is `dougmcarthur-dashboard`. Neither is
+user-visible and neither can be renamed by editing a string: a D1 rename is a
+data migration, and a Worker rename is a new Worker with its domains and
+secrets re-attached. They stay until there is a reason worth that.
 
 ## Database changes go through wrangler migrations, applied by CI
 

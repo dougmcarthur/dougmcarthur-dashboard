@@ -76,8 +76,9 @@ const auth = new Hono<{ Bindings: Env }>()
  * offering to replace it, which is how a keychain ends up with four entries
  * for one site.
  */
-const USER_ID = utf8Bytes('music-hq-owner')
-const USER_NAME = 'Music HQ'
+const USER_ID = utf8Bytes('sundogs-scout-owner')
+/** Shown in the operating system's passkey prompt, so it is the full name. */
+const USER_NAME = 'Sun Dogs Music Scout'
 
 function rp(c: { env: Env; req: { url: string } }) {
   return relyingParty({ dashboardUrl: c.env.DASHBOARD_URL, requestUrl: c.req.url })
@@ -259,14 +260,14 @@ auth.post('/enrol/request', async (c) => {
   await sendMail(c.env, {
     to,
     from: c.env.AUTH_EMAIL_SENDER ?? 'login@dougmcarthur.net',
-    subject: `Music HQ — passkey setup code ${issued.code}`,
+    subject: `Scout — passkey setup code ${issued.code}`,
     text:
-      `Your Music HQ passkey setup code is ${issued.code}.\n\n` +
+      `Your Scout passkey setup code is ${issued.code}.\n\n` +
       `It is good for ${ENROLMENT_CODE_TTL_MINUTES} minutes and lets you add one passkey.\n\n` +
       `If you did not ask for this, you can ignore it — the code does nothing on its own, ` +
       `and adding a passkey still needs your device to approve it.\n`,
     html:
-      `<p>Your Music HQ passkey setup code is <strong style="font-size:1.4em;letter-spacing:.1em">${issued.code}</strong></p>` +
+      `<p>Your Scout passkey setup code is <strong style="font-size:1.4em;letter-spacing:.1em">${issued.code}</strong></p>` +
       `<p>It is good for ${ENROLMENT_CODE_TTL_MINUTES} minutes and lets you add one passkey.</p>` +
       `<p>If you did not ask for this, you can ignore it — the code does nothing on its own, ` +
       `and adding a passkey still needs your device to approve it.</p>`,

@@ -222,7 +222,7 @@ export function renderHtml(digest: Digest, base: string): string {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
-<title>Music HQ</title>
+<title>Sun Dogs Music Scout</title>
 </head>
 <body style="margin:0;padding:0;background-color:${GROUND};">
 ${preheader(digest)}
@@ -232,7 +232,7 @@ ${preheader(digest)}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="width:100%;max-width:600px;border-collapse:collapse;">
 
       <tr><td style="padding:0 4px 18px 4px;">
-        <div style="${type(11, 700, 14, MUTED)}letter-spacing:0.1em;text-transform:uppercase;">Music HQ</div>
+        <div style="${type(11, 700, 14, MUTED)}letter-spacing:0.1em;text-transform:uppercase;">Sun Dogs Music Scout</div>
         <div style="${type(24, 700, 30, INK)}padding:6px 0 0 0;">${escape(subjectFor(digest))}</div>
         <div style="${type(14, 400, 20, BODY)}padding:4px 0 0 0;">The five worth your time, and what is behind them.</div>
       </td></tr>

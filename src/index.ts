@@ -177,7 +177,7 @@ async function runDigest(env: Env): Promise<void> {
     await sendMail(env, {
       to: settings.recipient,
       from: settings.sender,
-      subject: `Music HQ — ${subject}`,
+      subject: `Scout — ${subject}`,
       text,
       html,
     })

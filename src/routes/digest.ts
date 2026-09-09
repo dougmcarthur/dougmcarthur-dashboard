@@ -119,7 +119,7 @@ digest.post('/send', async (c) => {
   const result = await sendMail(c.env, {
     to: settings.recipient,
     from: settings.sender,
-    subject: `Music HQ — ${subject}`,
+    subject: `Scout — ${subject}`,
     text,
     html,
   })
