@@ -33,6 +33,11 @@ export type Env = {
    * unset is the way this change breaks something quietly.
    */
   API_TOKEN?: string
+  /**
+   * Encrypts the Google refresh token in `google_grants`. A Worker secret, so
+   * a copy of the database is not a working Gmail credential.
+   */
+  TOKEN_ENCRYPTION_KEY?: string
 }
 
 /**

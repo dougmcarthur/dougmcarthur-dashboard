@@ -240,6 +240,7 @@ describe('a panel that writes in bulk previews first', () => {
   const BULK = [
     'frontend/src/pages/artist/SourcePanel.tsx',
     'frontend/src/components/NotesBackfillCard.tsx',
+    'frontend/src/components/GmailDraftsPanel.tsx',
   ]
 
   it('uses the shared shell rather than a third hand-rolled one', () => {

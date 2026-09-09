@@ -8,6 +8,7 @@ import { ReconcilePanel } from '../components/ReconcilePanel'
 import { FIELD, FILTER } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { DraftActions } from '../components/DraftActions'
+import { GmailDraftsPanel } from '../components/GmailDraftsPanel'
 
 const SYNC_STATUSES: SyncStatus[] = ['draft_ready', 'pitched', 'confirmed', 'declined', 'archived']
 
@@ -302,6 +303,10 @@ export function SyncPage() {
 
       {showReconcile && <ReconcilePanel onClose={() => setShowReconcile(false)} />}
       {showCreate && <CreateSyncForm onDone={() => setShowCreate(false)} />}
+
+      {/* Above the list, because it acts on all of it. Closed until asked,
+          like every other bulk write in the app. */}
+      <GmailDraftsPanel />
 
       {isLoading ? (
         <SkeletonList rows={5} />

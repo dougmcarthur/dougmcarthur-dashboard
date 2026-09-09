@@ -379,6 +379,47 @@ differently per audience and reports what is stale or missing inside it. A file
 exported in March cannot tell you its photo credit went missing in April, which
 is the whole reason this is assembled on read.
 
+**Gmail drafting is a grant the person makes, not a secret somebody pasted.**
+Every Google token before this one was obtained at a terminal and stored with
+`wrangler secret put`. That cannot work for a feature where the *user* decides
+whether to connect: consent happens in their browser and what comes back has
+to be written at runtime. Secrets cannot be written at runtime, so migration
+0019 adds `google_grants` — keyed by **purpose**, so revoking drafting cannot
+also blind the read-only reply matcher.
+
+**The scope is wider than this repo's habit, knowingly.** Gmail's narrowest
+scope that creates a draft is `gmail.compose`, and it also permits *sending*;
+there is no drafts-only option. So the guarantee that nothing goes out on its
+own stops being enforced by Google and starts being enforced here — by there
+being no send call in `src/lib/googleGrant.ts` and by
+`test/uiConsistency.test.ts` failing if a Send button appears. The connect
+screen says exactly that, in those words, because a permission that protects
+less than the reader assumes is the kind of thing to write down rather than
+imply.
+
+The refresh token is **AES-GCM encrypted** with `TOKEN_ENCRYPTION_KEY`. It is
+the only value in D1 that is a credential somewhere else; everything else in
+there is prose.
+
+Three properties the route keeps:
+
+- **It previews first**, like the other two bulk writes, and the interesting
+  half of the preview is the **skipped** list. "Drafted four of seven" without
+  saying which three is a worse answer than not drafting, and the three
+  reasons — no address, no pitch, already pitched — each want something
+  different done about them.
+- **It re-plans server-side** rather than trusting the ids the screen sends. A
+  preview can be minutes old, and a target pitched in the meantime must not be
+  drafted because a stale screen still listed it.
+- **It writes no status.** A draft in your drafts folder is not a pitch that
+  went out, so nothing moves to `pitched` here. Same separation the reply
+  router keeps, for the same reason: two things that can be wrong
+  independently should be two actions.
+
+`prompt=consent` and `access_type=offline` are set explicitly rather than left
+to default, because Google returns a refresh token only on a fresh consent —
+without them the grant appears to work and stops an hour later.
+
 **A draft can open a compose window, and that is still not sending.**
 `shared/mailto.ts` builds a `mailto:` or Gmail-compose URL from a subject and
 body; `DraftActions` mounts Copy beside them wherever a draft is rendered —

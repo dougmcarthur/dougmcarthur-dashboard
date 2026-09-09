@@ -353,6 +353,24 @@ export const authEnrolmentCodes = sqliteTable('auth_enrolment_codes', {
   createdAt: text('created_at').notNull(),
 })
 
+/**
+ * A Google authorisation granted in the browser. See migration 0019 and
+ * src/lib/googleGrant.ts.
+ *
+ * Keyed by purpose rather than by scope string, so revoking the ability to
+ * write drafts cannot also blind the read-only reply matcher.
+ */
+export const googleGrants = sqliteTable('google_grants', {
+  purpose: text('purpose').primaryKey(),
+  /** AES-GCM, key from a Worker secret. The one credential in this database. */
+  refreshToken: text('refresh_token').notNull(),
+  accountEmail: text('account_email'),
+  /** Verbatim from Google — it may grant less than was asked for. */
+  scopes: text('scopes').notNull(),
+  grantedAt: text('granted_at').notNull(),
+  lastUsedAt: text('last_used_at'),
+})
+
 export type GigOpportunity = typeof gigOpportunities.$inferSelect
 export type SyncTarget = typeof syncTargets.$inferSelect
 export type PromoDraft = typeof promoDrafts.$inferSelect
@@ -370,3 +388,4 @@ export type NotificationEvent = typeof notificationEvents.$inferSelect
 export type PasskeyCredentialRow = typeof passkeyCredentials.$inferSelect
 export type AuthSessionRow = typeof authSessions.$inferSelect
 export type AuthEnrolmentCodeRow = typeof authEnrolmentCodes.$inferSelect
+export type GoogleGrantRow = typeof googleGrants.$inferSelect

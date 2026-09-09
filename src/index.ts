@@ -19,6 +19,7 @@ import syncReconcile from './routes/syncReconcile'
 import replies, { runReplyScan } from './routes/replies'
 import backfill, { runNotesBackfillOnce } from './routes/backfill'
 import auth from './routes/auth'
+import gmailDrafts from './routes/gmailDrafts'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
 import { isDigestDue } from '../shared/digestSchedule'
 import { sendMail, mailerConfigured } from './lib/mailer'
@@ -103,6 +104,7 @@ app.use('/api/*', async (c, next) => {
 })
 
 app.route('/api/auth', auth)
+app.route('/api/gmail', gmailDrafts)
 app.route('/api/overview', overview)
 app.route('/api/review', review)
 // NOTE: before '/api/gigs', for the same reason the reconcile router is

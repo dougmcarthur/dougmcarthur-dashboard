@@ -386,6 +386,31 @@ export interface PasskeySummary {
   current: boolean
 }
 
+
+/** A Google authorisation granted in the browser. See src/lib/googleGrant.ts. */
+export interface GmailGrant {
+  connected: boolean
+  accountEmail: string | null
+  grantedAt: string | null
+  lastUsedAt: string | null
+  /** False when Google handed back less than was asked for. */
+  canDraft: boolean
+  /** Whether the deployment can offer this at all. */
+  configured: boolean
+}
+
+export interface GmailDraftPlan {
+  ready: Array<{ id: number; name: string; to: string; subject: string; body: string }>
+  skipped: Array<{ id: number; name: string; reason: string }>
+  grant: GmailGrant
+}
+
+export interface GmailDraftResult {
+  created: Array<{ id: number; name: string; draftId: string }>
+  failed: Array<{ id: number; name: string; error: string }>
+  skipped: Array<{ id: number; name: string; reason: string }>
+}
+
 export const api = {
   auth: {
     session: () => apiFetch<SessionState>('/auth/session'),
@@ -419,6 +444,22 @@ export const api = {
       apiFetch<{ ok: boolean; remaining: number }>(`/auth/passkeys/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }),
+  },
+  /**
+   * Gmail drafting. Connecting is a browser navigation rather than a fetch —
+   * it ends at Google's consent screen, which is not something an XHR can
+   * show you.
+   */
+  gmail: {
+    status: () => apiFetch<GmailGrant>('/gmail/status'),
+    preview: () => apiFetch<GmailDraftPlan>('/gmail/drafts'),
+    apply: (ids?: number[]) =>
+      apiFetch<GmailDraftResult>('/gmail/drafts', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      }),
+    disconnect: () => apiFetch<{ ok: boolean }>('/gmail/disconnect', { method: 'POST' }),
+    connectHref: '/api/gmail/connect',
   },
   overview: () => apiFetch<Overview>('/overview'),
   review: (params?: { filter?: ReviewFilter; limit?: number }) => {

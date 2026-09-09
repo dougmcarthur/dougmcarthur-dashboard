@@ -743,6 +743,18 @@ optional variable:
 | `ANTHROPIC_API_KEY` | Runs the agents' model calls |
 | `SCOUT_API_TOKEN` | The same value as the Worker's `API_TOKEN` secret — the bearer the middleware checks |
 
+Gmail drafting (Settings → Sync → *Pitch drafts to Gmail*) needs one Worker
+secret and one thing registered with Google:
+
+| Worker secret | Value |
+| --- | --- |
+| `TOKEN_ENCRYPTION_KEY` | Any long random string. Encrypts the stored Google refresh token. |
+
+In Google Cloud → APIs & Services → Credentials, add
+`https://<your host>/api/gmail/callback` as an authorised redirect URI on the
+same OAuth client the Calendar and Gmail integrations already use. Register
+one per hostname the app is served from.
+
 | Variable | Value |
 | --- | --- |
 | `SCOUT_API_URL` | The app's origin. Set it when the app moves to its own hostname; the script defaults to the current one. |
