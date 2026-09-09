@@ -303,6 +303,56 @@ export const appSettings = sqliteTable('app_settings', {
   updatedAt: text('updated_at').notNull(),
 })
 
+/**
+ * Passkey login. See migration 0017 and docs/passkey-login.md.
+ *
+ * Single-user by design, so there is no `users` table: a registered
+ * authenticator *is* the account, and the three tables below hold the three
+ * lifetimes involved — a credential until it is revoked, a session for weeks,
+ * a challenge for one round trip.
+ */
+export const passkeyCredentials = sqliteTable('passkey_credentials', {
+  /** base64url credential ID, as an assertion names it. */
+  id: text('id').primaryKey(),
+  /** base64url COSE public key — the only thing about the authenticator that is trusted. */
+  publicKey: text('public_key').notNull(),
+  counter: integer('counter').notNull().default(0),
+  /** JSON array of transport hints. A UI hint for the next login, never a claim. */
+  transports: text('transports'),
+  deviceType: text('device_type'),
+  backedUp: integer('backed_up').notNull().default(0),
+  label: text('label').notNull(),
+  createdAt: text('created_at').notNull(),
+  lastUsedAt: text('last_used_at'),
+})
+
+export const authChallenges = sqliteTable('auth_challenges', {
+  id: text('id').primaryKey(),
+  challenge: text('challenge').notNull(),
+  purpose: text('purpose').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
+export const authSessions = sqliteTable('auth_sessions', {
+  /** SHA-256 of the cookie value. The cookie itself is never stored. */
+  id: text('id').primaryKey(),
+  credentialId: text('credential_id'),
+  label: text('label'),
+  createdAt: text('created_at').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
+  expiresAt: text('expires_at').notNull(),
+})
+
+export const authEnrolmentCodes = sqliteTable('auth_enrolment_codes', {
+  id: text('id').primaryKey(),
+  codeHash: text('code_hash').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  expiresAt: text('expires_at').notNull(),
+  usedAt: text('used_at'),
+  createdAt: text('created_at').notNull(),
+})
+
 export type GigOpportunity = typeof gigOpportunities.$inferSelect
 export type SyncTarget = typeof syncTargets.$inferSelect
 export type PromoDraft = typeof promoDrafts.$inferSelect
@@ -317,3 +367,6 @@ export type DigestReport = typeof digestReports.$inferSelect
 export type AppSetting = typeof appSettings.$inferSelect
 export type NotificationMark = typeof notificationMarks.$inferSelect
 export type NotificationEvent = typeof notificationEvents.$inferSelect
+export type PasskeyCredentialRow = typeof passkeyCredentials.$inferSelect
+export type AuthSessionRow = typeof authSessions.$inferSelect
+export type AuthEnrolmentCodeRow = typeof authEnrolmentCodes.$inferSelect

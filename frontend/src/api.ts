@@ -338,19 +338,88 @@ export interface DigestPreview {
   schedule: DigestSchedule
 }
 
+/**
+ * Fired when the Worker says the session is gone.
+ *
+ * Every screen makes its own requests, so the first one to be turned away is
+ * arbitrary — which is why this is an event rather than a return value. The
+ * gate listens once and re-asks who is signed in; without it a session that
+ * expires mid-visit reads as every panel on the page failing separately with
+ * "not signed in".
+ */
+export const UNAUTHENTICATED_EVENT = 'mhq:unauthenticated'
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
+    // The session cookie is same-origin and would be sent anyway; saying so
+    // keeps it working if the API ever moves to its own host.
+    credentials: 'same-origin',
     ...init,
   })
   if (!res.ok) {
+    if (res.status === 401) window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT))
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error((err as { error: string }).error)
   }
   return res.json()
 }
 
+/** Who is signed in, and what the login screen may offer. */
+export interface SessionState {
+  authenticated: boolean
+  label: string | null
+  /** Whether any passkey exists yet. False means set-up, not sign-in. */
+  enrolled: boolean
+  /** Whether an emailed setup code can be sent at all. */
+  recoveryAvailable: boolean
+}
+
+export interface PasskeySummary {
+  id: string
+  label: string
+  createdAt: string
+  lastUsedAt: string | null
+  /** False means losing the device loses the passkey. */
+  backedUp: boolean
+  /** The one this browser signed in with. */
+  current: boolean
+}
+
 export const api = {
+  auth: {
+    session: () => apiFetch<SessionState>('/auth/session'),
+    logout: () => apiFetch<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
+    logoutEverywhere: () => apiFetch<{ ok: boolean }>('/auth/logout-everywhere', { method: 'POST' }),
+    loginOptions: () =>
+      apiFetch<{ ceremony: string; options: Record<string, unknown> }>('/auth/login/options', {
+        method: 'POST',
+      }),
+    loginVerify: (body: { ceremony: string; response: unknown }) =>
+      apiFetch<{ ok: boolean; label: string }>('/auth/login/verify', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    requestCode: () =>
+      apiFetch<{ sent: boolean; to: string; expiresAt: string }>('/auth/enrol/request', {
+        method: 'POST',
+      }),
+    registerOptions: (body: { code?: string }) =>
+      apiFetch<{ ceremony: string; options: Record<string, unknown> }>('/auth/register/options', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    registerVerify: (body: { ceremony: string; response: unknown; code?: string; label?: string }) =>
+      apiFetch<{ ok: boolean; label: string }>('/auth/register/verify', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    passkeys: () => apiFetch<{ items: PasskeySummary[] }>('/auth/passkeys'),
+    revoke: (id: string) =>
+      apiFetch<{ ok: boolean; remaining: number }>(`/auth/passkeys/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
+  },
   overview: () => apiFetch<Overview>('/overview'),
   review: (params?: { filter?: ReviewFilter; limit?: number }) => {
     const qs = params

@@ -6,6 +6,7 @@ import { DigestSettingsCard } from '../components/DigestSettingsCard'
 import { FIELD } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { NotesBackfillCard } from '../components/NotesBackfillCard'
+import { PasskeysCard } from '../components/PasskeysCard'
 
 
 // ── Integration status card ───────────────────────────────────────────────────
@@ -306,7 +307,10 @@ export function SettingsPage() {
           independent panels rather than a document, so a single reading column
           pinned to the left just banks empty pixels on a wide display. */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
-        <AppearanceSettings />
+        <div className="space-y-8 min-w-0">
+          <AppearanceSettings />
+          <PasskeysCard />
+        </div>
         <div className="space-y-8 min-w-0">
           <IntegrationCards />
           <DigestSettingsCard />

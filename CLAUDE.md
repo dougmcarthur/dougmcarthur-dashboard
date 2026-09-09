@@ -98,12 +98,15 @@ date can go stale in the hours between. That cost run 28. CI now runs the suite
 twice, the second time under `TZ=Pacific/Auckland`, so the check CLAUDE.md
 prescribes is no longer one anybody has to remember.
 
-**There is no HTTP smoke test, on purpose.** Cloudflare Access sits in front of
-`dashboard.dougmcarthur.net`, so a request from a runner gets the login
-redirect and never reaches the Worker. A check that can only ever see the front
-door proves nothing and adds a way for a good deploy to go red. `wrangler
-deployments status` is the last step instead: it asks Cloudflare what is
-serving traffic rather than inferring it from an exit code.
+**There is still no HTTP smoke test.** It used to be impossible: Cloudflare
+Access sat in front of `dashboard.dougmcarthur.net`, so a request from a runner
+got the login redirect and never reached the Worker. Since passkey login
+replaced Access the request does reach the Worker — and gets a 401, because
+every `/api` route now needs a credential. So the reason changed and the
+conclusion did not: a check that can only ever see the front door proves
+nothing and adds a way for a good deploy to go red. `wrangler deployments
+status` is the last step instead: it asks Cloudflare what is serving traffic
+rather than inferring it from an exit code.
 
 `wrangler` is at 4.129.1 and `@cloudflare/workers-types` at 5. They move
 together — 4.129 peers on `^5`, so bumping one alone fails to resolve. The
@@ -118,6 +121,49 @@ non-interactive context: yes`. There is no `--yes` flag to fall back on. Check
 that line still appears in the run log after a wrangler bump.
 
 ## Conventions worth knowing before changing things
+
+**The Worker is the security boundary now, and it was not before.** Cloudflare
+Access used to authenticate at the edge — it emailed a six-digit one-time PIN,
+and its login page also offered *Sign in with Cloudflare*, which signed you
+into the Cloudflare **account** and dropped you at `dash.cloudflare.com`
+instead of here. `src/index.ts` had no auth in it at all as a result. Login is
+a WebAuthn passkey now, verified in the Worker, which changes what a mistake
+costs: a route that is not authenticated is public to the internet rather than
+public to whoever Access already trusted. So the check is **one middleware over
+`/api/*` with a written-down exemption list** (`PUBLIC_API_PREFIXES`) rather
+than something each router opts into — a router added tomorrow is covered by
+doing nothing. See `docs/passkey-login.md`.
+
+**Email still sends a code, and the code is not a login.** A passkey lives on a
+device and a device can be lost; D1 is not somewhere you can reset a login from
+and there is no identity provider in front any more, so there has to be a way
+back that does not need hardware you no longer have. The emailed code
+authorises **adding a passkey** — single use, five guesses, fifteen minutes,
+one live at a time — and the session you end up with is the one enrolment
+produced. A code that opened a session directly would be the old Access login
+wearing the new screen's clothes, which is why `test/uiConsistency.test.ts`
+fails if the code reaches a login endpoint or if the button taking it stops
+saying *Add a passkey*.
+
+**The research agents lost their front door and were given a token.** They POST
+and PATCH from outside this repo and outside a browser, so they cannot do a
+passkey ceremony — WebAuthn has no non-interactive mode. `API_TOKEN` as a
+bearer is their credential, checked before the session because it is a string
+compare and the session is a D1 read. Unset, there is no bearer path at all, so
+an empty deployment cannot be opened by guessing the empty string — but unset
+*with Access removed* is also how every agent request silently becomes a 401.
+That ordering is the one dangerous step in the rollout and it is written down
+in `docs/passkey-login.md`.
+
+**`DASHBOARD_URL` stopped being cosmetic.** Its hostname is the WebAuthn
+relying-party ID, which is baked into every credential at registration and
+checked on every assertion — so changing the hostname invalidates every passkey
+already enrolled. It is read from the var rather than from the request because
+a request header is written by whoever is asking; the request URL is only
+consulted when nothing is configured, which in practice means `wrangler dev`.
+`relyingParty` in `shared/auth.ts` is where that decision lives, and local
+development is deliberately two origins, because Vite serves the browser on
+5173 and proxies to wrangler on 8787.
 
 **Statuses say who decided.** `shortlisted`/`passed` are the artist's
 decisions; `invited`/`declined` are the organiser's. The old `approved` and

@@ -44,4 +44,20 @@ allowed_destination_addresses = [
 ]
 
 [vars]
+# Two jobs since passkey login replaced Cloudflare Access: it is the link base
+# in the digest email, and it is the WebAuthn relying party. The second makes
+# it load-bearing — the hostname is baked into every credential at
+# registration and checked on every assertion, so changing it invalidates
+# every passkey already enrolled. See docs/passkey-login.md.
 DASHBOARD_URL = "https://dashboard.dougmcarthur.net"
+
+# Where a passkey setup code is sent. Must be on the [[send_email]] allowlist
+# above — that binding is the boundary, not this var.
+AUTH_EMAIL = "dougmcarthur0@gmail.com"
+AUTH_EMAIL_SENDER = "login@dougmcarthur.net"
+
+# API_TOKEN is a secret, not a var: `wrangler secret put API_TOKEN`. It is the
+# research agents' credential, and it is the thing to set BEFORE switching
+# Cloudflare Access off — headless callers cannot do a passkey ceremony, so
+# without it every agent POST becomes a 401 the moment Access stops letting
+# them through.

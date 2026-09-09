@@ -12,8 +12,27 @@ export type Env = {
   // Optional so the Worker still boots (and every other route works) on a
   // deploy where the binding has not been added yet.
   EMAIL?: SendEmailBinding
-  // Public origin, used to build links in the digest email.
+  // Public origin. Used to build links in the digest email, and — since
+  // passkey login replaced Cloudflare Access — to derive the WebAuthn relying
+  // party. That second use makes it load-bearing rather than cosmetic: the
+  // hostname is baked into every credential at registration, so changing it
+  // invalidates every passkey already enrolled.
   DASHBOARD_URL?: string
+  /**
+   * Where a passkey setup code is emailed. The `send_email` allowlist in
+   * wrangler.toml is the real boundary; this only chooses among it.
+   */
+  AUTH_EMAIL?: string
+  AUTH_EMAIL_SENDER?: string
+  /**
+   * The research agents' credential — set with `wrangler secret put`.
+   *
+   * They POST and PATCH from outside a browser and outside this repo, so they
+   * cannot do a passkey ceremony. Until Cloudflare Access was removed they
+   * did not need one; now this is the only way in for them, and leaving it
+   * unset is the way this change breaks something quietly.
+   */
+  API_TOKEN?: string
 }
 
 /**

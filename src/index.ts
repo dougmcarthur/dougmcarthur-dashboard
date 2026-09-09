@@ -18,18 +18,91 @@ import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
 import replies, { runReplyScan } from './routes/replies'
 import backfill, { runNotesBackfillOnce } from './routes/backfill'
+import auth from './routes/auth'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
 import { isDigestDue } from '../shared/digestSchedule'
 import { sendMail, mailerConfigured } from './lib/mailer'
 import { gmailConfigured } from './lib/gmail'
 import { recordEvent } from './lib/notificationEvents'
+import { bearerAuthorised, pruneAuth, readSession } from './lib/auth'
+import { originAllowed, relyingParty } from '../shared/auth'
 import { localParts } from '../shared/digestSchedule'
 
 const app = new Hono<{ Bindings: Env }>()
 
 app.use('/api/*', logger())
-app.use('/api/*', cors())
 
+/**
+ * CORS, narrowed to this deployment.
+ *
+ * It was `cors()` — every origin — which was harmless while Cloudflare Access
+ * turned strangers away at the edge and nothing here relied on a cookie.
+ * Both halves of that changed at once. A wildcard `Access-Control-Allow-Origin`
+ * already refuses to carry credentials, so this is not the lock; narrowing it
+ * just means a cross-site page is told no at the preflight rather than after
+ * the route has run.
+ */
+app.use('/api/*', (c, next) => {
+  const party = relyingParty({ dashboardUrl: c.env.DASHBOARD_URL, requestUrl: c.req.url })
+  return cors({
+    origin: party ? party.origins : [],
+    credentials: true,
+  })(c, next)
+})
+
+/**
+ * The security boundary, and now the only one.
+ *
+ * Cloudflare Access used to sit in front of `dashboard.dougmcarthur.net` and
+ * this file had no auth in it at all — every request that reached the Worker
+ * had already been let through at the edge. Passkey login moved that job in
+ * here (see src/lib/auth.ts and docs/passkey-login.md), which changes what a
+ * mistake costs: a route that is not covered by this middleware is public to
+ * the internet, not merely public to whoever Access already trusted.
+ *
+ * So the check is one middleware over the whole API with a written-down list
+ * of exemptions, rather than something each router opts into. Adding a router
+ * cannot forget to authenticate; the only way to be public is to appear
+ * below.
+ *
+ * Static assets stay unauthenticated on purpose — the login screen is one of
+ * them, and a sign-in page you have to be signed in to fetch is not a design
+ * anyone can use. Nothing under `/assets` reads the database.
+ */
+const PUBLIC_API_PREFIXES = [
+  // The ceremonies themselves. Signing in cannot require being signed in.
+  '/api/auth/',
+]
+
+app.use('/api/*', async (c, next) => {
+  const path = new URL(c.req.url).pathname
+  if (PUBLIC_API_PREFIXES.some((prefix) => path.startsWith(prefix))) return next()
+
+  // Two credentials, and they are for two different callers: a browser sends
+  // the session cookie, the out-of-repo research agents send a bearer token.
+  // The token is checked first because it is a string compare and the session
+  // is a D1 read.
+  if (bearerAuthorised(c.env, c.req.header('Authorization'))) return next()
+
+  const session = await readSession(c.env, c.req.header('Cookie'))
+  if (!session) return c.json({ error: 'not signed in' }, 401)
+
+  // Second lock on cross-site writes. `SameSite=Lax` on the cookie is the
+  // first and does most of the work; this catches a browser that sends the
+  // cookie anyway with an `Origin` this deployment has never heard of. A
+  // request with no `Origin` passes, which is every non-browser caller — but
+  // those have already had to present the bearer token above to get here.
+  if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
+    const party = relyingParty({ dashboardUrl: c.env.DASHBOARD_URL, requestUrl: c.req.url })
+    if (party && !originAllowed(c.req.header('Origin'), party.origins)) {
+      return c.json({ error: 'cross-site request refused' }, 403)
+    }
+  }
+
+  return next()
+})
+
+app.route('/api/auth', auth)
 app.route('/api/overview', overview)
 app.route('/api/review', review)
 // NOTE: before '/api/gigs', for the same reason the reconcile router is
@@ -156,6 +229,10 @@ async function runHousekeeping(env: Env): Promise<void> {
   if (pruned.marks || pruned.events) {
     console.log(`pruned ${pruned.marks} marks, ${pruned.events} notification events`)
   }
+  // Expired sessions, spent challenges and dead setup codes. Not a
+  // correctness matter — every one of them is checked against the clock when
+  // it is read — so this only stops three tables growing without limit.
+  await pruneAuth(env)
 }
 
 /**
