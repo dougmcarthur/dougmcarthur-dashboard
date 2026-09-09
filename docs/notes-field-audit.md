@@ -227,6 +227,35 @@ Facebook page — and `submission_method` has three values that the wire type
 and the pickers agree on. A fourth would be a value the type says cannot
 exist. The note still says it and the Review screen still reads it from there.
 
+### What the dry run caught
+
+Run against the real rows before anything was written, the way the deadline
+backfill was. Four defects the unit fixtures never showed, each now fixed and
+pinned with the production string that exposed it. This is the argument for
+dry-running a backfill at all: a wrong reading at read time changes the moment
+the parser is fixed, and a wrong reading frozen into a column does not.
+
+| What | Row | Was | Is |
+| --- | --- | --- | --- |
+| Method read out of a negation | Winnipeg Folk | `form`, from *"**No web form**: submit by emailing…"* | `email` |
+| Location taken from a drafted form answer | Home Routes | `Winnipeg, MB`, from the *Mailing Address* the note drafts for you | null — it is a national circuit, and that address is yours |
+| Submission state filed again as a blocker | 3 rows | *"Not submitted; needs your review."* stored as work to do | null |
+| Currency written from a fallback | any fee with no currency named | `USD`, which `parseFee` defaults to | null — the amount stands, the currency is not claimed |
+
+### `fee_currency` is already a defaulted lie, and this backfill does not fix it
+
+All 34 rows carry `fee_currency = 'USD'`, because the column has that default
+and every insert took it. One of them is a CAD fee — `$85 CAD first entry` —
+and the note has said so all along.
+
+The backfill cannot correct it, and deliberately so: the never-overwrite rule
+sees a column with `USD` in it and leaves it alone, exactly as it would leave
+a value you had set by hand. It has no way to tell a decision from a default.
+
+Fixing it properly is a decision, not an extraction: either drop the column
+default so "unset" is expressible, or treat the amount and the currency as one
+fact and write them together. Left for that decision rather than guessed at.
+
 ### The rule that makes it safe to re-run
 
 `changesFor` writes only into a column that is empty. A value already there

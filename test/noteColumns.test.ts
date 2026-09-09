@@ -114,3 +114,58 @@ describe('changesFor — a backfill that cannot undo a decision', () => {
     expect(changesFor(applied, { location: 'Canmore, AB', submissionState: 'not_submitted' })).toEqual([])
   })
 })
+
+describe('what the dry run against production caught', () => {
+  // Four defects the fixtures never showed and the real 34 rows did. Each is
+  // pinned with the production string that exposed it, because a backfill
+  // freezes a wrong reading into a column where a read-time one at least
+  // changes when the parser is fixed.
+
+  it('does not read the method out of a negation', () => {
+    // Winnipeg Folk Festival. "No web form" was matching `web form` before
+    // anything reached the email branch, so the one festival that explicitly
+    // has no form came out as `form`.
+    const note = `No web form: submit by emailing music@winnipegfolkfestival.ca with a short bio, a current live performance video, and three relevant web links (website/SoundCloud/YouTube/Facebook), noting 'Manitoba' in the subject line.`
+    expect(gigNoteColumns({ fitNotes: note }).submissionMethod).toBe('email')
+  })
+
+  it('still reads a form that is really there', () => {
+    expect(gigNoteColumns({ fitNotes: 'Single-page intake form at the URL.' }).submissionMethod).toBe('form')
+  })
+
+  it('does not take the location out of a drafted mailing address', () => {
+    // Home Routes is a national touring circuit. The note drafts a form's
+    // answers, one of which is your own address — which was being stored as
+    // where the gig is, and would have costed the trip as a drive across town.
+    const note = `Winnipeg-headquartered national network booking regional touring circuits. Drafted field values for Doug to copy in himself: Contact Name: Doug McArthur; Mailing Address: needs Doug, only 'Winnipeg, MB' on file; Country: Canada.`
+    expect(gigNoteColumns({ fitNotes: note }).location).toBeNull()
+  })
+
+  it('still takes a location the narrative states', () => {
+    const note = `Doug's hometown flagship folk festival at Birds Hill Park, MB — strong genre fit.`
+    expect(gigNoteColumns({ fitNotes: note }).location).toBe('Birds Hill Park, MB')
+  })
+
+  it('does not file the submission state again as a blocker', () => {
+    // "Not submitted; needs your review." is the column next to it, not work
+    // to do. Three rows would have carried it as both.
+    const note = `Submission window hasn't opened yet. Not submitted; needs Doug's review.`
+    expect(gigNoteColumns({ fitNotes: note }).blockedOn).toBeNull()
+  })
+
+  it('keeps a blocker that says something the state does not', () => {
+    const note = `Equity/identity self-disclosure checkboxes intentionally left blank — not filled in on Doug's behalf.`
+    expect(gigNoteColumns({ fitNotes: note }).blockedOn).not.toBeNull()
+  })
+
+  it('writes a currency only where the fee text names one', () => {
+    // `parseFee` falls back to USD. Writing that fallback into a column turns
+    // a default into a claim — and one production fee really is CAD.
+    const unnamed = gigNoteColumns({ fitNotes: '', fee: '$35 (non-members) / $25 (members) — REQUIRED, non-refundable', paid: 1 })
+    expect(unnamed.feeAmount).toBe(35)
+    expect(unnamed.feeCurrency).toBeNull()
+
+    const named = gigNoteColumns({ fitNotes: '', fee: '$85 CAD first entry / $75 CAD each additional entry', paid: 1 })
+    expect(named.feeCurrency).toBe('CAD')
+  })
+})

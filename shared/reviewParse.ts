@@ -681,12 +681,26 @@ export function parseNote(note: string | null | undefined): ParsedNote {
   // Notes run URLs straight into sentence punctuation ("…dougmcarthur.net;").
   const links = uniq((note.match(RE.url) ?? []).map((u) => u.replace(/[.,;:!?)\]]+$/, '')))
   const tracks = KNOWN_TRACKS.filter((t) => new RegExp(`\\b${t}\\b`).test(note))
-  const location = note.match(RE.location)?.[0] ?? null
+  // Read from the narrative only. A note that drafts a form's answers carries
+  // "Mailing Address: … 'Winnipeg, MB'" — which is *your* address, not where
+  // the gig is, and it put Home Routes (a national touring circuit) in
+  // Winnipeg. The same exemption `depersonalise` makes for drafted values,
+  // for the same reason: inside that block the text is the answer, not the
+  // app describing the opportunity.
+  const beforeDrafts = note.split(/\bDrafted (?:field )?(?:values|profile content)\b/i)[0]
+  const location = beforeDrafts.match(RE.location)?.[0] ?? null
+
+  // "No web form: submit by emailing music@…" says how it is *not* done. Read
+  // straight, the Winnipeg Folk Festival — which has no form and explicitly
+  // asks for email — came out as `form`. The negation is stripped before the
+  // form test only: the `dm` branch above uses "no form to fill" as a
+  // positive signal and has to keep seeing it.
+  const affirmative = note.replace(/\bno\s+(?:\w+\s+){0,2}form\b/gi, ' ')
 
   const submissionMethod: SubmissionMethod =
     /facebook messenger|direct message|\bDM\b|no online application|no form to fill/i.test(note)
       ? 'dm'
-      : /airtable|google form|intake form|web form|application form|contact form/i.test(note)
+      : /airtable|google form|intake form|web form|application form|contact form/i.test(affirmative)
       ? 'form'
       : /portal|\baccount\b/i.test(note)
       ? 'portal'
