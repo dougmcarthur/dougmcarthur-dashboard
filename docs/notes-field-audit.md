@@ -242,19 +242,31 @@ the parser is fixed, and a wrong reading frozen into a column does not.
 | Submission state filed again as a blocker | 3 rows | *"Not submitted; needs your review."* stored as work to do | null |
 | Currency written from a fallback | any fee with no currency named | `USD`, which `parseFee` defaults to | null — the amount stands, the currency is not claimed |
 
-### `fee_currency` is already a defaulted lie, and this backfill does not fix it
+### `fee_currency` was a defaulted lie, and now is not
 
-All 34 rows carry `fee_currency = 'USD'`, because the column has that default
-and every insert took it. One of them is a CAD fee — `$85 CAD first entry` —
-and the note has said so all along.
+All 34 rows carried `fee_currency = 'USD'`, because the column has that
+default and every insert took it. Two of them are CAD fees and their own fee
+text has said so all along:
 
-The backfill cannot correct it, and deliberately so: the never-overwrite rule
-sees a column with `USD` in it and leaves it alone, exactly as it would leave
-a value you had set by hand. It has no way to tell a decision from a default.
+| Row | Fee text | Was |
+| --- | --- | --- |
+| 9 · Canadian Folk Music Awards | `$85 CAD first entry / $75 CAD each additional entry` | `USD` |
+| 34 · M for Montreal — Groover | `approx $5-20 CAD per submission` | `USD` |
 
-Fixing it properly is a decision, not an extraction: either drop the column
-default so "unset" is expressible, or treat the amount and the currency as one
-fact and write them together. Left for that decision rather than guessed at.
+The never-overwrite rule could not reach them: it sees a non-empty column and
+leaves it alone, exactly as it would leave a value set by hand. It has no way
+to tell a decision from a default.
+
+`OVERRIDES_A_DEFAULT` is the one narrow exception, and the narrowness is the
+safety. It applies to `fee_currency` alone, and only where the fee text
+**names** a currency — a named currency is not a competing opinion about the
+row, it is the row's own record of itself, and the value it disagrees with was
+a column default rather than anybody's choice.
+
+Fourteen rows name no currency at all, most of them `$0` or `None`. Those keep
+the default untouched: replacing a guess with a different guess is not an
+improvement. Four of them are US organisations, where `USD` is right by luck
+rather than by reading, and that distinction is worth keeping visible.
 
 ### How it runs
 

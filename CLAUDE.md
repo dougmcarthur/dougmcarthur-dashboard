@@ -371,7 +371,11 @@ other side of it. The marker is written *after* success, like
 is harmless anyway, which is the actual safety.
 
 Two rules hold it together. **A column that already holds something is never
-overwritten** (`changesFor`), so a value you set by hand survives an extractor
+overwritten** — with exactly one exception, `fee_currency`, because it
+defaults to `'USD'` at insert and so is never empty, while two rows say `CAD`
+in their own fee text. A currency the text *names* outranks a column default;
+a currency it does not name leaves the default alone. Nothing else gets that
+treatment, and the narrowness is the safety — (`changesFor`), so a value you set by hand survives an extractor
 re-run and the backfill is idempotent — and `updated_at` is left alone, because
 filling a column from a note that already said so is not a change to the row
 and would wake every snooze in the table. **Cached rendering is not a schema**:

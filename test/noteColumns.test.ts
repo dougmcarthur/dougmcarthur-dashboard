@@ -169,3 +169,45 @@ describe('what the dry run against production caught', () => {
     expect(named.feeCurrency).toBe('CAD')
   })
 })
+
+describe('the one column a stated value may overwrite', () => {
+  // `fee_currency` defaults to 'USD' at insert, so it is never empty and the
+  // never-overwrite rule can never reach it — while two production rows say
+  // CAD in their own fee text and hold USD.
+
+  it('replaces a defaulted currency with the one the fee text names', () => {
+    expect(changesFor({ feeCurrency: 'USD' }, { feeCurrency: 'CAD' })).toEqual([
+      { column: 'feeCurrency', from: 'USD', to: 'CAD' },
+    ])
+  })
+
+  it('records nothing when the stated currency is already stored', () => {
+    expect(changesFor({ feeCurrency: 'CAD' }, { feeCurrency: 'CAD' })).toEqual([])
+  })
+
+  it('leaves the default alone when the fee text names nothing', () => {
+    // `gigNoteColumns` returns null for an unnamed currency, and null is
+    // never written. Fourteen rows are in this case, most of them $0 or None:
+    // replacing a guess with a different guess is not an improvement.
+    const unnamed = gigNoteColumns({ fitNotes: '', fee: '$55 + processing fee', paid: 1 })
+    expect(unnamed.feeCurrency).toBeNull()
+    expect(changesFor({ feeCurrency: 'USD' }, { feeCurrency: unnamed.feeCurrency })).toEqual([])
+  })
+
+  it('does not extend the exception to any other column', () => {
+    // The narrowness is the safety. A location or a submission state you set
+    // by hand is a decision, and an extractor re-run must not undo one.
+    expect(changesFor(
+      { location: 'Winnipeg, MB', submissionState: 'submitted', blockedOn: '["x"]' },
+      { location: 'Canmore, AB', submissionState: 'not_submitted', blockedOn: '["y"]' },
+    )).toEqual([])
+  })
+
+  it('is still idempotent end to end', () => {
+    const proposed = { feeCurrency: 'CAD', location: 'Canmore, AB' }
+    const first = changesFor({ feeCurrency: 'USD', location: null }, proposed)
+    const applied: Record<string, unknown> = { feeCurrency: 'USD', location: null }
+    for (const change of first) applied[change.column] = change.to
+    expect(changesFor(applied, proposed)).toEqual([])
+  })
+})

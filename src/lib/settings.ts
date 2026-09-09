@@ -21,8 +21,17 @@ import type { Env } from '../types'
  * about the deployment, not about any row.
  */
 export const ONCE_KEYS = {
-  /** Written after the notes backfill succeeds. See src/routes/backfill.ts. */
-  notesBackfill: 'once.notesBackfill',
+  /**
+   * Written after the notes backfill succeeds. See src/routes/backfill.ts.
+   *
+   * Versioned, and the version is the point: a corrected extraction earns one
+   * more pass over rows a previous one already saw. `v1` ran before
+   * `fee_currency` was allowed to correct a column default, so `v2` exists to
+   * reach the two rows that say CAD and hold USD. Bumping this is safe
+   * because the backfill is idempotent — a re-run over rows it got right
+   * writes nothing.
+   */
+  notesBackfill: 'once.notesBackfill.v2',
 } as const
 
 export const DIGEST_KEYS = {
