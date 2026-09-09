@@ -13,6 +13,18 @@ import { appSettings } from '../db/schema'
 import type { Weekday, Schedule } from '../../shared/digestSchedule'
 import type { Env } from '../types'
 
+/**
+ * Markers for work that should happen once, ever.
+ *
+ * A key rather than a migration because the work is code — the extraction is
+ * a parser, not SQL — and a key rather than a column because it is a fact
+ * about the deployment, not about any row.
+ */
+export const ONCE_KEYS = {
+  /** Written after the notes backfill succeeds. See src/routes/backfill.ts. */
+  notesBackfill: 'once.notesBackfill',
+} as const
+
 export const DIGEST_KEYS = {
   enabled: 'digest.enabled',
   recipient: 'digest.recipient',
@@ -71,6 +83,16 @@ export async function readDigestSettings(env: Env): Promise<DigestSettings> {
     },
     lastSentAt: map.get(DIGEST_KEYS.lastSentAt) ?? null,
   }
+}
+
+/**
+ * One setting, by key. `readDigestSettings` reads the whole table because it
+ * wants most of it; a one-shot marker wants one row and no defaults.
+ */
+export async function readSetting(env: Env, key: string): Promise<string | null> {
+  const db = getDb(env.DB)
+  const row = await db.select().from(appSettings).where(eq(appSettings.key, key)).get()
+  return row?.value ?? null
 }
 
 export async function writeSetting(env: Env, key: string, value: string): Promise<void> {

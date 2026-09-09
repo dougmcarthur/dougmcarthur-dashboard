@@ -540,6 +540,8 @@ export interface BackfillPlan {
   wouldChange: number
   byColumn: Record<string, number>
   rows: BackfillRowPlan[]
+  /** When the one-shot cron run did this, or null if it never has. */
+  ranAt: string | null
 }
 
 export interface BackfillResult {

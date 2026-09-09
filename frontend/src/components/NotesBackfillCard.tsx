@@ -68,6 +68,9 @@ export function NotesBackfillCard() {
       {data && data.wouldChange === 0 && !done && (
         <p className="text-sm text-body">
           Nothing to fill. All {data.scanned} rows already carry what their notes say.
+          {data.ranAt && (
+            <span className="text-muted"> Filled automatically on {data.ranAt.slice(0, 10)}.</span>
+          )}
         </p>
       )}
 

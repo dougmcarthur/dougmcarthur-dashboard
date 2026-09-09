@@ -3,6 +3,8 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets } from '../db/schema'
 import { gigNoteColumns, syncNoteColumns, changesFor, type ColumnChange } from '../../shared/noteColumns'
+import { readSetting, writeSetting, ONCE_KEYS } from '../lib/settings'
+import { recordEvent } from '../lib/notificationEvents'
 import type { Env } from '../types'
 
 /**
@@ -71,7 +73,16 @@ function summarise(rows: RowPlan[]): Record<string, number> {
 
 backfill.get('/notes', async (c) => {
   const { rows, scanned } = await plan(c.env)
-  return c.json({ scanned, wouldChange: rows.length, byColumn: summarise(rows), rows })
+  return c.json({
+    scanned,
+    wouldChange: rows.length,
+    byColumn: summarise(rows),
+    rows,
+    // When the cron already did it. The button still works afterwards — it is
+    // idempotent — but "nothing to fill" reads very differently depending on
+    // whether anything ever ran.
+    ranAt: await readSetting(c.env, ONCE_KEYS.notesBackfill),
+  })
 })
 
 backfill.post('/notes', async (c) => {
@@ -96,5 +107,63 @@ backfill.post('/notes', async (c) => {
 
   return c.json({ scanned, changed: rows.length, byColumn: summarise(rows) })
 })
+
+/**
+ * The backfill, run once by the cron.
+ *
+ * The button on Settings is the ordinary way in. This exists because the
+ * extraction is code rather than SQL, so it cannot ride in a migration — and
+ * the Worker is the only thing that can reach both the parser and the rows.
+ *
+ * Not pinned to an hour, unlike the reply scan and housekeeping: those repeat
+ * and want a rhythm, this happens once and waiting until 7am for it would be
+ * a delay with nothing on the other side of it.
+ *
+ * The marker is written **after** the run succeeds, for the same reason
+ * `digest.lastSentAt` is: a failure has to be retried on the next tick, not
+ * counted as done. Running twice is harmless anyway — `changesFor` only
+ * writes into an empty column — so the marker is an optimisation and the
+ * idempotence is the actual safety.
+ */
+export async function runNotesBackfillOnce(env: Env): Promise<void> {
+  if (await readSetting(env, ONCE_KEYS.notesBackfill)) return
+
+  const db = getDb(env.DB)
+  const { rows, scanned } = await plan(env)
+
+  for (const row of rows) {
+    const values: Record<string, unknown> = {}
+    for (const change of row.changes) values[change.column] = change.to
+    if (row.table === 'gig') {
+      await db.update(gigOpportunities).set(values).where(eq(gigOpportunities.id, row.id))
+    } else {
+      await db.update(syncTargets).set(values).where(eq(syncTargets.id, row.id))
+    }
+  }
+
+  await writeSetting(env, ONCE_KEYS.notesBackfill, new Date().toISOString())
+
+  const byColumn = summarise(rows)
+  const detail = Object.entries(byColumn)
+    .map(([column, count]) => `${count} ${column}`)
+    .join(' · ')
+
+  // Recorded rather than only logged. A write to every row in two tables that
+  // nobody asked for at that moment should leave something you can find
+  // afterwards, and a console line in a Worker is not that.
+  await recordEvent(env, {
+    kind: 'reconcile',
+    tier: 'info',
+    title: rows.length
+      ? `Filled ${rows.length} ${rows.length === 1 ? 'row' : 'rows'} from their notes`
+      : 'Notes backfill found nothing to fill',
+    body: rows.length
+      ? `${detail}. Scanned ${scanned}. Columns that already held something were left alone.`
+      : `Scanned ${scanned} rows; every column the notes could fill already had a value.`,
+    href: '#settings',
+    action: 'See settings',
+    dedupeKey: 'once:notesBackfill',
+  })
+}
 
 export default backfill
