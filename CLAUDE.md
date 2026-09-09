@@ -217,6 +217,45 @@ compression moves neither. Retention is likewise already handled where it
 churns — `notification_events` and `notification_marks` both prune at 30 days,
 and no other table grows fast enough to have a policy worth writing.
 
+**A stopped agent is a condition, and nothing was watching for it.** The three
+research agents — `gig-festival-scan`, `sync-pitch-research`,
+`monthly-promo-checkin` — ran on a cadence from June, stopped within a week of
+each other in early August, and nobody noticed for a month. Every part needed
+to notice already existed: `task_runs` logs every run, the bell has a feed,
+housekeeping runs daily. None was looking. A missing gig is invisible in a way
+a wrong one is not — there is no row to be wrong.
+
+`shared/taskCadence.ts` fixes that, and it is a **condition** rather than an
+event because staleness is derivable from current state and self-heals the
+moment a run posts; an event row would outlive the situation it describes.
+Three things about how it decides:
+
+- **The cadence is measured, not configured.** Nothing declares that
+  `gig-festival-scan` is weekly — the schedule lives outside this repo, and a
+  settings row saying "weekly" is a second place for the truth to drift from.
+  The median gap between its own runs is the only claim available, and it
+  re-measures itself when a schedule changes. Median, not mean, so one holiday
+  cannot double the threshold and blind the check for a month.
+- **It is rated `critical`, unlike a failed run.** `runTier` rates a failure
+  `attention` because the next tick retries it. Nothing retries a schedule that
+  has stopped, which puts it squarely in what `critical` is reserved for —
+  plumbing broken now, costing you silently.
+- **It under-reports on purpose.** A floor of three days stops a task that ran
+  twice in a morning alarming by lunchtime; a ceiling of 45 days stops the
+  monthly agent — three runs, two gaps — from setting a threshold near eighty.
+  At the time of writing the monthly one is 35 days quiet and this does not
+  flag it. That is the safe direction: an alarm you learn to dismiss is worse
+  than none, and the ceiling still raises it inside six weeks.
+
+**A task that has never run cannot be missed**, because absence leaves no row.
+The check is a floor, not a guarantee.
+
+The parser earns its own test. Two production rows hold `2026-07-17 19:24:50` —
+a space instead of a `T`, no zone — which `Date.parse` may read as *local*
+time. Under `TZ=Pacific/Auckland` that is twelve hours out, enough to move a
+day count. `parseRunAt` reads a zoneless stamp as UTC, because that is the
+runner that wrote it.
+
 **Statuses say who decided.** `shortlisted`/`passed` are the artist's
 decisions; `invited`/`declined` are the organiser's. The old `approved` and
 `rejected` failed this and caused a real misreading — `rejected` meant *you*

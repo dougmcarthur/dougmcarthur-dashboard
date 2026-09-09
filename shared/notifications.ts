@@ -35,6 +35,8 @@ import type { ReviewItem, QueueSummary } from './reviewQueue'
  * The UI carries these as lightness rather than a third hue, so severity
  * survives colour blindness and the palette stays at two colours.
  */
+import { stalledTasks, type TaskHistory } from './taskCadence'
+
 export type Tier = 'critical' | 'attention' | 'info'
 
 /**
@@ -148,6 +150,32 @@ function plural(n: number, one: string, many: string): string {
  * reconciler cannot read Gmail to tell you a draft was already sent. Everything
  * else here is an inconvenience.
  */
+/**
+ * A scheduled agent that has stopped reporting.
+ *
+ * `critical` rather than `attention`, and the distinction is deliberate: a run
+ * that *failed* is retried on its next tick and costs you nothing today, which
+ * is why `runTier` in the task-runs route rates one `attention`. A schedule
+ * that has stopped is not retried by anything. It is plumbing that is broken
+ * now and costing you silently — the definition this app reserves `critical`
+ * for — and what it costs is festival deadlines passing with no row to show
+ * for them.
+ *
+ * The body says what the task's own history claims its interval is, because
+ * "quiet for 28 days" means nothing without "it used to run every 7".
+ */
+function automationNotes(histories: TaskHistory[], today: string): Draft[] {
+  return stalledTasks({ histories, today }).map((task) => ({
+    key: `automation:stalled:${task.taskId}`,
+    kind: 'automation' as NotificationKind,
+    tier: 'critical' as Tier,
+    title: `${task.taskId} has not run in ${task.daysSince} days`,
+    body: `It reported about every ${task.everyDays} days until it stopped. Nothing is collecting opportunities for it.`,
+    href: '#runs',
+    action: 'View runs',
+  }))
+}
+
 function connectionNotes(health: HealthInput): Draft[] {
   const out: Draft[] = []
 
@@ -374,6 +402,12 @@ export function buildNotifications(input: {
   marks: Mark[]
   /** Rows from `notification_events`. Absent is the same as none. */
   events?: StoredEvent[]
+  /**
+   * Every recorded run, grouped by task. Absent is the same as none, which
+   * means a caller that does not supply them simply gets no staleness check
+   * rather than a claim that nothing is stale.
+   */
+  taskRuns?: TaskHistory[]
   /** ISO timestamp; the date part is used for the dismissal window. */
   now: string
 }): { items: Notification[]; unread: number; unreadCritical: number; total: number } {
@@ -382,6 +416,7 @@ export function buildNotifications(input: {
 
   const raw = [
     ...connectionNotes(input.health),
+    ...automationNotes(input.taskRuns ?? [], input.now),
     ...healthNotes(input.summary),
     ...timingNotes(input.summary),
     ...snoozeNotes(input.items, today),

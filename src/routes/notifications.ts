@@ -9,9 +9,11 @@ import {
   promoDrafts,
   reminders,
   notificationMarks,
+  taskRuns,
 } from '../db/schema'
 import { buildReviewQueue, summariseQueue } from '../../shared/reviewQueue'
 import { buildNotifications, eventIdsFromKey, type Mark } from '../../shared/notifications'
+import type { TaskHistory } from '../../shared/taskCadence'
 import {
   readEvents,
   markEventsRead,
@@ -46,6 +48,17 @@ async function readMarks(env: Env): Promise<Mark[]> {
   }))
 }
 
+/** Flat rows into one history per task, which is what the cadence check takes. */
+function groupRuns(rows: Array<{ taskId: string; runAt: string }>): TaskHistory[] {
+  const byTask = new Map<string, string[]>()
+  for (const row of rows) {
+    const list = byTask.get(row.taskId)
+    if (list) list.push(row.runAt)
+    else byTask.set(row.taskId, [row.runAt])
+  }
+  return [...byTask].map(([taskId, runAt]) => ({ taskId, runAt }))
+}
+
 /**
  * The whole feed, exported because the pruning job needs the same answer.
  *
@@ -55,7 +68,7 @@ async function readMarks(env: Env): Promise<Mark[]> {
 export async function composeFeed(env: Env, now = new Date()) {
   const db = getDb(env.DB)
 
-  const [gigs, sync, promo, [orphans], marks, events] = await Promise.all([
+  const [gigs, sync, promo, [orphans], marks, events, runs] = await Promise.all([
     db.select().from(gigOpportunities).orderBy(desc(gigOpportunities.discoveredAt)),
     db.select().from(syncTargets).orderBy(desc(syncTargets.discoveredAt)),
     db.select().from(promoDrafts).orderBy(desc(promoDrafts.createdAt)),
@@ -72,6 +85,10 @@ export async function composeFeed(env: Env, now = new Date()) {
           AND ${reminders.entityId} NOT IN (SELECT id FROM sync_targets))`),
     readMarks(env),
     readEvents(env, now),
+    // Two columns, every row. The staleness check needs the whole history to
+    // measure a cadence from, and this table is tens of rows — the ordering is
+    // indexed as of migration 0018.
+    db.select({ taskId: taskRuns.taskId, runAt: taskRuns.runAt }).from(taskRuns),
   ])
 
   const items = buildReviewQueue({
@@ -90,6 +107,7 @@ export async function composeFeed(env: Env, now = new Date()) {
     },
     marks,
     events,
+    taskRuns: groupRuns(runs),
     now: now.toISOString(),
   })
 
