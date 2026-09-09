@@ -150,16 +150,30 @@ describe('matchesFilter', () => {
 
 // --- summariseQueue: blocks C and D of the Overview ---------------------------
 
-/** An ISO date `n` days from today, so these tests do not expire. */
+/**
+ * The date this block is written against. Fixed, not the clock.
+ *
+ * `offset` used to count from `new Date()` with the hours zeroed — local
+ * midnight — and then serialise it as UTC, while `buildReviewQueue` with no
+ * `today` reads UTC directly. In Winnipeg the two agree; a day ahead under
+ * `TZ=Pacific/Auckland` local midnight is noon the previous day in UTC, so
+ * every date here landed one off and "9 days ago" asserted against 10. It
+ * cost a deploy, and it is the second time this file has taught the same
+ * lesson: same inputs must mean the same thing on every run, in every zone.
+ */
+const STRIP_TODAY = '2026-08-25'
+
+/** An ISO date `n` days from `STRIP_TODAY`. Arithmetic in UTC throughout. */
 function offset(n: number): string {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
+  return new Date(Date.parse(`${STRIP_TODAY}T00:00:00Z`) + n * 86_400_000)
+    .toISOString()
+    .slice(0, 10)
 }
 
 const summarise = (input: Parameters<typeof buildReviewQueue>[0]) =>
-  summariseQueue(buildReviewQueue(input))
+  // `summariseQueue` takes no date of its own and needs none: every band it
+  // reads was already computed against the queue's `today`.
+  summariseQueue(buildReviewQueue({ ...input, today: STRIP_TODAY }))
 
 describe('summariseQueue — the time-critical strip', () => {
   it('bands a passed deadline as overdue and a near one as due soon', () => {

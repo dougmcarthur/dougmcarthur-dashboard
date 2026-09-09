@@ -164,3 +164,30 @@ describe('the source panel previews before it writes', () => {
     expect(src).toMatch(/never reviewed/)
   })
 })
+
+describe('no fixture reads the clock', () => {
+  // The failure this guards has now cost two deploys. `offset()` in
+  // reviewQueue.test.ts counted from local midnight and serialised it as UTC,
+  // while the queue read UTC directly — identical in Winnipeg, one day out
+  // under `TZ=Pacific/Auckland`, and so it passed locally and failed in CI on
+  // somebody else's change. A fixture must be relative to its own TODAY.
+  const testFiles = readdirSync('test')
+    .filter((f) => f.endsWith('.ts'))
+    .map((f) => join('test', f))
+
+  it('never calls new Date() or Date.now() with no argument', () => {
+    const offenders: string[] = []
+    for (const file of testFiles) {
+      readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+        if (line.trimStart().startsWith('*') || line.trimStart().startsWith('//')) return
+        // Quoted text first — a test *named* after this mistake is not the
+        // mistake, and this file contains exactly that.
+        const code = line.replace(/'[^']*'|"[^"]*"|`[^`]*`/g, "''")
+        if (/\bnew Date\(\s*\)|\bDate\.now\(\s*\)/.test(code)) {
+          offenders.push(`${file}:${i + 1} — ${line.trim()}`)
+        }
+      })
+    }
+    expect(offenders).toEqual([])
+  })
+})

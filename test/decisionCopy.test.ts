@@ -31,8 +31,16 @@ const promo = (o: Partial<PromoDraft> & { id: number }): PromoDraft => ({
 
 const first = (input: Parameters<typeof buildReviewQueue>[0]) => buildReviewQueue(input)[0]
 
-/** `n` days from the real clock, for the block below that reads it. */
-const fromNow = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10)
+/**
+ * The date the invariant block below is written against, and `n` days from
+ * it. Fixed rather than read off the clock: a fixture that counts from `now`
+ * agrees with the queue only while both read the same UTC day, which is a
+ * race the suite should not contain and a lesson `reviewQueue.test.ts` has
+ * already had to learn twice.
+ */
+const INVARIANT_TODAY = '2026-08-25'
+const fromToday = (n: number) =>
+  new Date(Date.parse(`${INVARIANT_TODAY}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
 
 describe('decision copy — the sentence names the decision', () => {
   it('asks whether it actually went out when status and note disagree', () => {
@@ -196,16 +204,16 @@ describe('decision copy — invariants that hold for every item', () => {
       gig({ id: 27, name: 'Declined', status: 'declined' }),
       gig({ id: 28, name: 'Expired out', status: 'expired', deadline: '2026-01-05' }),
       gig({ id: 29, name: 'Silent', status: 'submitted', submittedAt: '2026-01-10' }),
-      // Dates off the same clock this call reads, so the flag fires whenever
-      // the suite runs rather than only until the fixture goes stale.
+      // A show inside the P-2's ninety days, so the visa card is exercised by
+      // the legality invariant alongside every other shape of row.
       gig({
         id: 30, name: 'Short lead', country: 'US', performanceKind: 'paid',
-        performanceStart: fromNow(40),
+        performanceStart: fromToday(40),
       }),
-      gig({ id: 31, name: 'Unsaid kind', country: 'US', performanceStart: fromNow(40) }),
+      gig({ id: 31, name: 'Unsaid kind', country: 'US', performanceStart: fromToday(40) }),
       gig({
         id: 32, name: 'Short lead, already sent', status: 'submitted', submittedAt: '2026-01-10',
-        country: 'US', performanceKind: 'paid', performanceStart: fromNow(40),
+        country: 'US', performanceKind: 'paid', performanceStart: fromToday(40),
       }),
     ],
     sync: [
@@ -219,6 +227,7 @@ describe('decision copy — invariants that hold for every item', () => {
       }),
     ],
     promo: [promo({ id: 16 })],
+    today: INVARIANT_TODAY,
   })
 
   it('always produces a non-empty sentence', () => {
