@@ -210,3 +210,26 @@ describe('enrolmentCooldown', () => {
     expect(enrolmentCooldown({ now: TODAY, lastIssuedAt: 'whenever' }).allowed).toBe(true)
   })
 })
+
+import { enrolmentRecipient } from '../src/lib/auth'
+
+/**
+ * Where a break-glass code goes.
+ *
+ * Never user-supplied: an address typed on the login screen would decide the
+ * destination, so anyone able to load the page could mail themselves an
+ * enrolment code and take the account. Deployment configuration only.
+ */
+describe('enrolmentRecipient', () => {
+  it('uses the configured address', () => {
+    expect(enrolmentRecipient({ AUTH_EMAIL: 'artist@example.com' } as never)).toBe('artist@example.com')
+  })
+
+  it('returns null rather than falling back to somebody real', () => {
+    // It used to default to a hardcoded personal address, which worked for
+    // exactly one deployment and silently mailed a stranger's inbox on any
+    // other. Unset means recovery is unavailable and the screen says so.
+    expect(enrolmentRecipient({} as never)).toBeNull()
+    expect(enrolmentRecipient({ AUTH_EMAIL: '   ' } as never)).toBeNull()
+  })
+})

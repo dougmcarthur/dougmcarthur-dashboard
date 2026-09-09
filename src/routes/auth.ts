@@ -115,7 +115,7 @@ auth.get('/session', async (c) => {
     // Whether the break-glass path can work at all. A deployment with no
     // email binding and no passkeys is one nobody can get into, and the
     // screen should say so rather than offering a button that 500s.
-    recoveryAvailable: mailerConfigured(c.env),
+    recoveryAvailable: mailerConfigured(c.env) && enrolmentRecipient(c.env) !== null,
   })
 })
 
@@ -249,6 +249,11 @@ auth.post('/enrol/request', async (c) => {
     return c.json({ error: 'This site cannot send email, so a setup code cannot be sent.' }, 503)
   }
 
+  const to = enrolmentRecipient(c.env)
+  if (!to) {
+    return c.json({ error: 'This site has no recovery address set up yet.' }, 503)
+  }
+
   const now = new Date()
 
   // Throttled, because this is the one endpoint that takes no credential and
@@ -265,7 +270,6 @@ auth.post('/enrol/request', async (c) => {
   }
 
   const issued = await issueEnrolmentCode(c.env, now)
-  const to = enrolmentRecipient(c.env)
 
   await sendMail(c.env, {
     to,

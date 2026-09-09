@@ -159,6 +159,26 @@ wearing the new screen's clothes, which is why `test/uiConsistency.test.ts`
 fails if the code reaches a login endpoint or if the button taking it stops
 saying *Add a passkey*.
 
+**The recovery address is never typed by the person asking for it.** An email
+box on the login screen that decides where an enrolment code goes is an
+account-takeover vector: anyone who can load the page mails themselves a code
+and enrols a passkey. So `enrolmentRecipient` reads deployment configuration
+and nothing else — not a settings row either, which would be a way to redirect
+the recovery channel from inside the app, exactly what an attacker holding a
+session would reach for.
+
+It had a hardcoded personal address as its fallback, which worked for one
+deployment and would have silently mailed a stranger's inbox on any other.
+There is no default now: unset means `recoveryAvailable: false` and the screen
+says so, because a missing input is never a guess.
+
+**When accounts arrive the shape changes but the rule does not.** The typed
+address becomes a *lookup key* — the code still goes to the address already on
+file for the matching account, never to what was typed — and the screen says
+the same thing whether or not an account matched, since anything else is an
+account-existence oracle. With Google as the primary sign-in the address comes
+from the grant, so there is nothing to type at signup at all.
+
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a
 passkey ceremony — WebAuthn has no non-interactive mode. `API_TOKEN` as a
