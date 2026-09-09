@@ -414,6 +414,30 @@ describe('screens name things, they do not print identifiers', () => {
     }
   })
 
+  it('makes the routes that change who can sign in ask for the passkey', () => {
+    // A session cookie is not a good enough credential for these two: a
+    // stolen one would enrol its own passkey and delete yours, which outlives
+    // "sign out everywhere" because that clears sessions and not credentials.
+    // Both must consult `elevationState` — losing either guard is a change
+    // that typechecks, renders and tests green.
+    const src = readFileSync('src/routes/auth.ts', 'utf8')
+
+    const revoke = src.slice(src.indexOf("auth.delete('/passkeys/:id'"))
+    expect(revoke.slice(0, revoke.indexOf('\n})')), 'revoking a passkey').toContain(
+      'elevationState',
+    )
+
+    const authorise = src.slice(src.indexOf('async function authoriseEnrolment'))
+    const body = authorise.slice(0, authorise.indexOf('\n}'))
+    expect(body, 'adding a passkey').toContain('elevationState')
+
+    // ...and the emailed code must *not*, because it exists for the case
+    // where there is no passkey left to touch. Requiring one to use it would
+    // make recovery depend on the thing you are recovering from losing.
+    const codePath = body.slice(body.indexOf('if (!code)'))
+    expect(codePath, 'the emailed setup code').not.toContain('elevationState')
+  })
+
   it('keeps WebAuthn vocabulary out of what a signed-out person reads', () => {
     // "relying party not configured" is precise and useless: it names our
     // internals and nothing the reader can act on. The log keeps the exact

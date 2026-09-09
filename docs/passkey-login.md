@@ -78,7 +78,58 @@ Some details worth knowing before changing any of it:
   synced through iCloud Keychain reports `0` forever. A counter that goes
   *backwards* is rejected; one that stands still is normal.
 - **User verification is preferred, not required.** Demanding it would lock out
-  a hardware key that is working exactly as designed.
+  a hardware key that is working exactly as designed. The one exception is the
+  elevation ceremony below, where it *is* required — the point of asking twice
+  is the person rather than the device, and a silent assertion from an unlocked
+  laptop proves the laptop is present, which was never in doubt.
+
+## Changing who can sign in asks for the key again
+
+A session lasts thirty days, which is the right length for using the app and
+the wrong credential for changing how you get into it. Two routes change that:
+`POST /auth/register/*` adds a passkey and `DELETE /auth/passkeys/:id` removes
+one.
+
+Both accepted a session on its own until now, and that was a real gap rather
+than a theoretical one. Anyone holding a stolen session cookie could enrol
+their own passkey and delete every other — and that survives **sign out
+everywhere**, because signing out clears sessions and not credentials. The
+button you would reach for on realising you had been compromised was the one
+that would not help.
+
+So both now need a *recent assertion*: the cookie says which session, and the
+key says somebody is holding it. A passkey cannot be stolen the way a cookie
+can — it answers a fresh challenge from the authenticator or it does not
+answer.
+
+| Piece | Where |
+| --- | --- |
+| `ELEVATION_TTL_MINUTES`, `elevationState` | `shared/auth.ts` — fifteen minutes, decided against a `now` it is handed |
+| `auth_sessions.elevated_at` | migration `0020`, nullable; null is where every session starts |
+| `POST /auth/elevate/options` + `/verify` | the login assertion run again, under its own challenge purpose |
+| `withConfirmation` | `frontend/src/confirmIdentity.ts` — try, and re-assert only if the server asks |
+
+Four decisions inside that:
+
+- **Signing in is not elevation.** A fresh session starts unelevated, because
+  the cookie a sign-in produces is exactly what this defends against.
+- **The emailed setup code is exempt, and has to be.** It exists for the case
+  where there is no passkey left to touch. Requiring one to use it would make
+  recovery need the thing you are recovering from losing. `test/uiConsistency`
+  fails if the code branch of `authoriseEnrolment` ever consults elevation.
+- **Its own challenge purpose**, so a challenge issued for signing in can never
+  be replayed to raise a session's privilege.
+- **Try first, then ask.** The client attempts the action and re-asserts only
+  on a `needsElevation` refusal, so removing two stale credentials in a row
+  costs one touch rather than two. Exactly one retry: a loop of authenticator
+  dialogs is how somebody is trained to approve them without reading.
+
+**Nothing else asks.** Not the bulk writes, not the Gmail connect, not a status
+change — those are tenant-scoped and reversible, and a prompt you see
+constantly is one you stop reading. The rule is narrow on purpose: an action
+that changes who can get in, or that destroys data across a boundary. Admin
+mode, when it arrives, is the next thing to qualify — see
+`docs/multi-tenant-plan.md`.
 
 ## The research agents need a token now
 

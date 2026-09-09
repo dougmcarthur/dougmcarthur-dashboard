@@ -179,6 +179,35 @@ the same thing whether or not an account matched, since anything else is an
 account-existence oracle. With Google as the primary sign-in the address comes
 from the grant, so there is nothing to type at signup at all.
 
+**Changing who can sign in costs a passkey touch, and almost nothing else
+does.** A session is thirty days — the right length for using the app, the
+wrong credential for changing how you get into it. `POST /auth/register/*` and
+`DELETE /auth/passkeys/:id` took a session alone until migration 0020, so a
+stolen cookie could enrol its own passkey and delete every other, which
+survives *sign out everywhere*: that clears sessions, not credentials. The
+button you would reach for on being compromised was the one that would not
+help.
+
+Both now need a recent assertion. `elevationState` in `shared/auth.ts` is the
+fifteen-minute window, `auth_sessions.elevated_at` records the touch, and
+`/auth/elevate/*` is the login assertion run again under its own challenge
+purpose — so a challenge issued for signing in cannot be replayed to raise a
+session's privilege. Signing in is deliberately *not* elevation: the cookie a
+sign-in produces is the thing being defended against.
+
+**The emailed code is exempt and has to be.** It exists for the case where
+there is no passkey left to touch, so requiring one would make recovery need
+the thing you are recovering from losing. `test/uiConsistency.test.ts` fails if
+either route drops its check *or* if the code branch of `authoriseEnrolment`
+gains one.
+
+The rule stays narrow — an action that changes who can get in, or destroys data
+across a boundary — because a prompt you see constantly is one you stop
+reading. Bulk writes, Gmail connect and status changes are reversible and
+tenant-scoped, and none of them ask. Admin mode is the next thing that will
+(`docs/multi-tenant-plan.md`); the client tries first and re-asserts only on
+refusal, so a burst of removals costs one touch, and retries exactly once.
+
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a
 passkey ceremony — WebAuthn has no non-interactive mode. `API_TOKEN` as a

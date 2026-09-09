@@ -180,6 +180,8 @@ export interface ActiveSession {
   label: string | null
   credentialId: string | null
   expiresAt: string
+  /** Last passkey touch, or null. Not the same as when it signed in. */
+  elevatedAt: string | null
 }
 
 /**
@@ -218,7 +220,13 @@ export async function readSession(
       .where(eq(authSessions.id, id))
   }
 
-  return { id: row.id, label: row.label, credentialId: row.credentialId, expiresAt: row.expiresAt }
+  return {
+    id: row.id,
+    label: row.label,
+    credentialId: row.credentialId,
+    expiresAt: row.expiresAt,
+    elevatedAt: row.elevatedAt,
+  }
 }
 
 export async function destroySession(env: Env, cookieHeader: string | null | undefined): Promise<void> {
@@ -233,11 +241,25 @@ export async function destroyAllSessions(env: Env): Promise<void> {
   await getDb(env.DB).delete(authSessions)
 }
 
+/**
+ * Record that this session has just answered a passkey challenge.
+ *
+ * Stamped on the session rather than handed back as a token, because a token
+ * is a second credential to carry and this one would travel next to the cookie
+ * it is meant to be stronger than.
+ */
+export async function elevateSession(env: Env, sessionId: string, now = new Date()): Promise<void> {
+  await getDb(env.DB)
+    .update(authSessions)
+    .set({ elevatedAt: now.toISOString() })
+    .where(eq(authSessions.id, sessionId))
+}
+
 /* --------------------------------------------------------------------- */
 /* Challenges                                                             */
 /* --------------------------------------------------------------------- */
 
-export type ChallengePurpose = 'registration' | 'authentication'
+export type ChallengePurpose = 'registration' | 'authentication' | 'elevation'
 
 export async function storeChallenge(
   env: Env,

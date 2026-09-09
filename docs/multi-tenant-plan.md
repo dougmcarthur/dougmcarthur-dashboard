@@ -88,18 +88,23 @@ The one thing a second account bought that a mode does not is credential
 separation: a stolen artist session cookie is one POST away from the oversight
 surface, where a stolen artist *account* was not.
 
-So entering admin mode requires a fresh WebAuthn assertion, and the mode
-expires back to artist after thirty minutes. This is `sudo`, and it is the
-pattern GitHub uses for "Confirm access". A cookie alone cannot elevate,
-because elevating needs the authenticator in your hand — and the timeout means
-the window in which a session is admin-capable is measured in minutes rather
-than the thirty days a session lasts.
+So entering admin mode requires a fresh WebAuthn assertion, and the elevation
+lapses after fifteen minutes. A cookie alone cannot elevate, because elevating
+needs the authenticator in your hand — and the window means a session spends
+almost all of its life unable to do any of this.
 
-It reuses the assertion ceremony already in `src/routes/auth.ts` against the
-passkeys already enrolled: no new credential, no new recovery path, no new
-configuration. `auth_sessions` grows a mode and an expiry, and whether the
-elevation has lapsed is decided against a `now` that is handed in, like
-`sessionState` beside it.
+**That mechanism is already built**, ahead of the rest of this plan, because it
+turned out to be a live gap rather than a future one: `POST /auth/register/*`
+and `DELETE /auth/passkeys/:id` accepted a session alone, so a stolen cookie
+could enrol its own passkey and delete every other — which survives "sign out
+everywhere", since that clears sessions and not credentials. Both now need a
+recent assertion, `auth_sessions.elevated_at` records it, and `elevationState`
+in `shared/auth.ts` decides against a `now` it is handed.
+
+Admin mode is the second consumer of the same mechanism, not a new one. The
+general rule it establishes: **an action that changes who can get in, or that
+destroys data across a boundary, asks for the key again** — and nothing else
+does, because a prompt you see constantly is one you stop reading.
 
 ### What oversight reads, and the one thing it writes
 
@@ -252,8 +257,8 @@ rule that took `gig-festival-scan` off the screen.
    backfilled; 0018's indexes rebuilt as composites.
 2. Session resolves a tenant; domain reads and writes take it as an argument;
    agent tokens become per-tenant.
-3. Admin mode: the elevation ceremony and its expiry, then the `/admin`
-   routes and screen.
+3. Admin mode, reusing the elevation already built, then the `/admin` routes
+   and screen.
 4. Invite issue / redeem, with the redemption event.
 5. `tenant_id` to `NOT NULL` on the fourteen domain tables — and on `users`
    too, since every account owns a tenant now, including the owner's.

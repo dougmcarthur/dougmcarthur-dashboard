@@ -1,0 +1,14 @@
+-- A session is thirty days. That is the right length for using the app and the
+-- wrong credential for changing who can get into it: a cookie can be stolen,
+-- and today a stolen one can enrol its own passkey and delete yours — which
+-- survives "sign out everywhere", because that clears sessions, not
+-- credentials.
+--
+-- So the actions that change who can get in ask for the passkey again, and
+-- this column records when that last happened. Null is the state every session
+-- starts in: signing in is not elevation, since the cookie a sign-in produces
+-- is the thing being defended against.
+--
+-- Additive and nullable, so the currently-live Worker reads it as absent
+-- during the half-minute between the migration and the deploy.
+ALTER TABLE auth_sessions ADD COLUMN elevated_at TEXT;

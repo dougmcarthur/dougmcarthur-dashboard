@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ELEVATION_TTL_MINUTES,
   ENROLMENT_CODE_COOLDOWN_SECONDS,
   ENROLMENT_CODE_MAX_ATTEMPTS,
   SESSION_TTL_DAYS,
+  elevationState,
   enrolmentCodeState,
   enrolmentCooldown,
   formatEnrolmentCode,
@@ -231,5 +233,54 @@ describe('enrolmentRecipient', () => {
     // other. Unset means recovery is unavailable and the screen says so.
     expect(enrolmentRecipient({} as never)).toBeNull()
     expect(enrolmentRecipient({ AUTH_EMAIL: '   ' } as never)).toBeNull()
+  })
+})
+
+describe('elevationState', () => {
+  const minutesBefore = (n: number) => new Date(TODAY.getTime() - n * 60_000).toISOString()
+
+  it('treats a session that has never been elevated as not elevated', () => {
+    // The state every session starts in. Signing in is not elevation: the
+    // cookie a sign-in produces is exactly what elevation defends against.
+    expect(elevationState({ now: TODAY, elevatedAt: null }).elevated).toBe(false)
+    expect(elevationState({ now: TODAY, elevatedAt: undefined }).elevated).toBe(false)
+  })
+
+  it('holds for the window and then lapses', () => {
+    expect(elevationState({ now: TODAY, elevatedAt: minutesBefore(1) }).elevated).toBe(true)
+    expect(
+      elevationState({ now: TODAY, elevatedAt: minutesBefore(ELEVATION_TTL_MINUTES - 1) }).elevated,
+    ).toBe(true)
+    expect(
+      elevationState({ now: TODAY, elevatedAt: minutesBefore(ELEVATION_TTL_MINUTES) }).elevated,
+    ).toBe(false)
+    expect(
+      elevationState({ now: TODAY, elevatedAt: minutesBefore(ELEVATION_TTL_MINUTES + 60) }).elevated,
+    ).toBe(false)
+  })
+
+  it('reports when the confirmation runs out', () => {
+    const state = elevationState({ now: TODAY, elevatedAt: minutesBefore(5) })
+    expect(state.expiresAt).toBe(
+      new Date(TODAY.getTime() + (ELEVATION_TTL_MINUTES - 5) * 60_000).toISOString(),
+    )
+  })
+
+  it('refuses a stamp in the future rather than honouring it', () => {
+    // A clock that disagrees must not become an unbounded grant. The safe
+    // direction for a privilege check is to ask again.
+    const ahead = new Date(TODAY.getTime() + 60_000).toISOString()
+    expect(elevationState({ now: TODAY, elevatedAt: ahead }).elevated).toBe(false)
+  })
+
+  it('refuses an unparseable stamp', () => {
+    expect(elevationState({ now: TODAY, elevatedAt: 'sometime' }).elevated).toBe(false)
+  })
+
+  it('is much shorter than a session', () => {
+    // The whole point: a session lasts a month so that people do not stop
+    // locking their screens, and that is far too long to authorise changing
+    // who can sign in.
+    expect(ELEVATION_TTL_MINUTES * 60_000).toBeLessThan(SESSION_TTL_DAYS * 86_400_000 / 100)
   })
 })
