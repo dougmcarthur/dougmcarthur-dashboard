@@ -107,7 +107,7 @@ digest.get('/preview', async (c) => {
 digest.post('/send', async (c) => {
   const settings = await readDigestSettings(c.env)
   if (!mailerConfigured(c.env)) {
-    return c.json({ error: 'email binding not configured' }, 503)
+    return c.json({ error: 'This site cannot send email yet.' }, 503)
   }
 
   const { digest: built, subject, html, text } = await composeDigest(c.env)

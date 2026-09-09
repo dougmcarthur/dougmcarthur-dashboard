@@ -211,6 +211,19 @@ function pitchLengthNote(pitch: string | undefined): { note?: string } {
   }
 }
 
+/**
+ * The readable head of an error, for the notification body.
+ *
+ * Server errors arrive with a JSON payload glued to the end — `401 {"type":
+ * "error","error":{...}}` — and none of that belongs in a bell somebody
+ * checks over coffee. The full text is already in the run log.
+ */
+function firstSentence(detail: string): string {
+  const cut = detail.split(/[{[\n]/)[0].trim().replace(/[:\-–—,]\s*$/, '')
+  const text = cut.length > 8 ? cut : detail.slice(0, 120).trim()
+  return /[.!?]$/.test(text) ? text : `${text}.`
+}
+
 async function main(): Promise<void> {
   const [agentArg, ...flags] = process.argv.slice(2)
   if (!agentArg || !isAgentId(agentArg)) {
@@ -284,8 +297,13 @@ async function main(): Promise<void> {
     }
   } catch (err) {
     status = 'failed'
-    summary = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
-    console.error(summary)
+    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    // The full text goes to the run log, where a person debugging wants it.
+    // What reaches the notification body is a sentence — an exception with a
+    // JSON blob inside it is developer-speak in the bell, and the bell is
+    // read by somebody who wants to know whether to worry, not what threw.
+    console.error(detail)
+    summary = `This run could not finish. ${firstSentence(detail)}`
   } finally {
     // Always, including after a throw. The heartbeat is what
     // `shared/taskCadence.ts` measures, so a run that fails silently is the

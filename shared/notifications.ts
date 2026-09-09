@@ -36,6 +36,7 @@ import type { ReviewItem, QueueSummary } from './reviewQueue'
  * survives colour blindness and the palette stays at two colours.
  */
 import { stalledTasks, type TaskHistory } from './taskCadence'
+import { taskLabel } from './taskLabels'
 
 export type Tier = 'critical' | 'attention' | 'info'
 
@@ -169,8 +170,8 @@ function automationNotes(histories: TaskHistory[], today: string): Draft[] {
     key: `automation:stalled:${task.taskId}`,
     kind: 'automation' as NotificationKind,
     tier: 'critical' as Tier,
-    title: `${task.taskId} has not run in ${task.daysSince} days`,
-    body: `It reported about every ${task.everyDays} days until it stopped. Nothing is collecting opportunities for it.`,
+    title: `${taskLabel(task.taskId)} has not run in ${task.daysSince} days`,
+    body: `It ran about every ${task.everyDays} days until it stopped. Nothing has taken over in the meantime.`,
     href: '#runs',
     action: 'View runs',
   }))

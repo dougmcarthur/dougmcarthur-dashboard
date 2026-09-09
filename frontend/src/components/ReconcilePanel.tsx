@@ -226,9 +226,8 @@ export function ReconcilePanel({ onClose }: { onClose: () => void }) {
           <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
             {error.includes('not configured') ? (
               <span>
-                Gmail not configured — add <code className="bg-danger-bg px-1 rounded">GMAIL_REFRESH_TOKEN</code> as a
-                Worker secret. See{' '}
-                <code className="bg-danger-bg px-1 rounded">docs/gmail-setup.md</code>.
+                Gmail is not connected yet, so there is no sent mail to reconcile against.
+                Connecting it is a server-side setup step.
               </span>
             ) : (
               error

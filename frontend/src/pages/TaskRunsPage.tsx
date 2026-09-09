@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { api } from '../api'
+import { taskLabel } from '../../../shared/taskLabels'
 import { StatusBadge } from '../components/StatusBadge'
 import { SkeletonList } from '../components/Skeleton'
 import { FILTER } from '../components/ui/Field'
@@ -95,10 +96,10 @@ export function TaskRunsPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => setTask(r.taskId)}
-                    title={`Show only ${r.taskId}`}
+                    title={`Show only ${taskLabel(r.taskId)}`}
                     className="text-xs bg-sunken border border-line rounded px-1.5 py-0.5 text-body hover:border-line-strong transition-colors"
                   >
-                    {r.taskId}
+                    {taskLabel(r.taskId)}
                   </button>
                   {r.itemsAdded ? (
                     <span className="text-xs text-muted">

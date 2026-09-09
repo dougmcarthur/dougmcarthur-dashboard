@@ -363,3 +363,66 @@ describe('the shared draft actions open a compose window, never send one', () =>
     expect(src).toContain('unavailable')
   })
 })
+
+/**
+ * Nothing user-facing prints an internal identifier.
+ *
+ * The bell said *"gig-festival-scan has not run in 28 days"*. That string is
+ * the `task_id` an agent POSTs — a handle, not a name — and it had reached
+ * three surfaces before anybody looked at it: the notification title, the
+ * run-event title, and the History page. Slugs read as a leak in a product
+ * and as a bug in a screenshot.
+ *
+ * `taskLabel` in `shared/taskLabels.ts` is the one way to render one, and it
+ * humanises ids it has never seen rather than only the three that exist —
+ * the agents live outside this repo and will invent more.
+ */
+describe('screens name things, they do not print identifiers', () => {
+  const RENDERS_TASKS = [
+    'frontend/src/components/ActivityList.tsx',
+    'frontend/src/pages/TaskRunsPage.tsx',
+  ]
+
+  it('renders a task through its label, never the raw id', () => {
+    for (const file of RENDERS_TASKS) {
+      const src = readFileSync(file, 'utf8')
+      expect(src, file).toContain('taskLabel(')
+      // `{run.taskId}` / `{r.taskId}` straight into JSX is the exact shape
+      // that shipped. The id may still be passed around as a value — it is
+      // what the filter queries on — but it may not be printed.
+      expect(src, file).not.toMatch(/\{\s*\w+\.taskId\s*\}/)
+    }
+  })
+
+  it('builds notification titles from labels too', () => {
+    // The Worker writes these, so the guard has to reach past the frontend.
+    for (const file of ['shared/notifications.ts', 'src/routes/taskRuns.ts']) {
+      const src = readFileSync(file, 'utf8')
+      expect(src, file).toContain('taskLabel')
+      expect(src, file).not.toMatch(/title:\s*`\$\{\s*(task\.)?taskId\s*\}/)
+    }
+  })
+
+  it('points at no file inside this repository', () => {
+    // Two cards said "See docs/gmail-setup.md". Nobody holding only the app
+    // can open that, and once there is a second artist it is meaningless. The
+    // variable names stay — on a configuration card they are the actionable
+    // fact — but a path into a git repository is not a thing to render.
+    for (const file of FILES.filter((f) => f.endsWith('.tsx'))) {
+      const src = withoutComments(readFileSync(file, 'utf8'))
+      expect(src, file).not.toMatch(/<code[^>]*>[^<]*\.md</)
+    }
+  })
+
+  it('keeps WebAuthn vocabulary out of what a signed-out person reads', () => {
+    // "relying party not configured" is precise and useless: it names our
+    // internals and nothing the reader can act on. The log keeps the exact
+    // version; the screen gets a sentence.
+    const src = readFileSync('src/routes/auth.ts', 'utf8')
+    const shown = [...src.matchAll(/error:\s*'([^']+)'/g)].map((m) => m[1])
+    for (const message of shown) {
+      expect(message.toLowerCase(), message).not.toContain('relying party')
+      expect(message.toLowerCase(), message).not.toContain('binding')
+    }
+  })
+})

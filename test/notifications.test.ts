@@ -384,7 +384,10 @@ describe('a scheduled agent that has stopped', () => {
     expect(stalled).toBeDefined()
     expect(stalled!.tier).toBe('critical')
     expect(stalled!.kind).toBe('automation')
-    expect(stalled!.title).toContain('gig-festival-scan')
+    // The name, never the id. `gig-festival-scan` is the string the agent
+    // POSTs as its task_id, and it read as developer-speak in the bell.
+    expect(stalled!.title).toContain('Gig research')
+    expect(stalled!.title).not.toContain('gig-festival-scan')
   })
 
   it('says nothing while the agent is still reporting', () => {
