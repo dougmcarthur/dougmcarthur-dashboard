@@ -17,6 +17,7 @@ import notifications, { pruneNotifications } from './routes/notifications'
 import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
 import replies, { runReplyScan } from './routes/replies'
+import backfill from './routes/backfill'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
 import { isDigestDue } from '../shared/digestSchedule'
 import { sendMail, mailerConfigured } from './lib/mailer'
@@ -45,6 +46,7 @@ app.route('/api/artist', artist)
 app.route('/api/reference-docs', reference)
 app.route('/api/task-runs', taskRuns)
 app.route('/api/reminders', reminders)
+app.route('/api/backfill', backfill)
 app.route('/api/health', health)
 app.route('/api/replies', replies)
 app.route('/api/notifications', notifications)

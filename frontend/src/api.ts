@@ -483,6 +483,15 @@ export const api = {
      */
     draft: (id: number) => apiFetch<ReplyDraftResponse>(`/replies/${id}/draft`),
   },
+  /**
+   * Filling the columns migration 0001 added and nobody wrote to. Preview
+   * first, then apply — a bulk write you cannot look at is one you find out
+   * about afterwards.
+   */
+  backfill: {
+    preview: () => apiFetch<BackfillPlan>('/backfill/notes'),
+    apply: () => apiFetch<BackfillResult>('/backfill/notes', { method: 'POST' }),
+  },
   referenceDocs: {
     list: () => apiFetch<ReferenceDoc[]>('/reference-docs'),
     create: (body: { id: string; title: string; content: string }) =>
@@ -516,4 +525,25 @@ export const api = {
     ) =>
       apiFetch<DigestSettings>('/digest/settings', { method: 'PATCH', body: JSON.stringify(body) }),
   },
+}
+
+/** One row a notes backfill would touch. See src/routes/backfill.ts. */
+export interface BackfillRowPlan {
+  table: 'gig' | 'sync'
+  id: number
+  name: string
+  changes: Array<{ column: string; from: string | number | null; to: string | number | null }>
+}
+
+export interface BackfillPlan {
+  scanned: number
+  wouldChange: number
+  byColumn: Record<string, number>
+  rows: BackfillRowPlan[]
+}
+
+export interface BackfillResult {
+  scanned: number
+  changed: number
+  byColumn: Record<string, number>
 }
