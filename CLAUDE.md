@@ -1,8 +1,22 @@
-# Music HQ
+# Sun Dogs Music Scout
 
 Cloudflare Worker (Hono) + D1 + a React/Vite/Tailwind dashboard, for one
 person's gig, sync and promo pipeline. Deployed by GitHub Actions on every push
 to `main`.
+
+**The name is a house mark plus a product name**, and the shape is deliberate:
+*Scout*, by *Sun Dogs Music*. The bare word attracts an aggressive rights
+holder — Scouting America litigates on a dilution theory, including against
+businesses in unrelated trades — so the product is never branded on "Scout"
+standing alone. Say Scout, write Sun Dogs Music Scout. "Music Scout" is
+avoided on purpose: in the trade that phrase means an A&R person who scouts
+*talent*, which is the reverse of what this does.
+
+Infrastructure identifiers still carry the old name — the D1 database is
+`dougmcarthur-music-hq` and the Worker is `dougmcarthur-dashboard`. Neither is
+user-visible and neither can be renamed by editing a string: a D1 rename is a
+data migration, and a Worker rename is a new Worker with its domains and
+secrets re-attached. They stay until there is a reason worth that.
 
 ## Database changes go through wrangler migrations, applied by CI
 
@@ -98,12 +112,15 @@ date can go stale in the hours between. That cost run 28. CI now runs the suite
 twice, the second time under `TZ=Pacific/Auckland`, so the check CLAUDE.md
 prescribes is no longer one anybody has to remember.
 
-**There is no HTTP smoke test, on purpose.** Cloudflare Access sits in front of
-`dashboard.dougmcarthur.net`, so a request from a runner gets the login
-redirect and never reaches the Worker. A check that can only ever see the front
-door proves nothing and adds a way for a good deploy to go red. `wrangler
-deployments status` is the last step instead: it asks Cloudflare what is
-serving traffic rather than inferring it from an exit code.
+**There is still no HTTP smoke test.** It used to be impossible: Cloudflare
+Access sat in front of `dashboard.dougmcarthur.net`, so a request from a runner
+got the login redirect and never reached the Worker. Since passkey login
+replaced Access the request does reach the Worker — and gets a 401, because
+every `/api` route now needs a credential. So the reason changed and the
+conclusion did not: a check that can only ever see the front door proves
+nothing and adds a way for a good deploy to go red. `wrangler deployments
+status` is the last step instead: it asks Cloudflare what is serving traffic
+rather than inferring it from an exit code.
 
 `wrangler` is at 4.129.1 and `@cloudflare/workers-types` at 5. They move
 together — 4.129 peers on `^5`, so bumping one alone fails to resolve. The
@@ -118,6 +135,161 @@ non-interactive context: yes`. There is no `--yes` flag to fall back on. Check
 that line still appears in the run log after a wrangler bump.
 
 ## Conventions worth knowing before changing things
+
+**The Worker is the security boundary now, and it was not before.** Cloudflare
+Access used to authenticate at the edge — it emailed a six-digit one-time PIN,
+and its login page also offered *Sign in with Cloudflare*, which signed you
+into the Cloudflare **account** and dropped you at `dash.cloudflare.com`
+instead of here. `src/index.ts` had no auth in it at all as a result. Login is
+a WebAuthn passkey now, verified in the Worker, which changes what a mistake
+costs: a route that is not authenticated is public to the internet rather than
+public to whoever Access already trusted. So the check is **one middleware over
+`/api/*` with a written-down exemption list** (`PUBLIC_API_PREFIXES`) rather
+than something each router opts into — a router added tomorrow is covered by
+doing nothing. See `docs/passkey-login.md`.
+
+**Email still sends a code, and the code is not a login.** A passkey lives on a
+device and a device can be lost; D1 is not somewhere you can reset a login from
+and there is no identity provider in front any more, so there has to be a way
+back that does not need hardware you no longer have. The emailed code
+authorises **adding a passkey** — single use, five guesses, fifteen minutes,
+one live at a time — and the session you end up with is the one enrolment
+produced. A code that opened a session directly would be the old Access login
+wearing the new screen's clothes, which is why `test/uiConsistency.test.ts`
+fails if the code reaches a login endpoint or if the button taking it stops
+saying *Add a passkey*.
+
+**The research agents lost their front door and were given a token.** They POST
+and PATCH from outside this repo and outside a browser, so they cannot do a
+passkey ceremony — WebAuthn has no non-interactive mode. `API_TOKEN` as a
+bearer is their credential, checked before the session because it is a string
+compare and the session is a D1 read. Unset, there is no bearer path at all, so
+an empty deployment cannot be opened by guessing the empty string — but unset
+*at deploy time* is how every agent request silently becomes a 401. **Not at
+Access-removal time**, which is the easy thing to get backwards: Access
+authenticated at the edge and the Worker then trusted whatever arrived, so it
+never supplied a credential this middleware would accept. The secret and the
+agents' side of it are prerequisites of the deploy. That ordering is the one
+dangerous step in the rollout and it is written down in
+`docs/passkey-login.md`.
+
+**`DASHBOARD_URL` stopped being cosmetic.** Its hostname is the WebAuthn
+relying-party ID, which is baked into every credential at registration and
+checked on every assertion — so changing the hostname invalidates every passkey
+already enrolled. It is read from the var rather than from the request because
+a request header is written by whoever is asking; the request URL is only
+consulted when nothing is configured, which in practice means `wrangler dev`.
+`relyingParty` in `shared/auth.ts` is where that decision lives, and local
+development is deliberately two origins, because Vite serves the browser on
+5173 and proxies to wrangler on 8787.
+
+**The read path is three unbounded scans, and they are indexed now.**
+`composeFeed` and `buildReviewQueue` both open by reading every gig, every
+sync target and every promo draft, newest first. None of those orderings had
+an index, so production answered `SCAN gig_opportunities` + `USE TEMP B-TREE
+FOR ORDER BY` and reported **68 rows read to return 34**. Migration 0018 adds
+the three, plus `task_runs(run_at)` and two on `reminders`. The doubling is
+not why it matters: `WHERE tenant_id = ?` against an unindexed table scans
+*everybody's* rows to draw one artist's page, so **when `tenant_id` arrives
+every one of those indexes becomes a composite with `tenant_id` first** — an
+index that does not lead with the filtered column is one the planner declines
+to use.
+
+**The bell polls every five minutes, not every minute.** It costs a full
+`composeFeed` — about 155 rows on this database — so a tab open for eight
+hours was spending ~74,000 D1 row reads a day watching for a badge that
+rarely moved. Nothing in the feed is minute-sensitive; deadlines are measured
+in days and events arrive on an hourly cron. `refetchOnWindowFocus` is what
+makes it feel live, so the interval is the floor for a tab you are already
+staring at, not the delay before you learn anything.
+
+**Compressing stored text was measured and rejected; do not re-propose it.**
+Every piece of prose in production — gig notes, reference docs, reply
+snippets, sync notes, event bodies — totals about **76 KB**, inside a **408 KB**
+database, against a **5 GB** free-tier allowance. And per-row gzip, which is
+how a column would actually store it, gets only **1.5×** on these strings
+(22,985 bytes of gig notes → 15,301): 672-byte values are too short for the
+dictionary to pay for itself, and base64-ing the result back into a TEXT
+column gives most of that back. It would also spend CPU on a 10 ms-per-request
+budget to decompress prose that `reviewParse` has to read on every queue
+build. The costs that bind here are **rows read** and **requests**, and
+compression moves neither. Retention is likewise already handled where it
+churns — `notification_events` and `notification_marks` both prune at 30 days,
+and no other table grows fast enough to have a policy worth writing.
+
+**The research agents run in CI, and their instructions are files.** They were
+scheduled Claude sessions on one laptop until August 2026. Now
+`.github/workflows/agents.yml` holds the three schedules, `agent-run.yml` is
+the reusable mechanics, and `scripts/agents/run.ts` drives a tool-runner loop
+with server-side web search. The prompts are `scripts/agents/prompts/*.md` —
+in the repository on purpose: a change to how an agent behaves arrives as a
+diff somebody can read, and an agent that disappears leaves a hole in
+`git log` rather than in a UI nobody opens.
+
+Four things about it that are not obvious:
+
+- **The tool runner does not auto-resume `pause_turn`, and web search is what
+  triggers one.** Left alone, a long sweep stops mid-way and returns as if it
+  had finished — no error, no warning, a silently truncated answer that would
+  look like a quiet week. `run.ts` iterates the runner and pushes the paused
+  turn back; a run that still ends paused is recorded `incomplete`, never `ok`.
+- **The heartbeat is posted by the script, in a `finally`, not offered to the
+  agent as a tool.** An agent that crashed or forgot would leave no row, which
+  is exactly the invisibility that let three schedules die unnoticed. This is
+  what arms `shared/taskCadence.ts`, so it has to be something the agent
+  cannot skip. Verified: a run that dies on a bad API key still files a
+  `failed` row carrying the error.
+- **The agents get named, typed tools and never a general HTTP tool.** They
+  read a lot of festival pages, and a festival page is untrusted text written
+  by somebody else. `create_gig_opportunity` is one prompt injection away from
+  being safe; `http_request` would be one away from `DELETE /api/gigs/12`.
+- **JSON Schema, not the Zod helper.** `betaZodTool` is built against Zod 4 and
+  this repo is on Zod 3, which every route validator uses. Upgrading Zod to get
+  nicer tool definitions would put the Worker's request validation in the blast
+  radius of a script.
+
+Dry run is the default, as in `scripts/backfill-deadlines.ts`: nothing is
+written without `--apply`. A scheduled run always applies; a hand-triggered one
+applies only when asked.
+
+**A stopped agent is a condition, and nothing was watching for it.** The three
+research agents — `gig-festival-scan`, `sync-pitch-research`,
+`monthly-promo-checkin` — ran on a cadence from June, stopped within a week of
+each other in early August, and nobody noticed for a month. Every part needed
+to notice already existed: `task_runs` logs every run, the bell has a feed,
+housekeeping runs daily. None was looking. A missing gig is invisible in a way
+a wrong one is not — there is no row to be wrong.
+
+`shared/taskCadence.ts` fixes that, and it is a **condition** rather than an
+event because staleness is derivable from current state and self-heals the
+moment a run posts; an event row would outlive the situation it describes.
+Three things about how it decides:
+
+- **The cadence is measured, not configured.** Nothing declares that
+  `gig-festival-scan` is weekly — the schedule lives outside this repo, and a
+  settings row saying "weekly" is a second place for the truth to drift from.
+  The median gap between its own runs is the only claim available, and it
+  re-measures itself when a schedule changes. Median, not mean, so one holiday
+  cannot double the threshold and blind the check for a month.
+- **It is rated `critical`, unlike a failed run.** `runTier` rates a failure
+  `attention` because the next tick retries it. Nothing retries a schedule that
+  has stopped, which puts it squarely in what `critical` is reserved for —
+  plumbing broken now, costing you silently.
+- **It under-reports on purpose.** A floor of three days stops a task that ran
+  twice in a morning alarming by lunchtime; a ceiling of 45 days stops the
+  monthly agent — three runs, two gaps — from setting a threshold near eighty.
+  At the time of writing the monthly one is 35 days quiet and this does not
+  flag it. That is the safe direction: an alarm you learn to dismiss is worse
+  than none, and the ceiling still raises it inside six weeks.
+
+**A task that has never run cannot be missed**, because absence leaves no row.
+The check is a floor, not a guarantee.
+
+The parser earns its own test. Two production rows hold `2026-07-17 19:24:50` —
+a space instead of a `T`, no zone — which `Date.parse` may read as *local*
+time. Under `TZ=Pacific/Auckland` that is twelve hours out, enough to move a
+day count. `parseRunAt` reads a zoneless stamp as UTC, because that is the
+runner that wrote it.
 
 **Statuses say who decided.** `shortlisted`/`passed` are the artist's
 decisions; `invited`/`declined` are the organiser's. The old `approved` and
@@ -206,6 +378,88 @@ photographer credit is unusable the day it is added.
 differently per audience and reports what is stale or missing inside it. A file
 exported in March cannot tell you its photo credit went missing in April, which
 is the whole reason this is assembled on read.
+
+**Gmail drafting is a grant the person makes, not a secret somebody pasted.**
+Every Google token before this one was obtained at a terminal and stored with
+`wrangler secret put`. That cannot work for a feature where the *user* decides
+whether to connect: consent happens in their browser and what comes back has
+to be written at runtime. Secrets cannot be written at runtime, so migration
+0019 adds `google_grants` — keyed by **purpose**, so revoking drafting cannot
+also blind the read-only reply matcher.
+
+**The scope is wider than this repo's habit, knowingly.** Gmail's narrowest
+scope that creates a draft is `gmail.compose`, and it also permits *sending*;
+there is no drafts-only option. So the guarantee that nothing goes out on its
+own stops being enforced by Google and starts being enforced here — by there
+being no send call in `src/lib/googleGrant.ts` and by
+`test/uiConsistency.test.ts` failing if a Send button appears. The connect
+screen says exactly that, in those words, because a permission that protects
+less than the reader assumes is the kind of thing to write down rather than
+imply.
+
+The refresh token is **AES-GCM encrypted** with `TOKEN_ENCRYPTION_KEY`. It is
+the only value in D1 that is a credential somewhere else; everything else in
+there is prose.
+
+Three properties the route keeps:
+
+- **It previews first**, like the other two bulk writes, and the interesting
+  half of the preview is the **skipped** list. "Drafted four of seven" without
+  saying which three is a worse answer than not drafting, and the three
+  reasons — no address, no pitch, already pitched — each want something
+  different done about them.
+- **It re-plans server-side** rather than trusting the ids the screen sends. A
+  preview can be minutes old, and a target pitched in the meantime must not be
+  drafted because a stale screen still listed it.
+- **It writes no status.** A draft in your drafts folder is not a pitch that
+  went out, so nothing moves to `pitched` here. Same separation the reply
+  router keeps, for the same reason: two things that can be wrong
+  independently should be two actions.
+
+`prompt=consent` and `access_type=offline` are set explicitly rather than left
+to default, because Google returns a refresh token only on a fresh consent —
+without them the grant appears to work and stops an hour later.
+
+**A draft can open a compose window, and that is still not sending.**
+`shared/mailto.ts` builds a `mailto:` or Gmail-compose URL from a subject and
+body; `DraftActions` mounts Copy beside them wherever a draft is rendered —
+the reply draft and the sync pitch, which are the same shape and were the
+second copy, so the shell was extracted rather than written twice. A pre-filled
+compose window is not a send: the person's own Send button is still the last
+step, which is the line this app has always stopped at.
+
+The reason it is a module rather than a template is **length, and how it
+fails**. A `mailto:` URL past the platform ceiling does not truncate and does
+not error — on Windows the click does nothing at all. That is the same defect
+as the 150-character field that truncates mid-word on paste, so the length is
+measured *after* encoding and a draft that will not fit is not given a button
+that would lie about working; the screen names the handler and says why
+instead. Budgets are deliberately under the lowest credible figure —
+`mailto` 1,800, Gmail 4,000 — because being conservative costs a Copy button
+and being optimistic costs a click that does nothing. **Copy is never withheld**;
+it is the fallback that always works, and `test/uiConsistency.test.ts` fails if
+it ever sits behind the same length test.
+
+Encoding is not `encodeURIComponent` alone: it leaves `!'()*` alone, which some
+clients read as delimiters and truncate on, and it writes a newline as `%0A`
+where the RFC wants `%0D%0A`.
+
+**The two handlers are judged separately**, which is the whole reason both are
+offered: measured on real pitch prose, `mailto` runs out at about **190 words**
+and Gmail carries roughly 450. A 200-word pitch therefore gets Copy and Gmail,
+with mailto hidden and named. Encoding costs about 1.45×, mostly newlines
+tripling.
+
+So `sync-pitch-research` is told to write **150 words**, and the reason given
+to it is the editorial one rather than the technical one: a cold pitch to a
+music supervisor is competing with a hundred others and the short one gets
+read. "Our URL encoder has a limit" is a bad reason to shorten a pitch and
+"supervisors do not read four paragraphs" is a good one, and they happen to
+land in the same place. The tool result feeds the word count back when a draft
+runs long, so the agent can correct on the *next* target in the same run rather
+than only on the next run. It is guidance, never a refusal — a hard reject at
+the API would let a URL encoding limit veto editorial judgement, and lose the
+draft on the way.
 
 **The app drafts an application; it never submits one.** Phase 3 reads the
 form, stages an answer per field from the artist database and lists what has to

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api'
 import { Button } from './ui/Button'
+import { DraftActions } from './DraftActions'
 
 /**
  * The answer to an organiser's question, drafted from the artist database.
@@ -16,7 +17,6 @@ import { Button } from './ui/Button'
  */
 export function ReplyDraftPanel({ replyId }: { replyId: number }) {
   const [open, setOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
 
   const query = useQuery({
     queryKey: ['reply-draft', replyId],
@@ -98,20 +98,10 @@ export function ReplyDraftPanel({ replyId }: { replyId: number }) {
             </div>
           )}
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="neutral"
-              onClick={() => {
-                navigator.clipboard.writeText(`${draft.subject}\n\n${draft.body}`)
-                setCopied(true)
-              }}
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </Button>
-            <span className="text-xs text-faint">
-              Send it from your mail. Nothing here goes out on its own.
-            </span>
-          </div>
+          <DraftActions
+            draft={{ subject: draft.subject, body: draft.body }}
+            note="Send it from your mail. Nothing here goes out on its own."
+          />
         </>
       )}
     </div>

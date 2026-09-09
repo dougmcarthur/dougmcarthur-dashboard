@@ -5,7 +5,8 @@ opportunities, deciding which to apply to, preparing the applications, and
 tracking the sync-licensing pitches, promo drafts and automated task runs
 alongside them. Runs entirely on Cloudflare: a Hono API on Workers,
 a D1 (SQLite) database, and a React frontend served as static assets from the
-same Worker. The live site sits behind Cloudflare Access.
+same Worker. Login is a passkey, verified in the Worker — see
+[`docs/passkey-login.md`](docs/passkey-login.md).
 
 ## Where things stand
 
@@ -52,6 +53,10 @@ website and the press photos are still unread.)
   routing (`frontend/src/`). Built to `dist/` and served via the Worker's
   `ASSETS` binding. Screens: Overview, **Review**, Gigs, **Artist**, Sync,
   Promo, Settings, History.
+- **Login** — a WebAuthn passkey, verified in the Worker
+  (`src/routes/auth.ts`). This replaced Cloudflare Access, which emailed a
+  one-time PIN; email is now only how you *add* a passkey. See
+  [`docs/passkey-login.md`](docs/passkey-login.md).
 - **Integrations** — Google Calendar (three kinds of entry, reconciled against
   a gig's state — see [The gig pipeline](#the-gig-pipeline)), Gmail
   (`readonly`, reconciling sent pitches against sync targets and reading
@@ -68,8 +73,9 @@ src/
   db/                 Drizzle client + schema
   routes/             One Hono router per resource (gigs, artist, application, …)
   lib/                Everything that touches the outside: googleCalendar.ts,
-                      gmail.ts, mailer.ts, gigCalendar.ts, formParser.ts,
-                      applicationPrep.ts, digestMail.ts, settings.ts
+                      gmail.ts, mailer.ts, auth.ts, gigCalendar.ts,
+                      formParser.ts, applicationPrep.ts, digestMail.ts,
+                      settings.ts
 frontend/             React + Vite app (its own tsconfig.frontend.json)
 shared/               Pure logic imported by BOTH: wire types, the review queue,
                       digest content, the gig-status vocabulary, the artist
@@ -102,6 +108,18 @@ All routes are under `/api`; anything else falls through to static assets.
 | `/api/replies` | Replies found in the mail; `POST /scan`, `POST /:id/accept`, `POST /:id/dismiss` |
 | `/api/notifications` | The bell feed; `POST /read`, `POST /dismiss` |
 | `/api/health` | Which Google/Gmail secrets are configured |
+| `/api/auth` | Passkey login: `GET /session`, `POST /login/options` + `/login/verify`, `POST /enrol/request`, `POST /register/options` + `/register/verify`, `GET`/`DELETE /passkeys`, `POST /logout` |
+
+> **Everything but `/api/auth/*` needs a credential.** A middleware in
+> `src/index.ts` answers 401 to anything carrying neither a session cookie nor
+> a bearer `API_TOKEN`, so the Worker — not Cloudflare Access — is now the
+> security boundary. A router added without a thought about auth is covered by
+> it; the only way to be public is to be named in `PUBLIC_API_PREFIXES`.
+>
+> The out-of-repo research agents authenticate with the bearer token, because
+> they run headless and WebAuthn has no non-interactive mode. Setting
+> `API_TOKEN` is not optional once Access is off — see
+> [`docs/passkey-login.md`](docs/passkey-login.md).
 
 > Route order matters. `/api/sync/reconcile` is registered **before**
 > `/api/sync`, so the sync router's `/:id` handler doesn't swallow it, and
@@ -702,9 +720,12 @@ read — a flake there once took `main` down for a reason unrelated to the code.
 `d1 migrations apply` deliberately does **not**, because "try it again" is the
 wrong instinct about a write that may have half-landed.
 
-There is no HTTP smoke test on purpose: Access sits in front of the domain, so
-a runner only ever reaches the login redirect. `wrangler deployments status` is
-the last step instead — it asks Cloudflare what is serving traffic rather than
+There is still no HTTP smoke test. It used to be impossible — Cloudflare
+Access sat in front of the domain, so a runner only ever reached the login
+redirect — and now it is merely not worth it: every `/api` route answers 401
+without a credential, so the only thing a runner could check unauthenticated is
+that the front door is shut. `wrangler deployments status` is the last step
+instead, because it asks Cloudflare what is serving traffic rather than
 inferring it from an exit code.
 
 It needs two repository secrets (Settings → Secrets and variables → Actions):
@@ -713,6 +734,30 @@ It needs two repository secrets (Settings → Secrets and variables → Actions)
 | --- | --- |
 | `CLOUDFLARE_API_TOKEN` | API token with **Workers Scripts → Edit**, **D1 → Edit** and **Account Settings → Read**, scoped to the account owning this Worker |
 | `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account ID |
+
+The research agents (`.github/workflows/agents.yml`) need two more, plus an
+optional variable:
+
+| Secret | Value |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | Runs the agents' model calls |
+| `SCOUT_API_TOKEN` | The same value as the Worker's `API_TOKEN` secret — the bearer the middleware checks |
+
+Gmail drafting (Settings → Sync → *Pitch drafts to Gmail*) needs one Worker
+secret and one thing registered with Google:
+
+| Worker secret | Value |
+| --- | --- |
+| `TOKEN_ENCRYPTION_KEY` | Any long random string. Encrypts the stored Google refresh token. |
+
+In Google Cloud → APIs & Services → Credentials, add
+`https://<your host>/api/gmail/callback` as an authorised redirect URI on the
+same OAuth client the Calendar and Gmail integrations already use. Register
+one per hostname the app is served from.
+
+| Variable | Value |
+| --- | --- |
+| `SCOUT_API_URL` | The app's origin. Set it when the app moves to its own hostname; the script defaults to the current one. |
 
 **D1 · Edit, not Read.** `wrangler d1 migrations list` hits the write-capable
 `/query` endpoint, so a read-scoped token fails with `code: 7403` — and because
@@ -743,3 +788,11 @@ Set production secrets once with `wrangler secret put`:
   settings if you haven't already.
 - Run `wrangler whoami` and `wrangler deploy --dry-run` to confirm the config
   matches the live Worker before publishing.
+- `API_TOKEN` must be set (`wrangler secret put API_TOKEN`) and handed to the
+  research agents **before this Worker deploys** — not before Access is
+  switched off, which is the easy mistake. Access authenticated at the edge
+  and the Worker trusted whatever arrived, so it never supplied a credential
+  the new middleware accepts. Every agent POST becomes a 401 from the deploy
+  onwards, and nothing in the repository would notice.
+- `DASHBOARD_URL` is now the WebAuthn relying-party ID as well as the digest's
+  link base. Changing its hostname invalidates every enrolled passkey.

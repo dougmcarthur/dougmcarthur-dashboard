@@ -10,7 +10,7 @@
     "build": "npm run build:ui && npm run deploy",
     "predeploy": "npm run typecheck && npm run test",
     "deploy": "wrangler deploy",
-    "typecheck": "npm run typecheck:api && npm run typecheck:ui",
+    "typecheck": "npm run typecheck:api && npm run typecheck:ui && npm run typecheck:agents",
     "typecheck:api": "tsc --noEmit -p tsconfig.json",
     "typecheck:ui": "tsc -p tsconfig.frontend.json",
     "test": "vitest run",
@@ -18,18 +18,24 @@
     "db:generate": "drizzle-kit generate",
     "db:bootstrap:local": "node scripts/bootstrap-local-db.mjs",
     "db:migrate:local": "npm run db:bootstrap:local && wrangler d1 migrations apply dougmcarthur-music-hq --local",
-    "db:migrate:remote": "wrangler d1 migrations apply dougmcarthur-music-hq --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply dougmcarthur-music-hq --remote",
+    "typecheck:agents": "tsc -p tsconfig.scripts.json",
+    "agent": "tsx scripts/agents/run.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.4.3",
+    "@simplewebauthn/server": "^13.3.3",
     "drizzle-orm": "^0.44.1",
     "hono": "^4.7.11",
     "zod": "^3.25.64"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "@cloudflare/workers-types": "^5.20260908.1",
+    "@simplewebauthn/browser": "^13.3.0",
     "@tanstack/react-query": "^5.80.7",
     "@tanstack/react-table": "^8.21.3",
+    "@types/node": "^22.20.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.5.2",

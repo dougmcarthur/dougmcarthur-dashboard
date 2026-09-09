@@ -338,19 +338,129 @@ export interface DigestPreview {
   schedule: DigestSchedule
 }
 
+/**
+ * Fired when the Worker says the session is gone.
+ *
+ * Every screen makes its own requests, so the first one to be turned away is
+ * arbitrary — which is why this is an event rather than a return value. The
+ * gate listens once and re-asks who is signed in; without it a session that
+ * expires mid-visit reads as every panel on the page failing separately with
+ * "not signed in".
+ */
+export const UNAUTHENTICATED_EVENT = 'mhq:unauthenticated'
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
+    // The session cookie is same-origin and would be sent anyway; saying so
+    // keeps it working if the API ever moves to its own host.
+    credentials: 'same-origin',
     ...init,
   })
   if (!res.ok) {
+    if (res.status === 401) window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT))
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error((err as { error: string }).error)
   }
   return res.json()
 }
 
+/** Who is signed in, and what the login screen may offer. */
+export interface SessionState {
+  authenticated: boolean
+  label: string | null
+  /** Whether any passkey exists yet. False means set-up, not sign-in. */
+  enrolled: boolean
+  /** Whether an emailed setup code can be sent at all. */
+  recoveryAvailable: boolean
+}
+
+export interface PasskeySummary {
+  id: string
+  label: string
+  createdAt: string
+  lastUsedAt: string | null
+  /** False means losing the device loses the passkey. */
+  backedUp: boolean
+  /** The one this browser signed in with. */
+  current: boolean
+}
+
+
+/** A Google authorisation granted in the browser. See src/lib/googleGrant.ts. */
+export interface GmailGrant {
+  connected: boolean
+  accountEmail: string | null
+  grantedAt: string | null
+  lastUsedAt: string | null
+  /** False when Google handed back less than was asked for. */
+  canDraft: boolean
+  /** Whether the deployment can offer this at all. */
+  configured: boolean
+}
+
+export interface GmailDraftPlan {
+  ready: Array<{ id: number; name: string; to: string; subject: string; body: string }>
+  skipped: Array<{ id: number; name: string; reason: string }>
+  grant: GmailGrant
+}
+
+export interface GmailDraftResult {
+  created: Array<{ id: number; name: string; draftId: string }>
+  failed: Array<{ id: number; name: string; error: string }>
+  skipped: Array<{ id: number; name: string; reason: string }>
+}
+
 export const api = {
+  auth: {
+    session: () => apiFetch<SessionState>('/auth/session'),
+    logout: () => apiFetch<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
+    logoutEverywhere: () => apiFetch<{ ok: boolean }>('/auth/logout-everywhere', { method: 'POST' }),
+    loginOptions: () =>
+      apiFetch<{ ceremony: string; options: Record<string, unknown> }>('/auth/login/options', {
+        method: 'POST',
+      }),
+    loginVerify: (body: { ceremony: string; response: unknown }) =>
+      apiFetch<{ ok: boolean; label: string }>('/auth/login/verify', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    requestCode: () =>
+      apiFetch<{ sent: boolean; to: string; expiresAt: string }>('/auth/enrol/request', {
+        method: 'POST',
+      }),
+    registerOptions: (body: { code?: string }) =>
+      apiFetch<{ ceremony: string; options: Record<string, unknown> }>('/auth/register/options', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    registerVerify: (body: { ceremony: string; response: unknown; code?: string; label?: string }) =>
+      apiFetch<{ ok: boolean; label: string }>('/auth/register/verify', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    passkeys: () => apiFetch<{ items: PasskeySummary[] }>('/auth/passkeys'),
+    revoke: (id: string) =>
+      apiFetch<{ ok: boolean; remaining: number }>(`/auth/passkeys/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
+  },
+  /**
+   * Gmail drafting. Connecting is a browser navigation rather than a fetch —
+   * it ends at Google's consent screen, which is not something an XHR can
+   * show you.
+   */
+  gmail: {
+    status: () => apiFetch<GmailGrant>('/gmail/status'),
+    preview: () => apiFetch<GmailDraftPlan>('/gmail/drafts'),
+    apply: (ids?: number[]) =>
+      apiFetch<GmailDraftResult>('/gmail/drafts', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      }),
+    disconnect: () => apiFetch<{ ok: boolean }>('/gmail/disconnect', { method: 'POST' }),
+    connectHref: '/api/gmail/connect',
+  },
   overview: () => apiFetch<Overview>('/overview'),
   review: (params?: { filter?: ReviewFilter; limit?: number }) => {
     const qs = params

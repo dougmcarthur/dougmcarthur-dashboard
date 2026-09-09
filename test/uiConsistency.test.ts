@@ -19,6 +19,12 @@ function tsxFiles(dir: string): string[] {
 
 const FILES = tsxFiles('frontend/src')
 
+/** Source with comments removed, for rules about what a screen *says*. */
+function withoutComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+}
+
+
 describe('no dead hover states', () => {
   it('never sets hover:bg-X on an element already painted bg-X', () => {
     const offenders: string[] = []
@@ -210,7 +216,10 @@ describe('the reply draft offers to copy, never to send', () => {
   })
 
   it('offers copying instead', () => {
-    expect(src).toContain('navigator.clipboard.writeText')
+    // Copying moved into DraftActions when the sync pitch needed the same
+    // three affordances. The rule did not move: this panel must still put a
+    // copy in reach, it just does it by mounting the shared shell.
+    expect(src).toContain('<DraftActions')
   })
 
   it('quotes the sentence each ask was read from', () => {
@@ -231,6 +240,7 @@ describe('a panel that writes in bulk previews first', () => {
   const BULK = [
     'frontend/src/pages/artist/SourcePanel.tsx',
     'frontend/src/components/NotesBackfillCard.tsx',
+    'frontend/src/components/GmailDraftsPanel.tsx',
   ]
 
   it('uses the shared shell rather than a third hand-rolled one', () => {
@@ -250,5 +260,106 @@ describe('a panel that writes in bulk previews first', () => {
       expect(write, file).toBeGreaterThan(-1)
       expect(preview, file).toBeLessThan(write)
     }
+  })
+})
+
+/**
+ * Login is a passkey. Email adds one; it does not sign you in.
+ *
+ * The dashboard was behind Cloudflare Access, which mailed a six-digit code
+ * and also offered "Sign in with Cloudflare" — a button that authenticated
+ * you into the Cloudflare *account* and landed you on `dash.cloudflare.com`
+ * instead of here. Both are gone.
+ *
+ * What survives is a code that adds a passkey, and the distinction is the
+ * only thing standing between this design and the one it replaced: a code
+ * that opened a session would be the emailed login again, wearing the new
+ * screen's clothes. It is a rule about labels as much as about routes — the
+ * button that takes a code says "Add a passkey", and the day it says "Sign
+ * in" the two have quietly become the same thing again.
+ */
+describe('the login screen signs in with a passkey, never with a code', () => {
+  const src = readFileSync('frontend/src/components/LoginScreen.tsx', 'utf8')
+
+  it('offers no password field', () => {
+    expect(src).not.toMatch(/type=["']password["']/)
+  })
+
+  it('never offers to sign in with Cloudflare', () => {
+    // The button that sent you to dash.cloudflare.com. It came from Access's
+    // login page rather than from here, and nothing should reintroduce it.
+    //
+    // Comments are stripped first, because the file explains at some length
+    // what it replaced — and a rule that forbids naming the old design is a
+    // rule against writing down why the new one looks like this.
+    expect(withoutComments(src).toLowerCase()).not.toContain('cloudflare')
+  })
+
+  it('sends the setup code to enrolment, never to a login endpoint', () => {
+    // `registerVerify` is what a code may reach. `loginVerify` takes an
+    // assertion from an authenticator and nothing else.
+    const codePaths = [...src.matchAll(/api\.auth\.(\w+)\(\{[^}]*\bcode\b/g)].map((m) => m[1])
+    expect(codePaths.every((name) => name.startsWith('register'))).toBe(true)
+  })
+
+  it('labels the code button as adding a passkey, not as signing in', () => {
+    expect(src).toContain('Add a passkey')
+  })
+})
+
+/**
+ * Nothing renders before the Worker says who is asking.
+ *
+ * The real lock is the middleware in `src/index.ts` — a browser that skipped
+ * the gate would render a dashboard of 401s rather than anyone's data. This
+ * guards the other half: that the gate is mounted *outside* the app, so there
+ * is no arrangement in which a page renders first and asks afterwards.
+ */
+describe('the app is mounted behind the auth gate', () => {
+  const src = readFileSync('frontend/src/main.tsx', 'utf8')
+
+  it('wraps App rather than sitting inside it', () => {
+    expect(src).toMatch(/<AuthGate>[\s\S]*<App \/>[\s\S]*<\/AuthGate>/)
+  })
+})
+
+/**
+ * The shared draft actions copy and open; they never send.
+ *
+ * `ReplyDraftPanel` and the sync pitch both mount this, so the no-send rule
+ * that each of them used to carry alone now has one place to be broken and
+ * one place to be guarded. A `mailto:` or Gmail compose link is *not* a send —
+ * it opens a window with the person's own Send button in it, which is the same
+ * line this app has always stopped at.
+ */
+describe('the shared draft actions open a compose window, never send one', () => {
+  const src = readFileSync('frontend/src/components/DraftActions.tsx', 'utf8')
+
+  it('has no element that claims to send', () => {
+    const offenders = [
+      ...src.matchAll(/>\s*(Send|Submit)\b[^<]{0,24}</g),
+      ...src.matchAll(/label="\s*(Send|Submit)\b/g),
+    ].map((m) => m[1])
+    expect(offenders).toEqual([])
+  })
+
+  it('keeps copy available unconditionally', () => {
+    // Copy is the fallback that always works. It must never sit behind the
+    // same length test that withholds the compose links, or a long draft
+    // would leave nothing at all to do.
+    expect(src).toContain('navigator.clipboard.writeText')
+    expect(src).toMatch(/<Button[\s\S]{0,220}navigator\.clipboard\.writeText/)
+  })
+
+  it('renders a compose link only when the draft fits', () => {
+    // Over the ceiling a mailto click does nothing — no client, no error.
+    // Rendering the anchor anyway would be a button that lies about working.
+    expect(src).toContain('.filter((link) => link.href)')
+  })
+
+  it('says why a missing handler is missing', () => {
+    // A vanished button reads as a bug. A sentence reads as a fact.
+    expect(src).toContain('tooLong')
+    expect(src).toContain('unavailable')
   })
 })

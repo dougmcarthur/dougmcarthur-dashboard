@@ -88,7 +88,7 @@ export function Layout({
               href="#overview"
               className="font-semibold text-ink text-sm tracking-tight hover:text-body transition-colors shrink-0"
             >
-              Doug McArthur <span className="text-faint font-normal">— Music HQ</span>
+              Scout <span className="text-faint font-normal">— Sun Dogs Music</span>
             </a>
 
             <nav aria-label="Primary" className="hidden md:flex gap-0.5">

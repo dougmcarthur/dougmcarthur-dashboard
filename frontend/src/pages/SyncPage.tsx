@@ -7,6 +7,8 @@ import { SkeletonList } from '../components/Skeleton'
 import { ReconcilePanel } from '../components/ReconcilePanel'
 import { FIELD, FILTER } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
+import { DraftActions } from '../components/DraftActions'
+import { GmailDraftsPanel } from '../components/GmailDraftsPanel'
 
 const SYNC_STATUSES: SyncStatus[] = ['draft_ready', 'pitched', 'confirmed', 'declined', 'archived']
 
@@ -188,11 +190,21 @@ function SyncDetail({ target, onEdit }: { target: SyncTarget; onEdit: () => void
         </div>
       )}
       {target.pitchDraft && (
-        <div>
+        <div className="space-y-2">
           <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Pitch Draft</p>
           <p className="text-sm text-body leading-relaxed whitespace-pre-wrap bg-surface rounded-md border border-line p-3">
             {target.pitchDraft}
           </p>
+          {/* The agent writes this; you send it. Same shape as the reply
+              draft, so the same actions — see components/DraftActions.tsx. */}
+          <DraftActions
+            draft={{
+              to: target.contactEmail,
+              subject: `Sync licensing — ${target.name}`,
+              body: target.pitchDraft,
+            }}
+            note="Read it before you send it. Nothing here goes out on its own."
+          />
         </div>
       )}
       {target.confirmationMethod && (
@@ -291,6 +303,10 @@ export function SyncPage() {
 
       {showReconcile && <ReconcilePanel onClose={() => setShowReconcile(false)} />}
       {showCreate && <CreateSyncForm onDone={() => setShowCreate(false)} />}
+
+      {/* Above the list, because it acts on all of it. Closed until asked,
+          like every other bulk write in the app. */}
+      <GmailDraftsPanel />
 
       {isLoading ? (
         <SkeletonList rows={5} />

@@ -8,6 +8,7 @@ import {
 } from '../shared/notifications'
 import { buildReviewQueue, summariseQueue } from '../shared/reviewQueue'
 import type { GigOpportunity, SyncTarget } from '../shared/types'
+import type { TaskHistory } from '../shared/taskCadence'
 
 const NOW = '2026-08-25T09:00:00.000Z'
 const TODAY = '2026-08-25'
@@ -73,6 +74,7 @@ function build(input: {
   marks?: Mark[]
   events?: StoredEvent[]
   orphans?: number
+  taskRuns?: TaskHistory[]
   now?: string
 }) {
   const items = buildReviewQueue({ gigs: input.gigs, sync: input.sync, today: TODAY })
@@ -82,6 +84,7 @@ function build(input: {
     health: input.health ?? OK,
     marks: input.marks ?? [],
     events: input.events,
+    taskRuns: input.taskRuns,
     now: input.now ?? NOW,
   })
 }
@@ -352,5 +355,48 @@ describe('key parsing', () => {
   it('returns nothing for a condition key, so the route can tell them apart', () => {
     expect(eventIdsFromKey('connection:calendar')).toEqual([])
     expect(eventIdsFromKey('overdue:gig:14')).toEqual([])
+  })
+})
+
+/**
+ * A stopped agent reaches the bell.
+ *
+ * `shared/taskCadence.ts` decides what counts as stopped; this is the wiring
+ * check — that the answer travels through `buildNotifications` and comes out
+ * as something the bell will actually show, at the tier that gets attention.
+ *
+ * It is a condition rather than an event on purpose, so it self-heals: post a
+ * run and it is gone on the next read, with no row left behind still claiming
+ * the task is quiet.
+ */
+describe('a scheduled agent that has stopped', () => {
+  const weekly = (last: string): TaskHistory[] => [{
+    taskId: 'gig-festival-scan',
+    runAt: ['2026-06-21T00:00:00Z', '2026-06-28T00:00:00Z', '2026-07-05T00:00:00Z', last],
+  }]
+
+  it('raises it as critical, not as a passing note', () => {
+    // `runTier` rates a *failed* run `attention` because the next tick retries
+    // it. Nothing retries a schedule that has stopped, and what it costs is
+    // deadlines passing with no row to show for them.
+    const { items } = build({ taskRuns: weekly('2026-07-12T00:00:00Z') })
+    const stalled = items.find((n) => n.key.startsWith('automation:stalled:'))
+    expect(stalled).toBeDefined()
+    expect(stalled!.tier).toBe('critical')
+    expect(stalled!.kind).toBe('automation')
+    expect(stalled!.title).toContain('gig-festival-scan')
+  })
+
+  it('says nothing while the agent is still reporting', () => {
+    const recent = new Date(Date.parse(NOW) - 3 * 86_400_000).toISOString()
+    const { items } = build({ taskRuns: weekly(recent) })
+    expect(items.find((n) => n.key.startsWith('automation:stalled:'))).toBeUndefined()
+  })
+
+  it('claims nothing when no run history is supplied', () => {
+    // Absent has to mean "no check", never "nothing is stale" — a caller that
+    // forgets to pass the runs should get silence, not a false all-clear.
+    const { items } = build({})
+    expect(items.find((n) => n.key.startsWith('automation:stalled:'))).toBeUndefined()
   })
 })
