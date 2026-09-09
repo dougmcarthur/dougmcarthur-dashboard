@@ -252,6 +252,37 @@ Dry run is the default, as in `scripts/backfill-deadlines.ts`: nothing is
 written without `--apply`. A scheduled run always applies; a hand-triggered one
 applies only when asked.
 
+**Screens name things; they never print identifiers.** The bell shipped saying
+*"gig-festival-scan has not run in 28 days"* — that string is the `task_id` an
+agent POSTs, a handle rather than a name, and it had reached three surfaces
+before anybody read one out loud: the notification title, the run-event title
+and the History page. A slug reads as a leak in a product and as a bug in a
+screenshot.
+
+`taskLabel` in `shared/taskLabels.ts` is the only way to render one, and the
+shape of it matters: **the set is not closed.** The agents live outside this
+repo and send whatever id they like, so a lookup table alone would render the
+next new agent as a slug again. Known ids get a written name; anything else is
+humanised — the same treatment `shared/types.ts` gives status columns, and for
+the same reason. Sentence case, because these appear mid-sentence.
+
+Stored titles are not retrospectively fixed. `notification_events` keeps the
+title verbatim from when the run happened, so rows written before this change
+keep the old wording until they prune at thirty days. Rewriting stored prose
+at read time is the debt `reviewParse.ts` already is, and it would be a worse
+trade here than waiting a month.
+
+`test/uiConsistency.test.ts` guards all of it: no `{row.taskId}` in JSX, no
+notification title built from a raw id, no WebAuthn vocabulary in an error a
+signed-out person reads, and no `.md` path from this repository rendered in a
+`<code>` element.
+
+**The one place developer-speak stays is the integration cards**, which name
+the missing variables — `GOOGLE_REFRESH_TOKEN` and friends — because on a
+configuration screen the variable name *is* the actionable fact and "some
+settings are missing" helps nobody. What went was the repository file path
+beside it: whoever reads that card may not hold the source.
+
 **A stopped agent is a condition, and nothing was watching for it.** The three
 research agents — `gig-festival-scan`, `sync-pitch-research`,
 `monthly-promo-checkin` — ran on a cadence from June, stopped within a week of

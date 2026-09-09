@@ -7,6 +7,7 @@ import { taskRuns } from '../db/schema'
 import { recordEvent } from '../lib/notificationEvents'
 import type { Tier } from '../../shared/notifications'
 import type { Env } from '../types'
+import { taskLabel } from '../../shared/taskLabels'
 
 /**
  * What a run is worth telling you about.
@@ -21,10 +22,15 @@ function runTier(status: string): Tier {
   return status === 'ok' || status === 'success' ? 'info' : 'attention'
 }
 
-function runTitle(taskId: string, status: string, added: number): string {
-  if (status !== 'ok' && status !== 'success') return `${taskId} run ${status}`
-  if (added > 0) return `${taskId} added ${added} ${added === 1 ? 'item' : 'items'}`
-  return `${taskId} ran, nothing new`
+/** Exported so the copy is testable — it is user-facing prose with branches. */
+export function runTitle(taskId: string, status: string, added: number): string {
+  // `taskLabel`, never the raw id. The id is what the agent POSTs — an
+  // internal handle — and it had reached three screens before anybody
+  // noticed it reading as developer-speak.
+  const name = taskLabel(taskId)
+  if (status !== 'ok' && status !== 'success') return `${name} ${status === 'failed' ? 'failed' : `finished ${status}`}`
+  if (added > 0) return `${name} added ${added} ${added === 1 ? 'item' : 'items'}`
+  return `${name} ran, nothing new`
 }
 
 const taskRunsRouter = new Hono<{ Bindings: Env }>()

@@ -64,6 +64,16 @@ import {
 } from '../../shared/auth'
 import type { Env } from '../types'
 
+/**
+ * What a misconfigured relying party looks like to the person in front of it.
+ *
+ * The literal fault is that `DASHBOARD_URL` is unset or unparseable, so no
+ * WebAuthn relying-party ID can be derived — but "relying party not
+ * configured" on a login screen tells the reader nothing they can act on and
+ * everything about our internals. The log keeps the precise version.
+ */
+const SITE_MISCONFIGURED = 'This site is not set up for sign-in yet. Its address is missing.'
+
 const auth = new Hono<{ Bindings: Env }>()
 
 /**
@@ -130,7 +140,7 @@ auth.post('/logout-everywhere', async (c) => {
 
 auth.post('/login/options', async (c) => {
   const party = rp(c)
-  if (!party) return c.json({ error: 'relying party not configured' }, 500)
+  if (!party) return c.json({ error: SITE_MISCONFIGURED }, 500)
 
   const credentials = await listCredentials(c.env)
   if (credentials.length === 0) return c.json({ error: 'no passkey registered' }, 409)
@@ -159,7 +169,7 @@ const assertion = z.object({
 
 auth.post('/login/verify', zValidator('json', assertion), async (c) => {
   const party = rp(c)
-  if (!party) return c.json({ error: 'relying party not configured' }, 500)
+  if (!party) return c.json({ error: SITE_MISCONFIGURED }, 500)
 
   const body = c.req.valid('json')
   const expected = await consumeChallenge(c.env, { id: body.ceremony, purpose: 'authentication' })
@@ -236,7 +246,7 @@ auth.post('/login/verify', zValidator('json', assertion), async (c) => {
  */
 auth.post('/enrol/request', async (c) => {
   if (!mailerConfigured(c.env)) {
-    return c.json({ error: 'no email binding — recovery is unavailable' }, 503)
+    return c.json({ error: 'This site cannot send email, so a setup code cannot be sent.' }, 503)
   }
 
   const now = new Date()
@@ -287,7 +297,7 @@ const enrolRequest = z.object({
 
 auth.post('/register/options', zValidator('json', enrolRequest), async (c) => {
   const party = rp(c)
-  if (!party) return c.json({ error: 'relying party not configured' }, 500)
+  if (!party) return c.json({ error: SITE_MISCONFIGURED }, 500)
 
   const authorised = await authoriseEnrolment(c.env, c.req.header('Cookie'), c.req.valid('json').code)
   if (!authorised.ok) return c.json({ error: authorised.error }, authorised.status)
@@ -331,7 +341,7 @@ const attestation = z.object({
 
 auth.post('/register/verify', zValidator('json', attestation), async (c) => {
   const party = rp(c)
-  if (!party) return c.json({ error: 'relying party not configured' }, 500)
+  if (!party) return c.json({ error: SITE_MISCONFIGURED }, 500)
 
   const body = c.req.valid('json')
   // Re-checked rather than trusted from the options call: the two requests are

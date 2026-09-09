@@ -69,8 +69,8 @@ export function GmailDraftsPanel() {
     >
       {grant && !grant.configured && (
         <p className="text-xs text-warn-fg">
-          Google client credentials or the token encryption key are not set on this deployment,
-          so Gmail cannot be connected here.
+          Gmail is not available on this site yet — it still needs to be set up on the
+          server side. Nothing you can fix from here.
         </p>
       )}
 

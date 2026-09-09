@@ -48,7 +48,7 @@ function IntegrationCards() {
               ))}
             </div>
             <p className="text-xs text-muted">
-              See <code className="bg-sunken px-1 rounded">docs/google-calendar-setup.md</code>
+              Set these on the server, then reload. See the setup notes for Google Calendar.
             </p>
           </div>
         )}
@@ -71,7 +71,7 @@ function IntegrationCards() {
               ))}
             </div>
             <p className="text-xs text-muted">
-              See <code className="bg-sunken px-1 rounded">docs/gmail-setup.md</code>
+              Set these on the server, then reload. See the setup notes for Gmail.
             </p>
           </div>
         )}
