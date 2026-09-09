@@ -50,44 +50,66 @@ part that is finished.
 Adopting one later stays possible, because the boundary is already one
 middleware in `src/index.ts` rather than something spread through the routers.
 
-## Roles: two, not a matrix
+## The owner is a separate account, not a second hat
 
-`owner` and `artist`. That is the whole set.
+Two roles — `owner` and `artist` — and the owner is its **own account**,
+holding no tenant.
 
-The temptation is to build a permission system — roles, grants, a table of
-capabilities — and the reason not to is that there are two kinds of person
-here and no third kind on the horizon. A permissions matrix with two rows is a
-worse way to write `if (role === 'owner')`, and it invites a third role to be
-invented before anybody needs one.
+The first draft of this gave one account both jobs: an artist tenant like
+anybody else, plus access to the oversight routes. Separating them is a little
+more setup and a much stronger guarantee, for the reason in the next section.
+It also splits what a compromised session is worth: the artist login does not
+reach oversight, and the oversight login reaches no gigs.
 
-`owner` is not a super-artist. It is a *different surface*: an owner has their
-own artist tenant like anybody else, and separately can reach the oversight
-routes. There is no "act as this artist" mode, no impersonation. Better Auth's
-admin plugin offers impersonation and it is deliberately not being copied —
-the promise being made to an invited artist is that their gig notes are theirs,
-and a support tool that quietly breaks that promise is worse than no support
-tool.
+Dogfooding is not lost — the artist account still exists and is still the one
+the app gets used from daily. What changes is that the two are logged into
+separately.
 
-## "No access to personal data" is structural, not a policy
+There is no impersonation, and no "act as this artist" mode. Better Auth's
+admin plugin offers one and it is deliberately not being copied: the promise
+made to an invited artist is that their gig notes are theirs, and a support
+tool that quietly breaks that promise is worse than no support tool.
 
-The important half of this. Written as a rule it is a thing to remember;
-written as a shape it is a thing that cannot be forgotten.
+The role set stays at two. A permissions matrix with two rows is a worse way to
+write `if (role === "owner")`, and it invites a third role to be invented
+before anybody needs one.
 
-**Owner routes never read a domain table.** They read `users`, `invites`, and
-a `usage_daily` rollup, and nothing else. Not `gig_opportunities` with a count
-aggregate, not `artist_assets` filtered to a total — nothing, because the
-moment one owner query touches a domain table the guarantee becomes a claim
-about how careful the query was.
+## "No access to personal data" is a type, not a policy
 
-Counts that the owner does need — how many gigs, how many drafts — are written
-into `usage_daily` by the cron, by code that runs *as the tenant* and emits a
-number. The owner reads the number. The table stays unreachable.
+This is the whole reason the accounts are separate.
 
-This is enforceable the way this repo enforces things it cannot type-check:
-`test/uiConsistency.test.ts` already reads source and fails on patterns. A new
-guard reads `src/routes/admin.ts` and fails if any domain table name appears
-in it. The list of domain tables is the fourteen below; the allowed list is
-three.
+Every domain read takes a `tenant_id` as a required argument — the way
+`buildReviewQueue` takes `today` rather than reading the clock, and for the
+same reason: a function that fetches its own scope is a function that can fetch
+the wrong one silently. The session resolves to a tenant in one place.
+
+**The owner account resolves to none.** Not a wildcard, not zero, not a
+sentinel meaning "all" — null, and the argument is not nullable. So an owner
+route that tried to read `gig_opportunities` would not return a stranger's
+rows; it would fail to compile. The guarantee stops being something to audit
+and becomes something that cannot be expressed.
+
+What oversight actually reads is `users`, `invites` and a `usage_daily`
+rollup, and nothing else. Counts the owner needs — how many gigs, how many
+drafts — are written into that rollup by the cron, by code running *as the
+tenant* that emits a number. The owner reads the number.
+
+**One operation crosses the line, and it is a write.** An artist who leaves
+must be able to take their data with them, which means deleting it: a
+tenant-scoped `DELETE` across the fourteen tables, naming no columns and
+returning no rows. "Never reads a domain table" survives that intact — never
+*touches* one was not the promise, and could not be.
+
+**Admin recovery is its own configured address.** The rarely-used passkey is
+the one that will be missing when it is needed, so `enrolmentRecipient` grows
+from one deployment value to one per account kind. It must not fall back to
+the artist account's address: that would make the artist login a path to the
+oversight login, which is the thing this separation exists to prevent.
+
+The oversight surface lives under `/admin` — separate routes and screens, one
+deployment. Its own Worker and domain would double the deploy, the secrets and
+the migration path in order to isolate something the tenant boundary already
+isolates.
 
 ## What gets a `tenant_id`
 
@@ -215,10 +237,11 @@ rule that took `gig-festival-scan` off the screen.
    backfilled; 0018's indexes rebuilt as composites.
 2. Session resolves a tenant; domain reads and writes take it as an argument;
    agent tokens become per-tenant.
-3. Owner routes + oversight screen, with the source-level guard that keeps them
-   off domain tables.
+3. The owner account and its `/admin` routes and screen, plus its own
+   recovery address.
 4. Invite issue / redeem, with the redemption event.
-5. `tenant_id` to `NOT NULL`.
+5. `tenant_id` to `NOT NULL` on the fourteen domain tables. On `users` it
+   stays nullable, because that null is what the owner account is.
 
 Steps 1 and 2 are the whole risk. Steps 3 and 4 are the part that was asked
 for, and they are small — which is the thing worth knowing before starting,
