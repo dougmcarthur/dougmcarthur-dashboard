@@ -237,6 +237,26 @@ Rules, each with a reason:
   An account that exists but has no credential is a thing to reason about, and
   there is no reason to have one.
 
+### Mail to an invited artist needs the allowlist gone first
+
+A prerequisite that is easy to miss because nothing about it is visible while
+there is one user. The `send_email` binding sends through an explicit
+`allowed_destination_addresses` list in `wrangler.toml` — two entries, both the
+owner's. That is a genuine security property today rather than a limitation:
+the Worker cannot mail anywhere else even if the code is wrong, which no
+key-based sender can promise.
+
+It stops working the moment somebody else needs mail. An invited artist's
+address is not on the list, and adding each one by hand is a deploy per signup.
+Sending to a *verified destination address* is free on any plan; sending to an
+arbitrary recipient needs **Workers Paid and an onboarded sending domain**.
+
+So that onboarding is a prerequisite of step 4, not of anything before it —
+and the day it lands, the binding stops being the boundary. Whatever replaces
+it has to refuse to mail an address that is not on an invite or an account,
+because "send a code to this address" pointed at an arbitrary inbox is the
+account-takeover vector the recovery rule exists to prevent.
+
 ### The notification is the bell that already exists
 
 Redemption writes a `notification_events` row, which the owner's feed shows
