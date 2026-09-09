@@ -54,6 +54,14 @@ export interface SyncNoteColumns {
   confirmationMethod: SubmissionMethod
 }
 
+/** A "blocker" that only says the thing `submission_state` already says. */
+const RESTATES_STATE = /^\s*(?:not submitted|not sent|not started|application not filled)\b[^.]*\.?\s*$/i
+
+/** True when the fee text names a currency rather than leaving it implied. */
+function namesCurrency(fee: string | null): boolean {
+  return fee !== null && /\b(?:CAD|USD|AUD|EUR|GBP)\b|£|€/i.test(fee)
+}
+
 /**
  * `unknown` is written as null.
  *
@@ -84,12 +92,24 @@ export function gigNoteColumns(row: {
     // still says it, and the Review screen still reads it from the note.
     submissionMethod: parsed.submissionMethod === 'dm' ? null : parsed.submissionMethod,
     location: parsed.location,
-    blockedOn: parsed.blockers.length > 0 ? JSON.stringify(parsed.blockers) : null,
+    // A blocker that only restates the submission state is not a blocker —
+    // it is the column next to it. "Not submitted; needs your review" was
+    // being stored as work to do on rows whose whole content is that they
+    // have not been sent yet.
+    blockedOn: (() => {
+      const real = parsed.blockers.filter((b) => !RESTATES_STATE.test(b))
+      return real.length > 0 ? JSON.stringify(real) : null
+    })(),
     // Only a cost. `parseFee` keeps money paid *to* you in `payout`, and
     // writing that into `fee_amount` would invert the sign of the one number
     // on this row that means "this costs you".
     feeAmount: fee.required ? fee.amount : null,
-    feeCurrency: fee.required && fee.amount !== null ? fee.currency : null,
+    // Only when the text names one. `parseFee` falls back to USD, and a
+    // defaulted currency written into a column reads as a reading. See the
+    // note in docs/notes-field-audit.md about the 34 rows that already carry
+    // a defaulted 'USD' this backfill deliberately does not touch.
+    feeCurrency:
+      fee.required && fee.amount !== null && namesCurrency(row.fee ?? null) ? fee.currency : null,
   }
 }
 
