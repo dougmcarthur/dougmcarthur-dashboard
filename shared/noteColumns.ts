@@ -34,7 +34,13 @@
  * Pure, like everything in shared/.
  */
 
-import { parseNote, parseFee, type SubmissionState, type SubmissionMethod } from './reviewParse'
+import {
+  parseNote,
+  parseFee,
+  type ParsedNote,
+  type SubmissionState,
+  type SubmissionMethod,
+} from './reviewParse'
 
 export interface GigNoteColumns {
   /** not_submitted | submitted | unknown — the fact `status` keeps getting wrong. */
@@ -166,4 +172,69 @@ export function changesFor(
     out.push({ column, from: (from ?? null) as string | number | null, to })
   }
   return out
+}
+
+/**
+ * The stored columns, preferred over what the note says.
+ *
+ * The other half of moving extraction to write time, and the one that fixes a
+ * real bug rather than a cost: until this existed, a column set by hand was
+ * **invisible**. The screen re-derived `submission_state` from the prose on
+ * every render, so correcting a row to say it really was sent changed the
+ * database and nothing else — the queue went on showing what the note
+ * implied, and the conflict flag went on firing.
+ *
+ * Prefer, not replace. A null column still falls back to the parse, because
+ * null means "the note makes no claim" on 21 rows and "nothing has extracted
+ * this yet" on any row that reached D1 without going through a route. Both
+ * want the same answer and neither wants a blank.
+ *
+ * Only the four facts that have columns are overridden. `requirements`,
+ * `dealTerms`, `alerts` and the drafted values have none and are still
+ * derived — see the note at the top of this file about why they should stay
+ * that way.
+ */
+export function withStoredColumns(
+  parsed: ParsedNote,
+  row: {
+    submissionState?: string | null
+    submissionMethod?: string | null
+    location?: string | null
+    blockedOn?: string | null
+  },
+): ParsedNote {
+  return {
+    ...parsed,
+    submissionState: isState(row.submissionState) ? row.submissionState : parsed.submissionState,
+    submissionMethod: isMethod(row.submissionMethod) ? row.submissionMethod : parsed.submissionMethod,
+    location: row.location?.trim() || parsed.location,
+    blockers: storedBlockers(row.blockedOn) ?? parsed.blockers,
+  }
+}
+
+function isState(value: string | null | undefined): value is SubmissionState {
+  return value === 'not_submitted' || value === 'submitted' || value === 'unknown'
+}
+
+function isMethod(value: string | null | undefined): value is Exclude<SubmissionMethod, null> {
+  return value === 'email' || value === 'form' || value === 'portal' || value === 'dm'
+}
+
+/**
+ * A stored blocker list, or null to fall back.
+ *
+ * Malformed JSON falls back to the parse rather than throwing or showing an
+ * empty list: "nothing is blocked" is a claim, and a column nobody can read
+ * is not entitled to make it.
+ */
+function storedBlockers(raw: string | null | undefined): string[] | null {
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return null
+    const strings = parsed.filter((v): v is string => typeof v === 'string')
+    return strings.length > 0 ? strings : null
+  } catch {
+    return null
+  }
 }

@@ -63,6 +63,19 @@ export interface GigOpportunity {
   performanceStart?: string | null
   performanceEnd?: string | null
   /**
+   * The two facts a note carries that had no column — migration 0016, filled
+   * on write by `shared/noteColumns.ts` and by the backfill for older rows.
+   *
+   * Declared here because the queue *prefers* them over re-parsing the note.
+   * Left undeclared they still arrive over the wire — the routes return the
+   * row — but nothing would type-check against them and a rename would go
+   * unnoticed.
+   */
+  /** not_submitted | submitted. Null means the note makes no claim. */
+  submissionState?: string | null
+  /** Things waiting on you, as a JSON array. */
+  blockedOn?: string | null
+  /**
    * What the trip costs, and the paperwork that gates it — migration 0013.
    * All optional, all read through `shared/gigCost.ts`, which never defaults
    * a missing one silently: an estimate that could not count its lodging says
