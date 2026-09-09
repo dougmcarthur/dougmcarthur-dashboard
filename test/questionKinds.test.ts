@@ -100,3 +100,24 @@ describe('target length', () => {
     expect(targetLength({ fieldType: 'text' })).toBe(300)
   })
 })
+
+describe('the loose identity words are bounded', () => {
+  // Each of these was a real misclassification. `hometown` sits in the
+  // identity block, which is tested before story and logistics, so anything
+  // it swallows never reaches the kind that should have had it.
+  it('does not read "Artist Statement" as a hometown', () => {
+    // The worst of them: an artist statement is a bio, and answering it with
+    // "Winnipeg, MB" is a filled box that is wrong rather than an empty one.
+    expect(classifyQuestion({ label: 'Artist Statement' })?.key).toBe('bio')
+  })
+
+  it('does not read a platform whose name ends in "town" as a hometown', () => {
+    expect(classifyQuestion({ label: 'Bandsintown' })).toBeUndefined()
+  })
+
+  it('still reads the words that are actually the question', () => {
+    for (const label of ['Hometown', 'Home town', 'City', 'Town/City', 'Province/State', 'Country', 'Region', 'Location', 'Based in', 'Where are you from?']) {
+      expect(classifyQuestion({ label })?.key, label).toBe('hometown')
+    }
+  })
+})

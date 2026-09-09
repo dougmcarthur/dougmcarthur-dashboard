@@ -43,7 +43,12 @@ export const QUESTION_KINDS: QuestionKind[] = [
   { key: 'contact_name', label: 'Contact name', category: 'identity', lengthSensitive: false, reuse: 'verbatim', match: /contact (name|person)|your (full )?name|first name|last name|legal name|^name$/i },
   { key: 'email', label: 'Email address', category: 'identity', lengthSensitive: false, reuse: 'verbatim', match: /e-?mail/i },
   { key: 'phone', label: 'Phone number', category: 'identity', lengthSensitive: false, reuse: 'verbatim', match: /phone|mobile|cell|telephone/i },
-  { key: 'hometown', label: 'Hometown / based in', category: 'identity', lengthSensitive: false, reuse: 'verbatim', match: /home ?town|city|town|based (in|out of)|location|province|state|country|region|where are you from/i },
+  // The loose words are bounded, and every one of them had a victim: `town`
+  // matched "Bandsintown", and `state` matched "Artist Statement" — which,
+  // because identity is tested before story, meant a form asking for an
+  // artist statement was answered with a hometown. Found by the artist
+  // database sourcing, which classifies a document's headings through here.
+  { key: 'hometown', label: 'Hometown / based in', category: 'identity', lengthSensitive: false, reuse: 'verbatim', match: /home ?town|\bcity\b|\btown\b|based (in|out of)|\blocation\b|\bprovince\b|\bstate\b|\bcountry\b|\bregion\b|where are you from/i },
   { key: 'genre', label: 'Genre', category: 'identity', lengthSensitive: false, reuse: 'verbatim', match: /genre|style of music|music (type|category)|sounds like|category/i },
   { key: 'lineup', label: 'Line-up / band members', category: 'identity', lengthSensitive: false, reuse: 'verbatim', match: /line ?up|band members|number of (performers|musicians|people)|how many (people|performers|musicians)|personnel/i },
   { key: 'management', label: 'Management / booking contact', category: 'identity', lengthSensitive: false, reuse: 'verbatim', match: /manager|management|booking (agent|contact)|agent|representation/i },
