@@ -735,6 +735,18 @@ It needs two repository secrets (Settings → Secrets and variables → Actions)
 | `CLOUDFLARE_API_TOKEN` | API token with **Workers Scripts → Edit**, **D1 → Edit** and **Account Settings → Read**, scoped to the account owning this Worker |
 | `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account ID |
 
+The research agents (`.github/workflows/agents.yml`) need two more, plus an
+optional variable:
+
+| Secret | Value |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | Runs the agents' model calls |
+| `SCOUT_API_TOKEN` | The same value as the Worker's `API_TOKEN` secret — the bearer the middleware checks |
+
+| Variable | Value |
+| --- | --- |
+| `SCOUT_API_URL` | The app's origin. Set it when the app moves to its own hostname; the script defaults to the current one. |
+
 **D1 · Edit, not Read.** `wrangler d1 migrations list` hits the write-capable
 `/query` endpoint, so a read-scoped token fails with `code: 7403` — and because
 `wrangler deploy` never touches D1, that gap stays invisible until a migration

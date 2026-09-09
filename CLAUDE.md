@@ -217,6 +217,41 @@ compression moves neither. Retention is likewise already handled where it
 churns — `notification_events` and `notification_marks` both prune at 30 days,
 and no other table grows fast enough to have a policy worth writing.
 
+**The research agents run in CI, and their instructions are files.** They were
+scheduled Claude sessions on one laptop until August 2026. Now
+`.github/workflows/agents.yml` holds the three schedules, `agent-run.yml` is
+the reusable mechanics, and `scripts/agents/run.ts` drives a tool-runner loop
+with server-side web search. The prompts are `scripts/agents/prompts/*.md` —
+in the repository on purpose: a change to how an agent behaves arrives as a
+diff somebody can read, and an agent that disappears leaves a hole in
+`git log` rather than in a UI nobody opens.
+
+Four things about it that are not obvious:
+
+- **The tool runner does not auto-resume `pause_turn`, and web search is what
+  triggers one.** Left alone, a long sweep stops mid-way and returns as if it
+  had finished — no error, no warning, a silently truncated answer that would
+  look like a quiet week. `run.ts` iterates the runner and pushes the paused
+  turn back; a run that still ends paused is recorded `incomplete`, never `ok`.
+- **The heartbeat is posted by the script, in a `finally`, not offered to the
+  agent as a tool.** An agent that crashed or forgot would leave no row, which
+  is exactly the invisibility that let three schedules die unnoticed. This is
+  what arms `shared/taskCadence.ts`, so it has to be something the agent
+  cannot skip. Verified: a run that dies on a bad API key still files a
+  `failed` row carrying the error.
+- **The agents get named, typed tools and never a general HTTP tool.** They
+  read a lot of festival pages, and a festival page is untrusted text written
+  by somebody else. `create_gig_opportunity` is one prompt injection away from
+  being safe; `http_request` would be one away from `DELETE /api/gigs/12`.
+- **JSON Schema, not the Zod helper.** `betaZodTool` is built against Zod 4 and
+  this repo is on Zod 3, which every route validator uses. Upgrading Zod to get
+  nicer tool definitions would put the Worker's request validation in the blast
+  radius of a script.
+
+Dry run is the default, as in `scripts/backfill-deadlines.ts`: nothing is
+written without `--apply`. A scheduled run always applies; a hand-triggered one
+applies only when asked.
+
 **A stopped agent is a condition, and nothing was watching for it.** The three
 research agents — `gig-festival-scan`, `sync-pitch-research`,
 `monthly-promo-checkin` — ran on a cadence from June, stopped within a week of

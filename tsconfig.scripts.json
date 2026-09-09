@@ -1,0 +1,19 @@
+{
+  "// why": [
+    "The agent runner is production automation, not a one-off script, so it is",
+    "typechecked. It cannot join tsconfig.json: that one is the Worker, whose",
+    "`types` is @cloudflare/workers-types and where `process` does not exist.",
+    "These run under tsx on Node."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["scripts/agents"]
+}

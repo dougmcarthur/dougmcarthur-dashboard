@@ -1,0 +1,46 @@
+name: Agent run
+
+# One agent, once. Called by agents.yml rather than scheduled itself, so the
+# three schedules live together in one readable file and the mechanics live
+# here without being written out three times.
+
+on:
+  workflow_call:
+    inputs:
+      agent:
+        required: true
+        type: string
+      apply:
+        required: true
+        type: boolean
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    # A sweep is I/O and model latency, not compute, but it is not quick.
+    # Bounded so a hung run cannot sit on a runner for six hours.
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Typecheck the agent code before running it. Cheap, and the alternative
+      # is finding out from a half-finished sweep.
+      - name: Typecheck agents
+        run: npx tsc -p tsconfig.scripts.json
+
+      - name: Run ${{ inputs.agent }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SCOUT_API_TOKEN: ${{ secrets.SCOUT_API_TOKEN }}
+          # Set this as a repository variable when the app moves to
+          # scout.sundogsmusic.ca. Until then the script's own default applies.
+          SCOUT_API_URL: ${{ vars.SCOUT_API_URL }}
+        run: npx tsx scripts/agents/run.ts ${{ inputs.agent }} ${{ inputs.apply && '--apply' || '' }}

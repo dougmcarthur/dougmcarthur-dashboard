@@ -1,0 +1,72 @@
+name: Agents
+
+# The three research agents, on a schedule that does not depend on anybody's
+# laptop being open.
+#
+# They ran as scheduled Claude sessions on one machine until August 2026, when
+# all three stopped within a week of each other and nothing noticed for a
+# month. Two things changed. They run here now — and their instructions are
+# files in this repository (scripts/agents/prompts/), so a change to how an
+# agent behaves arrives as a diff somebody can read, and an agent that
+# disappears leaves a hole in `git log` rather than in a UI nobody opens.
+#
+# The app watches too: `shared/taskCadence.ts` measures each task's cadence
+# from its own run history and raises a critical notification when one goes
+# quiet for longer than its own habit. That check is armed by the heartbeat
+# `scripts/agents/run.ts` posts in a `finally`, so a crashed run still reports.
+
+on:
+  schedule:
+    # UTC. Winnipeg is UTC-5 in summer and UTC-6 in winter, so these land
+    # between 6 and 7am local — early enough to be read over coffee, and
+    # staggered so three model runs never contend for the same minute.
+    - cron: '0 12 * * 1' # gig-festival-scan, Mondays
+    - cron: '0 12 * * 3' # sync-pitch-research, Wednesdays
+    - cron: '0 12 1 * *' # monthly-promo-checkin, the 1st
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: Which agent to run
+        required: true
+        type: choice
+        options: [gig-festival-scan, sync-pitch-research, monthly-promo-checkin]
+      apply:
+        description: Write to the database (off = dry run, logs what it would do)
+        type: boolean
+        default: false
+
+# One agent at a time. They read and write the same tables, and two runs
+# racing is how you get a duplicate row that both of them checked for and
+# neither of them saw.
+concurrency:
+  group: agents
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  gig-festival-scan:
+    if: github.event.schedule == '0 12 * * 1' || inputs.agent == 'gig-festival-scan'
+    uses: ./.github/workflows/agent-run.yml
+    with:
+      agent: gig-festival-scan
+      # A scheduled run always writes; a hand-triggered one writes only if asked.
+      apply: ${{ github.event_name == 'schedule' || inputs.apply == true }}
+    secrets: inherit
+
+  sync-pitch-research:
+    if: github.event.schedule == '0 12 * * 3' || inputs.agent == 'sync-pitch-research'
+    uses: ./.github/workflows/agent-run.yml
+    with:
+      agent: sync-pitch-research
+      apply: ${{ github.event_name == 'schedule' || inputs.apply == true }}
+    secrets: inherit
+
+  monthly-promo-checkin:
+    if: github.event.schedule == '0 12 1 * *' || inputs.agent == 'monthly-promo-checkin'
+    uses: ./.github/workflows/agent-run.yml
+    with:
+      agent: monthly-promo-checkin
+      apply: ${{ github.event_name == 'schedule' || inputs.apply == true }}
+    secrets: inherit
