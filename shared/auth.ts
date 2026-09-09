@@ -74,6 +74,53 @@ export function enrolmentCooldown(input: {
   return { allowed: false, retryAfterSeconds: Math.ceil((window - Math.max(elapsed, 0)) / 1000) }
 }
 
+/**
+ * How long one passkey touch keeps a session *elevated*.
+ *
+ * A session is thirty days because signing in constantly is how people stop
+ * locking their screens. But a handful of actions are not "use the app" —
+ * they change who can get in, and a thirty-day cookie is the wrong credential
+ * to authorise those with, because a cookie can be stolen and a passkey
+ * cannot: it stays on the authenticator and answers a fresh challenge or it
+ * does not answer at all.
+ *
+ * So those actions ask for the passkey again, and the answer is good for
+ * fifteen minutes. Long enough to remove three stale credentials without
+ * touching the key three times; short enough that a session spends almost all
+ * of its life unable to do any of it. There is deliberately one window for
+ * every elevated action rather than a tuned number per feature — a second
+ * value is a second thing to reason about, for a difference nobody can
+ * perceive.
+ */
+export const ELEVATION_TTL_MINUTES = 15
+
+/**
+ * Whether a session's last passkey touch is still recent enough to act on.
+ *
+ * Reads the clock it is handed, like everything else here. Null means the
+ * session has never been elevated, which is the state every session starts in
+ * — signing in is not elevation, because the cookie that carries a sign-in is
+ * exactly what this is defending against.
+ */
+export function elevationState(input: {
+  now: Date
+  elevatedAt: string | null | undefined
+  ttlMinutes?: number
+}): { elevated: boolean; expiresAt: string | null } {
+  if (!input.elevatedAt) return { elevated: false, expiresAt: null }
+
+  const at = Date.parse(input.elevatedAt)
+  if (!Number.isFinite(at)) return { elevated: false, expiresAt: null }
+
+  const window = (input.ttlMinutes ?? ELEVATION_TTL_MINUTES) * 60_000
+  const expires = at + window
+  // A stamp in the future reads as not elevated rather than as permission:
+  // the safe direction for a privilege check is to ask again.
+  if (at > input.now.getTime()) return { elevated: false, expiresAt: null }
+  if (expires <= input.now.getTime()) return { elevated: false, expiresAt: null }
+  return { elevated: true, expiresAt: new Date(expires).toISOString() }
+}
+
 /** The cookie. `__Host-` pins it to this exact origin and to Secure. */
 export const SESSION_COOKIE = '__Host-mhq_session'
 

@@ -180,6 +180,8 @@ export interface ActiveSession {
   label: string | null
   credentialId: string | null
   expiresAt: string
+  /** Last passkey touch, or null. Not the same as when it signed in. */
+  elevatedAt: string | null
 }
 
 /**
@@ -218,7 +220,13 @@ export async function readSession(
       .where(eq(authSessions.id, id))
   }
 
-  return { id: row.id, label: row.label, credentialId: row.credentialId, expiresAt: row.expiresAt }
+  return {
+    id: row.id,
+    label: row.label,
+    credentialId: row.credentialId,
+    expiresAt: row.expiresAt,
+    elevatedAt: row.elevatedAt,
+  }
 }
 
 export async function destroySession(env: Env, cookieHeader: string | null | undefined): Promise<void> {
@@ -233,11 +241,25 @@ export async function destroyAllSessions(env: Env): Promise<void> {
   await getDb(env.DB).delete(authSessions)
 }
 
+/**
+ * Record that this session has just answered a passkey challenge.
+ *
+ * Stamped on the session rather than handed back as a token, because a token
+ * is a second credential to carry and this one would travel next to the cookie
+ * it is meant to be stronger than.
+ */
+export async function elevateSession(env: Env, sessionId: string, now = new Date()): Promise<void> {
+  await getDb(env.DB)
+    .update(authSessions)
+    .set({ elevatedAt: now.toISOString() })
+    .where(eq(authSessions.id, sessionId))
+}
+
 /* --------------------------------------------------------------------- */
 /* Challenges                                                             */
 /* --------------------------------------------------------------------- */
 
-export type ChallengePurpose = 'registration' | 'authentication'
+export type ChallengePurpose = 'registration' | 'authentication' | 'elevation'
 
 export async function storeChallenge(
   env: Env,
@@ -292,16 +314,29 @@ export async function countCredentials(env: Env): Promise<number> {
 /* --------------------------------------------------------------------- */
 
 /**
- * Where a break-glass code is sent.
+ * Where a break-glass code is sent, or null when nowhere is configured.
  *
- * A setting would be a way to redirect the recovery channel from inside the
- * app, which is exactly what an attacker with a session would want. It is a
- * `[vars]` entry instead, and in either case the `send_email` allowlist in
- * wrangler.toml is the real boundary — the Worker cannot mail an address that
- * is not on it, whatever this returns.
+ * **Never user-supplied, and that is the whole point.** An address typed on
+ * the login screen would decide where an enrolment code goes, so anyone who
+ * could load the page could mail themselves one and take the account. The
+ * destination is deployment configuration; what a person types can only ever
+ * be a *lookup key* for an address already on file.
+ *
+ * A settings row would be worse still — a way to redirect the recovery
+ * channel from inside the app, which is exactly what an attacker holding a
+ * session would reach for.
+ *
+ * There is no default. It used to fall back to a hardcoded personal address,
+ * which worked for exactly one deployment and silently mailed somebody else's
+ * inbox on any other. Unset now means recovery is unavailable and the screen
+ * says so — a missing input is never a guess.
+ *
+ * The `send_email` allowlist in wrangler.toml is the real boundary either
+ * way: the Worker cannot mail an address that is not on it, whatever this
+ * returns.
  */
-export function enrolmentRecipient(env: Env): string {
-  return env.AUTH_EMAIL ?? 'dougmcarthur0@gmail.com'
+export function enrolmentRecipient(env: Env): string | null {
+  return env.AUTH_EMAIL?.trim() || null
 }
 
 export interface IssuedCode {

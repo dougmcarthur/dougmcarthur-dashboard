@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { startRegistration } from '@simplewebauthn/browser'
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser'
 import { api } from '../api'
+import { withConfirmation } from '../confirmIdentity'
 import { Button } from './ui/Button'
 import { relativeTime, shortDate } from '../format'
 
@@ -19,8 +20,15 @@ import { relativeTime, shortDate } from '../format'
  * device; one bound to a single machine does not, and the difference is
  * exactly the difference between "I lost my laptop" and "I lost my only way
  * in". Adding a second passkey from here is the answer, and it needs no
- * emailed code — you are already signed in, which is a stronger claim than
- * the code makes.
+ * emailed code — but it does need the key you already have.
+ *
+ * Both buttons on this card change *who can sign in*, which is the one thing
+ * a session cookie is not a good enough credential to authorise: a stolen one
+ * would add its own passkey and remove yours, and that outlives signing out
+ * everywhere. So each goes through `withConfirmation`, which asks for the
+ * authenticator when the server says the session has not proved itself
+ * lately. Nothing else on this screen does that, and that is the point — a
+ * prompt you see constantly is one you stop reading.
  */
 export function PasskeysCard() {
   const qc = useQueryClient()
@@ -29,13 +37,14 @@ export function PasskeysCard() {
   const passkeys = useQuery({ queryKey: ['auth', 'passkeys'], queryFn: api.auth.passkeys })
 
   const add = useMutation({
-    mutationFn: async () => {
-      const { ceremony, options } = await api.auth.registerOptions({})
-      const response = await startRegistration({
-        optionsJSON: options as unknown as PublicKeyCredentialCreationOptionsJSON,
-      })
-      return api.auth.registerVerify({ ceremony, response })
-    },
+    mutationFn: () =>
+      withConfirmation(async () => {
+        const { ceremony, options } = await api.auth.registerOptions({})
+        const response = await startRegistration({
+          optionsJSON: options as unknown as PublicKeyCredentialCreationOptionsJSON,
+        })
+        return api.auth.registerVerify({ ceremony, response })
+      }),
     onSuccess: () => {
       setError(null)
       qc.invalidateQueries({ queryKey: ['auth'] })
@@ -47,8 +56,17 @@ export function PasskeysCard() {
   })
 
   const revoke = useMutation({
-    mutationFn: (id: string) => api.auth.revoke(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['auth'] }),
+    mutationFn: (id: string) => withConfirmation(() => api.auth.revoke(id)),
+    onSuccess: () => {
+      setError(null)
+      qc.invalidateQueries({ queryKey: ['auth'] })
+    },
+    // Cancelling the authenticator prompt is a decision, not a failure, so it
+    // clears the message rather than reporting one — same rule as adding.
+    onError: (err) => {
+      const message = err instanceof Error ? err.message : 'Could not remove that passkey'
+      setError(/NotAllowedError|abort|cancel/i.test(message) ? null : message)
+    },
   })
 
   // Both reload rather than clearing the query cache, because the page you
@@ -74,7 +92,8 @@ export function PasskeysCard() {
           <h2 className="text-sm font-semibold text-ink">Passkeys</h2>
           <p className="text-xs text-muted mt-0.5">
             What can sign in to this dashboard. Cloudflare Access and the emailed login code are
-            gone; a code now only ever adds a passkey.
+            gone; a code now only ever adds a passkey. Adding or removing one asks for a passkey
+            first, even though you are signed in.
           </p>
         </div>
         <Button variant="primary" className="shrink-0 whitespace-nowrap" disabled={add.isPending} onClick={() => add.mutate()}>

@@ -349,6 +349,14 @@ export interface DigestPreview {
  */
 export const UNAUTHENTICATED_EVENT = 'mhq:unauthenticated'
 
+/**
+ * The server wants the passkey touched again before it will do this.
+ *
+ * Thrown rather than returned so that a caller which has not been taught to
+ * re-assert still fails visibly instead of silently doing nothing.
+ */
+export class ElevationRequired extends Error {}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -359,8 +367,15 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   })
   if (!res.ok) {
     if (res.status === 401) window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT))
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error((err as { error: string }).error)
+    const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
+      error: string
+      needsElevation?: boolean
+    }
+    // Not an error to show: the caller is expected to ask for the passkey and
+    // try again. Carried on the error rather than returned, because every
+    // caller that does not know about it should keep failing loudly.
+    if (err.needsElevation) throw new ElevationRequired(err.error)
+    throw new Error(err.error)
   }
   return res.json()
 }
@@ -436,6 +451,15 @@ export const api = {
       }),
     registerVerify: (body: { ceremony: string; response: unknown; code?: string; label?: string }) =>
       apiFetch<{ ok: boolean; label: string }>('/auth/register/verify', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    elevateOptions: () =>
+      apiFetch<{ ceremony: string; options: Record<string, unknown> }>('/auth/elevate/options', {
+        method: 'POST',
+      }),
+    elevateVerify: (body: { ceremony: string; response: unknown }) =>
+      apiFetch<{ ok: boolean; confirmedUntil: string | null }>('/auth/elevate/verify', {
         method: 'POST',
         body: JSON.stringify(body),
       }),

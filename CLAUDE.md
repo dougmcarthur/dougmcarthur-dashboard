@@ -159,6 +159,55 @@ wearing the new screen's clothes, which is why `test/uiConsistency.test.ts`
 fails if the code reaches a login endpoint or if the button taking it stops
 saying *Add a passkey*.
 
+**The recovery address is never typed by the person asking for it.** An email
+box on the login screen that decides where an enrolment code goes is an
+account-takeover vector: anyone who can load the page mails themselves a code
+and enrols a passkey. So `enrolmentRecipient` reads deployment configuration
+and nothing else — not a settings row either, which would be a way to redirect
+the recovery channel from inside the app, exactly what an attacker holding a
+session would reach for.
+
+It had a hardcoded personal address as its fallback, which worked for one
+deployment and would have silently mailed a stranger's inbox on any other.
+There is no default now: unset means `recoveryAvailable: false` and the screen
+says so, because a missing input is never a guess.
+
+**When accounts arrive the shape changes but the rule does not.** The typed
+address becomes a *lookup key* — the code still goes to the address already on
+file for the matching account, never to what was typed — and the screen says
+the same thing whether or not an account matched, since anything else is an
+account-existence oracle. With Google as the primary sign-in the address comes
+from the grant, so there is nothing to type at signup at all.
+
+**Changing who can sign in costs a passkey touch, and almost nothing else
+does.** A session is thirty days — the right length for using the app, the
+wrong credential for changing how you get into it. `POST /auth/register/*` and
+`DELETE /auth/passkeys/:id` took a session alone until migration 0020, so a
+stolen cookie could enrol its own passkey and delete every other, which
+survives *sign out everywhere*: that clears sessions, not credentials. The
+button you would reach for on being compromised was the one that would not
+help.
+
+Both now need a recent assertion. `elevationState` in `shared/auth.ts` is the
+fifteen-minute window, `auth_sessions.elevated_at` records the touch, and
+`/auth/elevate/*` is the login assertion run again under its own challenge
+purpose — so a challenge issued for signing in cannot be replayed to raise a
+session's privilege. Signing in is deliberately *not* elevation: the cookie a
+sign-in produces is the thing being defended against.
+
+**The emailed code is exempt and has to be.** It exists for the case where
+there is no passkey left to touch, so requiring one would make recovery need
+the thing you are recovering from losing. `test/uiConsistency.test.ts` fails if
+either route drops its check *or* if the code branch of `authoriseEnrolment`
+gains one.
+
+The rule stays narrow — an action that changes who can get in, or destroys data
+across a boundary — because a prompt you see constantly is one you stop
+reading. Bulk writes, Gmail connect and status changes are reversible and
+tenant-scoped, and none of them ask. Admin mode is the next thing that will
+(`docs/multi-tenant-plan.md`); the client tries first and re-asserts only on
+refusal, so a burst of removals costs one touch, and retries exactly once.
+
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a
 passkey ceremony — WebAuthn has no non-interactive mode. `API_TOKEN` as a

@@ -342,6 +342,11 @@ export const authSessions = sqliteTable('auth_sessions', {
   createdAt: text('created_at').notNull(),
   lastSeenAt: text('last_seen_at').notNull(),
   expiresAt: text('expires_at').notNull(),
+  /**
+   * When this session last answered a passkey challenge, which is separate
+   * from when it signed in. Null until it does; see `elevationState`.
+   */
+  elevatedAt: text('elevated_at'),
 })
 
 export const authEnrolmentCodes = sqliteTable('auth_enrolment_codes', {

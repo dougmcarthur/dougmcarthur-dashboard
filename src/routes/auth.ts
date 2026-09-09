@@ -9,9 +9,24 @@
  *   login      — anyone may start it; only a registered passkey finishes it.
  *   enrol      — needs an emailed code, because the browser asking has no
  *                passkey yet and so cannot prove anything else.
- *   add        — needs a session. Adding a second passkey from a laptop you
- *                are already signed in on should not involve your inbox.
- *   revoke     — needs a session.
+ *   elevate    — needs a session *and* a passkey. It is the login assertion
+ *                run a second time, and all it does is stamp the session.
+ *   add        — needs a session that has been elevated, or an emailed code.
+ *                Adding a passkey from a laptop you are already signed in on
+ *                should not involve your inbox — but it should involve the
+ *                key, because the cookie alone is what a thief has.
+ *   revoke     — needs an elevated session, for the same reason.
+ *
+ * **Why add and revoke are not merely session-guarded.** They are the two
+ * actions that change who can get in, and a stolen cookie that could use them
+ * would enrol its own passkey and delete yours — which outlives "sign out
+ * everywhere", because that clears sessions and not credentials. A passkey
+ * cannot be stolen the way a cookie can: it answers a fresh challenge from
+ * the authenticator or it does not answer.
+ *
+ * The emailed code stays exempt from elevation, and has to be: it exists for
+ * the case where there is no passkey left to touch. Requiring one to use it
+ * would make recovery need the thing you are recovering from losing.
  *
  * Everything under `/api/auth` is exempt from the middleware in
  * `src/index.ts`, which is what makes the exemption list worth reading
@@ -43,6 +58,7 @@ import {
   createSession,
   destroyAllSessions,
   destroySession,
+  elevateSession,
   enrolmentRecipient,
   fromBase64url,
   issueEnrolmentCode,
@@ -58,6 +74,7 @@ import { mailerConfigured, sendMail } from '../lib/mailer'
 import {
   CHALLENGE_TTL_SECONDS,
   ENROLMENT_CODE_TTL_MINUTES,
+  elevationState,
   enrolmentCooldown,
   passkeyLabel,
   relyingParty,
@@ -115,7 +132,7 @@ auth.get('/session', async (c) => {
     // Whether the break-glass path can work at all. A deployment with no
     // email binding and no passkeys is one nobody can get into, and the
     // screen should say so rather than offering a button that 500s.
-    recoveryAvailable: mailerConfigured(c.env),
+    recoveryAvailable: mailerConfigured(c.env) && enrolmentRecipient(c.env) !== null,
   })
 })
 
@@ -244,9 +261,98 @@ auth.post('/login/verify', zValidator('json', assertion), async (c) => {
  * matters: it does not say whether a passkey is already registered. That is
  * the fact an attacker would most like to learn from this endpoint.
  */
+/* --------------------------------------------------------------------- */
+/* Elevation                                                              */
+/* --------------------------------------------------------------------- */
+
+/**
+ * Prove, again, that the authenticator is in hand.
+ *
+ * Identical to the login ceremony except for what it produces: no session is
+ * created, and the one already open is stamped instead. Kept as its own
+ * purpose rather than reusing `authentication`, so a challenge issued for
+ * signing in can never be replayed to raise a session's privilege.
+ */
+auth.post('/elevate/options', async (c) => {
+  const party = rp(c)
+  if (!party) return c.json({ error: SITE_MISCONFIGURED }, 500)
+
+  const session = await readSession(c.env, c.req.header('Cookie'))
+  if (!session) return c.json({ error: 'not signed in' }, 401)
+
+  const credentials = await listCredentials(c.env)
+  if (credentials.length === 0) return c.json({ error: 'no passkey registered' }, 409)
+
+  const options = await generateAuthenticationOptions({
+    rpID: party.rpId,
+    timeout: CHALLENGE_TTL_SECONDS * 1000,
+    allowCredentials: [],
+    // Required rather than preferred, unlike signing in. The point of asking
+    // twice is the person, not the device: a silent assertion from an
+    // unlocked laptop proves the laptop is present, which was never in doubt.
+    userVerification: 'required',
+  })
+
+  const ceremony = await storeChallenge(c.env, {
+    challenge: options.challenge,
+    purpose: 'elevation',
+  })
+  return c.json({ ceremony, options })
+})
+
+auth.post('/elevate/verify', zValidator('json', assertion), async (c) => {
+  const party = rp(c)
+  if (!party) return c.json({ error: SITE_MISCONFIGURED }, 500)
+
+  const session = await readSession(c.env, c.req.header('Cookie'))
+  if (!session) return c.json({ error: 'not signed in' }, 401)
+
+  const body = c.req.valid('json')
+  const expected = await consumeChallenge(c.env, { id: body.ceremony, purpose: 'elevation' })
+  if (!expected) return c.json({ error: 'that took too long — try again' }, 400)
+
+  const response = body.response as unknown as AuthenticationResponseJSON
+  const db = getDb(c.env.DB)
+  const row = await db
+    .select()
+    .from(passkeyCredentials)
+    .where(eq(passkeyCredentials.id, response.id))
+    .get()
+  if (!row) return c.json({ error: 'that key is not registered here' }, 401)
+
+  let verification
+  try {
+    verification = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: expected,
+      expectedOrigin: party.origins,
+      expectedRPID: party.rpId,
+      credential: {
+        id: row.id,
+        publicKey: fromBase64url(row.publicKey),
+        counter: row.counter,
+        transports: parseTransports(row.transports),
+      },
+    })
+  } catch {
+    return c.json({ error: 'that did not check out — try again' }, 401)
+  }
+  if (!verification.verified) return c.json({ error: 'that did not check out — try again' }, 401)
+
+  const now = new Date()
+  await elevateSession(c.env, session.id, now)
+  const state = elevationState({ now, elevatedAt: now.toISOString() })
+  return c.json({ ok: true, confirmedUntil: state.expiresAt })
+})
+
 auth.post('/enrol/request', async (c) => {
   if (!mailerConfigured(c.env)) {
     return c.json({ error: 'This site cannot send email, so a setup code cannot be sent.' }, 503)
+  }
+
+  const to = enrolmentRecipient(c.env)
+  if (!to) {
+    return c.json({ error: 'This site has no recovery address set up yet.' }, 503)
   }
 
   const now = new Date()
@@ -265,7 +371,6 @@ auth.post('/enrol/request', async (c) => {
   }
 
   const issued = await issueEnrolmentCode(c.env, now)
-  const to = enrolmentRecipient(c.env)
 
   await sendMail(c.env, {
     to,
@@ -300,7 +405,9 @@ auth.post('/register/options', zValidator('json', enrolRequest), async (c) => {
   if (!party) return c.json({ error: SITE_MISCONFIGURED }, 500)
 
   const authorised = await authoriseEnrolment(c.env, c.req.header('Cookie'), c.req.valid('json').code)
-  if (!authorised.ok) return c.json({ error: authorised.error }, authorised.status)
+  if (!authorised.ok) {
+    return c.json({ error: authorised.error, needsElevation: authorised.needsElevation }, authorised.status)
+  }
 
   const existing = await listCredentials(c.env)
   const options = await generateRegistrationOptions({
@@ -348,7 +455,9 @@ auth.post('/register/verify', zValidator('json', attestation), async (c) => {
   // independent, and "I already passed this a moment ago" is a claim the
   // second one is in no position to make.
   const authorised = await authoriseEnrolment(c.env, c.req.header('Cookie'), body.code)
-  if (!authorised.ok) return c.json({ error: authorised.error }, authorised.status)
+  if (!authorised.ok) {
+    return c.json({ error: authorised.error, needsElevation: authorised.needsElevation }, authorised.status)
+  }
 
   const expected = await consumeChallenge(c.env, { id: body.ceremony, purpose: 'registration' })
   if (!expected) return c.json({ error: 'this setup expired — start again' }, 400)
@@ -420,6 +529,16 @@ auth.delete('/passkeys/:id', async (c) => {
   const session = await readSession(c.env, c.req.header('Cookie'))
   if (!session) return c.json({ error: 'not signed in' }, 401)
 
+  // Removing a passkey is the other half of the takeover a stolen cookie
+  // would attempt, and the more urgent half: enrolling one is only useful
+  // once yours are gone.
+  if (!elevationState({ now: new Date(), elevatedAt: session.elevatedAt }).elevated) {
+    return c.json(
+      { error: 'Confirm it is you before changing how you sign in.', needsElevation: true },
+      403,
+    )
+  }
+
   const id = decodeURIComponent(c.req.param('id'))
   const db = getDb(c.env.DB)
   const row = await db.select().from(passkeyCredentials).where(eq(passkeyCredentials.id, id)).get()
@@ -437,14 +556,20 @@ auth.delete('/passkeys/:id', async (c) => {
 
 type Authorised =
   | { ok: true; codeId: string | null }
-  | { ok: false; error: string; status: 401 | 403 | 429 }
+  | { ok: false; error: string; status: 401 | 403 | 429; needsElevation?: true }
 
 /**
  * Two ways to be allowed to add a passkey, and they are not equivalent.
  *
- * A session is the everyday one. A code is the one that exists because the
- * session is unreachable, so it is spent, attempt-limited and short-lived
- * where the session is none of those things.
+ * A session is the everyday one — but on its own it is a cookie, and adding a
+ * passkey is how a stolen cookie becomes permanent access. So the session path
+ * wants a recent assertion as well: the cookie says which session, the key
+ * says somebody is holding it.
+ *
+ * A code is the one that exists because the session is unreachable, so it is
+ * spent, attempt-limited and short-lived where the session is none of those
+ * things — and it is **not** elevated, because it exists precisely for the
+ * case where there is no passkey left to touch.
  */
 async function authoriseEnrolment(
   env: Env,
@@ -452,7 +577,17 @@ async function authoriseEnrolment(
   code: string | undefined,
 ): Promise<Authorised> {
   const session = await readSession(env, cookie)
-  if (session) return { ok: true, codeId: null }
+  if (session) {
+    if (elevationState({ now: new Date(), elevatedAt: session.elevatedAt }).elevated) {
+      return { ok: true, codeId: null }
+    }
+    return {
+      ok: false,
+      error: 'Confirm it is you before changing how you sign in.',
+      status: 403,
+      needsElevation: true,
+    }
+  }
 
   if (!code) return { ok: false, error: 'a setup code is required', status: 401 }
 
