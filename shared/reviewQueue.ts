@@ -24,6 +24,7 @@ import { normaliseGigStatus, isGigSettled, hasBeenSubmitted, awaitsYourReply } f
 import type { GigOpportunity, SyncTarget, PromoDraft } from './types'
 import { decisionFor, type Decision } from './decisionCopy'
 import { visaLead } from './gigCost'
+import { withStoredColumns } from './noteColumns'
 import {
   parseNote,
   parseFee,
@@ -371,7 +372,10 @@ function score(flags: ReviewFlag[], deadline: ParsedDeadline): number {
 }
 
 function gigItem(row: GigOpportunity, today: string): Omit<ReviewItem, 'decision'> {
-  const parsed = parseNote(row.fitRationale ?? row.fitNotes)
+  // The columns first, the prose only where they are empty. Until this the
+  // screen re-derived on every render, so a `submission_state` you corrected
+  // by hand changed the database and nothing you could see.
+  const parsed = withStoredColumns(parseNote(row.fitRationale ?? row.fitNotes), row)
   const fee = parseFee(row.fee, row.paid)
   const deadline = parseDeadline(row.deadline, {
     note: row.deadlineNote,
@@ -399,7 +403,9 @@ function gigItem(row: GigOpportunity, today: string): Omit<ReviewItem, 'decision
 }
 
 function syncItem(row: SyncTarget, today: string): Omit<ReviewItem, 'decision'> {
-  const parsed = parseNote(row.notes)
+  const parsed = withStoredColumns(parseNote(row.notes), {
+    submissionMethod: row.confirmationMethod,
+  })
   const fee = parseFee(null, 0)
   const deadline = parseDeadline(null)
   const flags = flagsFor('sync', row.status, parsed, fee, deadline, null, null, today)

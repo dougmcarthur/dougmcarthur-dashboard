@@ -361,6 +361,19 @@ six worth storing (`submission_state` and `blocked_on` from migration 0016,
 note**, with `POST /api/backfill/notes` applying the same extraction to older
 rows behind a preview.
 
+**The column wins over the prose, and the fallback stays.** `withStoredColumns`
+merges the stored values over a parsed note in `gigItem` and `syncItem`, so a
+`submission_state` you correct by hand actually reaches the screen — until it
+existed, the queue re-derived from the note on every render and a corrected row
+changed the database and nothing you could see, with the conflict flag still
+firing at a question already answered. A null column still falls back to the
+parse, because null means "the note makes no claim" on most rows and "nothing
+has extracted this yet" on any row that reached D1 without a route; both want
+the same answer. Unreadable `blocked_on` JSON falls back too rather than
+reporting an empty list — "nothing is blocked" is a claim, and a column nobody
+can parse is not entitled to make it. The four facts with columns are
+overridden; everything else stays derived.
+
 The plan's last step — "once backfilled, the parser is deleted" — is not
 reachable, and this is the thing to know before trying again: the research
 agents write prose from outside this repo, so a backfill alone leaves every

@@ -749,3 +749,38 @@ describe('the visa lead time, which is a constraint rather than a cost', () => {
     expect(matchesFilter(item, 'timing')).toBe(true)
   })
 })
+
+describe('the queue reads the columns, not just the prose', () => {
+  const CONFLICTED = {
+    id: 1, name: 'Home Routes', status: 'submitted',
+    fitNotes: 'Submission status: NOT submitted. Single-page intake form at the URL.',
+  }
+
+  it('raises a conflict while the note is the only source', () => {
+    const [item] = on({ gigs: [gig(CONFLICTED)] })
+    expect(item.flags.some((f) => f.id === 'conflict')).toBe(true)
+  })
+
+  it('clears it once the column says the note is out of date', () => {
+    // The bug this closes: correcting the row used to change the database and
+    // nothing you could see. The screen re-derived from the prose every
+    // render, so the conflict flag went on firing at a row that had been
+    // answered.
+    const [item] = on({ gigs: [gig({ ...CONFLICTED, submissionState: 'submitted' })] })
+    expect(item.flags.some((f) => f.id === 'conflict')).toBe(false)
+    expect(item.parsed.submissionState).toBe('submitted')
+  })
+
+  it('still raises it when the column agrees with the note', () => {
+    const [item] = on({ gigs: [gig({ ...CONFLICTED, submissionState: 'not_submitted' })] })
+    expect(item.flags.some((f) => f.id === 'conflict')).toBe(true)
+  })
+
+  it('takes the blockers from the column, so "Needs you" follows an edit', () => {
+    const [item] = on({
+      gigs: [gig({ id: 2, name: 'Edited', blockedOn: '["Needs a photo credit"]' })],
+    })
+    expect(item.parsed.blockers).toEqual(['Needs a photo credit'])
+    expect(item.flags.some((f) => f.id === 'blocked')).toBe(true)
+  })
+})

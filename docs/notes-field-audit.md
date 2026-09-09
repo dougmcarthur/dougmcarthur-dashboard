@@ -306,9 +306,11 @@ row's facts, and moving it would wake every snooze in the table.
    `shared/noteColumns.ts`, `POST /api/backfill/notes`. See above for what was
    left derived and why.
 5. ~~Once backfilled, the Review screen reads columns and the parser is
-   deleted.~~ **Not reachable as written** — see above. Extraction moved to
-   write time instead. What is genuinely left: point the Review screen at the
-   columns where a column now exists, so the parse stops running per render.
+   deleted.~~ Half done, and the half that mattered was not the half the plan
+   named. The screen reads the columns now (`withStoredColumns`), which fixed
+   a real bug: a column corrected by hand was invisible, because the queue
+   re-derived from the prose every render. The parser is **not** deleted and
+   cannot be — see above.
 
 ## Queries used
 

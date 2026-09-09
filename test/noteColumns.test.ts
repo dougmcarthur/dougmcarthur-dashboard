@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { gigNoteColumns, syncNoteColumns, changesFor } from '../shared/noteColumns'
+import { gigNoteColumns, syncNoteColumns, changesFor, withStoredColumns } from '../shared/noteColumns'
+import { parseNote } from '../shared/reviewParse'
 
 // Verbatim production note bodies, the same ones `reviewParse.test.ts` uses.
 // An extractor tested against prose invented to suit it has been tested
@@ -209,5 +210,70 @@ describe('the one column a stated value may overwrite', () => {
     const applied: Record<string, unknown> = { feeCurrency: 'USD', location: null }
     for (const change of first) applied[change.column] = change.to
     expect(changesFor(applied, proposed)).toEqual([])
+  })
+})
+
+describe('withStoredColumns — the column wins over the prose', () => {
+  // The bug this fixes: until the queue read the columns, correcting
+  // `submission_state` by hand changed the database and nothing you could
+  // see. The screen re-derived from the note on every render.
+  const NOTE = `Submission status: NOT submitted. Single-page intake form at the URL. Contact Phone: needs Doug, not on file.`
+
+  it('lets a corrected state override what the note implies', () => {
+    const parsed = parseNote(NOTE)
+    expect(parsed.submissionState).toBe('not_submitted')
+
+    const merged = withStoredColumns(parsed, { submissionState: 'submitted' })
+    expect(merged.submissionState).toBe('submitted')
+  })
+
+  it('falls back to the note when the column is empty', () => {
+    // Null means "the note makes no claim" on most rows, and "nothing has
+    // extracted this yet" on any row that reached D1 without a route. Both
+    // want the parse, and neither wants a blank.
+    const merged = withStoredColumns(parseNote(NOTE), { submissionState: null, blockedOn: null })
+    expect(merged.submissionState).toBe('not_submitted')
+    expect(merged.blockers.length).toBeGreaterThan(0)
+  })
+
+  it('prefers a stored location and method', () => {
+    const merged = withStoredColumns(parseNote(NOTE), {
+      location: 'Canmore, AB',
+      submissionMethod: 'email',
+    })
+    expect(merged.location).toBe('Canmore, AB')
+    expect(merged.submissionMethod).toBe('email')
+  })
+
+  it('ignores a stored value that is not one of the states', () => {
+    // Status columns are not a closed set — production carries values outside
+    // every union. A junk one must not become the answer.
+    const merged = withStoredColumns(parseNote(NOTE), { submissionState: 'mailed it probably' })
+    expect(merged.submissionState).toBe('not_submitted')
+  })
+
+  it('falls back rather than claiming nothing is blocked, on unreadable JSON', () => {
+    // "Nothing is blocked" is a claim, and a column nobody can parse is not
+    // entitled to make it.
+    for (const raw of ['{oops', '[]', '{"a":1}', '[1,2,3]']) {
+      const merged = withStoredColumns(parseNote(NOTE), { blockedOn: raw })
+      expect(merged.blockers.length, raw).toBeGreaterThan(0)
+    }
+  })
+
+  it('uses a stored blocker list when it has one', () => {
+    const merged = withStoredColumns(parseNote(NOTE), { blockedOn: '["Needs a photo credit"]' })
+    expect(merged.blockers).toEqual(['Needs a photo credit'])
+  })
+
+  it('leaves the facts that have no column derived', () => {
+    // `requirements`, `dealTerms`, `alerts` and the drafted values are
+    // rendered and never queried, so they stay parsed. Storing copies would
+    // be a parser cache with a staleness bug.
+    const parsed = parseNote(NOTE)
+    const merged = withStoredColumns(parsed, { submissionState: 'submitted' })
+    expect(merged.draftedFields).toBe(parsed.draftedFields)
+    expect(merged.alerts).toBe(parsed.alerts)
+    expect(merged.requirements).toBe(parsed.requirements)
   })
 })
