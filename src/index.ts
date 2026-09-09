@@ -16,10 +16,11 @@ import health from './routes/health'
 import notifications, { pruneNotifications } from './routes/notifications'
 import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
-import replies from './routes/replies'
+import replies, { runReplyScan } from './routes/replies'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
 import { isDigestDue } from '../shared/digestSchedule'
 import { sendMail, mailerConfigured } from './lib/mailer'
+import { gmailConfigured } from './lib/gmail'
 import { recordEvent } from './lib/notificationEvents'
 import { localParts } from '../shared/digestSchedule'
 
@@ -156,6 +157,52 @@ async function runHousekeeping(env: Env): Promise<void> {
 }
 
 /**
+ * The local hours a reply scan runs on.
+ *
+ * Three times a day rather than every tick. Pinned to local hours instead of
+ * tracked in a settings row, for the reason housekeeping is: it needs no
+ * state and it cannot drift. A missed tick costs a few hours of noticing,
+ * which is the right price for a mailbox — an organiser's question is urgent
+ * in days, not in minutes, and twenty-four Gmail sweeps a day to find that
+ * out is work nobody asked for.
+ *
+ * Morning, midday and evening, because those are when a reply gets read.
+ */
+export const REPLY_SCAN_HOURS = [7, 12, 18]
+
+export function isReplyScanHour(hour: number): boolean {
+  return REPLY_SCAN_HOURS.includes(hour)
+}
+
+/**
+ * The mailbox sweep, on a schedule rather than on a button.
+ *
+ * The scan was already safe to run unattended — a reply you have resolved is
+ * never re-proposed, which is the property that makes this a scheduling
+ * question rather than a design one. Until now the property was true and
+ * unused: nothing ran it but a click, so a reply sat unnoticed exactly as
+ * long as you went without opening the page.
+ *
+ * It does not move any row. Accepting a match is still yours, and so is the
+ * transition after it. See docs/reply-matching-plan.md.
+ */
+async function runReplyScanIfDue(env: Env): Promise<void> {
+  if (!gmailConfigured(env)) return
+  const settings = await readDigestSettings(env)
+  const now = new Date()
+  if (!isReplyScanHour(localParts(now, settings.schedule.timezone).hour)) return
+
+  // The queue's rule, in the one place a scan could have broken it: the
+  // window `planReplyScan` derives is measured from a date, so the date is
+  // computed once here rather than read again downstream.
+  const today = now.toISOString().slice(0, 10)
+  const result = await runReplyScan(env, today)
+  if (result.stored > 0 || result.found > 0) {
+    console.log(`reply scan: ${result.found} found, ${result.stored} stored, ${result.skipped} already decided`)
+  }
+}
+
+/**
  * The Hono app, exported by name so tests can drive it with `app.request()`.
  * The default export is the Worker handler object — it has to carry
  * `scheduled` alongside `fetch`, so it is no longer the app itself.
@@ -173,6 +220,12 @@ export default {
         }),
         runHousekeeping(env).catch((err) => {
           console.error('housekeeping failed:', err)
+        }),
+        runReplyScanIfDue(env).catch((err) => {
+          // Logged and swallowed, like the others. A Gmail outage must not
+          // take the digest down with it — they share a tick and nothing
+          // else.
+          console.error('reply scan failed:', err)
         }),
       ]),
     )

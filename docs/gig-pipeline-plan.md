@@ -274,7 +274,7 @@ So, without exception:
 | B | Performance dates; `booked` writes a real calendar event | **Done.** Completes the calendar story |
 | C | Artist database + EPK assembly | **Done** apart from sourcing. Everything in phases 3–5 draws on it |
 | D | Phase 3: form pre-fill, draft emails, materials checklist | **Done.** Migration 0011, `shared/application.ts`, and the panel on the gig row. See [application-prep-plan.md](./application-prep-plan.md) |
-| E | Phase 4: Gmail follow-up classification | **Done.** Migration 0012, `shared/replyMatch.ts` + `shared/replyClassify.ts`. See [reply-matching-plan.md](./reply-matching-plan.md) |
+| E | Phase 4: Gmail follow-up classification | **Done.** Migrations 0012 and 0015, `shared/replyMatch.ts`, `replyClassify.ts` and `replyDraft.ts`, swept on the cron. See [reply-matching-plan.md](./reply-matching-plan.md) |
 | F | Cost model + swing-weight elicitation + scoring | **Half built.** The cost side is in — migration 0013, `shared/gigCost.ts`. The scoring side waits on the elicitation |
 | G | Preference learning and calibration | Needs F, and needs decisions logged *with* their scores |
 | H | Phase 5: agreement templates | Last, because it is the rarest event |
@@ -296,8 +296,12 @@ a quoted form receipt — with the domain as a corroborator, and a confirmed
 match binds the sender for good. See
 [reply-matching-plan.md](./reply-matching-plan.md).
 
-What is left of the phase: `info_requested` is recognised but the answer is not
-drafted, and the scan runs when you press the button rather than on the cron.
+Both loose ends are now closed. `info_requested` is answered as well as
+recognised — `shared/replyDraft.ts` reads what was asked for while the body is
+in hand (migration 0015) and drafts the reply from the artist database on read
+— and the scan runs on the cron at three local hours rather than only when you
+press the button. Neither writes a status; that is still `PATCH /api/gigs/:id`
+and still yours.
 
 **F — cost and scoring. Half built.** The cost side needed nothing from
 anybody and is in: migration 0013, `shared/gigCost.ts`, a panel on the gig

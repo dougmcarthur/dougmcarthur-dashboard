@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { app } from '../src/index'
+import { app, isReplyScanHour, REPLY_SCAN_HOURS } from '../src/index'
 
 // No integration secrets configured — enough to exercise routing without a DB.
 const emptyEnv = {} as Record<string, unknown>
@@ -281,4 +281,40 @@ describe('API route registration', () => {
     expect(res.status).toBe(400)
   })
 
+})
+
+describe('the reply scan schedule', () => {
+  // Three fixed local hours rather than a settings row, for the reason
+  // housekeeping gives: it needs no state and it cannot drift. The test is
+  // here so the cadence is a decision on record rather than a constant
+  // somebody trims to one on a quiet afternoon.
+  it('runs morning, midday and evening', () => {
+    expect(REPLY_SCAN_HOURS).toEqual([7, 12, 18])
+  })
+
+  it('is due on those hours and on no others', () => {
+    for (let hour = 0; hour < 24; hour++) {
+      expect(isReplyScanHour(hour), `hour ${hour}`).toBe(REPLY_SCAN_HOURS.includes(hour))
+    }
+  })
+})
+
+describe('the reply draft route', () => {
+  // It validates the id before touching D1, so this is reachable with no
+  // database binding — the same property the application router's cases rely
+  // on.
+  it('needs an id that is an id', async () => {
+    const res = await app.request('/api/replies/not-a-number/draft', {}, emptyEnv)
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: string }
+    expect(body.error).toContain('reply id')
+  })
+
+  it('is not swallowed by another replies route', async () => {
+    // `/replies/:id/draft` sits alongside `/replies/:id/accept` and
+    // `/replies/scan`. Reaching the 400 above proves the path resolves here
+    // rather than to one of those.
+    const res = await app.request('/api/replies/0/draft', {}, emptyEnv)
+    expect(res.status).toBe(400)
+  })
 })

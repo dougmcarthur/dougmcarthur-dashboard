@@ -174,6 +174,35 @@ export interface ReplyFeed {
   unresolved: number
 }
 
+/** An answer the reply asked for. See shared/replyDraft.ts. */
+export interface RecognisedAsk {
+  id: string
+  label: string
+  questionKind: string | null
+  attachment: boolean
+  /** The sentence it was read from, verbatim. */
+  evidence: string
+}
+
+export interface ReplyDraft {
+  subject: string
+  body: string
+  asks: RecognisedAsk[]
+  answered: string[]
+  missing: string[]
+  attachments: string[]
+  unrecognised: string[]
+  gaps: Array<{ marker: string; prompt: string }>
+  /** Re-read from the stored snippet rather than the email. */
+  approximate: boolean
+}
+
+export interface ReplyDraftResponse {
+  replyId: number
+  gig: { id: number; name: string; status: string } | null
+  draft: ReplyDraft
+}
+
 /** What a scan asked for, and how far back it reached. */
 export interface ReplyScanResult {
   queries: string[]
@@ -447,6 +476,12 @@ export const api = {
       ),
     dismiss: (id: number) =>
       apiFetch<{ id: number; resolution: string }>(`/replies/${id}/dismiss`, { method: 'POST' }),
+    /**
+     * The answer to their question, drafted from the artist database.
+     * Composed on read, so an entry added since the mail arrived appears
+     * without a re-scan. Nothing here sends anything.
+     */
+    draft: (id: number) => apiFetch<ReplyDraftResponse>(`/replies/${id}/draft`),
   },
   referenceDocs: {
     list: () => apiFetch<ReferenceDoc[]>('/reference-docs'),

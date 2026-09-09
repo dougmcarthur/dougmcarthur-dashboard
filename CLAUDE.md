@@ -266,6 +266,33 @@ weren't able to make it work" — is an acknowledgement carrying a date, not a
 rejection. The deciding sentence is stored verbatim; a reading you cannot check
 is a reading you should not trust.
 
+**An ask is recognised while the body is in hand; the answer is drafted on
+read.** `gig_replies` keeps a 400-character snippet, not the email, so
+`recogniseAsks` runs at scan time and stores what was asked for — the same
+move `classifyReply` already makes with the deciding sentence. Composing the
+reply happens later, against the artist database *as it is then*, so an answer
+missing in March and on file in April appears without a re-scan. A row stored
+before migration 0015 is re-read from the snippet and marked `approximate`,
+the treatment a deadline recovered from prose gets.
+
+The ask vocabulary is closed on purpose: it matches nouns the library already
+has a kind for, and a request sentence matching none of them is reported in
+`unrecognised` rather than guessed at. `composeReplyDraft` fills what is on
+file, marks what is not, lists files to attach and never claims one is
+attached — and always leaves a gap, because a draft that reads as finished is
+the one that gets sent unfinished. Copy, no Send;
+`test/uiConsistency.test.ts` fails if a Send button appears, and that guard
+matches a short element label rather than any prose so the caption telling you
+to send it yourself does not trip it.
+
+**The mailbox is swept on the cron, three times a day.** `REPLY_SCAN_HOURS`
+is 7, 12 and 18 local, pinned like housekeeping's 3am rather than tracked in a
+settings row: no state, no drift, and a missed tick costs a few hours of
+noticing. The property that makes this safe was already there — a reply you
+have resolved is never re-proposed — it was just unused, so a reply sat unseen
+exactly as long as you went without opening the page. The scan still writes no
+status.
+
 **The reply router never writes a status.** Accepting binds the correspondent
 and records the judgement, and stops; moving the row is `PATCH /api/gigs/:id`,
 which owns what a transition means. Two calls is the correct number — they can

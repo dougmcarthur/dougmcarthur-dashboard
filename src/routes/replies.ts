@@ -3,8 +3,8 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { eq, and, desc, isNull, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
-import { gigReplies, gigCorrespondents, gigOpportunities } from '../db/schema'
-import { gmailConfigured } from '../lib/gmail'
+import { gigReplies, gigCorrespondents, gigOpportunities, artistAssets } from '../db/schema'
+import { gmailConfigured, type GmailEnv } from '../lib/gmail'
 import { fetchReplies, planReplyScan } from '../lib/gmailReplies'
 import { recordEvent } from '../lib/notificationEvents'
 import {
@@ -14,6 +14,7 @@ import {
   type MatchableGig,
 } from '../../shared/replyMatch'
 import { classifyReply, REPLY_CLASS_LABELS } from '../../shared/replyClassify'
+import { recogniseAsks, composeReplyDraft, type AskReading, type RecognisedAsk } from '../../shared/replyDraft'
 import { normaliseGigStatus } from '../../shared/gigStatus'
 import type { Env } from '../types'
 
@@ -116,23 +117,28 @@ function safeJson(raw: string | null): unknown[] {
  * and one you have already resolved is left exactly as you left it — a re-scan
  * must not resurrect a decision you already made.
  */
-replies.post('/scan', async (c) => {
-  if (!gmailConfigured(c.env)) return notConfigured(c)
-
-  const db = getDb(c.env.DB)
-  const today = todayOf(c)
+/**
+ * One scan, shared by the button and the cron.
+ *
+ * `today` is an argument rather than read here, for the same reason the queue
+ * takes one: `planReplyScan` derives its lookback from it, and a scan whose
+ * horizon depends on when it happened to run is a scan you cannot reason
+ * about.
+ */
+export async function runReplyScan(env: Env & GmailEnv, today: string): Promise<ReplyScanOutcome> {
+  const db = getDb(env.DB)
   const now = new Date().toISOString()
 
   const allGigs = await db.select().from(gigOpportunities)
   const gigs = allGigs.map(toMatchable)
-  const bindings = await loadBindings(c.env)
+  const bindings = await loadBindings(env)
 
   const plan = planReplyScan({ gigs, bindings, today })
   if (plan.queries.length === 0) {
-    return c.json({ ...plan, found: 0, stored: 0, skipped: 0, items: [] })
+    return { ...plan, found: 0, stored: 0, skipped: 0 }
   }
 
-  const messages = await fetchReplies(c.env, plan)
+  const messages = await fetchReplies(env, plan)
 
   const existing = messages.length
     ? await db
@@ -144,7 +150,7 @@ replies.post('/scan', async (c) => {
 
   let stored = 0
   let skipped = 0
-  const fresh: Array<{ subject: string; gigName: string | null; classification: string }> = []
+  const fresh: Array<{ subject: string | null; gigName: string | null; classification: string }> = []
 
   for (const message of messages) {
     const prior = byMessage.get(message.messageId)
@@ -158,6 +164,9 @@ replies.post('/scan', async (c) => {
     const { candidates, ambiguous } = matchReply(message, gigs, bindings)
     const best = candidates[0]
     const classification = classifyReply(message.body)
+    // Read here, not on demand: this is the only moment the whole body
+    // exists. See migration 0015.
+    const reading = recogniseAsks(message.body)
 
     const values = {
       gmailMessageId: message.messageId,
@@ -186,6 +195,8 @@ replies.post('/scan', async (c) => {
         })),
       ),
       matchAmbiguous: ambiguous ? 1 : 0,
+      asks: JSON.stringify(reading.asks),
+      unrecognisedAsks: JSON.stringify(reading.unrecognised),
       createdAt: now,
     }
 
@@ -204,7 +215,7 @@ replies.post('/scan', async (c) => {
 
   if (stored > 0) {
     const decisive = fresh.filter((f) => f.classification !== 'unclear' && f.classification !== 'acknowledged')
-    await recordEvent(c.env, {
+    await recordEvent(env, {
       kind: 'reconcile',
       tier: decisive.length > 0 ? 'attention' : 'info',
       title: stored === 1 ? 'One reply found in your mail' : `${stored} replies found in your mail`,
@@ -217,8 +228,82 @@ replies.post('/scan', async (c) => {
     })
   }
 
-  return c.json({ ...plan, found: messages.length, stored, skipped })
+  return { ...plan, found: messages.length, stored, skipped }
+}
+
+/**
+ * The plan plus what the run did with it. Built off `planReplyScan`'s own
+ * return type rather than restated, so a field added there cannot quietly
+ * stop being reported here.
+ */
+export type ReplyScanOutcome = ReturnType<typeof planReplyScan> & {
+  found: number
+  stored: number
+  skipped: number
+}
+
+replies.post('/scan', async (c) => {
+  if (!gmailConfigured(c.env)) return notConfigured(c)
+  return c.json(await runReplyScan(c.env, todayOf(c)))
 })
+
+/**
+ * The reply to their question, drafted from the artist database.
+ *
+ * Composed on read rather than stored, for the reason the EPK is: an answer
+ * that was missing when the mail arrived and is on file now should appear
+ * without a re-scan. The asks themselves are stored, because the body they
+ * were read from is not.
+ *
+ * Nothing here sends anything. See shared/replyDraft.ts.
+ */
+replies.get('/:id/draft', async (c) => {
+  const db = getDb(c.env.DB)
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'A reply id is required.' }, 400)
+
+  const reply = await db.select().from(gigReplies).where(eq(gigReplies.id, id)).get()
+  if (!reply) return c.json({ error: 'not found' }, 404)
+
+  // Rows stored before migration 0015 carry no asks. Re-reading the snippet
+  // is a worse answer than reading the email was, and it says so: the draft
+  // is marked approximate rather than presented as complete.
+  const stored = parseAsks(reply.asks, reply.unrecognisedAsks)
+  const approximate = stored === null
+  const reading = stored ?? recogniseAsks([reply.snippet, reply.evidence].filter(Boolean).join('\n'))
+
+  const gig = reply.gigId
+    ? await db.select().from(gigOpportunities).where(eq(gigOpportunities.id, reply.gigId)).get()
+    : null
+  const assets = await db.select().from(artistAssets)
+
+  return c.json({
+    replyId: reply.id,
+    gig: gig ? { id: gig.id, name: gig.name, status: gig.status } : null,
+    draft: composeReplyDraft({
+      gig: gig ? { name: gig.name, organizer: gig.organizer } : null,
+      reply: { subject: reply.subject, fromName: reply.fromName, evidence: reply.evidence },
+      reading,
+      assets,
+      approximate,
+    }),
+  })
+})
+
+/** Stored asks, or null when the row predates migration 0015. */
+function parseAsks(asks: string | null, unrecognised: string | null): AskReading | null {
+  if (!asks) return null
+  try {
+    const parsed = JSON.parse(asks)
+    if (!Array.isArray(parsed)) return null
+    return {
+      asks: parsed as RecognisedAsk[],
+      unrecognised: Array.isArray(safeJson(unrecognised)) ? (safeJson(unrecognised) as string[]) : [],
+    }
+  } catch {
+    return null
+  }
+}
 
 const AcceptSchema = z.object({
   /** Overrides the matched gig — the answer when the matcher got it wrong. */
