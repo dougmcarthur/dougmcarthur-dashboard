@@ -84,7 +84,7 @@ export interface GigOpportunity {
   location?: string | null
   /** CA | US | other. The visa rule turns on this and nothing else. */
   country?: string | null
-  /** drive | regional | transcontinental | international. Guessed when null. */
+  /** local | drive | regional | transcontinental | international. Guessed when null. */
   travelBand?: string | null
   /** none | standard | major. Guessed when null. */
   lodgingTier?: string | null

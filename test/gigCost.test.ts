@@ -331,3 +331,40 @@ describe('performanceKindOf', () => {
     expect(performanceKindOf(null)).toBeNull()
   })
 })
+
+describe('the band that was missing', () => {
+  // Both of these were live on production rows. Neither is cosmetic: they
+  // make home-town gigs look expensive, for an artist whose stated goal is
+  // expanding beyond Winnipeg.
+  it('does not price a show in your own city as a trip', () => {
+    expect(inferTravelBand('Winnipeg, MB', 'CA')).toBe('local')
+    expect(TRAVEL_BANDS.local.cost.high).toBeLessThan(TRAVEL_BANDS.drive.cost.low)
+  })
+
+  it('does not price a park half an hour away as a regional flight', () => {
+    // Birds Hill Park is where the Winnipeg Folk Festival is held. It banded
+    // as a $450–850 flight purely for not being a town anybody had listed.
+    expect(inferTravelBand('Birds Hill Park, MB', 'CA')).toBe('local')
+  })
+
+  it('treats any Manitoba address as a drive at worst', () => {
+    // The province is about 1,200 km end to end and the far corner is still
+    // not a flight. This is the rule that stops the list being a gazetteer.
+    expect(inferTravelBand('Flin Flon, MB', 'CA')).toBe('drive')
+    expect(inferTravelBand('somewhere in Manitoba', 'CA')).toBe('drive')
+  })
+
+  it('books no hotel in the city you live in', () => {
+    const e = estimateGigCost(gig({ country: 'CA', location: 'Winnipeg, MB', nights: null }))
+    expect(e.lines.find((l) => l.id === 'lodging')).toBeUndefined()
+    // A day of food and parking, not a trip.
+    expect(e.net.high).toBeLessThan(200)
+  })
+
+  it('still sends a real trip to a real band', () => {
+    expect(inferTravelBand('Canmore, AB', 'CA')).toBe('regional')
+    expect(inferTravelBand('Owen Sound, ON', 'CA')).toBe('regional')
+    expect(inferTravelBand('Lyons, CO', 'US')).toBe('regional')
+    expect(inferTravelBand('Austin, TX', 'US')).toBe('transcontinental')
+  })
+})

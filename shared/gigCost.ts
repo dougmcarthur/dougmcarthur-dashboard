@@ -29,7 +29,7 @@ export interface CostRange {
   high: number
 }
 
-export type TravelBand = 'drive' | 'regional' | 'transcontinental' | 'international'
+export type TravelBand = 'local' | 'drive' | 'regional' | 'transcontinental' | 'international'
 export type LodgingTier = 'none' | 'standard' | 'major'
 export type PerformanceKind = 'showcase' | 'paid'
 export type Country = 'CA' | 'US' | 'other'
@@ -41,6 +41,12 @@ export type Country = 'CA' | 'US' | 'other'
  * "Whitehorse, YT" does not carry.
  */
 export const TRAVEL_BANDS: Record<TravelBand, { label: string; note: string; cost: CostRange }> = {
+  // The band that was missing, and its absence was not cosmetic: a show at
+  // Birds Hill Park, thirty kilometres out, priced as a regional *flight* at
+  // $450–850, and one in Winnipeg itself as a $120–400 drive. Both are wrong
+  // in the direction that matters most here — they make home-town gigs look
+  // expensive, for an artist whose stated goal is expanding beyond Winnipeg.
+  local: { label: 'Local', note: 'In or beside Winnipeg — fuel and parking', cost: { low: 0, high: 40 } },
   drive: { label: 'Drive', note: 'Within about 800 km of Winnipeg', cost: { low: 120, high: 400 } },
   regional: { label: 'Regional flight', note: 'Elsewhere in Canada, or the near US', cost: { low: 450, high: 850 } },
   transcontinental: { label: 'Transcontinental flight', note: 'A coast, or the far US', cost: { low: 700, high: 1400 } },
@@ -71,6 +77,8 @@ export const PER_DIEM: CostRange = { low: 55, high: 95 }
  * a gap where the lodging should be — which was all 34 of them.
  */
 export const NIGHTS_BY_BAND: Record<TravelBand, { low: number; high: number }> = {
+  // Nobody books a hotel in the city they live in.
+  local: { low: 0, high: 0 },
   drive: { low: 0, high: 1 },
   regional: { low: 1, high: 2 },
   transcontinental: { low: 2, high: 3 },
@@ -166,6 +174,18 @@ export function normaliseCountry(raw: string | null | undefined): Country | null
  * these lists only stop the estimate being empty on the 34 rows that predate
  * the column, and every estimate says which of its bands were guessed.
  */
+/**
+ * Home, and the ring around it you would not sleep away from.
+ *
+ * Birds Hill Park is on this list because the Winnipeg Folk Festival is held
+ * there and it is a half-hour drive, not because the list is trying to be a
+ * gazetteer.
+ */
+const LOCAL_PLACES = [
+  'winnipeg', 'birds hill', 'east st paul', 'west st paul', 'headingley',
+  'oak bluff', 'lorette', 'niverville', 'st norbert', 'charleswood', 'transcona',
+]
+
 const DRIVE_PLACES = [
   'manitoba', 'winnipeg', 'brandon', 'gimli', 'dauphin', 'steinbach', 'selkirk', 'morden', 'winkler',
   'saskatchewan', 'regina', 'saskatoon', 'yorkton',
@@ -202,8 +222,14 @@ const mentions = (haystack: string, needles: string[]): boolean =>
  */
 export function inferTravelBand(location: string | null | undefined, country: Country | null): TravelBand | null {
   const t = (location ?? '').toLowerCase()
+  if (t && mentions(t, LOCAL_PLACES)) return 'local'
   if (t && mentions(t, DRIVE_PLACES)) return 'drive'
   if (t && mentions(t, FAR_PLACES)) return 'transcontinental'
+  // A Manitoba address is a drive at worst, whether or not the town is on a
+  // list. The province is about 1,200 km end to end and the far corner of it
+  // is still not a flight — "Birds Hill Park, MB" was banding as a regional
+  // flight purely for not being a place anybody had named.
+  if (/,\s*mb\b|\bmanitoba\b/.test(t)) return 'drive'
   if (country === 'other') return 'international'
   if (country === 'CA' || country === 'US') return 'regional'
   return null
