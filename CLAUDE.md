@@ -151,9 +151,13 @@ passkey ceremony — WebAuthn has no non-interactive mode. `API_TOKEN` as a
 bearer is their credential, checked before the session because it is a string
 compare and the session is a D1 read. Unset, there is no bearer path at all, so
 an empty deployment cannot be opened by guessing the empty string — but unset
-*with Access removed* is also how every agent request silently becomes a 401.
-That ordering is the one dangerous step in the rollout and it is written down
-in `docs/passkey-login.md`.
+*at deploy time* is how every agent request silently becomes a 401. **Not at
+Access-removal time**, which is the easy thing to get backwards: Access
+authenticated at the edge and the Worker then trusted whatever arrived, so it
+never supplied a credential this middleware would accept. The secret and the
+agents' side of it are prerequisites of the deploy. That ordering is the one
+dangerous step in the rollout and it is written down in
+`docs/passkey-login.md`.
 
 **`DASHBOARD_URL` stopped being cosmetic.** Its hostname is the WebAuthn
 relying-party ID, which is baked into every credential at registration and

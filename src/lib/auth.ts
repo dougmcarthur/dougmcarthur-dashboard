@@ -17,9 +17,12 @@
  *    exemption list, rather than a decorator each route has to remember.
  *  - **The research agents lost their front door.** They POST from outside a
  *    browser and cannot do a passkey ceremony, so they authenticate with
- *    `API_TOKEN` as a bearer instead. Without that secret set they get a 401
- *    at the moment Access is switched off, which is the one way this change
- *    breaks something silently — see docs/passkey-login.md.
+ *    `API_TOKEN` as a bearer instead. They break **the moment this deploys**,
+ *    not when Access is later switched off: Access let a request through the
+ *    edge and the Worker then trusted everything that arrived, so it never
+ *    supplied a credential the middleware below would accept. Setting the
+ *    secret and teaching the agents to send it is a prerequisite of the
+ *    deploy, not of the Access removal — see docs/passkey-login.md.
  */
 
 import { eq, lt } from 'drizzle-orm'

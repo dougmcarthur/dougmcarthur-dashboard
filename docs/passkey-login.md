@@ -93,7 +93,11 @@ bearer token instead:
 Authorization: Bearer <API_TOKEN>
 ```
 
-Set it before switching Access off, not after:
+**Set it before you deploy, not before you remove Access.** This is the part
+that is easy to get backwards. Access authenticated at the *edge* and the
+Worker then trusted whatever arrived — it never handed the Worker a credential
+the middleware would recognise. So the agents start getting 401s the moment
+this Worker goes live, whether or not Access is still in front of it.
 
 ```bash
 openssl rand -base64 32                     # generate
@@ -101,8 +105,11 @@ npx wrangler secret put API_TOKEN           # paste
 ```
 
 With `API_TOKEN` unset there is no bearer path at all — an empty secret is not
-a credential, so nothing can be guessed into it — and every agent request gets
-a 401 the moment Access stops letting them through.
+a credential, so nothing can be guessed into it. Setting it is only half the
+job: the agents live outside this repository and have to be taught to send the
+header. Until both halves are done they will 401, and because they retry on
+their own schedule the symptom is gig rows quietly failing to arrive rather
+than anything announcing itself.
 
 ## Rolling this out, in the order that avoids a lockout
 
@@ -111,24 +118,31 @@ and step 4 is a thing you do in the Cloudflare dashboard, not in this
 repository. Doing it before step 3 leaves the app open; doing step 3 before
 step 2 leaves you locked out of a dashboard nobody can reach.
 
-1. **Merge and deploy.** CI applies migration 0017 and ships the Worker. The
+1. **Set `API_TOKEN` and teach the agents to send it — before merging.**
+   `npx wrangler secret put API_TOKEN` works against the live Worker without
+   a deploy, so the secret can be in place before the code that needs it. Do
+   this first: the agents 401 from the moment the Worker ships, not from the
+   moment Access goes.
+2. **Merge and deploy.** CI applies migration 0017 and ships the Worker. The
    login screen is live but Access is still in front of it, so nothing is
    reachable from outside yet either way.
-2. **Set the secrets.**
-   - `npx wrangler secret put API_TOKEN` — and give the same value to the
-     research agents.
+3. **Check the rest of the configuration.**
    - Confirm `[[send_email]]` in `wrangler.toml` still lists the address the
      setup code should go to. The binding is the real boundary: the Worker
      cannot mail an address that is not on that list, whatever the code says.
-3. **Enrol a passkey — while Access is still on.** Sign in through Access as
+   - `AUTH_EMAIL_SENDER` is `login@dougmcarthur.net`. Same domain as the
+     digest's sender, so it should need nothing new — but it has never sent a
+     message, and it is the only route to a first passkey. If the code never
+     arrives, that address is the first thing to look at.
+4. **Enrol a passkey — while Access is still on.** Sign in through Access as
    usual, land on the login screen, click *Email me a setup code*, and add a
    passkey. Then add a **second** one on another device. A single
    non-synced passkey is one lost laptop away from a break-glass email, and
    the Passkeys card on Settings says which of yours are synced.
-4. **Turn Access off.** Zero Trust → Access → Applications → the dashboard app
+5. **Turn Access off.** Zero Trust → Access → Applications → the dashboard app
    → delete it (or set its policy to Bypass). The Worker is the boundary from
    this moment on.
-5. **Check the agents.** One authenticated POST from an agent, and one
+6. **Check the agents.** One authenticated POST from an agent, and one
    unauthenticated request from anywhere, which must answer
    `{"error":"not signed in"}` with a 401.
 

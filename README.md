@@ -765,8 +765,10 @@ Set production secrets once with `wrangler secret put`:
 - Run `wrangler whoami` and `wrangler deploy --dry-run` to confirm the config
   matches the live Worker before publishing.
 - `API_TOKEN` must be set (`wrangler secret put API_TOKEN`) and handed to the
-  research agents **before** Cloudflare Access is switched off. With Access
-  gone and the secret unset, every agent POST becomes a 401 and nothing in the
-  repository would notice.
+  research agents **before this Worker deploys** — not before Access is
+  switched off, which is the easy mistake. Access authenticated at the edge
+  and the Worker trusted whatever arrived, so it never supplied a credential
+  the new middleware accepts. Every agent POST becomes a 401 from the deploy
+  onwards, and nothing in the repository would notice.
 - `DASHBOARD_URL` is now the WebAuthn relying-party ID as well as the digest's
   link base. Changing its hostname invalidates every enrolled passkey.
