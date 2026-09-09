@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
 import { Button } from './ui/Button'
+import { Disclosure } from './ui/Disclosure'
 
 /**
  * Filling the columns migration 0001 added and nobody ever wrote to.
@@ -36,33 +37,21 @@ export function NotesBackfillCard() {
     },
   })
 
-  if (!open) {
-    return (
-      <div className="rounded-lg border border-line bg-surface px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-body">
-          Facts buried in the note columns.{' '}
-          <span className="text-muted">Lift them into the columns that have been empty since 0001.</span>
-        </p>
-        <Button variant="neutral" onClick={() => setOpen(true)}>Read the notes</Button>
-      </div>
-    )
-  }
-
   const data = preview.data
 
   return (
-    <div className="rounded-lg border border-line bg-surface px-4 py-3.5 space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-ink">From the note columns</p>
-          <p className="text-xs text-muted mt-0.5">
-            A column that already holds something is never touched, so this is safe to run twice.
-          </p>
-        </div>
-        <Button variant="quiet" onClick={() => setOpen(false)}>Close</Button>
-      </div>
-
-      {preview.isLoading && <p className="text-sm text-muted">Reading {'…'}</p>}
+    <Disclosure
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      teaser="Facts buried in the note columns."
+      hint="Lift them into the columns that have been empty since 0001."
+      openLabel="Read the notes"
+      title="From the note columns"
+      subtitle="A column that already holds something is never touched, so this is safe to run twice."
+      loading={preview.isLoading}
+      error={apply.isError ? 'Could not fill them. Nothing was written.' : null}
+    >
       {done && <p className="text-sm text-success-fg">{done}</p>}
 
       {data && data.wouldChange === 0 && !done && (
@@ -104,7 +93,6 @@ export function NotesBackfillCard() {
         </>
       )}
 
-      {apply.isError && <p className="text-sm text-danger-fg">Could not fill them. Nothing was written.</p>}
-    </div>
+    </Disclosure>
   )
 }

@@ -416,9 +416,11 @@ export const api = {
   },
   /** The artist database — see shared/artistAssets.ts. */
   artist: {
-    list: (params?: { kind?: string }) => {
-      const qs = params?.kind ? `?kind=${encodeURIComponent(params.kind)}` : ''
-      return apiFetch<ArtistAssetPage>(`/artist${qs}`)
+    list: (params?: { kind?: string; freshness?: string }) => {
+      const qs = new URLSearchParams()
+      if (params?.kind) qs.set('kind', params.kind)
+      if (params?.freshness) qs.set('freshness', params.freshness)
+      return apiFetch<ArtistAssetPage>(`/artist${qs.size ? `?${qs}` : ''}`)
     },
     epk: (audience: EpkAudience) => apiFetch<Epk>(`/artist/epk?audience=${audience}`),
     create: (body: ArtistAssetInput) =>

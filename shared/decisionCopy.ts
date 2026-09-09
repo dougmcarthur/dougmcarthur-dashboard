@@ -20,7 +20,6 @@ import {
   type GigStatus,
   normaliseGigStatus,
   nextGigStatuses,
-  gigStatusMeta,
 } from './gigStatus'
 
 /** Everything the copy needs — an item before its own sentence is attached. */

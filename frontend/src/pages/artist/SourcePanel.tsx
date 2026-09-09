@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type AssetProposal } from '../../api'
 import { Button } from '../../components/ui/Button'
+import { Disclosure } from '../../components/ui/Disclosure'
 
 /**
  * Filling the library from the reference documents.
@@ -32,34 +33,21 @@ export function SourcePanel({ onDone }: { onDone: () => void }) {
     },
   })
 
-  if (!open) {
-    return (
-      <div className="rounded-lg border border-line bg-surface px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-body">
-          The reference documents already describe you.{' '}
-          <span className="text-muted">Read them into the library rather than typing it twice.</span>
-        </p>
-        <Button variant="neutral" onClick={() => setOpen(true)}>Read the documents</Button>
-      </div>
-    )
-  }
-
   const data = preview.data
 
   return (
-    <div className="rounded-lg border border-line bg-surface px-4 py-3.5 space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-ink">From the reference documents</p>
-          <p className="text-xs text-muted mt-0.5">
-            Nothing is written until you say so, and everything added lands as never reviewed —
-            a document said it, you have not.
-          </p>
-        </div>
-        <Button variant="quiet" onClick={() => setOpen(false)}>Close</Button>
-      </div>
-
-      {preview.isLoading && <p className="text-sm text-muted">Reading…</p>}
+    <Disclosure
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      teaser="The reference documents already describe you."
+      hint="Read them into the library rather than typing it twice."
+      openLabel="Read the documents"
+      title="From the reference documents"
+      subtitle="Nothing is written until you say so, and everything added lands as never reviewed — a document said it, you have not."
+      loading={preview.isLoading}
+      error={apply.isError ? 'Could not add them. Nothing was written.' : null}
+    >
 
       {data && data.wouldAdd === 0 && (
         <p className="text-sm text-body">
@@ -115,9 +103,6 @@ export function SourcePanel({ onDone }: { onDone: () => void }) {
         </details>
       )}
 
-      {apply.isError && (
-        <p className="text-sm text-danger-fg">Could not add them. Nothing was written.</p>
-      )}
-    </div>
+    </Disclosure>
   )
 }

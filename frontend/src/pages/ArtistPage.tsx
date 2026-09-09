@@ -30,13 +30,16 @@ const AUDIENCES: Array<{ id: EpkAudience; label: string; blurb: string }> = [
 export function ArtistPage() {
   const qc = useQueryClient()
   const [kindFilter, setKindFilter] = useState('')
+  // Which freshness the library is narrowed to, or '' for all of it. Driven
+  // by the counts below, which were previously a number with nowhere to go.
+  const [freshness, setFreshness] = useState('')
   const [tab, setTab] = useState<'library' | EpkAudience>('library')
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['artist', kindFilter],
-    queryFn: () => api.artist.list(kindFilter ? { kind: kindFilter } : undefined),
+    queryKey: ['artist', kindFilter, freshness],
+    queryFn: () => api.artist.list({ kind: kindFilter || undefined, freshness: freshness || undefined }),
   })
 
   const epk = useQuery({
@@ -97,17 +100,44 @@ export function ArtistPage() {
         from overdue material looks complete and is not, which is the one
         failure a generated document has that a folder does not.
       */}
+      {/*
+        Buttons, not labels. These counts are the two questions the artist
+        database exists to answer, and reading one and then hunting the list
+        for the rows behind it was the whole friction — one sourcing run puts
+        twenty-two assets in the second bucket at once.
+      */}
       {data && (data.needsReview > 0 || data.unreviewed > 0) && (
         <div className="flex flex-wrap gap-2 text-sm">
           {data.needsReview > 0 && (
-            <span className="px-3 py-1.5 rounded-lg border border-danger-line bg-danger-bg text-danger-fg">
+            <button
+              onClick={() => { setFreshness(freshness === 'overdue' ? '' : 'overdue'); setTab('library') }}
+              aria-pressed={freshness === 'overdue'}
+              className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                freshness === 'overdue'
+                  ? 'border-danger-line bg-danger-fg text-surface'
+                  : 'border-danger-line bg-danger-bg text-danger-fg hover:border-danger-fg'
+              }`}
+            >
               <strong>{data.needsReview}</strong> overdue for review
-            </span>
+            </button>
           )}
           {data.unreviewed > 0 && (
-            <span className="px-3 py-1.5 rounded-lg border border-line bg-surface text-muted">
+            <button
+              onClick={() => { setFreshness(freshness === 'unreviewed' ? '' : 'unreviewed'); setTab('library') }}
+              aria-pressed={freshness === 'unreviewed'}
+              className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                freshness === 'unreviewed'
+                  ? 'border-line-strong bg-ink text-surface'
+                  : 'border-line bg-surface text-muted hover:border-line-strong'
+              }`}
+            >
               <strong>{data.unreviewed}</strong> never reviewed
-            </span>
+            </button>
+          )}
+          {freshness && (
+            <button onClick={() => setFreshness('')} className="px-3 py-1.5 text-muted hover:text-ink transition-colors">
+              Show everything
+            </button>
           )}
         </div>
       )}
