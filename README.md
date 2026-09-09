@@ -270,6 +270,38 @@ deadline — a deadline can still be met — and is the third explicit exception
 `awaitingDecision`, so it surfaces even on a row the queue would otherwise call
 settled.
 
+### Answering them, and when the mail is read
+
+`info_requested` is the state the plan singled out as the one that stalls if
+nobody notices. Two things close that loop.
+
+**The ask is recognised while the body is in hand.** `gig_replies` stores a
+400-character snippet, not the email, so `recogniseAsks` runs at scan time and
+records what was asked for beside the deciding sentence — an ask can sit four
+paragraphs down. Composing the reply happens later, against the artist
+database *as it is then*, so an answer that was missing when the mail arrived
+and is on file now appears without a re-scan. Rows stored before migration
+0015 are re-read from the snippet and marked approximate.
+
+The vocabulary is closed: it matches nouns the library already has a kind for
+— a press photo, a stage plot, set length, line-up, availability, a tax form.
+A request sentence matching none of them is reported as unrecognised rather
+than guessed at, and quoted so you can read it yourself.
+
+`composeReplyDraft` fills what is on file, marks what is not, lists files to
+attach and never claims one is attached. It always leaves a gap, because a
+draft that reads as finished is the one that gets sent unfinished. **Copy, and
+no Send** — sharper here than on an application, because a wrong auto-reply to
+a festival that just asked you a question is worse than a slow one.
+
+**The mailbox is swept on the cron**, at 07:00, 12:00 and 18:00 local. Pinned
+hours rather than a settings row, the same reasoning housekeeping uses: no
+state, no drift, and a missed tick costs a few hours of noticing. The property
+that makes an unattended scan safe — a reply you have resolved is never
+re-proposed — was already there and simply unused, so a reply sat unseen
+exactly as long as you went without opening the page. The scan still writes no
+status.
+
 ## The artist database
 
 `#artist` holds everything a booking manager could ask for — bios at several

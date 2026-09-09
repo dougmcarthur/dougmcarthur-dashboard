@@ -191,3 +191,35 @@ describe('no fixture reads the clock', () => {
     expect(offenders).toEqual([])
   })
 })
+
+describe('the reply draft offers to copy, never to send', () => {
+  const src = readFileSync('frontend/src/components/ReplyDraftPanel.tsx', 'utf8')
+
+  it('has no button that claims to send the reply', () => {
+    // Sharper than the application's version of this rule: a wrong auto-reply
+    // to a festival that just asked you a question is worse than a slow one.
+    // A *label*, not prose: the verb has to be most of the element's text.
+    // "Send it from your mail. Nothing here goes out on its own." is a
+    // caption telling you to do it yourself, and a guard that cannot tell
+    // those apart is one you end up wording around.
+    const offenders = [
+      ...src.matchAll(/>\s*(Send|Reply|Submit)\b[^<]{0,24}</g),
+      ...src.matchAll(/label="\s*(Send|Reply|Submit)\b/g),
+    ].map((m) => m[1])
+    expect(offenders).toEqual([])
+  })
+
+  it('offers copying instead', () => {
+    expect(src).toContain('navigator.clipboard.writeText')
+  })
+
+  it('quotes the sentence each ask was read from', () => {
+    // The same rule the classification follows. A reading you cannot check is
+    // a reading you should not trust.
+    expect(src).toContain('ask.evidence')
+  })
+
+  it('says when the asks were re-read from the snippet', () => {
+    expect(src).toContain('draft.approximate')
+  })
+})

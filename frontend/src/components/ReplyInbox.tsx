@@ -5,6 +5,7 @@ import { gigStatusMeta, normaliseGigStatus, nextGigStatuses, type GigStatus } fr
 import { shortDate } from '../format'
 import { Button } from './ui/Button'
 import { Select } from './ui/Field'
+import { ReplyDraftPanel } from './ReplyDraftPanel'
 
 /**
  * Phase 4 on screen: what arrived in the mail, and what the app thinks it
@@ -125,6 +126,17 @@ function Card({
           Not this one
         </Button>
       </div>
+
+      {/*
+        Only where they actually asked for something. A rejection needs no
+        answer and an acknowledgement needs none either; offering to draft one
+        would be offering work that should not be done.
+      */}
+      {reply.classification === 'info_requested' && (
+        <div className="mt-2">
+          <ReplyDraftPanel replyId={reply.id} />
+        </div>
+      )}
     </div>
   )
 }

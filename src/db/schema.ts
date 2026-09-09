@@ -194,6 +194,14 @@ export const gigReplies = sqliteTable('gig_replies', {
   matchAmbiguous: integer('match_ambiguous').default(0),
   resolution: text('resolution'),
   resolvedAt: text('resolved_at'),
+  /**
+   * What the organiser asked for, as JSON, read at scan time while the whole
+   * body is in hand — the snippet is 400 characters and an ask can sit below
+   * it. See migration 0015 and shared/replyDraft.ts.
+   */
+  asks: text('asks'),
+  /** Request sentences that matched nothing this app knows how to answer. */
+  unrecognisedAsks: text('unrecognised_asks'),
   createdAt: text('created_at').notNull(),
 })
 
