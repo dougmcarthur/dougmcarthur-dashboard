@@ -126,6 +126,24 @@ export interface ColumnChange {
 }
 
 /**
+ * Columns where a stated value outranks whatever is already stored.
+ *
+ * One entry, and it needs its reasons. `fee_currency` defaults to `'USD'` at
+ * insert, so it is never empty and the never-overwrite rule can never reach
+ * it — while two production rows say `$85 CAD` and `approx $5-20 CAD` in
+ * their own fee text and hold `USD`.
+ *
+ * The exception is narrow on purpose: it applies only where the fee text
+ * **names** a currency. A named currency is not a competing opinion about the
+ * row, it is the row's own record of itself, and the stored value it
+ * disagrees with was a column default rather than anybody's decision. Where
+ * nothing is named — fourteen rows, most of them `$0` or `None` — the
+ * default stands untouched, because replacing a guess with a different guess
+ * is not an improvement.
+ */
+const OVERRIDES_A_DEFAULT = new Set(['feeCurrency'])
+
+/**
  * What a backfill would change on one row, and nothing it would not.
  *
  * A value already in the column stays, whatever the note now says. That is
@@ -140,8 +158,11 @@ export function changesFor(
   const out: ColumnChange[] = []
   for (const [column, to] of Object.entries(proposed)) {
     const from = current[column]
-    if (from !== null && from !== undefined && from !== '') continue
+    const occupied = from !== null && from !== undefined && from !== ''
+    if (occupied && !OVERRIDES_A_DEFAULT.has(column)) continue
     if (to === null || to === undefined || to === '') continue
+    // Nothing to record when the stated value is what is already there.
+    if (occupied && from === to) continue
     out.push({ column, from: (from ?? null) as string | number | null, to })
   }
   return out
