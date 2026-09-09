@@ -178,6 +178,66 @@ already exists.
 
 ---
 
+---
+
+## The backfill, and the step the plan got wrong
+
+**Done, with one correction.** Migration 0016 adds `submission_state` and
+`blocked_on`; `shared/noteColumns.ts` extracts them along with
+`submission_method`, `fee_amount`, `fee_currency` (from 0001) and `location`
+(from 0013); `POST /api/backfill/notes` applies the same extraction to the
+rows that predate it, previewed by the `GET`.
+
+### Step 5 cannot happen as written
+
+> *5. Once backfilled, the Review screen reads columns and the parser is
+> deleted.*
+
+It cannot. The research agents that write these notes live **outside this
+repo** and will keep writing prose. A backfill alone leaves every *future* row
+with a filled note and empty columns — the same bug the audit is about, in the
+opposite direction and harder to notice, because the table would look mostly
+populated.
+
+So extraction does not go away. What changes is **when**: `POST /api/gigs`,
+`PATCH /api/gigs/:id` and `POST /api/sync` now derive the columns on the way
+in, once, instead of every screen deriving them on the way out, forever. The
+parser stays; it stops being something a screen depends on. That is the
+achievable version of "deleted" and it is worth saying out loud, because the
+version in the plan reads as reachable and is not.
+
+### What did not become a column, and why
+
+**Cached rendering is not a schema.** `requirements`, `dealTerms`,
+`provenance`, the drafted field values and the drafted message are rendered
+and nothing else. A JSON copy of them in a column would be a cache of the
+parser wearing a schema's clothes — with a staleness failure the read-time
+version cannot have, since a parser fix would silently stop reaching stored
+rows. They stay derived. The test is whether you would ever *query* the
+column; for these the answer is no.
+
+**Four of 0001's nine columns cannot be backfilled at all.** `organizer` this
+document already calls too ambiguous to do safely, and `audience_size`,
+`genre_fit_score` and `agency_type` appear in no note in a form anything can
+read. Filling those means entering them, not extracting them, and a backfill
+that pretended otherwise would be inventing data. They stay NULL, honestly.
+
+**`dm` is dropped.** The parser recognises it — one gig is booked through a
+Facebook page — and `submission_method` has three values that the wire type
+and the pickers agree on. A fourth would be a value the type says cannot
+exist. The note still says it and the Review screen still reads it from there.
+
+### The rule that makes it safe to re-run
+
+`changesFor` writes only into a column that is empty. A value already there
+stays, whatever the note now says — the same rule the application panel
+follows about your writing, for the same reason: a value set by hand is a
+decision, and an extractor re-run is not allowed to quietly undo one. It also
+means the backfill is idempotent, which is what lets it sit behind a button
+rather than behind a ceremony. `updated_at` is deliberately not touched:
+filling a column from a note that already said so is not a change to the
+row's facts, and moving it would wake every snooze in the table.
+
 ## Suggested order of work
 
 1. Fix the status vocabularies (decide the canonical set, migrate the rows,
@@ -186,10 +246,15 @@ already exists.
    "did we actually send this?" questions, not data-cleaning.
 3. ~~Split `deadline` into `deadline` (ISO) + `deadline_note` + `opens_at`.~~
    Done — migration 0003 and `scripts/backfill-deadlines.ts`.
-4. Add the columns in the tables above and backfill them, using
-   `shared/reviewParse.ts` as the extraction spec — its unit tests in
-   `test/reviewParse.test.ts` run against verbatim production note bodies.
-5. Once backfilled, the Review screen reads columns and the parser is deleted.
+4. ~~Add the columns in the tables above and backfill them, using
+   `shared/reviewParse.ts` as the extraction spec.~~
+   Done for the six that are worth storing — migration 0016,
+   `shared/noteColumns.ts`, `POST /api/backfill/notes`. See above for what was
+   left derived and why.
+5. ~~Once backfilled, the Review screen reads columns and the parser is
+   deleted.~~ **Not reachable as written** — see above. Extraction moved to
+   write time instead. What is genuinely left: point the Review screen at the
+   columns where a column now exists, so the parse stops running per render.
 
 ## Queries used
 

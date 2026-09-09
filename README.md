@@ -29,9 +29,13 @@ in §7 of the plan have to be answered once by the person whose taste is being
 encoded, and until they are there is deliberately **no score anywhere** — a
 cost and no value is a usable half, an invented value is not.
 
-One debt sits outside the phases: `shared/reviewParse.ts` re-derives structured
+One debt sits outside the phases, now mostly paid down: `shared/reviewParse.ts` re-derives structured
 facts out of prose on every read because migration 0001's columns were never
-**backfilled**; it is a stopgap that should be deleted rather than extended.
+**backfilled**. `shared/noteColumns.ts` now extracts the six facts worth
+storing and the routes run it on write, so the parse happens once per row
+instead of once per render — but the parser stays, because the research agents
+keep writing prose and something has to read it. See
+[the audit](docs/notes-field-audit.md#the-backfill-and-the-step-the-plan-got-wrong).
 (The artist database's **sourcing** gap is closed — see
 [Filling it](#filling-it-from-the-reference-documents) — though Drive, the
 website and the press photos are still unread.)

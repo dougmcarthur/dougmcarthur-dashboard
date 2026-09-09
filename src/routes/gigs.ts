@@ -14,6 +14,7 @@ import {
 } from '../../shared/gigStatus'
 import { performanceDateProblem } from '../../shared/performance'
 import { splitDeadline } from '../../shared/reviewParse'
+import { gigNoteColumns } from '../../shared/noteColumns'
 import type { Env } from '../types'
 
 const gigs = new Hono<{ Bindings: Env }>()
@@ -94,13 +95,21 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
   const dateProblem = performanceDateProblem(b.performanceStart, b.performanceEnd)
   if (dateProblem) return c.json({ error: dateProblem }, 400)
 
+  // See shared/noteColumns.ts, and docs/notes-field-audit.md for why this is
+  // on the way in rather than on the way out.
+  const derived = gigNoteColumns({ fitRationale: b.fitRationale, fee: null, paid: b.paid ? 1 : 0 })
+
   const result = await db
     .insert(gigOpportunities)
     .values({
       name: b.name,
       type: b.type,
       organizer: b.organizer ?? null,
-      submissionMethod: b.submissionMethod ?? null,
+      // Derived from the note where the caller did not say. The agents that
+      // POST these rows write prose and always will, so the parse has to
+      // happen somewhere; once, on the way in, is the cheap place. What the
+      // caller states always wins over what the note implies.
+      submissionMethod: b.submissionMethod ?? derived.submissionMethod,
       audienceSize: b.audienceSize ?? null,
       genreFitScore: b.genreFitScore ?? null,
       deadline: b.deadline ?? null,
@@ -114,7 +123,9 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
       applicationUrl: b.applicationUrl ?? null,
       performanceStart: b.performanceStart ?? null,
       performanceEnd: b.performanceEnd ?? null,
-      location: b.location ?? null,
+      location: b.location ?? derived.location,
+      submissionState: derived.storedSubmissionState,
+      blockedOn: derived.blockedOn,
       country: b.country ?? null,
       travelBand: b.travelBand ?? null,
       lodgingTier: b.lodgingTier ?? null,
@@ -167,6 +178,26 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
 
   const updates: Record<string, unknown> = { ...b, updatedAt: new Date().toISOString() }
   if (b.paid !== undefined) updates.paid = b.paid ? 1 : 0
+
+  // A rewritten note is re-read, but only into columns that are still empty.
+  // Same rule as the backfill: a value set by hand is a decision, and an
+  // extractor is not allowed to undo one. What this PATCH states explicitly
+  // wins over both.
+  if (b.fitRationale !== undefined) {
+    const derived = gigNoteColumns({ fitRationale: b.fitRationale, fee: before.fee, paid: before.paid })
+    const fill = {
+      submissionState: derived.storedSubmissionState,
+      submissionMethod: derived.submissionMethod,
+      location: derived.location,
+      blockedOn: derived.blockedOn,
+    } as const
+    for (const [column, value] of Object.entries(fill)) {
+      const existing = (before as unknown as Record<string, unknown>)[column]
+      if (value !== null && (existing === null || existing === undefined || existing === '')) {
+        if ((b as Record<string, unknown>)[column] === undefined) updates[column] = value
+      }
+    }
+  }
 
   // Statuses arriving from the research agents are still the pre-rename ones
   // (`approved`, `pending_review`), so normalise on the way in rather than

@@ -49,6 +49,17 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   /** Why it could not be read, in a sentence, verbatim from the parser. */
   prepNote: text('prep_note'),
   /**
+   * The two facts a note carries that had no column. Migration 0016, filled
+   * by `shared/noteColumns.ts` on write and by the backfill for older rows.
+   *
+   * `submissionState` is the fact `status` keeps getting wrong — three rows
+   * have claimed `submitted` while their own note said otherwise. Null means
+   * the note makes no claim, which is not the same as "not submitted".
+   */
+  submissionState: text('submission_state'), // not_submitted | submitted
+  /** Things waiting on you, JSON array. See the Review screen's "Needs you". */
+  blockedOn: text('blocked_on'),
+  /**
    * What the trip costs, and the paperwork that gates it. Migration 0013.
    *
    * `location` is prose because that is how the research agents write it;

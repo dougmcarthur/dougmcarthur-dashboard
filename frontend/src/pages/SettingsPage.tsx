@@ -5,6 +5,7 @@ import { AppearanceSettings } from '../components/AppearanceSettings'
 import { DigestSettingsCard } from '../components/DigestSettingsCard'
 import { FIELD } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
+import { NotesBackfillCard } from '../components/NotesBackfillCard'
 
 
 // ── Integration status card ───────────────────────────────────────────────────
@@ -310,6 +311,11 @@ export function SettingsPage() {
           <IntegrationCards />
           <DigestSettingsCard />
         </div>
+      </div>
+
+      <div className="space-y-3 max-w-4xl">
+        <h2 className="text-sm font-semibold text-ink">Data</h2>
+        <NotesBackfillCard />
       </div>
 
       <div className="space-y-3 max-w-4xl">

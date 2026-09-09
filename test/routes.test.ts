@@ -318,3 +318,13 @@ describe('the reply draft route', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('the notes backfill router', () => {
+  // Mounted at /api/backfill, ahead of nothing it could collide with. Both
+  // verbs touch D1 immediately, so the only thing reachable without a binding
+  // is that the path resolves at all — a 404 here would mean it does not.
+  it('is registered', async () => {
+    const res = await app.request('/api/backfill/notes', {}, emptyEnv)
+    expect(res.status).not.toBe(404)
+  })
+})

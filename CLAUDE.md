@@ -345,6 +345,32 @@ unstated `performance_kind` keeps the ninety days rather than resolving to the
 free answer, and says it is asking rather than asserting — the cheap
 resolution is how you find out with sixty days left.
 
+**The note parser moved to write time; it did not go away.** Migration 0001's
+columns were never filled, so `shared/reviewParse.ts` re-derived them on every
+read — the oldest debt in the repo. `shared/noteColumns.ts` now extracts the
+six worth storing (`submission_state` and `blocked_on` from migration 0016,
+`submission_method`/`fee_amount`/`fee_currency` from 0001, `location` from
+0013) and the gig and sync routes run it **on insert and on a rewritten
+note**, with `POST /api/backfill/notes` applying the same extraction to older
+rows behind a preview.
+
+The plan's last step — "once backfilled, the parser is deleted" — is not
+reachable, and this is the thing to know before trying again: the research
+agents write prose from outside this repo, so a backfill alone leaves every
+*future* row with a filled note and empty columns. Extraction has to keep
+happening; only its timing changed.
+
+Two rules hold it together. **A column that already holds something is never
+overwritten** (`changesFor`), so a value you set by hand survives an extractor
+re-run and the backfill is idempotent — and `updated_at` is left alone, because
+filling a column from a note that already said so is not a change to the row
+and would wake every snooze in the table. **Cached rendering is not a schema**:
+`requirements`, `dealTerms`, `provenance` and the drafted values are rendered
+and never queried, so storing JSON copies would be a parser cache with a
+staleness bug the read-time version cannot have. They stay derived, and
+`organizer`, `audience_size`, `genre_fit_score` and `agency_type` stay NULL,
+because no note carries them in a form anything can read.
+
 **Deadlines are often prose.** 26 of 34 gig rows hold things like "None —
 rolling artist roster intake" in `deadline`. Anything wanting a real date must
 go through `splitDeadline`, which returns null rather than guessing. Where a

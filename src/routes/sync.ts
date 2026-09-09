@@ -5,6 +5,7 @@ import { eq, and, desc } from 'drizzle-orm'
 import { getDb } from '../db'
 import { syncTargets, reminders } from '../db/schema'
 import type { Env } from '../types'
+import { syncNoteColumns } from '../../shared/noteColumns'
 
 const sync = new Hono<{ Bindings: Env }>()
 
@@ -52,7 +53,9 @@ sync.post('/', zValidator('json', SyncInsertSchema), async (c) => {
     agencyType: b.agencyType ?? null,
     contactEmail: b.contactEmail || null,
     contactRole: b.contactRole ?? null,
-    confirmationMethod: b.confirmationMethod ?? null,
+    // Derived from the note where the caller did not say — same reasoning as
+    // the gig route. See shared/noteColumns.ts.
+    confirmationMethod: b.confirmationMethod ?? syncNoteColumns({ notes: b.notes }).confirmationMethod,
     notes: b.notes ?? null,
     pitchDraft: b.pitchDraft ?? null,
     status: b.status ?? 'draft_ready',
