@@ -51,6 +51,36 @@ export interface ArtistAssetPage {
   unreviewed: number
 }
 
+/** A library entry a reference document proposes. See shared/artistSource.ts. */
+export interface AssetProposal {
+  kind: string
+  label: string
+  value: string
+  questionKind: string | null
+  variant: string | null
+  source: string
+  notes: string | null
+}
+
+/** A document section nothing could be filed from, named rather than dropped. */
+export interface SkippedSection {
+  heading: string
+  reason: string
+}
+
+export interface SourcePreview {
+  proposals: AssetProposal[]
+  skipped: SkippedSection[]
+  existing: string[]
+  wouldAdd: number
+}
+
+export interface SourceResult {
+  added: number
+  existing: number
+  skipped: SkippedSection[]
+}
+
 export interface ArtistAssetInput {
   kind: string
   label: string
@@ -369,6 +399,14 @@ export const api = {
     /** Still good: pushes the review date out by the kind's own interval. */
     reviewed: (id: number) => apiFetch<ArtistAsset>(`/artist/${id}/reviewed`, { method: 'POST' }),
     delete: (id: number) => apiFetch<{ ok: boolean }>(`/artist/${id}`, { method: 'DELETE' }),
+    /**
+     * What the reference documents would add to the library, and then adding
+     * it. Two calls rather than one, because a preview you cannot look at
+     * before it writes is not a preview.
+     */
+    sourcePreview: () => apiFetch<SourcePreview>('/artist/source'),
+    source: () =>
+      apiFetch<SourceResult>('/artist/source', { method: 'POST' }),
   },
   /**
    * The application packet — the form's questions with an answer staged

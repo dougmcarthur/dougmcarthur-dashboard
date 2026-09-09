@@ -29,10 +29,12 @@ in §7 of the plan have to be answered once by the person whose taste is being
 encoded, and until they are there is deliberately **no score anywhere** — a
 cost and no value is a usable half, an invented value is not.
 
-Two debts sit outside the phases. The artist database has no **sourcing** —
-assets are entered by hand. And `shared/reviewParse.ts` re-derives structured
+One debt sits outside the phases: `shared/reviewParse.ts` re-derives structured
 facts out of prose on every read because migration 0001's columns were never
 **backfilled**; it is a stopgap that should be deleted rather than extended.
+(The artist database's **sourcing** gap is closed — see
+[Filling it](#filling-it-from-the-reference-documents) — though Drive, the
+website and the press photos are still unread.)
 
 ## Stack
 
@@ -294,6 +296,39 @@ the form parser and therefore to phase 3.
 What is **not** built is sourcing: assets are entered by hand or POSTed by the
 research agents. Nothing yet reads the reference docs in D1, Drive or the
 website.
+
+### Filling it from the reference documents
+
+`artist_assets` was empty in production from migration 0009 onward, which is
+what every *"Nothing on file answers this yet"* in an application panel was
+reporting. The facts were never missing — they sit in `reference_docs`, three
+markdown documents this app already stores and never read.
+
+`shared/artistSource.ts` reads them on three rules, and the notable thing is
+how few there are:
+
+| Rule | Example |
+| --- | --- |
+| A `##` heading is a question; its body is the answer | `## Genre` becomes the `genre` answer — via `classifyQuestion`, the same function that maps a form field's label |
+| A parenthetical in the heading is the variant | `## Approved Short Bio (150 words — Manitoba Music)` is the bio at one length, which is what `pickForLength` chooses between |
+| A labelled URL on its own line is a link | `Spotify: https://…` in a platform list |
+
+The third rule deliberately skips a labelled URL **inside a list item**: the
+discography lists a Spotify URL under each album, and mining those would file
+six records under the one "Spotify link" question.
+
+**No prose is parsed.** The follower counts are the fastest-staling facts here
+and a form asks for them as numbers, so the temptation is real — and taking
+them means a regex per phrasing, which is `shared/reviewParse.ts` all over
+again. A section that cannot be filed is listed in `skipped` and shown on the
+page, the same way phase 3 lists the questions it could not answer.
+
+**Everything sourced lands `unreviewed`.** A hand-added asset gets a review
+date seeded from its kind, because adding one yourself is a claim that it is
+right; a document saying so is not that claim. `GET /api/artist/source`
+previews, `POST /api/artist/source` writes, and re-running adds only what is
+new — a row is identified by the document and heading it came from, so an
+entry you have since edited is never overwritten.
 
 ## Notifications
 
