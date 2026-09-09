@@ -20,8 +20,23 @@ import { relativeTime } from '../format'
  * Reading happens when you open an item, or when you say so.
  */
 
-/** Poll only while the tab is visible; a backgrounded tab should cost nothing. */
-const POLL_MS = 60_000
+/**
+ * Poll only while the tab is visible; a backgrounded tab should cost nothing.
+ *
+ * Five minutes rather than one, and the reason is what a poll costs rather
+ * than what it shows. `composeFeed` reads every gig, every sync target and
+ * every promo draft to answer — about 155 rows on this database — so a tab
+ * left open for eight hours spent roughly 74,000 D1 row reads a day on a bell
+ * that almost never changed. Nothing in the feed is minute-sensitive: the
+ * conditions are derived from deadlines measured in days, and the events are
+ * cron runs that happen hourly at most.
+ *
+ * `refetchOnWindowFocus` below is what actually keeps it feeling live — coming
+ * back to the tab refetches immediately, whatever the interval says — so the
+ * five minutes is the floor for a tab you are already looking at, not the
+ * delay before you see anything.
+ */
+const POLL_MS = 300_000
 
 function Icon({ name, className }: { name: string; className?: string }) {
   const paths: Record<string, ReactElement> = {

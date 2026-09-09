@@ -165,6 +165,40 @@ consulted when nothing is configured, which in practice means `wrangler dev`.
 development is deliberately two origins, because Vite serves the browser on
 5173 and proxies to wrangler on 8787.
 
+**The read path is three unbounded scans, and they are indexed now.**
+`composeFeed` and `buildReviewQueue` both open by reading every gig, every
+sync target and every promo draft, newest first. None of those orderings had
+an index, so production answered `SCAN gig_opportunities` + `USE TEMP B-TREE
+FOR ORDER BY` and reported **68 rows read to return 34**. Migration 0018 adds
+the three, plus `task_runs(run_at)` and two on `reminders`. The doubling is
+not why it matters: `WHERE tenant_id = ?` against an unindexed table scans
+*everybody's* rows to draw one artist's page, so **when `tenant_id` arrives
+every one of those indexes becomes a composite with `tenant_id` first** — an
+index that does not lead with the filtered column is one the planner declines
+to use.
+
+**The bell polls every five minutes, not every minute.** It costs a full
+`composeFeed` — about 155 rows on this database — so a tab open for eight
+hours was spending ~74,000 D1 row reads a day watching for a badge that
+rarely moved. Nothing in the feed is minute-sensitive; deadlines are measured
+in days and events arrive on an hourly cron. `refetchOnWindowFocus` is what
+makes it feel live, so the interval is the floor for a tab you are already
+staring at, not the delay before you learn anything.
+
+**Compressing stored text was measured and rejected; do not re-propose it.**
+Every piece of prose in production — gig notes, reference docs, reply
+snippets, sync notes, event bodies — totals about **76 KB**, inside a **408 KB**
+database, against a **5 GB** free-tier allowance. And per-row gzip, which is
+how a column would actually store it, gets only **1.5×** on these strings
+(22,985 bytes of gig notes → 15,301): 672-byte values are too short for the
+dictionary to pay for itself, and base64-ing the result back into a TEXT
+column gives most of that back. It would also spend CPU on a 10 ms-per-request
+budget to decompress prose that `reviewParse` has to read on every queue
+build. The costs that bind here are **rows read** and **requests**, and
+compression moves neither. Retention is likewise already handled where it
+churns — `notification_events` and `notification_marks` both prune at 30 days,
+and no other table grows fast enough to have a policy worth writing.
+
 **Statuses say who decided.** `shortlisted`/`passed` are the artist's
 decisions; `invited`/`declined` are the organiser's. The old `approved` and
 `rejected` failed this and caused a real misreading — `rejected` meant *you*
