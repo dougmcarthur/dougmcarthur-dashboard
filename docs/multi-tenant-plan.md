@@ -50,66 +50,81 @@ part that is finished.
 Adopting one later stays possible, because the boundary is already one
 middleware in `src/index.ts` rather than something spread through the routers.
 
-## The owner is a separate account, not a second hat
+## One account, two modes, and a passkey touch between them
 
-Two roles — `owner` and `artist` — and the owner is its **own account**,
-holding no tenant.
+Two roles — `owner` and `artist` — on **one account**, which is in one of two
+**modes** at a time. The owner flips to admin mode from the settings menu; the
+option renders only for an owner, and the `/admin` routes check the role
+themselves, because a hidden button is still a URL.
 
-The first draft of this gave one account both jobs: an artist tenant like
-anybody else, plus access to the oversight routes. Separating them is a little
-more setup and a much stronger guarantee, for the reason in the next section.
-It also splits what a compromised session is worth: the artist login does not
-reach oversight, and the oversight login reaches no gigs.
+This went through two worse drafts and the reasons both were dropped are the
+argument for this one.
 
-Dogfooding is not lost — the artist account still exists and is still the one
-the app gets used from daily. What changes is that the two are logged into
-separately.
+**One account with both jobs at once** was the first, and it rested "no access
+to personal data" on a rule about how admin routes are written, enforced by a
+source-level test. A rule to remember rather than a shape that holds.
 
-There is no impersonation, and no "act as this artist" mode. Better Auth's
-admin plugin offers one and it is deliberately not being copied: the promise
-made to an invited artist is that their gig notes are theirs, and a support
-tool that quietly breaks that promise is worse than no support tool.
+**A separate owner account holding no tenant** was the second. It made the
+guarantee structural, but it bought that with a second passkey used once a
+month — the credential that is missing when it is finally needed — and a second
+recovery address that only ever gets exercised in an emergency, which is the
+worst time to find out it was configured wrong.
+
+Modes keep the structural guarantee and pay neither cost, because **the tenant
+is resolved from the session, and the mode is session state**:
+
+- In artist mode the session resolves to the owner's own tenant.
+- In admin mode it resolves to **null** — not a wildcard, not a sentinel
+  meaning "all". Null, and the `tenant_id` every domain read takes is not
+  nullable.
+
+So an admin-mode request that reached for `gig_opportunities` does not return a
+stranger's rows; it fails to compile. Same property the separate account had,
+without the second credential.
+
+### Flipping modes costs a passkey assertion
+
+The one thing a second account bought that a mode does not is credential
+separation: a stolen artist session cookie is one POST away from the oversight
+surface, where a stolen artist *account* was not.
+
+So entering admin mode requires a fresh WebAuthn assertion, and the mode
+expires back to artist after thirty minutes. This is `sudo`, and it is the
+pattern GitHub uses for "Confirm access". A cookie alone cannot elevate,
+because elevating needs the authenticator in your hand — and the timeout means
+the window in which a session is admin-capable is measured in minutes rather
+than the thirty days a session lasts.
+
+It reuses the assertion ceremony already in `src/routes/auth.ts` against the
+passkeys already enrolled: no new credential, no new recovery path, no new
+configuration. `auth_sessions` grows a mode and an expiry, and whether the
+elevation has lapsed is decided against a `now` that is handed in, like
+`sessionState` beside it.
+
+### What oversight reads, and the one thing it writes
+
+`users`, `invites` and a `usage_daily` rollup, and nothing else. Counts the
+owner needs — how many gigs, how many drafts — are written into that rollup by
+the cron, by code running *as the tenant* that emits a number. The owner reads
+the number.
+
+**One operation crosses the line, and it is a write.** An artist who leaves
+must be able to have their data deleted: a tenant-scoped `DELETE` across the
+fourteen tables, naming no columns and returning no rows. "Never reads a domain
+table" survives that intact — never *touches* one was not the promise, and
+could not be.
+
+There is no impersonation and no "act as this artist" mode. Better Auth's admin
+plugin offers one and it is deliberately not being copied: the promise made to
+an invited artist is that their gig notes are theirs, and a support tool that
+quietly breaks that promise is worse than no support tool. Admin mode is not a
+bigger artist mode — it is a different surface, reachable at `/admin`, in the
+same deployment. Its own Worker and domain would double the deploy and the
+secrets in order to isolate what the tenant boundary already isolates.
 
 The role set stays at two. A permissions matrix with two rows is a worse way to
 write `if (role === "owner")`, and it invites a third role to be invented
 before anybody needs one.
-
-## "No access to personal data" is a type, not a policy
-
-This is the whole reason the accounts are separate.
-
-Every domain read takes a `tenant_id` as a required argument — the way
-`buildReviewQueue` takes `today` rather than reading the clock, and for the
-same reason: a function that fetches its own scope is a function that can fetch
-the wrong one silently. The session resolves to a tenant in one place.
-
-**The owner account resolves to none.** Not a wildcard, not zero, not a
-sentinel meaning "all" — null, and the argument is not nullable. So an owner
-route that tried to read `gig_opportunities` would not return a stranger's
-rows; it would fail to compile. The guarantee stops being something to audit
-and becomes something that cannot be expressed.
-
-What oversight actually reads is `users`, `invites` and a `usage_daily`
-rollup, and nothing else. Counts the owner needs — how many gigs, how many
-drafts — are written into that rollup by the cron, by code running *as the
-tenant* that emits a number. The owner reads the number.
-
-**One operation crosses the line, and it is a write.** An artist who leaves
-must be able to take their data with them, which means deleting it: a
-tenant-scoped `DELETE` across the fourteen tables, naming no columns and
-returning no rows. "Never reads a domain table" survives that intact — never
-*touches* one was not the promise, and could not be.
-
-**Admin recovery is its own configured address.** The rarely-used passkey is
-the one that will be missing when it is needed, so `enrolmentRecipient` grows
-from one deployment value to one per account kind. It must not fall back to
-the artist account's address: that would make the artist login a path to the
-oversight login, which is the thing this separation exists to prevent.
-
-The oversight surface lives under `/admin` — separate routes and screens, one
-deployment. Its own Worker and domain would double the deploy, the secrets and
-the migration path in order to isolate something the tenant boundary already
-isolates.
 
 ## What gets a `tenant_id`
 
@@ -237,11 +252,11 @@ rule that took `gig-festival-scan` off the screen.
    backfilled; 0018's indexes rebuilt as composites.
 2. Session resolves a tenant; domain reads and writes take it as an argument;
    agent tokens become per-tenant.
-3. The owner account and its `/admin` routes and screen, plus its own
-   recovery address.
+3. Admin mode: the elevation ceremony and its expiry, then the `/admin`
+   routes and screen.
 4. Invite issue / redeem, with the redemption event.
-5. `tenant_id` to `NOT NULL` on the fourteen domain tables. On `users` it
-   stays nullable, because that null is what the owner account is.
+5. `tenant_id` to `NOT NULL` on the fourteen domain tables — and on `users`
+   too, since every account owns a tenant now, including the owner's.
 
 Steps 1 and 2 are the whole risk. Steps 3 and 4 are the part that was asked
 for, and they are small — which is the thing worth knowing before starting,
