@@ -17,7 +17,7 @@ import notifications, { pruneNotifications } from './routes/notifications'
 import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
 import replies, { runReplyScan } from './routes/replies'
-import backfill from './routes/backfill'
+import backfill, { runNotesBackfillOnce } from './routes/backfill'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
 import { isDigestDue } from '../shared/digestSchedule'
 import { sendMail, mailerConfigured } from './lib/mailer'
@@ -222,6 +222,10 @@ export default {
         }),
         runHousekeeping(env).catch((err) => {
           console.error('housekeeping failed:', err)
+        }),
+        // One-shot, and it un-arms itself. See runNotesBackfillOnce.
+        runNotesBackfillOnce(env).catch((err) => {
+          console.error('notes backfill failed:', err)
         }),
         runReplyScanIfDue(env).catch((err) => {
           // Logged and swallowed, like the others. A Gmail outage must not

@@ -256,6 +256,19 @@ Fixing it properly is a decision, not an extraction: either drop the column
 default so "unset" is expressible, or treat the amount and the currency as one
 fact and write them together. Left for that decision rather than guessed at.
 
+### How it runs
+
+Two ways, one mechanism. `POST /api/backfill/notes` is the button on Settings
+→ Data. `runNotesBackfillOnce` is a one-shot on the hourly cron, guarded by
+`once.notesBackfill` in `app_settings`, because the extraction is a parser
+rather than SQL and so cannot ride in the migration that added the columns —
+and Cloudflare Access means the endpoint is not reachable from outside a
+browser session.
+
+It records a notification event rather than only logging: a write across every
+row of two tables, at a moment nobody chose, should leave something you can
+find afterwards, and a console line in a Worker is not that.
+
 ### The rule that makes it safe to re-run
 
 `changesFor` writes only into a column that is empty. A value already there

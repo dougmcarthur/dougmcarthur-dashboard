@@ -360,6 +360,16 @@ agents write prose from outside this repo, so a backfill alone leaves every
 *future* row with a filled note and empty columns. Extraction has to keep
 happening; only its timing changed.
 
+The backfill runs two ways. `POST /api/backfill/notes` is the button on
+Settings, and `runNotesBackfillOnce` is a **one-shot on the cron**, guarded by
+`once.notesBackfill` in `app_settings` — the extraction is code rather than
+SQL, so it cannot ride in a migration, and the Worker is the only thing that
+can reach both the parser and the rows. Not pinned to an hour like the reply
+scan: it happens once, so waiting for 7am would be a delay with nothing on the
+other side of it. The marker is written *after* success, like
+`digest.lastSentAt`, so a failure retries on the next tick — and running twice
+is harmless anyway, which is the actual safety.
+
 Two rules hold it together. **A column that already holds something is never
 overwritten** (`changesFor`), so a value you set by hand survives an extractor
 re-run and the backfill is idempotent — and `updated_at` is left alone, because
