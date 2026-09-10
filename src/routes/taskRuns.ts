@@ -1,12 +1,13 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { and, desc, eq, sql, type SQL } from 'drizzle-orm'
+import { desc, eq, sql, type SQL } from 'drizzle-orm'
 import { getDb } from '../db'
 import { taskRuns } from '../db/schema'
+import { scoped, withTenant } from '../db/scope'
+import { tenantOf, type AppEnv } from '../context'
 import { recordEvent } from '../lib/notificationEvents'
 import type { Tier } from '../../shared/notifications'
-import type { Env } from '../types'
 import { taskLabel } from '../../shared/taskLabels'
 
 /**
@@ -33,7 +34,7 @@ export function runTitle(taskId: string, status: string, added: number): string 
   return `${name} ran, nothing new`
 }
 
-const taskRunsRouter = new Hono<{ Bindings: Env }>()
+const taskRunsRouter = new Hono<AppEnv>()
 
 /**
  * The run log, filtered server-side.
@@ -52,18 +53,29 @@ taskRunsRouter.get('/', async (c) => {
   const task = c.req.query('task')
   const status = c.req.query('status')
 
+  const tenant = tenantOf(c)
   const where: SQL[] = []
   if (task) where.push(eq(taskRuns.taskId, task))
   if (status) where.push(eq(taskRuns.status, status))
-  const filter = where.length > 0 ? and(...where) : undefined
+  const filter = scoped(taskRuns, tenant, ...where)
 
   const [rows, [total], tasks, statuses] = await Promise.all([
     db.select().from(taskRuns).where(filter).orderBy(desc(taskRuns.runAt)).limit(limit).offset(offset),
     db.select({ count: sql<number>`count(*)` }).from(taskRuns).where(filter),
-    // Facets cover the whole log, not the current filter — otherwise choosing
-    // one task would remove every other task from the menu that chose it.
-    db.selectDistinct({ v: taskRuns.taskId }).from(taskRuns).orderBy(taskRuns.taskId),
-    db.selectDistinct({ v: taskRuns.status }).from(taskRuns).orderBy(taskRuns.status),
+    // Facets cover this artist's whole log, not the current filter — otherwise
+    // choosing one task would remove every other task from the menu that chose
+    // it. Scoped all the same: the menu is a list of what *you* run, and a
+    // stranger's task id appearing in it would be a leak wearing a dropdown.
+    db
+      .selectDistinct({ v: taskRuns.taskId })
+      .from(taskRuns)
+      .where(scoped(taskRuns, tenant))
+      .orderBy(taskRuns.taskId),
+    db
+      .selectDistinct({ v: taskRuns.status })
+      .from(taskRuns)
+      .where(scoped(taskRuns, tenant))
+      .orderBy(taskRuns.status),
   ])
 
   return c.json({
@@ -95,21 +107,22 @@ taskRunsRouter.post(
     const runAt = b.run_at ?? new Date().toISOString()
     const added = b.items_added ?? 0
 
+    const tenant = tenantOf(c)
     const result = await db
       .insert(taskRuns)
-      .values({
+      .values(withTenant(tenant, {
         taskId: b.task_id,
         runAt,
         status: b.status,
         summary: b.summary ?? null,
         itemsAdded: added,
-      })
+      }))
       .returning({ id: taskRuns.id })
 
     // Nobody is watching when a scheduled agent posts here, which is exactly
     // what makes this an event rather than something the History page covers.
     // Keyed on the run's own timestamp so a retried POST does not report twice.
-    await recordEvent(c.env, {
+    await recordEvent(c.env, tenant, {
       kind: 'automation',
       tier: runTier(b.status),
       title: runTitle(b.task_id, b.status, added),

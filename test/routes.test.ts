@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { app, isReplyScanHour, REPLY_SCAN_HOURS } from '../src/index'
+import { ownerOnlyD1 } from './support/fakeD1'
 
 /**
  * No integration secrets configured — enough to exercise routing without a DB.
@@ -12,7 +13,15 @@ import { app, isReplyScanHour, REPLY_SCAN_HOURS } from '../src/index'
  * the same door they use rather than a hole cut for the suite.
  */
 const TEST_TOKEN = 'test-bearer-token'
-const emptyEnv = { API_TOKEN: TEST_TOKEN } as Record<string, unknown>
+
+/**
+ * `DB` is here because the door now needs one. Since tenant scoping, a request
+ * resolves to an artist before any route runs, and resolving one is a read —
+ * so a binding is a prerequisite of reaching a handler at all, integration
+ * secrets or not. `ownerOnlyD1` holds the bootstrap account and nothing else;
+ * it ignores every WHERE, which is why nothing below asserts about scoping.
+ */
+const emptyEnv = { API_TOKEN: TEST_TOKEN, DB: ownerOnlyD1() } as Record<string, unknown>
 
 /** `app.request`, authenticated. The middleware is exercised on its own below. */
 function request(path: string, init: RequestInit = {}, env: Record<string, unknown> = emptyEnv) {
@@ -372,7 +381,7 @@ describe('the artist freshness filter', () => {
  * router opts into.
  */
 describe('API authentication', () => {
-  const env = { API_TOKEN: 'test-bearer-token' } as Record<string, unknown>
+  const env = { API_TOKEN: 'test-bearer-token', DB: ownerOnlyD1() } as Record<string, unknown>
 
   it('turns away a request with no credential at all', async () => {
     const res = await app.request('/api/health', {}, env)
@@ -388,7 +397,7 @@ describe('API authentication', () => {
   // Without the secret set there is no bearer path at all, so an empty
   // deployment cannot be opened by guessing the empty string.
   it('accepts no bearer token when API_TOKEN is unset', async () => {
-    const res = await app.request('/api/health', { headers: { Authorization: 'Bearer ' } }, {})
+    const res = await app.request('/api/health', { headers: { Authorization: 'Bearer ' } }, { DB: ownerOnlyD1() })
     expect(res.status).toBe(401)
   })
 

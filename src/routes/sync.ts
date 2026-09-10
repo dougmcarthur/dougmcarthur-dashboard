@@ -1,13 +1,14 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, desc } from 'drizzle-orm'
 import { getDb } from '../db'
 import { syncTargets, reminders } from '../db/schema'
-import type { Env } from '../types'
+import { scoped, withTenant } from '../db/scope'
+import { tenantOf, type AppEnv } from '../context'
 import { syncNoteColumns } from '../../shared/noteColumns'
 
-const sync = new Hono<{ Bindings: Env }>()
+const sync = new Hono<AppEnv>()
 
 const SyncInsertSchema = z.object({
   name: z.string().min(1),
@@ -31,14 +32,15 @@ sync.get('/', async (c) => {
   if (status) conditions.push(eq(syncTargets.status, status))
   if (agencyType) conditions.push(eq(syncTargets.agencyType, agencyType))
 
-  const rows =
-    conditions.length > 0
-      ? await db
-          .select()
-          .from(syncTargets)
-          .where(and(...conditions))
-          .orderBy(desc(syncTargets.discoveredAt))
-      : await db.select().from(syncTargets).orderBy(desc(syncTargets.discoveredAt))
+  // One branch rather than two. The unfiltered case used to skip `.where()`
+  // entirely, which is exactly the shape that quietly returns everybody's rows
+  // once a tenant exists — `scoped` makes the filter unconditional and the
+  // optional conditions the variable part.
+  const rows = await db
+    .select()
+    .from(syncTargets)
+    .where(scoped(syncTargets, tenantOf(c), ...conditions))
+    .orderBy(desc(syncTargets.discoveredAt))
 
   return c.json(rows)
 })
@@ -48,7 +50,7 @@ sync.post('/', zValidator('json', SyncInsertSchema), async (c) => {
   const b = c.req.valid('json')
   const ts = new Date().toISOString()
 
-  const result = await db.insert(syncTargets).values({
+  const result = await db.insert(syncTargets).values(withTenant(tenantOf(c), {
     name: b.name,
     agencyType: b.agencyType ?? null,
     contactEmail: b.contactEmail || null,
@@ -61,7 +63,7 @@ sync.post('/', zValidator('json', SyncInsertSchema), async (c) => {
     status: b.status ?? 'draft_ready',
     discoveredAt: ts,
     updatedAt: ts,
-  }).returning({ id: syncTargets.id })
+  })).returning({ id: syncTargets.id })
 
   return c.json({ id: result[0].id }, 201)
 })
@@ -71,7 +73,7 @@ sync.get('/:id', async (c) => {
   const row = await db
     .select()
     .from(syncTargets)
-    .where(eq(syncTargets.id, Number(c.req.param('id'))))
+    .where(scoped(syncTargets, tenantOf(c), eq(syncTargets.id, Number(c.req.param('id')))))
     .get()
 
   if (!row) return c.json({ error: 'not found' }, 404)
@@ -83,12 +85,13 @@ sync.patch('/:id', zValidator('json', SyncPatchSchema), async (c) => {
   const id = Number(c.req.param('id'))
   const b = c.req.valid('json')
 
+  const tenant = tenantOf(c)
   await db
     .update(syncTargets)
     .set({ ...b, updatedAt: new Date().toISOString() })
-    .where(eq(syncTargets.id, id))
+    .where(scoped(syncTargets, tenant, eq(syncTargets.id, id)))
 
-  const row = await db.select().from(syncTargets).where(eq(syncTargets.id, id)).get()
+  const row = await db.select().from(syncTargets).where(scoped(syncTargets, tenant, eq(syncTargets.id, id))).get()
   if (!row) return c.json({ error: 'not found' }, 404)
   return c.json(row)
 })
@@ -98,10 +101,11 @@ sync.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   // Same orphaning as gigs: reminders point at (entity_type, entity_id) with
   // no foreign key to enforce it, so the reminder has to go with the row.
+  const tenant = tenantOf(c)
   await db
     .delete(reminders)
-    .where(and(eq(reminders.entityType, 'sync'), eq(reminders.entityId, id)))
-  await db.delete(syncTargets).where(eq(syncTargets.id, id))
+    .where(scoped(reminders, tenant, eq(reminders.entityType, 'sync'), eq(reminders.entityId, id)))
+  await db.delete(syncTargets).where(scoped(syncTargets, tenant, eq(syncTargets.id, id)))
   return c.json({ ok: true })
 })
 

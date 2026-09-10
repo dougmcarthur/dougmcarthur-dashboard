@@ -50,6 +50,7 @@ import type {
 } from '@simplewebauthn/server'
 import { getDb } from '../db'
 import { passkeyCredentials } from '../db/schema'
+import { actorForSession, ownerUserId } from '../lib/actor'
 import {
   base64url,
   checkEnrolmentCode,
@@ -64,6 +65,7 @@ import {
   issueEnrolmentCode,
   lastCodeIssuedAt,
   listCredentials,
+  credentialsForUser,
   readSession,
   sessionCookie,
   spendEnrolmentCode,
@@ -146,7 +148,9 @@ auth.post('/logout', async (c) => {
 auth.post('/logout-everywhere', async (c) => {
   const session = await readSession(c.env, c.req.header('Cookie'))
   if (!session) return c.json({ error: 'not signed in' }, 401)
-  await destroyAllSessions(c.env)
+  const actor = await actorForSession(c.env, session)
+  if (!actor) return c.json({ error: 'not signed in' }, 401)
+  await destroyAllSessions(c.env, actor.userId)
   c.header('Set-Cookie', clearedSessionCookie())
   return c.json({ ok: true })
 })
@@ -237,6 +241,10 @@ auth.post('/login/verify', zValidator('json', assertion), async (c) => {
   const session = await createSession(c.env, {
     credentialId: row.id,
     label: row.label,
+    // Whose session this is comes from the credential, not from anything the
+    // browser said: a discoverable passkey names itself, and the account it
+    // was enrolled against is the only account it can sign in to.
+    userId: row.userId,
     now,
   })
   c.header('Set-Cookie', sessionCookie(session.token, session.maxAgeSeconds))
@@ -370,7 +378,10 @@ auth.post('/enrol/request', async (c) => {
     )
   }
 
-  const issued = await issueEnrolmentCode(c.env, now)
+  // The code enrols a passkey for the account the configured recovery address
+  // belongs to, which today is the owner's. Nothing the requester typed picks
+  // it — that is the whole rule the recovery address exists under.
+  const issued = await issueEnrolmentCode(c.env, { userId: await ownerUserId(c.env), now })
 
   await sendMail(c.env, {
     to,
@@ -409,7 +420,7 @@ auth.post('/register/options', zValidator('json', enrolRequest), async (c) => {
     return c.json({ error: authorised.error, needsElevation: authorised.needsElevation }, authorised.status)
   }
 
-  const existing = await listCredentials(c.env)
+  const existing = authorised.userId ? await credentialsForUser(c.env, authorised.userId) : []
   const options = await generateRegistrationOptions({
     rpName: USER_NAME,
     rpID: party.rpId,
@@ -490,13 +501,19 @@ auth.post('/register/verify', zValidator('json', attestation), async (c) => {
       deviceType: info.credentialDeviceType,
       backedUp: info.credentialBackedUp ? 1 : 0,
       label,
+      userId: authorised.userId,
       createdAt: now.toISOString(),
       lastUsedAt: now.toISOString(),
     })
 
   if (authorised.codeId) await spendEnrolmentCode(c.env, authorised.codeId, now)
 
-  const session = await createSession(c.env, { credentialId: info.credential.id, label, now })
+  const session = await createSession(c.env, {
+    credentialId: info.credential.id,
+    label,
+    userId: authorised.userId,
+    now,
+  })
   c.header('Set-Cookie', sessionCookie(session.token, session.maxAgeSeconds))
   return c.json({ ok: true, label })
 })
@@ -508,8 +525,10 @@ auth.post('/register/verify', zValidator('json', attestation), async (c) => {
 auth.get('/passkeys', async (c) => {
   const session = await readSession(c.env, c.req.header('Cookie'))
   if (!session) return c.json({ error: 'not signed in' }, 401)
+  const actor = await actorForSession(c.env, session)
+  if (!actor) return c.json({ error: 'not signed in' }, 401)
 
-  const rows = await listCredentials(c.env)
+  const rows = await credentialsForUser(c.env, actor.userId)
   return c.json({
     items: rows.map((row) => ({
       id: row.id,
@@ -539,23 +558,28 @@ auth.delete('/passkeys/:id', async (c) => {
     )
   }
 
+  const actor = await actorForSession(c.env, session)
+  if (!actor) return c.json({ error: 'not signed in' }, 401)
+
   const id = decodeURIComponent(c.req.param('id'))
   const db = getDb(c.env.DB)
   const row = await db.select().from(passkeyCredentials).where(eq(passkeyCredentials.id, id)).get()
-  if (!row) return c.json({ error: 'not found' }, 404)
+  // Somebody else's credential answers 404 rather than 403, because "that is
+  // not yours" is itself a fact about what exists elsewhere.
+  if (!row || row.userId !== actor.userId) return c.json({ error: 'not found' }, 404)
 
   // Revoking the last one is allowed. It leaves the emailed code as the only
   // way back in, which is a real state — a stolen laptop is exactly when you
   // want this button — and refusing would be the app deciding it knows better
   // than you about a device you are holding.
   await db.delete(passkeyCredentials).where(eq(passkeyCredentials.id, id))
-  return c.json({ ok: true, remaining: (await listCredentials(c.env)).length })
+  return c.json({ ok: true, remaining: (await credentialsForUser(c.env, actor.userId)).length })
 })
 
 /* --------------------------------------------------------------------- */
 
 type Authorised =
-  | { ok: true; codeId: string | null }
+  | { ok: true; codeId: string | null; userId: string | null }
   | { ok: false; error: string; status: 401 | 403 | 429; needsElevation?: true }
 
 /**
@@ -579,7 +603,7 @@ async function authoriseEnrolment(
   const session = await readSession(env, cookie)
   if (session) {
     if (elevationState({ now: new Date(), elevatedAt: session.elevatedAt }).elevated) {
-      return { ok: true, codeId: null }
+      return { ok: true, codeId: null, userId: session.userId }
     }
     return {
       ok: false,
@@ -592,7 +616,7 @@ async function authoriseEnrolment(
   if (!code) return { ok: false, error: 'a setup code is required', status: 401 }
 
   const check = await checkEnrolmentCode(env, code)
-  if (check.ok) return { ok: true, codeId: check.id }
+  if (check.ok) return { ok: true, codeId: check.id, userId: check.userId }
 
   switch (check.reason) {
     case 'locked':

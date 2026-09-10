@@ -208,35 +208,85 @@ tenant-scoped, and none of them ask. Admin mode is the next thing that will
 (`docs/multi-tenant-plan.md`); the client tries first and re-asserts only on
 refusal, so a burst of removals costs one touch, and retries exactly once.
 
-**`tenant_id` exists in the schema and nothing reads it yet.** Migration 0021
-is step 1 of `docs/multi-tenant-plan.md`: `tenants`, `users`, `invites` and
-`usage_daily`, a `tenant_id` on the fourteen domain tables, a `user_id` on the
-credential tables, and composite twins for 0018's indexes. The single-column
-indexes are kept alongside the composites until scoping ships, because a swap
-would leave today's unscoped reads with no usable index for however many
-deploys separate the two.
+**A request resolves to an artist before any route runs.** Fourteen tables
+hold rows that belong to one person, and `src/db/scope.ts` is the only way to
+reach them: `scoped(table, tenant, ...rest)` builds the `WHERE`, `withTenant`
+builds the values, and `TenantId` is a **branded** type with one constructor,
+so a user id or a label cannot be passed where a tenant belongs. The
+resolution happens once, in the middleware, exactly like authentication — a
+router added next month is scoped by doing nothing, or it is a hole. From a
+route inward the tenant is an *argument*, never fetched, for the reason
+`buildReviewQueue` takes `today` instead of reading the clock: a function that
+fetches its own scope can fetch the wrong one silently.
 
-The thing not to undo is the **default**. Every column added there defaults to
-the one tenant this database has ever had, so a write from a route not yet
-taught to pass a tenant — which is all of them, and includes the live Worker
-across the half-minute deploy gap — files correctly rather than as a NULL
-nobody scoped. **The scoping deploy drops the defaults**, and has to: past that
-point a write that did not say who it belongs to is a bug, and a default is
-precisely what would stop it looking like one.
+Admin mode (`docs/multi-tenant-plan.md`) resolves to **null**, not a wildcard,
+and `TenantId` is not nullable — so an admin-mode request reaching for
+`gig_opportunities` fails to compile rather than returning a stranger's rows.
 
-**A uniqueness constraint is an interface, and moves with the code that names
-it.** Four of the fourteen are unique on a value two artists can share —
-`gig_correspondents(kind, value)`, `google_grants(purpose)`,
-`notification_marks(dedupe_key)`, `notification_events(dedupe_key)` — and each
-must grow a leading `tenant_id`. None of that is in 0021, because live code
-names two of them in an upsert target and SQLite requires `ON CONFLICT` to
-match a unique constraint exactly: widening the key does not stale those
-statements, it errors them, under the old Worker. Keeping the narrow index as a
-prop is what would make the change pointless, since the narrow index is what
-forbids a second tenant. So they widen in the scoping deploy, next to the
-upserts. The opposite call was right for 0018's orderings — an index no
-statement names is invisible, so a twin costs nothing and buys a safe
-window.
+**A missing filter is a test failure, not a leak.**
+`test/tenantScope.test.ts` reads the source and fails when one of the fourteen
+is named in a query that does not pass through `scoped` or `withTenant`. It
+has to be source-level: an unscoped query typechecks, runs, and returns the
+right rows for as long as there is one artist — it starts being wrong on the
+day nobody is re-reading these queries. Exemptions are a list with a written
+reason each, and there is one (event retention, which is a platform rule).
+
+**The two shapes that used to hide a missing scope.** A `.where()` that was
+skipped entirely when no filters applied — `conditions.length > 0 ? … : …` in
+the gig and sync list routes — is now one branch with the tenant
+unconditional. And an `inArray(id, ids)` where the ids came from the browser:
+the tenant filter beside it is not redundant, it is the whole check.
+
+**The cron has no request to read a scope from, and gives three answers.**
+Housekeeping runs per tenant, because which notification marks are dead is
+derived from that artist's own feed; event retention runs once beside it. The
+digest and the reply scan run for the **owner's tenant only**, because their
+inputs are platform configuration rather than the tenant's — the schedule and
+recipient live in `app_settings`, and the mailbox is one `GMAIL_REFRESH_TOKEN`
+pointing at one inbox. Looping those over every tenant would mail the owner N
+times and scan his mailbox on a stranger's behalf. Per-artist digests and
+mailbox grants are real work with schema behind them, and are not pretended to
+exist. The notes backfill runs for every tenant under one marker, because the
+marker is platform state and writing it after the first would record the job
+as done.
+
+**An `ON CONFLICT` target is part of an interface.** Four uniqueness
+constraints had to grow a leading `tenant_id` (`gig_correspondents(kind,
+value)`, `google_grants(purpose)`, `notification_marks(dedupe_key)`,
+`notification_events(dedupe_key)`) and migration 0021 deliberately left them
+alone: live code named two of them in an upsert target, and SQLite requires
+that target to match a unique constraint exactly, so widening the key would
+have *errored* those statements under the old Worker rather than staled them.
+Migration 0022 widens them — and it is only safe because the statements no
+longer name a constraint at all. `storeGrant` is a delete-then-insert, and the
+two mark writers are an update followed by an insert that conflicts to
+nothing; both work against the schema on either side of the migration.
+`digest_reports` keeps its target, because `entity_id` is a global
+autoincrement and two artists cannot collide on one. 0022 also drops 0018's
+single-column indexes, whose window closed when the reads started leading with
+`tenant_id`.
+
+The `tenant_id` **defaults** from 0021 are still there and stay until the
+column goes `NOT NULL`. Dropping them in 0022 would leave the pre-scoping
+Worker writing NULLs across the migrate-then-deploy gap, and the default is
+only wrong once a second tenant exists.
+
+**The agents' token now belongs to somebody, and the old one still works.**
+`API_TOKEN` is a Worker secret with no tenant attached — correct with one
+artist, wrong with two, and wrong invisibly: a gig filed to the wrong tenant
+just appears on a stranger's Overview. `agent_tokens` (migration 0022) is a
+hashed, revocable, per-tenant credential, issued and revoked through
+`/api/agent-tokens` behind a passkey touch, because minting a token that can
+write to your account is squarely "changes who can get in". An agent cannot
+manage tokens: a credential issuing its own successor makes revoking one a
+race rather than an ending.
+
+`actorForBearer` still accepts `API_TOKEN` and resolves it to the owner's
+tenant — the same "read both spellings" move `normaliseGigStatus` makes,
+because withdrawing it in this deploy would 401 every agent until three GitHub
+secrets were rotated. It goes when `.github/workflows/agents.yml` holds a row
+instead. **There is no Settings UI for these yet**; the screen is step 3's
+work and the routes are usable without one.
 
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a

@@ -1,6 +1,7 @@
-import { and, desc, gte, inArray, lt, sql } from 'drizzle-orm'
+import { desc, gte, inArray, lt, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import { notificationEvents } from '../db/schema'
+import { scoped, withTenant, type TenantId } from '../db/scope'
 import type { StoredEvent, Tier } from '../../shared/notifications'
 import type { Env } from '../types'
 
@@ -40,12 +41,18 @@ export interface EventInput {
   createdAt?: string
 }
 
-export async function recordEvent(env: Env, input: EventInput): Promise<void> {
+/**
+ * `tenant` is an argument on every function here, including the ones a cron
+ * calls, because the bell is one artist's. An event recorded without a tenant
+ * would appear in everybody's feed, which is the failure that has no error
+ * message.
+ */
+export async function recordEvent(env: Env, tenant: TenantId, input: EventInput): Promise<void> {
   try {
     const db = getDb(env.DB)
     await db
       .insert(notificationEvents)
-      .values({
+      .values(withTenant(tenant, {
         kind: input.kind,
         tier: input.tier,
         title: input.title,
@@ -56,7 +63,7 @@ export async function recordEvent(env: Env, input: EventInput): Promise<void> {
         createdAt: input.createdAt ?? new Date().toISOString(),
         readAt: null,
         dismissedAt: null,
-      })
+      }))
       .onConflictDoNothing()
   } catch (err) {
     console.error('notification event not recorded:', err)
@@ -64,14 +71,21 @@ export async function recordEvent(env: Env, input: EventInput): Promise<void> {
 }
 
 /** Undismissed events inside the retention window, newest first. */
-export async function readEvents(env: Env, now = new Date()): Promise<StoredEvent[]> {
+export async function readEvents(env: Env, tenant: TenantId, now = new Date()): Promise<StoredEvent[]> {
   const db = getDb(env.DB)
   const since = new Date(now.getTime() - EVENT_RETENTION_DAYS * 86_400_000).toISOString()
 
   const rows = await db
     .select()
     .from(notificationEvents)
-    .where(and(gte(notificationEvents.createdAt, since), sql`${notificationEvents.dismissedAt} IS NULL`))
+    .where(
+      scoped(
+        notificationEvents,
+        tenant,
+        gte(notificationEvents.createdAt, since),
+        sql`${notificationEvents.dismissedAt} IS NULL`,
+      ),
+    )
     .orderBy(desc(notificationEvents.createdAt))
     .limit(200)
 
@@ -89,18 +103,29 @@ export async function readEvents(env: Env, now = new Date()): Promise<StoredEven
   }))
 }
 
-export async function markEventsRead(env: Env, ids: number[], readAt: string): Promise<void> {
+export async function markEventsRead(
+  env: Env,
+  tenant: TenantId,
+  ids: number[],
+  readAt: string,
+): Promise<void> {
   if (ids.length === 0) return
-  const db = getDb(env.DB)
-  await db.update(notificationEvents).set({ readAt }).where(inArray(notificationEvents.id, ids))
-}
-
-export async function markAllEventsRead(env: Env, readAt: string): Promise<void> {
   const db = getDb(env.DB)
   await db
     .update(notificationEvents)
     .set({ readAt })
-    .where(sql`${notificationEvents.readAt} IS NULL`)
+    // The tenant filter is not redundant beside a list of ids the caller just
+    // read: the ids arrive from the browser, and an id from somebody else's
+    // feed is exactly what an unscoped `inArray` would happily mark read.
+    .where(scoped(notificationEvents, tenant, inArray(notificationEvents.id, ids)))
+}
+
+export async function markAllEventsRead(env: Env, tenant: TenantId, readAt: string): Promise<void> {
+  const db = getDb(env.DB)
+  await db
+    .update(notificationEvents)
+    .set({ readAt })
+    .where(scoped(notificationEvents, tenant, sql`${notificationEvents.readAt} IS NULL`))
 }
 
 /**
@@ -112,16 +137,28 @@ export async function markAllEventsRead(env: Env, readAt: string): Promise<void>
  * reading it is still a decision about it, and leaving the badge up afterwards
  * would be the badge lying.
  */
-export async function dismissEvents(env: Env, ids: number[], at: string): Promise<void> {
+export async function dismissEvents(
+  env: Env,
+  tenant: TenantId,
+  ids: number[],
+  at: string,
+): Promise<void> {
   if (ids.length === 0) return
   const db = getDb(env.DB)
   await db
     .update(notificationEvents)
     .set({ dismissedAt: at, readAt: at })
-    .where(inArray(notificationEvents.id, ids))
+    .where(scoped(notificationEvents, tenant, inArray(notificationEvents.id, ids)))
 }
 
-/** Housekeeping. Returns how many rows went. */
+/**
+ * Housekeeping. Returns how many rows went.
+ *
+ * The one function here that is deliberately not tenant-scoped: retention is
+ * a platform rule about how long a row lives, applied identically to every
+ * tenant, and running it per tenant would be N deletes to express one policy.
+ * It names no tenant because it needs none — the cutoff is the whole predicate.
+ */
 export async function pruneEvents(env: Env, now = new Date()): Promise<number> {
   const db = getDb(env.DB)
   const cutoff = new Date(now.getTime() - EVENT_RETENTION_DAYS * 86_400_000).toISOString()

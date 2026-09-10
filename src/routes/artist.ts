@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { eq, asc } from 'drizzle-orm'
 import { getDb } from '../db'
 import { artistAssets, referenceDocs } from '../db/schema'
+import { scoped, withTenant, type TenantId } from '../db/scope'
+import { tenantOf, type AppEnv } from '../context'
 import {
   ASSET_KINDS,
   assembleEpk,
@@ -19,7 +21,7 @@ import { classifyQuestion, kindByKey, targetLength } from '../../shared/question
 import { extractAll, type AssetProposal } from '../../shared/artistSource'
 import type { Env } from '../types'
 
-const artist = new Hono<{ Bindings: Env }>()
+const artist = new Hono<AppEnv>()
 
 const AUDIENCES: EpkAudience[] = ['festival', 'sync', 'press']
 const FRESHNESS: Freshness[] = ['fresh', 'due_soon', 'overdue', 'unreviewed']
@@ -74,6 +76,7 @@ artist.get('/', async (c) => {
   const rows = (await db
     .select()
     .from(artistAssets)
+    .where(scoped(artistAssets, tenantOf(c)))
     .orderBy(asc(artistAssets.sortOrder), asc(artistAssets.label))) as ArtistAsset[]
 
   // Freshness filters alongside the kind filter, because the counts below
@@ -108,7 +111,10 @@ artist.get('/epk', async (c) => {
   }
 
   const db = getDb(c.env.DB)
-  const rows = (await db.select().from(artistAssets)) as ArtistAsset[]
+  const rows = (await db
+    .select()
+    .from(artistAssets)
+    .where(scoped(artistAssets, tenantOf(c)))) as ArtistAsset[]
   return c.json(assembleEpk(rows, { audience: raw as EpkAudience, today: todayOf(c) }))
 })
 
@@ -138,7 +144,10 @@ artist.get('/answer', async (c) => {
   })
 
   const db = getDb(c.env.DB)
-  const rows = (await db.select().from(artistAssets)) as ArtistAsset[]
+  const rows = (await db
+    .select()
+    .from(artistAssets)
+    .where(scoped(artistAssets, tenantOf(c)))) as ArtistAsset[]
   const candidates = rows.filter((r) => !r.archived && r.questionKind === kind.key)
   const answer = pickForLength(candidates, wanted)
   const today = todayOf(c)
@@ -164,16 +173,23 @@ artist.get('/answer', async (c) => {
  * panel has: you look at what it found before any of it lands. See
  * shared/artistSource.ts for the three rules that decide what is extracted.
  */
-async function propose(env: Env): Promise<{
+async function propose(env: Env, tenant: TenantId): Promise<{
   proposals: AssetProposal[]
   skipped: Array<{ heading: string; reason: string }>
   existing: string[]
 }> {
   const db = getDb(env.DB)
-  const docs = await db.select().from(referenceDocs).orderBy(asc(referenceDocs.id))
+  const docs = await db
+    .select()
+    .from(referenceDocs)
+    .where(scoped(referenceDocs, tenant))
+    .orderBy(asc(referenceDocs.id))
   const { proposals, skipped } = extractAll(docs)
 
-  const rows = (await db.select().from(artistAssets)) as ArtistAsset[]
+  const rows = (await db
+    .select()
+    .from(artistAssets)
+    .where(scoped(artistAssets, tenant))) as ArtistAsset[]
   const known = new Set(rows.map((r) => r.source).filter((s): s is string => !!s))
 
   return {
@@ -186,17 +202,18 @@ async function propose(env: Env): Promise<{
 }
 
 artist.get('/source', async (c) => {
-  const { proposals, skipped, existing } = await propose(c.env)
+  const { proposals, skipped, existing } = await propose(c.env, tenantOf(c))
   return c.json({ proposals, skipped, existing, wouldAdd: proposals.length })
 })
 
 artist.post('/source', async (c) => {
   const db = getDb(c.env.DB)
-  const { proposals, skipped, existing } = await propose(c.env)
+  const tenant = tenantOf(c)
+  const { proposals, skipped, existing } = await propose(c.env, tenant)
   const ts = new Date().toISOString()
 
   for (const p of proposals) {
-    await db.insert(artistAssets).values({
+    await db.insert(artistAssets).values(withTenant(tenant, {
       kind: normaliseAssetKind(p.kind),
       label: p.label,
       value: p.value,
@@ -217,7 +234,7 @@ artist.post('/source', async (c) => {
       archived: 0,
       createdAt: ts,
       updatedAt: ts,
-    })
+    }))
   }
 
   return c.json({ added: proposals.length, existing: existing.length, skipped })
@@ -235,7 +252,7 @@ artist.post('/', zValidator('json', AssetSchema), async (c) => {
 
   const result = await db
     .insert(artistAssets)
-    .values({
+    .values(withTenant(tenantOf(c), {
       kind: normaliseAssetKind(b.kind),
       label: b.label,
       value: b.value ?? null,
@@ -254,7 +271,7 @@ artist.post('/', zValidator('json', AssetSchema), async (c) => {
       archived: b.archived ? 1 : 0,
       createdAt: ts,
       updatedAt: ts,
-    })
+    }))
     .returning({ id: artistAssets.id })
 
   return c.json({ id: result[0].id }, 201)
@@ -276,11 +293,20 @@ artist.patch('/:id', zValidator('json', AssetPatchSchema), async (c) => {
   // the old one.
   if (b.value !== undefined) updates.charCount = measure(b.value)
 
-  const before = await db.select().from(artistAssets).where(eq(artistAssets.id, id)).get()
+  const tenant = tenantOf(c)
+  const before = await db
+    .select()
+    .from(artistAssets)
+    .where(scoped(artistAssets, tenant, eq(artistAssets.id, id)))
+    .get()
   if (!before) return c.json({ error: 'not found' }, 404)
 
-  await db.update(artistAssets).set(updates).where(eq(artistAssets.id, id))
-  const row = await db.select().from(artistAssets).where(eq(artistAssets.id, id)).get()
+  await db.update(artistAssets).set(updates).where(scoped(artistAssets, tenant, eq(artistAssets.id, id)))
+  const row = await db
+    .select()
+    .from(artistAssets)
+    .where(scoped(artistAssets, tenant, eq(artistAssets.id, id)))
+    .get()
   return c.json(row)
 })
 
@@ -291,21 +317,28 @@ artist.patch('/:id', zValidator('json', AssetPatchSchema), async (c) => {
 artist.post('/:id/reviewed', async (c) => {
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
-  const row = await db.select().from(artistAssets).where(eq(artistAssets.id, id)).get()
+  const tenant = tenantOf(c)
+  const row = await db
+    .select()
+    .from(artistAssets)
+    .where(scoped(artistAssets, tenant, eq(artistAssets.id, id)))
+    .get()
   if (!row) return c.json({ error: 'not found' }, 404)
 
   const reviewBy = defaultReviewBy(row.kind, todayOf(c))
   await db
     .update(artistAssets)
     .set({ reviewBy, updatedAt: new Date().toISOString() })
-    .where(eq(artistAssets.id, id))
+    .where(scoped(artistAssets, tenant, eq(artistAssets.id, id)))
 
   return c.json({ ...row, reviewBy })
 })
 
 artist.delete('/:id', async (c) => {
   const db = getDb(c.env.DB)
-  await db.delete(artistAssets).where(eq(artistAssets.id, Number(c.req.param('id'))))
+  await db
+    .delete(artistAssets)
+    .where(scoped(artistAssets, tenantOf(c), eq(artistAssets.id, Number(c.req.param('id')))))
   return c.json({ ok: true })
 })
 

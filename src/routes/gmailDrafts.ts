@@ -22,9 +22,10 @@
  */
 
 import { Hono } from 'hono'
-import { and, eq, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
 import { syncTargets } from '../db/schema'
+import { scoped, type TenantId } from '../db/scope'
+import { tenantOf, type AppEnv } from '../context'
 import {
   GMAIL_COMPOSE_SCOPE,
   REQUESTED_SCOPES,
@@ -43,7 +44,7 @@ import { encodeDraft, planDrafts } from '../../shared/gmailDraft'
 import { randomToken } from '../lib/auth'
 import type { Env } from '../types'
 
-const gmail = new Hono<{ Bindings: Env }>()
+const gmail = new Hono<AppEnv>()
 
 /** Ten minutes is longer than a consent screen takes and shorter than a day. */
 const STATE_COOKIE = '__Host-mhq_oauth_state'
@@ -61,7 +62,7 @@ function readStateCookie(header: string | null | undefined): string | null {
   return null
 }
 
-gmail.get('/status', async (c) => c.json(await readGrant(c.env)))
+gmail.get('/status', async (c) => c.json(await readGrant(c.env, tenantOf(c))))
 
 /**
  * Send the browser to Google.
@@ -115,7 +116,11 @@ gmail.get('/callback', async (c) => {
 
   try {
     const { refreshToken, accessToken, scopes } = await exchangeCode(c.env, code)
-    await storeGrant(c.env, { refreshToken, accountEmail: await accountEmail(accessToken), scopes })
+    await storeGrant(c.env, tenantOf(c), {
+      refreshToken,
+      accountEmail: await accountEmail(accessToken),
+      scopes,
+    })
     // Reported rather than assumed: Google may hand back less than was asked
     // for, and finding that out here beats finding it out mid-write.
     const ok = scopes.includes(GMAIL_COMPOSE_SCOPE) ? 'connected' : 'missing_scope'
@@ -127,7 +132,7 @@ gmail.get('/callback', async (c) => {
 })
 
 gmail.post('/disconnect', async (c) => {
-  await forgetGrant(c.env)
+  await forgetGrant(c.env, tenantOf(c))
   return c.json({ ok: true })
 })
 
@@ -135,8 +140,8 @@ gmail.post('/disconnect', async (c) => {
 /* The bulk write, behind its preview                                     */
 /* --------------------------------------------------------------------- */
 
-async function currentPlan(env: Env) {
-  const rows = await getDb(env.DB).select().from(syncTargets)
+async function currentPlan(env: Env, tenant: TenantId) {
+  const rows = await getDb(env.DB).select().from(syncTargets).where(scoped(syncTargets, tenant))
   return planDrafts(
     rows.map((r) => ({
       id: r.id,
@@ -150,24 +155,26 @@ async function currentPlan(env: Env) {
 
 /** What would happen, including what would not and why. */
 gmail.get('/drafts', async (c) => {
-  const [plan, grant] = await Promise.all([currentPlan(c.env), readGrant(c.env)])
+  const tenant = tenantOf(c)
+  const [plan, grant] = await Promise.all([currentPlan(c.env, tenant), readGrant(c.env, tenant)])
   return c.json({ ...plan, grant })
 })
 
 gmail.post('/drafts', async (c) => {
-  const grant = await readGrant(c.env)
+  const tenant = tenantOf(c)
+  const grant = await readGrant(c.env, tenant)
   if (!grant.connected) return c.json({ error: 'Gmail is not connected' }, 409)
   if (!grant.canDraft) return c.json({ error: 'The Gmail grant does not include drafting' }, 409)
 
   const body = await c.req.json<{ ids?: number[] }>().catch(() => ({ ids: undefined }))
-  const plan = await currentPlan(c.env)
+  const plan = await currentPlan(c.env, tenant)
   // Re-planned server-side rather than trusting the ids alone: the preview
   // may be minutes old, and a target pitched in the meantime must not be
   // drafted because a stale screen still lists it.
   const chosen = body.ids?.length ? plan.ready.filter((r) => body.ids!.includes(r.id)) : plan.ready
   if (chosen.length === 0) return c.json({ created: [], failed: [], skipped: plan.skipped })
 
-  const token = await accessTokenForGrant(c.env)
+  const token = await accessTokenForGrant(c.env, tenant)
   const from = grant.accountEmail
 
   const created: Array<{ id: number; name: string; draftId: string }> = []
@@ -188,7 +195,7 @@ gmail.post('/drafts', async (c) => {
     }
   }
 
-  if (created.length > 0) await markGrantUsed(c.env)
+  if (created.length > 0) await markGrantUsed(c.env, tenant)
 
   // Deliberately no status write. A draft is not a send, and moving these to
   // `pitched` here would tell you a pitch went out that is still sitting in

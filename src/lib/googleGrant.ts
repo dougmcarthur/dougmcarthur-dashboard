@@ -24,6 +24,7 @@
 import { eq } from 'drizzle-orm'
 import { getDb } from '../db'
 import { googleGrants } from '../db/schema'
+import { scoped, withTenant, type TenantId } from '../db/scope'
 import type { Env } from '../types'
 
 export const GMAIL_COMPOSE_SCOPE = 'https://www.googleapis.com/auth/gmail.compose'
@@ -110,12 +111,12 @@ export function redirectUri(env: Env): string {
   return `${base}/api/gmail/callback`
 }
 
-export async function readGrant(env: Env): Promise<GrantStatus> {
+export async function readGrant(env: Env, tenant: TenantId): Promise<GrantStatus> {
   const configured = grantConfigured(env)
   const row = await getDb(env.DB)
     .select()
     .from(googleGrants)
-    .where(eq(googleGrants.purpose, GRANT_PURPOSE))
+    .where(scoped(googleGrants, tenant, eq(googleGrants.purpose, GRANT_PURPOSE)))
     .get()
 
   if (!row) {
@@ -134,35 +135,45 @@ export async function readGrant(env: Env): Promise<GrantStatus> {
   }
 }
 
+/**
+ * Replace this tenant's grant, if any, with a new one.
+ *
+ * Delete-then-insert rather than an upsert, and that is a deliberate change
+ * rather than a simplification. This used to be
+ * `onConflictDoUpdate({ target: googleGrants.purpose })`, which names a
+ * uniqueness constraint — and the constraint moved in this same deploy, from
+ * `purpose` to `(tenant_id, purpose)`, because two artists can both hold a
+ * `gmail.compose` grant. SQLite requires an `ON CONFLICT` target to match a
+ * unique constraint exactly, so an upsert naming the old key would error
+ * against the new schema and one naming the new key would error against the
+ * old — and CI migrates before it deploys, so both shapes are live for half a
+ * minute. Two statements that name no constraint work against either.
+ *
+ * Re-consenting is rare and not concurrent, so the gap between the delete and
+ * the insert costs nothing worth a transaction.
+ */
 export async function storeGrant(
   env: Env,
+  tenant: TenantId,
   input: { refreshToken: string; accountEmail: string | null; scopes: string },
 ): Promise<void> {
   const now = new Date().toISOString()
-  await getDb(env.DB)
-    .insert(googleGrants)
-    .values({
-      purpose: GRANT_PURPOSE,
-      refreshToken: await encryptToken(env, input.refreshToken),
-      accountEmail: input.accountEmail,
-      scopes: input.scopes,
-      grantedAt: now,
-      lastUsedAt: null,
-    })
-    .onConflictDoUpdate({
-      target: googleGrants.purpose,
-      set: {
-        refreshToken: await encryptToken(env, input.refreshToken),
-        accountEmail: input.accountEmail,
-        scopes: input.scopes,
-        grantedAt: now,
-        lastUsedAt: null,
-      },
-    })
+  const db = getDb(env.DB)
+  await db.delete(googleGrants).where(scoped(googleGrants, tenant, eq(googleGrants.purpose, GRANT_PURPOSE)))
+  await db.insert(googleGrants).values(withTenant(tenant, {
+    purpose: GRANT_PURPOSE,
+    refreshToken: await encryptToken(env, input.refreshToken),
+    accountEmail: input.accountEmail,
+    scopes: input.scopes,
+    grantedAt: now,
+    lastUsedAt: null,
+  }))
 }
 
-export async function forgetGrant(env: Env): Promise<void> {
-  await getDb(env.DB).delete(googleGrants).where(eq(googleGrants.purpose, GRANT_PURPOSE))
+export async function forgetGrant(env: Env, tenant: TenantId): Promise<void> {
+  await getDb(env.DB)
+    .delete(googleGrants)
+    .where(scoped(googleGrants, tenant, eq(googleGrants.purpose, GRANT_PURPOSE)))
 }
 
 /* --------------------------------------------------------------------- */
@@ -196,11 +207,11 @@ export async function exchangeCode(
 }
 
 /** A short-lived access token for the stored grant. */
-export async function accessTokenForGrant(env: Env): Promise<string> {
+export async function accessTokenForGrant(env: Env, tenant: TenantId): Promise<string> {
   const row = await getDb(env.DB)
     .select()
     .from(googleGrants)
-    .where(eq(googleGrants.purpose, GRANT_PURPOSE))
+    .where(scoped(googleGrants, tenant, eq(googleGrants.purpose, GRANT_PURPOSE)))
     .get()
   if (!row) throw new Error('Gmail is not connected')
 
@@ -241,9 +252,9 @@ export async function createDraft(accessToken: string, raw: string): Promise<{ i
   return res.json<{ id: string }>()
 }
 
-export async function markGrantUsed(env: Env): Promise<void> {
+export async function markGrantUsed(env: Env, tenant: TenantId): Promise<void> {
   await getDb(env.DB)
     .update(googleGrants)
     .set({ lastUsedAt: new Date().toISOString() })
-    .where(eq(googleGrants.purpose, GRANT_PURPOSE))
+    .where(scoped(googleGrants, tenant, eq(googleGrants.purpose, GRANT_PURPOSE)))
 }

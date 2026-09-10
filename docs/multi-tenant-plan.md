@@ -255,6 +255,73 @@ environment variable. That is a change to `.github/workflows/agents.yml` and
 forgotten, because nothing breaks visibly when a gig lands in the wrong
 tenant — it just appears on a stranger's Overview.
 
+### What step 2 actually did, and the four things it taught
+
+**Done.** `src/db/scope.ts` holds the mechanism, `src/lib/actor.ts` resolves a
+request to an actor, and `src/context.ts` is the one place a route reads a
+scope off a request. `TenantId` is branded with a single constructor, so the
+"admin mode resolves to null and does not compile" guarantee above is a type
+rather than a convention.
+
+**A missing filter is a source-level test.** `test/tenantScope.test.ts` reads
+the tree and fails when one of the fourteen is queried without `scoped` or
+`withTenant`. It has to be source-level rather than behavioural, because with
+one artist an unscoped query returns exactly the right rows and every
+behavioural test passes — it starts being wrong on the day nobody is looking.
+Exemptions are a list with a written reason each; there is one.
+
+**Two shapes hid the missing scope, and both are gone.** A `.where()` that
+was skipped entirely when no filters applied — the
+`conditions.length > 0 ? … : …` in both list routes — is now one branch with
+the tenant unconditional. And an
+`inArray(id, ids)` where the ids came from the browser: the tenant filter
+beside it is not belt-and-braces, it is the only check there is.
+
+**A uniqueness constraint is part of an interface.** Four of them had to grow a
+leading `tenant_id`, and the reason 0021 could not do it is that live code
+named two in an upsert target: SQLite requires `ON CONFLICT` to match a unique
+constraint exactly, so widening the key *errors* the old statements rather than
+staling them. Migration 0022 widens them only because the statements no longer
+name a constraint — `storeGrant` is a delete-then-insert, and the two mark
+writers are an update followed by a conflict-to-nothing insert. Both work
+against the schema on either side of the gap.
+
+**The cron has no request to read a scope from**, which forced a decision the
+plan had not made. Housekeeping is per tenant, because which marks are dead is
+derived from that artist's feed; event retention runs once. The digest and the
+reply scan run for the **owner's tenant only**, because their inputs are
+platform configuration and not the tenant's — the schedule and recipient are
+in `app_settings`, the mailbox is one `GMAIL_REFRESH_TOKEN`. Looping those
+over every tenant would mail the owner N times and scan his mailbox on
+somebody else's behalf.
+
+That is a real gap rather than a decision: **an invited artist gets no digest
+and no reply scan.** Both need per-artist configuration — a digest schedule and
+recipient that are not platform state, and a mailbox grant per tenant like
+`google_grants` already is for drafting. It belongs before invites (step 4)
+ship, and it is not in this step.
+
+### Agent tokens: the table exists and the secret still works
+
+`agent_tokens` is per-tenant, hashed, revocable, and issued through
+`/api/agent-tokens` behind a passkey touch — minting a credential that can
+write to your account is squarely the "changes who can get in" rule. An agent
+is refused those routes: a credential that can issue its own successor makes
+revoking one a race rather than an ending.
+
+`API_TOKEN` is **not** withdrawn. `actorForBearer` still accepts it and
+resolves it to the owner's tenant, which is the same "read both spellings" move
+`normaliseGigStatus` makes for the agents' status vocabulary. Withdrawing it in
+the deploy that introduced the table would have 401'd every agent until three
+GitHub secrets were rotated — a coordination with no upside while there is one
+tenant. It goes when `.github/workflows/agents.yml` and `scripts/agents/api.ts`
+hold a row instead, and that is the step most likely to be forgotten for
+exactly the reason above: nothing breaks visibly when a gig lands in the wrong
+tenant.
+
+There is no Settings screen for these yet. The routes work without one, and the
+screen is step 3's.
+
 ## Usage: a daily rollup, not a meter
 
 What the owner needs to see is "is this artist costing me anything unusual",
@@ -346,9 +413,13 @@ rule that took `gig-festival-scan` off the screen.
    composite twins for 0018's indexes. **Done — migration 0021.** No code
    reads any of it yet.
 2. Session resolves a tenant; domain reads and writes take it as an argument;
-   agent tokens become per-tenant. The scoping migration that ships with it
-   drops the defaults and the single-column index twins, and widens the four
-   uniqueness constraints alongside the upserts that name them.
+   agent tokens become per-tenant. **Done — migration 0022 plus the scoping
+   deploy.** It widened the four uniqueness constraints alongside the upserts
+   that name them and dropped the single-column index twins; the column
+   defaults stay until step 5, because dropping them here would leave the
+   pre-scoping Worker writing NULLs across the migrate-then-deploy gap.
+   Outstanding from this step: per-artist digest and mailbox configuration,
+   and retiring `API_TOKEN` once the agents hold rows.
 3. Admin mode, reusing the elevation already built, then the `/admin` routes
    and screen.
 4. Invite issue / redeem, with the redemption event.

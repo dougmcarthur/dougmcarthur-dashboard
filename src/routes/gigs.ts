@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, desc } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, reminders } from '../db/schema'
+import { scoped, withTenant } from '../db/scope'
+import { tenantOf, type AppEnv } from '../context'
 import { syncGigCalendar, removeGigCalendar, type GigRow } from '../lib/gigCalendar'
 import {
   normaliseGigStatus,
@@ -15,9 +17,8 @@ import {
 import { performanceDateProblem } from '../../shared/performance'
 import { splitDeadline } from '../../shared/reviewParse'
 import { gigNoteColumns } from '../../shared/noteColumns'
-import type { Env } from '../types'
 
-const gigs = new Hono<{ Bindings: Env }>()
+const gigs = new Hono<AppEnv>()
 
 const GigInsertSchema = z.object({
   name: z.string().min(1),
@@ -72,17 +73,15 @@ gigs.get('/', async (c) => {
   if (paid !== undefined) conditions.push(eq(gigOpportunities.paid, paid === 'true' ? 1 : 0))
   if (type) conditions.push(eq(gigOpportunities.type, type))
 
-  const rows =
-    conditions.length > 0
-      ? await db
-          .select()
-          .from(gigOpportunities)
-          .where(and(...conditions))
-          .orderBy(desc(gigOpportunities.discoveredAt))
-      : await db
-          .select()
-          .from(gigOpportunities)
-          .orderBy(desc(gigOpportunities.discoveredAt))
+  // One branch, not two. The unfiltered arm used to have no `.where()` at all,
+  // which is the shape that silently returns every artist's rows once there is
+  // more than one — `scoped` makes the tenant unconditional and leaves only the
+  // query-string filters optional.
+  const rows = await db
+    .select()
+    .from(gigOpportunities)
+    .where(scoped(gigOpportunities, tenantOf(c), ...conditions))
+    .orderBy(desc(gigOpportunities.discoveredAt))
 
   return c.json(rows)
 })
@@ -101,7 +100,7 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
 
   const result = await db
     .insert(gigOpportunities)
-    .values({
+    .values(withTenant(tenantOf(c), {
       name: b.name,
       type: b.type,
       organizer: b.organizer ?? null,
@@ -144,7 +143,7 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
       submittedAt: hasBeenSubmitted(normaliseGigStatus(b.status)) ? ts : null,
       discoveredAt: ts,
       updatedAt: ts,
-    })
+    }))
     .returning({ id: gigOpportunities.id })
 
   return c.json({ id: result[0].id }, 201)
@@ -155,7 +154,7 @@ gigs.get('/:id', async (c) => {
   const row = await db
     .select()
     .from(gigOpportunities)
-    .where(eq(gigOpportunities.id, Number(c.req.param('id'))))
+    .where(scoped(gigOpportunities, tenantOf(c), eq(gigOpportunities.id, Number(c.req.param('id')))))
     .get()
 
   if (!row) return c.json({ error: 'not found' }, 404)
@@ -166,12 +165,15 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const b = c.req.valid('json')
+  const tenant = tenantOf(c)
 
-  // Fetch the row before patching so we can detect status transitions
+  // Fetch the row before patching so we can detect status transitions. Scoped,
+  // which is also what makes every write below safe: they all key off `id`, and
+  // this read is the one place that establishes the id is this artist's.
   const before = await db
     .select()
     .from(gigOpportunities)
-    .where(eq(gigOpportunities.id, id))
+    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
     .get()
 
   if (!before) return c.json({ error: 'not found' }, 404)
@@ -257,7 +259,7 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
   }
   Object.assign(updates, await syncGigCalendar(c.env, after))
 
-  await db.update(gigOpportunities).set(updates).where(eq(gigOpportunities.id, id))
+  await db.update(gigOpportunities).set(updates).where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
 
   const deadlineDate = after.deadline ? splitDeadline(after.deadline).date : null
 
@@ -268,14 +270,14 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
     const reminderDate = new Date(deadlineDate)
     reminderDate.setDate(reminderDate.getDate() - 7)
 
-    await db.insert(reminders).values({
+    await db.insert(reminders).values(withTenant(tenant, {
       entityType: 'gig',
       entityId: id,
       reminderType: 'pre_deadline',
       scheduledFor: reminderDate.toISOString().slice(0, 10),
       status: 'pending',
       createdAt: new Date().toISOString(),
-    })
+    }))
   }
 
   // Anything settled — you passed, they declined, it expired — has no pending
@@ -286,7 +288,9 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
       .update(reminders)
       .set({ status: 'dismissed' })
       .where(
-        and(
+        scoped(
+          reminders,
+          tenant,
           eq(reminders.entityType, 'gig'),
           eq(reminders.entityId, id),
           eq(reminders.status, 'pending'),
@@ -297,7 +301,7 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
   const row = await db
     .select()
     .from(gigOpportunities)
-    .where(eq(gigOpportunities.id, id))
+    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
     .get()
 
   return c.json(row)
@@ -306,6 +310,7 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
 gigs.delete('/:id', async (c) => {
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
+  const tenant = tenantOf(c)
 
   // A gig can own three calendar entries now, not one. Deleting only the
   // deadline reminder would leave an orphaned show on the calendar for a gig
@@ -317,7 +322,7 @@ gigs.delete('/:id', async (c) => {
       showEventId: gigOpportunities.showEventId,
     })
     .from(gigOpportunities)
-    .where(eq(gigOpportunities.id, id))
+    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
     .get()
 
   if (row) await removeGigCalendar(c.env, row)
@@ -330,8 +335,8 @@ gigs.delete('/:id', async (c) => {
   // reminder is worse than a missing one.
   await db
     .delete(reminders)
-    .where(and(eq(reminders.entityType, 'gig'), eq(reminders.entityId, id)))
-  await db.delete(gigOpportunities).where(eq(gigOpportunities.id, id))
+    .where(scoped(reminders, tenant, eq(reminders.entityType, 'gig'), eq(reminders.entityId, id)))
+  await db.delete(gigOpportunities).where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
   return c.json({ ok: true })
 })
 

@@ -4,10 +4,11 @@ import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { getDb } from '../db'
 import { syncTargets } from '../db/schema'
+import { scoped } from '../db/scope'
+import { tenantOf, type AppEnv } from '../context'
 import { getSentEmailsForAddresses, gmailConfigured } from '../lib/gmail'
-import type { Env } from '../types'
 
-const reconcile = new Hono<{ Bindings: Env }>()
+const reconcile = new Hono<AppEnv>()
 
 // GET /api/sync/reconcile — preview: what would change, plus draft diffs
 reconcile.get('/', async (c) => {
@@ -24,7 +25,7 @@ reconcile.get('/', async (c) => {
   }
 
   const db = getDb(c.env.DB)
-  const targets = await db.select().from(syncTargets)
+  const targets = await db.select().from(syncTargets).where(scoped(syncTargets, tenantOf(c)))
 
   const emails = targets.map((t) => t.contactEmail).filter((e): e is string => !!e)
   const sentByEmail = await getSentEmailsForAddresses(c.env, emails)
@@ -86,6 +87,7 @@ reconcile.post(
     const { updates } = c.req.valid('json')
     const now = new Date().toISOString()
 
+    const tenant = tenantOf(c)
     const applied: number[] = []
 
     for (const u of updates) {
@@ -97,7 +99,10 @@ reconcile.post(
       if (u.pitchSent) patch.pitchSent = u.pitchSent
       if (u.learnFromSent && u.pitchSent) patch.pitchDraft = u.pitchSent
 
-      await db.update(syncTargets).set(patch).where(eq(syncTargets.id, u.id))
+      // The ids come from a preview the browser is holding, so each one is a
+      // claim rather than a fact. Scoping the write is what makes a stale or
+      // forged id a no-op instead of somebody else's status change.
+      await db.update(syncTargets).set(patch).where(scoped(syncTargets, tenant, eq(syncTargets.id, u.id)))
       applied.push(u.id)
     }
 

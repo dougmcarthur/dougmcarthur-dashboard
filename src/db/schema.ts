@@ -1,6 +1,8 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 export const gigOpportunities = sqliteTable('gig_opportunities', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   type: text('type').notNull(),
@@ -88,6 +90,8 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
 })
 
 export const syncTargets = sqliteTable('sync_targets', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   agencyType: text('agency_type'),
@@ -106,6 +110,8 @@ export const syncTargets = sqliteTable('sync_targets', {
 })
 
 export const promoDrafts = sqliteTable('promo_drafts', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   id: integer('id').primaryKey({ autoIncrement: true }),
   month: text('month').notNull(),
   title: text('title').notNull(),
@@ -115,6 +121,8 @@ export const promoDrafts = sqliteTable('promo_drafts', {
 })
 
 export const referenceDocs = sqliteTable('reference_docs', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   id: text('id').primaryKey(),
   title: text('title').notNull(),
   content: text('content').notNull(),
@@ -129,6 +137,8 @@ export const referenceDocs = sqliteTable('reference_docs', {
  * canonical application question it answers.
  */
 export const artistAssets = sqliteTable('artist_assets', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   id: integer('id').primaryKey({ autoIncrement: true }),
   kind: text('kind').notNull(),
   label: text('label').notNull(),
@@ -156,6 +166,8 @@ export const artistAssets = sqliteTable('artist_assets', {
  * yes", which is the difference between an application and a pile of guesses.
  */
 export const applicationFields = sqliteTable('application_fields', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   id: integer('id').primaryKey({ autoIncrement: true }),
   gigId: integer('gig_id').notNull(),
   fieldKey: text('field_key').notNull(),
@@ -184,6 +196,8 @@ export const applicationFields = sqliteTable('application_fields', {
  * tells you that you were rejected when you were not.
  */
 export const gigReplies = sqliteTable('gig_replies', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   id: integer('id').primaryKey({ autoIncrement: true }),
   gmailMessageId: text('gmail_message_id').notNull(),
   gmailThreadId: text('gmail_thread_id').notNull(),
@@ -224,6 +238,8 @@ export const gigReplies = sqliteTable('gig_replies', {
  * event's name and every one after it is a lookup.
  */
 export const gigCorrespondents = sqliteTable('gig_correspondents', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   id: integer('id').primaryKey({ autoIncrement: true }),
   gigId: integer('gig_id').notNull(),
   kind: text('kind').notNull(), // 'address' | 'thread'
@@ -232,6 +248,8 @@ export const gigCorrespondents = sqliteTable('gig_correspondents', {
 })
 
 export const taskRuns = sqliteTable('task_runs', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   id: integer('id').primaryKey({ autoIncrement: true }),
   taskId: text('task_id').notNull(),
   runAt: text('run_at').notNull(),
@@ -241,6 +259,8 @@ export const taskRuns = sqliteTable('task_runs', {
 })
 
 export const reminders = sqliteTable('reminders', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   id: integer('id').primaryKey({ autoIncrement: true }),
   entityType: text('entity_type').notNull(), // 'gig' | 'sync'
   entityId: integer('entity_id').notNull(),
@@ -256,6 +276,8 @@ export const reminders = sqliteTable('reminders', {
  * item that has not changed" enforceable.
  */
 export const digestReports = sqliteTable('digest_reports', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   entityType: text('entity_type').notNull(),
   entityId: integer('entity_id').notNull(),
   grp: text('grp').notNull(),
@@ -268,6 +290,8 @@ export const digestReports = sqliteTable('digest_reports', {
  * table because phase 1 carries only conditions, which are derived on read.
  */
 export const notificationMarks = sqliteTable('notification_marks', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   dedupeKey: text('dedupe_key').primaryKey(),
   firstSeen: text('first_seen').notNull(),
   readAt: text('read_at'),
@@ -282,6 +306,8 @@ export const notificationMarks = sqliteTable('notification_marks', {
  * the things that happened at a moment and are gone if nobody wrote them down.
  */
 export const notificationEvents = sqliteTable('notification_events', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   id: integer('id').primaryKey({ autoIncrement: true }),
   kind: text('kind').notNull(), // 'automation' | 'digest' | 'reconcile'
   tier: text('tier').notNull(), // 'critical' | 'attention' | 'info'
@@ -312,6 +338,8 @@ export const appSettings = sqliteTable('app_settings', {
  * a challenge for one round trip.
  */
 export const passkeyCredentials = sqliteTable('passkey_credentials', {
+  /** Which account this belongs to. See migration 0021. */
+  userId: text('user_id'),
   /** base64url credential ID, as an assertion names it. */
   id: text('id').primaryKey(),
   /** base64url COSE public key — the only thing about the authenticator that is trusted. */
@@ -335,6 +363,8 @@ export const authChallenges = sqliteTable('auth_challenges', {
 })
 
 export const authSessions = sqliteTable('auth_sessions', {
+  /** Which account this belongs to. See migration 0021. */
+  userId: text('user_id'),
   /** SHA-256 of the cookie value. The cookie itself is never stored. */
   id: text('id').primaryKey(),
   credentialId: text('credential_id'),
@@ -350,6 +380,8 @@ export const authSessions = sqliteTable('auth_sessions', {
 })
 
 export const authEnrolmentCodes = sqliteTable('auth_enrolment_codes', {
+  /** Which account this belongs to. See migration 0021. */
+  userId: text('user_id'),
   id: text('id').primaryKey(),
   codeHash: text('code_hash').notNull(),
   attempts: integer('attempts').notNull().default(0),
@@ -366,6 +398,8 @@ export const authEnrolmentCodes = sqliteTable('auth_enrolment_codes', {
  * write drafts cannot also blind the read-only reply matcher.
  */
 export const googleGrants = sqliteTable('google_grants', {
+  /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
+  tenantId: text('tenant_id'),
   purpose: text('purpose').primaryKey(),
   /** AES-GCM, key from a Worker secret. The one credential in this database. */
   refreshToken: text('refresh_token').notNull(),
@@ -374,6 +408,78 @@ export const googleGrants = sqliteTable('google_grants', {
   scopes: text('scopes').notNull(),
   grantedAt: text('granted_at').notNull(),
   lastUsedAt: text('last_used_at'),
+})
+
+/* --------------------------------------------------------------------- */
+/* Accounts. See migration 0021 and docs/multi-tenant-plan.md.            */
+/* --------------------------------------------------------------------- */
+
+/**
+ * An artist. One row here owns every domain row carrying its id.
+ *
+ * Separate from `users` because the two will not stay one-to-one: a tenant is
+ * the thing rows belong to, a user is the thing that signs in.
+ */
+export const tenants = sqliteTable('tenants', {
+  id: text('id').primaryKey(),
+  displayName: text('display_name'),
+  createdAt: text('created_at').notNull(),
+})
+
+/** Somebody who can sign in. `role` is 'owner' | 'artist' and stays two values. */
+export const users = sqliteTable('users', {
+  id: text('id').primaryKey(),
+  role: text('role').notNull().default('artist'),
+  tenantId: text('tenant_id'),
+  displayName: text('display_name'),
+  /** The recovery address, and the only place one may come from. Never typed. */
+  email: text('email'),
+  createdAt: text('created_at').notNull(),
+})
+
+/** An invitation to create an account. Stored hashed — it is a credential. */
+export const invites = sqliteTable('invites', {
+  id: text('id').primaryKey(),
+  tokenHash: text('token_hash').notNull(),
+  email: text('email').notNull(),
+  displayName: text('display_name'),
+  issuedBy: text('issued_by').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  redeemedAt: text('redeemed_at'),
+  redeemedUserId: text('redeemed_user_id'),
+  revokedAt: text('revoked_at'),
+  createdAt: text('created_at').notNull(),
+})
+
+/** One row per tenant per day, written by the housekeeping tick. */
+export const usageDaily = sqliteTable('usage_daily', {
+  tenantId: text('tenant_id').notNull(),
+  day: text('day').notNull(),
+  domainRows: integer('domain_rows').notNull().default(0),
+  gigRows: integer('gig_rows').notNull().default(0),
+  promoRows: integer('promo_rows').notNull().default(0),
+  apiRequests: integer('api_requests').notNull().default(0),
+  agentRuns: integer('agent_runs').notNull().default(0),
+  gmailDrafts: integer('gmail_drafts').notNull().default(0),
+  aiCalls: integer('ai_calls').notNull().default(0),
+  writtenAt: text('written_at').notNull(),
+})
+
+/**
+ * A research agent's credential, per tenant. See migration 0022.
+ *
+ * `API_TOKEN` was a platform secret with no tenant attached, which is fine
+ * with one artist and wrong with two: the agents POST gigs, and those gigs
+ * belong to somebody. Stored hashed, like every other credential here.
+ */
+export const agentTokens = sqliteTable('agent_tokens', {
+  id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  label: text('label').notNull(),
+  createdAt: text('created_at').notNull(),
+  lastUsedAt: text('last_used_at'),
+  revokedAt: text('revoked_at'),
 })
 
 export type GigOpportunity = typeof gigOpportunities.$inferSelect
@@ -394,3 +500,8 @@ export type PasskeyCredentialRow = typeof passkeyCredentials.$inferSelect
 export type AuthSessionRow = typeof authSessions.$inferSelect
 export type AuthEnrolmentCodeRow = typeof authEnrolmentCodes.$inferSelect
 export type GoogleGrantRow = typeof googleGrants.$inferSelect
+export type TenantRow = typeof tenants.$inferSelect
+export type UserRow = typeof users.$inferSelect
+export type InviteRow = typeof invites.$inferSelect
+export type UsageDailyRow = typeof usageDaily.$inferSelect
+export type AgentTokenRow = typeof agentTokens.$inferSelect
