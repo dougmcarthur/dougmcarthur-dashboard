@@ -330,6 +330,46 @@ which, rather than shipping three zeroes a screen would render as "none". A
 request counter is a write per request, which is the shape this app keeps
 declining to build, so it needs somewhere outside D1 before it can be honest.
 
+**An invitation is a credential that grants an account.** The biggest one
+this app hands out — a passkey signs into an account that exists, this one
+brings one into being — so it gets the strictest handling. Stored hashed and
+shown **once**, like an agent token: nothing can print it again, and losing it
+costs a withdrawal and a reissue. Thirty days, single use, withdrawable until
+redeemed. The address is typed by the owner and fixed at issue, which is the
+signup half of the recovery-address rule: at signup there is nothing on file,
+so it has to come from somewhere trusted.
+
+**The token lives in the URL fragment, never the path.** `#join/<token>`. A
+fragment is never sent to the server, never lands in an access log and never
+appears in a `Referer` header; the client reads it and POSTs it in a body.
+`test/invites.test.ts` fails if a join call starts putting it in a path, or if
+the list route ever grows a `token` field.
+
+**Redemption spends the invitation last.** The tenant, the account and the
+first passkey are written in one flow, and the invite is marked used only after
+the credential verifies — so a cancelled prompt leaves the link working, which
+is what somebody whose browser gave up needs and costs nothing, because it is
+still single use once it lands. The owner finds out through the bell, as an
+**event**: "somebody joined on Tuesday" is not recoverable from Wednesday's
+state. The title says their name, never a tenant id and never an address.
+
+**A passkey user handle is per account now.** It was one fixed string — right
+for one user, a bug with two, because an authenticator *replaces* a credential
+sharing a handle and two people enrolling on one device would replace each
+other. The owner keeps the original string, since their authenticators already
+hold credentials under it and switching would leave a duplicate keychain entry
+for nothing; everybody else is keyed by their account id.
+
+**Scout cannot mail an invitation yet, and says so.** The `send_email` binding
+sends through an allowlist of two addresses, both the owner's — a real security
+property today, not a limitation: the Worker cannot mail anywhere else even if
+the code is wrong. The gate is a **domain**, not a plan; sending to an
+arbitrary recipient needs `sundogsmusic.ca` onboarded to Email Service. Until
+then the owner copies the link. The same prerequisite blocks per-artist
+recovery: the emailed setup code goes to the configured address and enrols the
+*owner's* account, which is safe — only the owner can read that inbox — but is
+not recovery for anybody else.
+
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a
 passkey ceremony — WebAuthn has no non-interactive mode. `API_TOKEN` as a

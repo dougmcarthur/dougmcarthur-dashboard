@@ -9,10 +9,11 @@ oversight screens and the invite UI are the *visible* part and the smallest
 part, and neither can exist before the thing they are about — an account that
 owns rows — exists underneath them.
 
-**Steps 1 to 3 are done** (migrations 0021–0023). Invites are not, and the
-`NOT NULL` pass at the end is not. Each step's section below carries a note on
-what it actually did and where the plan turned out to be wrong, which is worth
-more than a plan that reads as though it was right.
+**Steps 1 to 4 are done** (migrations 0021–0023; invites needed none, because
+their table arrived with 0021). What is left is the `NOT NULL` pass at the end,
+and two things gated on mail — see the invites section. Each step's section
+below carries a note on what it actually did and where the plan turned out to
+be wrong, which is worth more than a plan that reads as though it was right.
 
 ## Why not a library
 
@@ -425,6 +426,50 @@ Rules, each with a reason:
   An account that exists but has no credential is a thing to reason about, and
   there is no reason to have one.
 
+### What step 4 actually did
+
+**Done, and it needed no migration** — `invites` has been sitting in the schema
+since 0021, which is what step 1 being done properly buys. `shared/invites.ts`
+holds the rules against a `now` it is handed, `src/lib/invites.ts` is the
+storage and the one flow that creates an account, `/api/admin/invites` issues,
+lists and withdraws, and `/api/auth/join/*` redeems.
+
+**The URL is `#join/<token>`, in the fragment.** The plan wrote `/join/<token>`
+and a path is the wrong place: a fragment is never sent to the server, never
+lands in an access log and never appears in a `Referer` header, which is
+exactly what a credential in a URL needs. The client reads it and POSTs it in a
+body — all three join requests take it that way, and
+`test/invites.test.ts` fails if one starts putting it in a path.
+
+**The link is shown once and handed over, not emailed.** Same bargain as an
+agent token, for the same reason: the column holds a hash, so nothing can print
+it again, and losing it costs a withdrawal and a reissue. Emailing it is
+blocked on the domain onboarding below, and the screen says so rather than
+offering a button that would throw.
+
+**Redemption is spent last.** The invitation is marked used only after the
+credential verifies — so a cancelled prompt or a failed ceremony leaves the
+link working, which is what somebody whose browser gave up needs and costs
+nothing, because it is still single use once it lands. The tenant, the account
+and the first passkey are written in that one flow.
+
+**A passkey handle is per account now.** It was one fixed string, which was
+right for one user and becomes a bug with two: an authenticator replaces a
+credential sharing a handle, so two people enrolling on one device would
+replace each other. The owner keeps the original string — their authenticators
+already hold credentials under it and switching would leave a duplicate
+keychain entry for nothing — and everybody else is keyed by their account id.
+
+**The redemption notification is an event in the owner's feed**, titled with
+the artist's name, exactly as planned. Recorded after the session is issued, so
+a failure to notify cannot cost somebody their signup.
+
+**Outstanding, and both wait on the same thing:** Scout cannot mail an
+invitation, and an invited artist has no recovery path — the emailed setup code
+goes to the configured address and enrols the *owner's* account, which is safe
+(only the owner can read that inbox) but is not recovery for anybody else. Both
+need the section below.
+
 ### Mail to an invited artist needs the allowlist gone first
 
 A prerequisite that is easy to miss because nothing about it is visible while
@@ -483,7 +528,10 @@ rule that took `gig-festival-scan` off the screen.
    guarantee turned out to be a type rather than a rule; see below. Outstanding
    from this step: three of `usage_daily`'s seven counters have no writer, and
    the invite list on the screen waits on step 4.
-4. Invite issue / redeem, with the redemption event.
+4. Invite issue / redeem, with the redemption event. **Done — no migration
+   needed, since `invites` arrived with 0021.** Outstanding: mailing the
+   invitation, and per-artist recovery, both gated on onboarding
+   `sundogsmusic.ca` to Email Service.
 5. `tenant_id` to `NOT NULL` on the fourteen domain tables — and on `users`
    too, since every account owns a tenant now, including the owner's.
 

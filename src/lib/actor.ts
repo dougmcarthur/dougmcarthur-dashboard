@@ -191,6 +191,27 @@ export async function ownerTenant(env: Env): Promise<TenantId | null> {
   return row?.tenantId ? asTenantId(row.tenantId) : null
 }
 
+/**
+ * One account by id, with the label a passkey prompt should show.
+ *
+ * The label is the recovery address when there is one, then the display name,
+ * then nothing — an operating system prompt saying which account it is about
+ * is the difference between two entries in a keychain and two entries that
+ * look identical.
+ */
+export async function accountById(
+  env: Env,
+  userId: string,
+): Promise<{ userId: string; role: Role; label: string | null } | null> {
+  const row = await getDb(env.DB).select().from(users).where(eq(users.id, userId)).get()
+  if (!row) return null
+  return {
+    userId: row.id,
+    role: row.role === 'owner' ? 'owner' : 'artist',
+    label: row.email ?? row.displayName ?? null,
+  }
+}
+
 /** The owner's account id, for the one code path with nobody signed in to ask. */
 export async function ownerUserId(env: Env): Promise<string | null> {
   return (await ownerUser(env))?.id ?? null

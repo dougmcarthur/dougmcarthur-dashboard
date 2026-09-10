@@ -437,6 +437,45 @@ export interface RemovalResult {
   usersDeleted: number
 }
 
+/** An invitation, as the oversight surface sees it. Never the token. */
+export interface InviteSummary {
+  id: string
+  email: string
+  displayName: string | null
+  state: 'valid' | 'redeemed' | 'revoked' | 'expired'
+  createdAt: string
+  expiresAt: string
+  redeemedAt: string | null
+  revokedAt: string | null
+}
+
+export interface InviteList {
+  items: InviteSummary[]
+  /** False while the mail binding's allowlist is the boundary. See the route. */
+  canMail: boolean
+}
+
+/** The one moment the token exists outside the invitee's browser. */
+export interface IssuedInvite {
+  id: string
+  token: string
+  expiresAt: string
+}
+
+/**
+ * What the join screen learns before asking anybody to touch anything.
+ *
+ * Only the success shape, deliberately. A dead invitation answers 404 or 410
+ * and `apiFetch` turns that into a thrown `Error` carrying the sentence the
+ * server wrote — so the refusal reaches the screen the same way every other
+ * refusal does, rather than as a second success type the caller has to
+ * remember to check.
+ */
+export interface JoinCheck {
+  email: string
+  displayName: string | null
+}
+
 export interface PasskeySummary {
   id: string
   label: string
@@ -522,6 +561,24 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ mode }),
       }),
+    /**
+     * Redeeming an invitation: signing up and signing in at once.
+     *
+     * The token travels in a body rather than a path, because a credential in
+     * a URL is a credential in an access log and a browser history.
+     */
+    joinCheck: (token: string) =>
+      apiFetch<JoinCheck>('/auth/join/check', { method: 'POST', body: JSON.stringify({ token }) }),
+    joinOptions: (token: string) =>
+      apiFetch<{ ceremony: string; options: Record<string, unknown> }>('/auth/join/options', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      }),
+    joinVerify: (body: { token: string; ceremony: string; response: unknown; label?: string }) =>
+      apiFetch<{ ok: boolean; label: string }>('/auth/join/verify', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     passkeys: () => apiFetch<{ items: PasskeySummary[] }>('/auth/passkeys'),
     revoke: (id: string) =>
       apiFetch<{ ok: boolean; remaining: number }>(`/auth/passkeys/${encodeURIComponent(id)}`, {
@@ -557,6 +614,13 @@ export const api = {
       apiFetch<RemovalPreview>(`/admin/artists/${encodeURIComponent(id)}/removal`),
     remove: (id: string) =>
       apiFetch<RemovalResult>(`/admin/artists/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    invites: () => apiFetch<InviteList>('/admin/invites'),
+    invite: (body: { email: string; displayName?: string }) =>
+      apiFetch<IssuedInvite>('/admin/invites', { method: 'POST', body: JSON.stringify(body) }),
+    revokeInvite: (id: string) =>
+      apiFetch<{ id: string; revoked: boolean }>(`/admin/invites/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
   },
   /** What to call this artist. One field, set by them, read by oversight. */
   profile: {

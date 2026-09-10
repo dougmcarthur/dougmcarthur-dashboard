@@ -2,6 +2,8 @@ import { useEffect, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, UNAUTHENTICATED_EVENT } from '../api'
 import { LoginScreen } from './LoginScreen'
+import { JoinScreen } from './JoinScreen'
+import { useHashRoute } from '../hooks/useHashRoute'
 
 /**
  * Nothing renders until the Worker says who is asking.
@@ -17,6 +19,18 @@ import { LoginScreen } from './LoginScreen'
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
+  /**
+   * The invitation token comes from the hash and nowhere else.
+   *
+   * A fragment is never sent to the server, never lands in an access log and
+   * never appears in a `Referer` header — which is exactly what a credential in
+   * a URL needs. The client reads it and POSTs it in a body.
+   *
+   * Read through the router hook rather than off `location` directly, so that
+   * leaving the join screen is a hash change like any other rather than a link
+   * that changes the URL and re-renders nothing.
+   */
+  const [page, , arg] = useHashRoute('overview')
   const session = useQuery({
     queryKey: ['auth', 'session'],
     queryFn: api.auth.session,
@@ -41,6 +55,25 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (session.isLoading) return <div className="min-h-screen bg-canvas" />
 
   if (!session.data?.authenticated) {
+    // An invitation is checked before the sign-in screen is offered, because
+    // somebody following one has no account to sign in to yet. Only while
+    // signed out: a link opened in a browser that is already somebody else's
+    // session should not quietly enrol a second account into it.
+    if (page === 'join' && arg) {
+      return (
+        <JoinScreen
+          token={arg}
+          onJoined={() => {
+            // The hash goes first. A reload that kept `#join/…` would land on a
+            // route the signed-in app does not have, and the token would sit in
+            // the address bar of an account it has already been spent on.
+            window.location.assign('#overview')
+            window.location.reload()
+          }}
+        />
+      )
+    }
+
     return (
       <LoginScreen
         session={

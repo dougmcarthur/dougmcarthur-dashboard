@@ -4,6 +4,7 @@ import { api, type AdminArtist, type RemovalPreview } from '../api'
 import { withConfirmation } from '../confirmIdentity'
 import { Button } from '../components/ui/Button'
 import { Disclosure } from '../components/ui/Disclosure'
+import { InvitesPanel } from '../components/InvitesPanel'
 import { relativeTime, shortDate } from '../format'
 
 /**
@@ -61,6 +62,10 @@ export function AdminPage() {
         Storage figures are sampled once a day by the overnight job, so a brand-new account
         shows nothing until tomorrow.
       </p>
+
+      <hr className="border-line" />
+
+      <InvitesPanel />
     </div>
   )
 }

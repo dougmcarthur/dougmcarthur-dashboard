@@ -50,7 +50,7 @@ import type {
 } from '@simplewebauthn/server'
 import { getDb } from '../db'
 import { passkeyCredentials } from '../db/schema'
-import { accountForSession, actorForSession, ownerUserId } from '../lib/actor'
+import { accountById, accountForSession, actorForSession, ownerTenant, ownerUserId } from '../lib/actor'
 import {
   base64url,
   checkEnrolmentCode,
@@ -74,6 +74,9 @@ import {
   utf8Bytes,
 } from '../lib/auth'
 import { mailerConfigured, sendMail } from '../lib/mailer'
+import { findInvite, redeemInvite } from '../lib/invites'
+import { INVITE_REFUSALS, maskAddress } from '../../shared/invites'
+import { recordEvent } from '../lib/notificationEvents'
 import {
   CHALLENGE_TTL_SECONDS,
   ENROLMENT_CODE_TTL_MINUTES,
@@ -109,6 +112,25 @@ const auth = new Hono<{ Bindings: Env }>()
 const USER_ID = utf8Bytes('sundogs-scout-owner')
 /** Shown in the operating system's passkey prompt, so it is the full name. */
 const USER_NAME = 'Sun Dogs Music Scout'
+
+/**
+ * The handle for one account, now that there can be more than one.
+ *
+ * The comment above is still the reason it has to be stable — an authenticator
+ * replaces a credential sharing a user handle — but with accounts the same
+ * property becomes a requirement in the other direction: two different people
+ * enrolling on one device must **not** replace each other, which is exactly
+ * what a single fixed handle would do.
+ *
+ * The owner keeps the original string. Their authenticators already hold
+ * credentials under it, and switching would leave a second entry beside the
+ * first in a keychain rather than replacing it — a cosmetic mess bought for
+ * nothing, since there is one owner and the value is already unique to them.
+ * Everybody else is keyed by their account id.
+ */
+function userHandle(account: { userId: string; role: 'owner' | 'artist' } | null) {
+  return !account || account.role === 'owner' ? USER_ID : utf8Bytes(account.userId)
+}
 
 function rp(c: { env: Env; req: { url: string } }) {
   return relyingParty({ dashboardUrl: c.env.DASHBOARD_URL, requestUrl: c.req.url })
@@ -276,6 +298,184 @@ auth.post('/login/verify', zValidator('json', assertion), async (c) => {
  * matters: it does not say whether a passkey is already registered. That is
  * the fact an attacker would most like to learn from this endpoint.
  */
+/* --------------------------------------------------------------------- */
+/* Joining, on an invitation                                              */
+/* --------------------------------------------------------------------- */
+
+/**
+ * Redeeming an invitation, which is signing up and signing in at once.
+ *
+ * These sit under `/api/auth`, which the tenant middleware exempts — and they
+ * have to, because nobody redeeming an invite has an account yet, let alone a
+ * tenant. The invitation *is* the credential for these three requests.
+ *
+ * The token arrives in a **body** rather than a path segment. It is a
+ * credential, and a credential in a URL is a credential in an access log, a
+ * referrer header and somebody's browser history.
+ *
+ * The shape mirrors the enrolment-code flow deliberately — check, options,
+ * verify — because it is the same ceremony with a different thing authorising
+ * it. What differs is what it produces: an emailed code adds a passkey to an
+ * account that exists, and this one brings the account into being.
+ */
+const joinToken = z.object({ token: z.string().trim().min(1) })
+
+/** What the join screen shows before asking anybody to touch anything. */
+auth.post('/join/check', zValidator('json', joinToken), async (c) => {
+  const found = await findInvite(c.env, c.req.valid('json').token)
+  // A token matching nothing and a token matching something dead are different
+  // answers. Both refuse; only the second can say what happened, and somebody
+  // following a month-old link is better served by "this expired" than by a
+  // blank refusal.
+  if (!found) {
+    return c.json({ ok: false, error: 'We do not recognise this invitation.' }, 404)
+  }
+  if (found.state !== 'valid') {
+    return c.json({ ok: false, error: INVITE_REFUSALS[found.state] }, 410)
+  }
+  return c.json({
+    ok: true,
+    // Masked: a link can be forwarded or sit in a history, and a full address
+    // on a page anyone holding the URL can load is an address they now have.
+    email: maskAddress(found.invite.email),
+    displayName: found.invite.displayName,
+  })
+})
+
+auth.post('/join/options', zValidator('json', joinToken), async (c) => {
+  const party = rp(c)
+  if (!party) return c.json({ error: SITE_MISCONFIGURED }, 500)
+
+  const found = await findInvite(c.env, c.req.valid('json').token)
+  if (!found) return c.json({ error: 'That invitation is not one we know.' }, 404)
+  if (found.state !== 'valid') return c.json({ error: INVITE_REFUSALS[found.state] }, 410)
+
+  const options = await generateRegistrationOptions({
+    rpName: USER_NAME,
+    rpID: party.rpId,
+    // A handle nobody holds yet: the account does not exist until the ceremony
+    // verifies, so this is keyed by the invitation. It has to be distinct from
+    // every other account's, or an authenticator would offer to replace a
+    // passkey belonging to somebody else on the same device.
+    userID: utf8Bytes(`invite:${found.invite.id}`),
+    userName: found.invite.email,
+    userDisplayName: found.invite.displayName ?? found.invite.email,
+    timeout: CHALLENGE_TTL_SECONDS * 1000,
+    attestationType: 'none',
+    // Nothing to exclude. Whoever this is has no credentials here yet, and
+    // listing anybody else's would publish their credential ids.
+    excludeCredentials: [],
+    authenticatorSelection: {
+      // Discoverable, like every other passkey here: the login screen asks for
+      // no username, so a non-resident key would be unusable afterwards.
+      residentKey: 'required',
+      userVerification: 'preferred',
+    },
+  })
+
+  const ceremony = await storeChallenge(c.env, {
+    challenge: options.challenge,
+    purpose: 'registration',
+  })
+  return c.json({ ceremony, options })
+})
+
+const joinAttestation = z.object({
+  token: z.string().trim().min(1),
+  ceremony: z.string().min(1),
+  response: z.record(z.unknown()),
+  label: z.string().trim().max(80).optional(),
+})
+
+auth.post('/join/verify', zValidator('json', joinAttestation), async (c) => {
+  const party = rp(c)
+  if (!party) return c.json({ error: SITE_MISCONFIGURED }, 500)
+
+  const body = c.req.valid('json')
+  // Re-checked rather than trusted from the options call, exactly as the
+  // enrolment ceremony re-checks its code: the two requests are independent,
+  // and "I passed this a moment ago" is a claim the second is in no position
+  // to make.
+  const found = await findInvite(c.env, body.token)
+  if (!found) return c.json({ error: 'That invitation is not one we know.' }, 404)
+  if (found.state !== 'valid') return c.json({ error: INVITE_REFUSALS[found.state] }, 410)
+
+  const expected = await consumeChallenge(c.env, { id: body.ceremony, purpose: 'registration' })
+  if (!expected) return c.json({ error: 'this setup expired — start again' }, 400)
+
+  let verification
+  try {
+    verification = await verifyRegistrationResponse({
+      response: body.response as unknown as RegistrationResponseJSON,
+      expectedChallenge: expected,
+      expectedOrigin: party.origins,
+      expectedRPID: party.rpId,
+      requireUserVerification: false,
+    })
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : 'setup failed' }, 400)
+  }
+
+  const info = verification.registrationInfo
+  if (!verification.verified || !info) return c.json({ error: 'setup failed' }, 400)
+
+  // Only now. The invitation is spent when a credential actually lands, so a
+  // cancelled prompt or a failed ceremony leaves the link usable — which is
+  // what somebody whose browser gave up needs, and costs nothing, because the
+  // token is still single-use once it works.
+  const now = new Date()
+  const account = await redeemInvite(c.env, found.invite, now)
+  const label = body.label || passkeyLabel(c.req.header('User-Agent'))
+
+  await getDb(c.env.DB)
+    .insert(passkeyCredentials)
+    .values({
+      id: info.credential.id,
+      publicKey: base64url(info.credential.publicKey),
+      counter: info.credential.counter,
+      transports: info.credential.transports ? JSON.stringify(info.credential.transports) : null,
+      deviceType: info.credentialDeviceType,
+      backedUp: info.credentialBackedUp ? 1 : 0,
+      label,
+      userId: account.userId,
+      createdAt: now.toISOString(),
+      lastUsedAt: now.toISOString(),
+    })
+
+  const session = await createSession(c.env, {
+    credentialId: info.credential.id,
+    label,
+    userId: account.userId,
+    now,
+  })
+  c.header('Set-Cookie', sessionCookie(session.token, session.maxAgeSeconds))
+
+  // The owner finds out through the bell they already have, not through a new
+  // channel. An **event** rather than a condition, by the rule this app runs
+  // on: "somebody joined on Tuesday" is not recoverable from Wednesday's
+  // state — a user row says they exist, not that they just arrived.
+  //
+  // Recorded after the session is issued rather than before, so a failure here
+  // cannot cost somebody their signup. It swallows its own errors anyway.
+  const owner = await ownerTenant(c.env)
+  if (owner) {
+    await recordEvent(c.env, owner, {
+      kind: 'reconcile',
+      tier: 'info',
+      // The name, never the tenant id and never the address. Same rule that
+      // took `gig-festival-scan` off the screen.
+      title: `${account.displayName ?? 'A new artist'} joined`,
+      body: 'They set up a passkey and their account is live.',
+      href: '#admin',
+      action: 'See artists',
+      dedupeKey: `invite:redeemed:${found.invite.id}`,
+      createdAt: now.toISOString(),
+    })
+  }
+
+  return c.json({ ok: true, label })
+})
+
 /* --------------------------------------------------------------------- */
 /* Admin mode                                                             */
 /* --------------------------------------------------------------------- */
@@ -452,7 +652,7 @@ auth.post('/enrol/request', async (c) => {
       `and adding a passkey still needs your device to approve it.</p>`,
   })
 
-  return c.json({ sent: true, to: maskEmail(to), expiresAt: issued.expiresAt })
+  return c.json({ sent: true, to: maskAddress(to), expiresAt: issued.expiresAt })
 })
 
 /* --------------------------------------------------------------------- */
@@ -474,11 +674,12 @@ auth.post('/register/options', zValidator('json', enrolRequest), async (c) => {
   }
 
   const existing = authorised.userId ? await credentialsForUser(c.env, authorised.userId) : []
+  const account = authorised.userId ? await accountById(c.env, authorised.userId) : null
   const options = await generateRegistrationOptions({
     rpName: USER_NAME,
     rpID: party.rpId,
-    userID: USER_ID,
-    userName: USER_NAME,
+    userID: userHandle(account),
+    userName: account?.label ?? USER_NAME,
     timeout: CHALLENGE_TTL_SECONDS * 1000,
     attestationType: 'none',
     // So the same device offers to replace its own passkey rather than
@@ -695,13 +896,6 @@ function parseTransports(value: string | null): AuthenticatorTransportFuture[] |
     // rather than throwing.
     return undefined
   }
-}
-
-/** `d••••••@gmail.com` — enough to recognise, not enough to harvest. */
-function maskEmail(address: string): string {
-  const [name, domain] = address.split('@')
-  if (!domain) return '•••'
-  return `${name.slice(0, 1)}${'•'.repeat(Math.max(name.length - 1, 1))}@${domain}`
 }
 
 export default auth
