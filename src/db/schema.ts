@@ -377,6 +377,11 @@ export const authSessions = sqliteTable('auth_sessions', {
    * from when it signed in. Null until it does; see `elevationState`.
    */
   elevatedAt: text('elevated_at'),
+  /**
+   * 'admin', or null for artist mode. See migration 0023 — a mode rather than
+   * a second account, and the tenant is resolved from it.
+   */
+  mode: text('mode'),
 })
 
 export const authEnrolmentCodes = sqliteTable('auth_enrolment_codes', {

@@ -380,14 +380,61 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json()
 }
 
+/** Which surface this session is on. See docs/multi-tenant-plan.md. */
+export type SessionMode = 'artist' | 'admin'
+
 /** Who is signed in, and what the login screen may offer. */
 export interface SessionState {
   authenticated: boolean
   label: string | null
+  /**
+   * 'owner' decides whether the mode switch is offered at all. Null when
+   * signed out. Not a grant — every admin route checks it again, because a
+   * hidden button is still a URL.
+   */
+  role: 'owner' | 'artist' | null
+  /** Which surface the app should render. Artist unless the session says so. */
+  mode: SessionMode
   /** Whether any passkey exists yet. False means set-up, not sign-in. */
   enrolled: boolean
   /** Whether an emailed setup code can be sent at all. */
   recoveryAvailable: boolean
+}
+
+/** One artist, as the oversight surface sees them: a name, a date, numbers. */
+export interface AdminArtist {
+  id: string
+  displayName: string | null
+  since: string
+  accounts: number
+  owner: boolean
+  usage: {
+    day: string
+    domainRows: number
+    gigRows: number
+    promoRows: number
+    agentRuns: number
+  } | null
+}
+
+export interface AdminArtists {
+  items: AdminArtist[]
+  /** Which usage fields have a writer. The rest are gaps, not zeroes. */
+  measured: string[]
+}
+
+/** What removing an artist would destroy: a size per table, never content. */
+export interface RemovalPreview {
+  tenantId: string
+  rows: Array<{ table: string; count: number }>
+  total: number
+  users: number
+}
+
+export interface RemovalResult {
+  tenantId: string
+  rowsDeleted: number
+  usersDeleted: number
 }
 
 export interface PasskeySummary {
@@ -463,6 +510,18 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    /**
+     * Move this session between the artist and oversight surfaces.
+     *
+     * Entering admin mode answers 403 with `needsElevation` until the passkey
+     * is touched, so callers wrap it in `withConfirmation` like any other
+     * action that changes who can get in.
+     */
+    setMode: (mode: SessionMode) =>
+      apiFetch<{ mode: SessionMode }>('/auth/mode', {
+        method: 'POST',
+        body: JSON.stringify({ mode }),
+      }),
     passkeys: () => apiFetch<{ items: PasskeySummary[] }>('/auth/passkeys'),
     revoke: (id: string) =>
       apiFetch<{ ok: boolean; remaining: number }>(`/auth/passkeys/${encodeURIComponent(id)}`, {
@@ -484,6 +543,29 @@ export const api = {
       }),
     disconnect: () => apiFetch<{ ok: boolean }>('/gmail/disconnect', { method: 'POST' }),
     connectHref: '/api/gmail/connect',
+  },
+  /**
+   * The oversight surface.
+   *
+   * Every call here 403s unless the session is in admin mode, and every call
+   * *outside* here 403s while it is — the two surfaces are separate rather
+   * than nested, so the app renders one or the other and never both.
+   */
+  admin: {
+    artists: () => apiFetch<AdminArtists>('/admin/artists'),
+    removalPreview: (id: string) =>
+      apiFetch<RemovalPreview>(`/admin/artists/${encodeURIComponent(id)}/removal`),
+    remove: (id: string) =>
+      apiFetch<RemovalResult>(`/admin/artists/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  },
+  /** What to call this artist. One field, set by them, read by oversight. */
+  profile: {
+    read: () => apiFetch<{ displayName: string | null }>('/profile'),
+    save: (displayName: string | null) =>
+      apiFetch<{ displayName: string | null }>('/profile', {
+        method: 'PATCH',
+        body: JSON.stringify({ displayName }),
+      }),
   },
   overview: () => apiFetch<Overview>('/overview'),
   review: (params?: { filter?: ReviewFilter; limit?: number }) => {

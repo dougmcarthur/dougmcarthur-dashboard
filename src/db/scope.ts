@@ -31,6 +31,22 @@
 
 import { and, eq, type SQL } from 'drizzle-orm'
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
+import {
+  applicationFields,
+  artistAssets,
+  digestReports,
+  gigCorrespondents,
+  gigOpportunities,
+  gigReplies,
+  googleGrants,
+  notificationEvents,
+  notificationMarks,
+  promoDrafts,
+  referenceDocs,
+  reminders,
+  syncTargets,
+  taskRuns,
+} from './schema'
 
 declare const TENANT_BRAND: unique symbol
 
@@ -113,3 +129,32 @@ export const SCOPED_TABLES = [
 ] as const
 
 export type ScopedTableName = (typeof SCOPED_TABLES)[number]
+
+/**
+ * The same fourteen as table objects, for the two jobs that have to visit all
+ * of them rather than name one: counting a tenant's rows, and deleting them.
+ *
+ * A second list is a second place to forget a table, so
+ * `test/tenantScope.test.ts` checks the two against each other. Keeping both is
+ * still better than the alternatives — a name is what the source-level guard
+ * can match, and an object is what a query can use.
+ */
+export const DOMAIN_TABLES = [
+  gigOpportunities,
+  syncTargets,
+  promoDrafts,
+  referenceDocs,
+  artistAssets,
+  applicationFields,
+  gigReplies,
+  gigCorrespondents,
+  taskRuns,
+  reminders,
+  digestReports,
+  notificationMarks,
+  notificationEvents,
+  googleGrants,
+] as const
+
+/** One of the fourteen, as a table a query can name. */
+export type DomainTable = (typeof DOMAIN_TABLES)[number]

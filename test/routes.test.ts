@@ -394,6 +394,21 @@ describe('API authentication', () => {
     expect(res.status).toBe(401)
   })
 
+  /**
+   * The oversight surface is not a bigger version of the artist one.
+   *
+   * A research agent has no account and no mode, so it is refused outright
+   * rather than told to switch to something it cannot have. The other
+   * direction — an admin-mode session refused an artist route — needs a real
+   * session and therefore a real database, so it is asserted at the source
+   * level in test/adminMode.test.ts instead of faked here.
+   */
+  it('refuses the oversight surface to an agent token', async () => {
+    const res = await request('/api/admin/artists', {}, env)
+    expect(res.status).toBe(403)
+    expect((await res.json() as { error: string }).error).toContain('agent token')
+  })
+
   // Without the secret set there is no bearer path at all, so an empty
   // deployment cannot be opened by guessing the empty string.
   it('accepts no bearer token when API_TOKEN is unset', async () => {

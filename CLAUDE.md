@@ -288,6 +288,48 @@ secrets were rotated. It goes when `.github/workflows/agents.yml` holds a row
 instead. **There is no Settings UI for these yet**; the screen is step 3's
 work and the routes are usable without one.
 
+**Admin mode is a different surface, not a bigger one.** The owner has two
+jobs and one account; `auth_sessions.mode` (migration 0023) says which surface
+a session is on. In artist mode it resolves to the owner's own tenant; in
+admin mode it resolves to **no tenant** — and that is a type rather than a
+null. `AppEnv` carries an `actor` and `AdminEnv` carries an `admin`, the two
+do not overlap, and `AdminActor` has no tenant field at all, so an oversight
+route reaching for `gig_opportunities` has nothing to hand `scoped()` and does
+not compile. `src/index.ts` is the only place that sets either.
+
+**Both refusals matter.** An artist-mode session is refused `/api/admin/*`,
+and an admin-mode session is refused everything else. Drop the second and
+admin mode becomes an artist session with extra pages, with the promise made
+to an invited artist resting on the owner not clicking a link. Each refusal
+names the mode the request would need (`needsMode`), so the client can offer
+the switch instead of an error — and the app renders one surface or the other,
+because a page of 403s is the design working and looking broken.
+
+Entering costs a passkey touch, which is the one thing a separate owner
+account would have bought that a mode does not: credential separation. Leaving
+costs nothing, because giving up privilege is not a privileged act. There is
+no impersonation and no "act as this artist", deliberately — a support tool
+that quietly breaks the promise is worse than no support tool, and
+`test/adminMode.test.ts` fails if the oversight screen so much as carries the
+vocabulary, or links to a route that surface cannot reach.
+
+**Oversight reads three tables and writes one thing.** `tenants`, `users` and
+the `usage_daily` rollup — the counts are written by the cron running *as the
+tenant*, which emits a number, and the owner reads the number. The one write
+that crosses the line is removing an artist: a tenant-scoped delete across the
+fourteen, previewed first as a **count per table**, which names no column and
+returns no row. The owner's own tenant is refused, because deleting it takes
+the account holding the surface with it. `test/adminMode.test.ts` fails if the
+admin router names one of the fourteen, or uses `asTenantId` more than the
+once that removal needs.
+
+**Three of the rollup's seven counters have no writer, and the API says so.**
+`domain_rows`, `gig_rows`, `promo_rows` and `agent_runs` are measured;
+`api_requests`, `gmail_drafts` and `ai_calls` are not. `MEASURED_FIELDS` names
+which, rather than shipping three zeroes a screen would render as "none". A
+request counter is a write per request, which is the shape this app keeps
+declining to build, so it needs somewhere outside D1 before it can be honest.
+
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a
 passkey ceremony — WebAuthn has no non-interactive mode. `API_TOKEN` as a

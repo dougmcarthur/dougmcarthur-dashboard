@@ -4,10 +4,15 @@ This is the plan for turning a one-person app into a platform with a small
 number of invited artists on it, and an owner who can see that they are there
 without being able to read what they are doing.
 
-Nothing here is built yet. It is written first because the order matters: the
+It was written before any of it was built, because the order matters: the
 oversight screens and the invite UI are the *visible* part and the smallest
 part, and neither can exist before the thing they are about — an account that
 owns rows — exists underneath them.
+
+**Steps 1 to 3 are done** (migrations 0021–0023). Invites are not, and the
+`NOT NULL` pass at the end is not. Each step's section below carries a note on
+what it actually did and where the plan turned out to be wrong, which is worth
+more than a plan that reads as though it was right.
 
 ## Why not a library
 
@@ -105,6 +110,59 @@ Admin mode is the second consumer of the same mechanism, not a new one. The
 general rule it establishes: **an action that changes who can get in, or that
 destroys data across a boundary, asks for the key again** — and nothing else
 does, because a prompt you see constantly is one you stop reading.
+
+### What step 3 actually did, and where the guarantee ended up living
+
+**Done.** `auth_sessions.mode` (migration 0023) is the whole of the mode;
+`POST /api/auth/mode` moves a session between surfaces; `/api/admin/*` is the
+oversight surface; `src/lib/usage.ts` writes the daily rollup on the
+housekeeping tick; and the React app renders one surface or the other rather
+than nesting them.
+
+**The guarantee is a type, and that was not the original plan.** The plan said
+admin mode resolves to null and a domain read would "fail to compile", which
+implied a nullable tenant somewhere. A nullable tenant only refuses at the call
+sites somebody remembered to null-check. What shipped instead is two context
+types that do not overlap: a tenant-scoped router is `AppEnv` and can only
+reach an `actor`, the oversight router is `AdminEnv` and can only reach an
+`admin` — and `AdminActor` has **no tenant field at all**, so `scoped()` has
+nothing to be handed. `src/index.ts` is the one place that sets either, being
+the one place that decides which surface a request is on.
+
+**Both refusals matter, not just the obvious one.** An artist-mode session is
+refused `/api/admin/*`, and an admin-mode session is refused everything else.
+Without the second, admin mode would be an artist session with extra pages and
+the promise would rest on the owner not clicking a link. Each refusal names the
+mode the request would need, so the client can offer the switch rather than an
+error — and the app renders the admin screen alone, because a page of 403s is
+the design working and looking broken.
+
+**Two source-level guards, in `test/adminMode.test.ts`.** The oversight router
+must name none of the fourteen, and may use `asTenantId` exactly once — for the
+removal, which is the one operation that crosses the line. The oversight screen
+must link to no artist route and must not carry the vocabulary of
+impersonation, because offering the words is how the feature gets built by
+accident.
+
+**The removal previews.** A count per table, which names no column and returns
+no row: the size of the thing, not any of its content. Every other bulk write
+in this app previews first, and it matters most on the one that cannot be
+undone. The owner's own tenant is refused — deleting it would take the account
+holding the surface with it.
+
+**Three of the rollup's seven counters have no writer.** `domain_rows`,
+`gig_rows`, `promo_rows` and `agent_runs` are measured; `api_requests`,
+`gmail_drafts` and `ai_calls` are not, and the API says which is which rather
+than shipping three zeroes a screen would render as "none". A request counter
+in particular is the thing this plan already declined to build — it is a write
+per request — so it needs somewhere outside D1 to live before it can be honest.
+
+**One thing was added that the plan did not ask for**, because the screen made
+it obvious: `tenants.display_name` had no writer, so the oversight surface's
+identifying column was blank forever. `PATCH /api/profile` lets an artist name
+their own account. Deliberately not an owner-side rename — an owner who could
+rename an artist would be editing a row in an account they are otherwise not
+allowed to read, for no reason better than convenience.
 
 ### What oversight reads, and the one thing it writes
 
@@ -421,7 +479,10 @@ rule that took `gig-festival-scan` off the screen.
    Outstanding from this step: per-artist digest and mailbox configuration,
    and retiring `API_TOKEN` once the agents hold rows.
 3. Admin mode, reusing the elevation already built, then the `/admin` routes
-   and screen.
+   and screen. **Done — migration 0023 plus the oversight deploy.** The
+   guarantee turned out to be a type rather than a rule; see below. Outstanding
+   from this step: three of `usage_daily`'s seven counters have no writer, and
+   the invite list on the screen waits on step 4.
 4. Invite issue / redeem, with the redemption event.
 5. `tenant_id` to `NOT NULL` on the fourteen domain tables — and on `users`
    too, since every account owns a tenant now, including the owner's.

@@ -42,6 +42,25 @@ export interface AgentActor {
   tokenId: string | null
 }
 
+/**
+ * The owner, on the oversight surface.
+ *
+ * Note what is missing: there is no `tenant` on this type at all. That is the
+ * whole mechanism behind "admin mode resolves to null, not to a wildcard" —
+ * `scoped()` takes a `TenantId`, an admin route is handed one of these, and
+ * there is nothing to pass. An admin route that reached for
+ * `gig_opportunities` does not return a stranger's rows; it fails to compile.
+ *
+ * It is deliberately not `UserActor` with a nullable tenant, because that
+ * shape only refuses at the call sites somebody remembered to null-check.
+ */
+export interface AdminActor {
+  kind: 'admin'
+  userId: string
+  session: ActiveSession
+}
+
+/** What a tenant-scoped route sees. Admin mode is not in this union. */
 export type Actor = UserActor | AgentActor
 
 /**
@@ -53,14 +72,52 @@ export type Actor = UserActor | AgentActor
  * rows these are" has to be *no rows*, never *all rows*. A 401 is a bad
  * afternoon; the alternative is a leak.
  */
-export async function actorForSession(env: Env, session: ActiveSession): Promise<UserActor | null> {
+export interface Account {
+  userId: string
+  role: Role
+  tenantId: string | null
+}
+
+/**
+ * The account behind a session, whichever surface it is on.
+ *
+ * Separate from `actorForSession` because two callers want different things:
+ * a route wants the surface, and the mode switch wants the *role*, which is a
+ * fact about the account rather than about the session. Asking the actor would
+ * mean asking the answer the switch is about to change.
+ */
+export async function accountForSession(env: Env, session: ActiveSession): Promise<Account | null> {
   if (!session.userId) return null
   const row = await getDb(env.DB).select().from(users).where(eq(users.id, session.userId)).get()
-  if (!row?.tenantId) return null
+  if (!row) return null
   return {
-    kind: 'user',
     userId: row.id,
     role: row.role === 'owner' ? 'owner' : 'artist',
+    tenantId: row.tenantId,
+  }
+}
+
+export async function actorForSession(
+  env: Env,
+  session: ActiveSession,
+): Promise<UserActor | AdminActor | null> {
+  const row = await accountForSession(env, session)
+  if (!row) return null
+  const { role } = row
+
+  // Admin mode is a fact about the session *and* the account. A session can
+  // only enter it as an owner, so a non-owner sitting in admin mode should not
+  // be possible — and if it somehow is, the safe reading is the artist surface,
+  // which is scoped, rather than the oversight one, which is not.
+  if (session.mode === 'admin' && role === 'owner') {
+    return { kind: 'admin', userId: row.userId, session }
+  }
+
+  if (!row.tenantId) return null
+  return {
+    kind: 'user',
+    userId: row.userId,
+    role,
     tenant: asTenantId(row.tenantId),
     session,
   }

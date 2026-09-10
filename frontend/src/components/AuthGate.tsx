@@ -47,6 +47,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
           session.data ?? {
             authenticated: false,
             label: null,
+            role: null,
+            mode: 'artist',
             enrolled: false,
             recoveryAvailable: false,
           }

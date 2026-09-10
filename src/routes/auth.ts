@@ -50,7 +50,7 @@ import type {
 } from '@simplewebauthn/server'
 import { getDb } from '../db'
 import { passkeyCredentials } from '../db/schema'
-import { actorForSession, ownerUserId } from '../lib/actor'
+import { accountForSession, actorForSession, ownerUserId } from '../lib/actor'
 import {
   base64url,
   checkEnrolmentCode,
@@ -68,6 +68,7 @@ import {
   credentialsForUser,
   readSession,
   sessionCookie,
+  setSessionMode,
   spendEnrolmentCode,
   storeChallenge,
   utf8Bytes,
@@ -127,9 +128,15 @@ function rp(c: { env: Env; req: { url: string } }) {
 auth.get('/session', async (c) => {
   const session = await readSession(c.env, c.req.header('Cookie'))
   const credentials = await listCredentials(c.env)
+  const account = session ? await accountForSession(c.env, session) : null
   return c.json({
     authenticated: Boolean(session),
     label: session?.label ?? null,
+    // The role decides whether the mode switch is offered at all, and the mode
+    // decides which surface the app renders. Both are facts the client cannot
+    // work out for itself, and neither is a grant — the routes check again.
+    role: account?.role ?? null,
+    mode: session?.mode ?? 'artist',
     enrolled: credentials.length > 0,
     // Whether the break-glass path can work at all. A deployment with no
     // email binding and no passkeys is one nobody can get into, and the
@@ -269,6 +276,52 @@ auth.post('/login/verify', zValidator('json', assertion), async (c) => {
  * matters: it does not say whether a passkey is already registered. That is
  * the fact an attacker would most like to learn from this endpoint.
  */
+/* --------------------------------------------------------------------- */
+/* Admin mode                                                             */
+/* --------------------------------------------------------------------- */
+
+/**
+ * Move this session between the two surfaces.
+ *
+ * Entering admin mode costs a passkey touch, and the reason is the one thing a
+ * separate owner account would have bought that a mode does not: credential
+ * separation. A stolen artist session cookie is one POST away from the
+ * oversight surface, where a stolen artist *account* was not. So elevating is
+ * the price of the switch, and the fifteen-minute window means a session spends
+ * almost all of its life unable to make it.
+ *
+ * Leaving costs nothing. Giving up privilege is not a privileged act, and a
+ * confirmation prompt on the way out is one more prompt to learn to click.
+ *
+ * This route sits under `/api/auth`, which the tenant middleware exempts — it
+ * has to, because it is the one endpoint that must work from *either* surface.
+ */
+auth.post('/mode', zValidator('json', z.object({ mode: z.enum(['artist', 'admin']) })), async (c) => {
+  const session = await readSession(c.env, c.req.header('Cookie'))
+  if (!session) return c.json({ error: 'not signed in' }, 401)
+
+  const { mode } = c.req.valid('json')
+  if (mode === 'artist') {
+    await setSessionMode(c.env, session.id, 'artist')
+    return c.json({ mode: 'artist' })
+  }
+
+  const account = await accountForSession(c.env, session)
+  // Not found rather than forbidden: whether this deployment has an oversight
+  // surface at all is not a fact an artist's session is entitled to confirm.
+  if (account?.role !== 'owner') return c.json({ error: 'not found' }, 404)
+
+  if (!elevationState({ now: new Date(), elevatedAt: session.elevatedAt }).elevated) {
+    return c.json(
+      { error: 'Confirm it is you before changing how you sign in.', needsElevation: true },
+      403,
+    )
+  }
+
+  await setSessionMode(c.env, session.id, 'admin')
+  return c.json({ mode: 'admin' })
+})
+
 /* --------------------------------------------------------------------- */
 /* Elevation                                                              */
 /* --------------------------------------------------------------------- */

@@ -157,6 +157,33 @@ export interface Session {
   maxAgeSeconds: number
 }
 
+/**
+ * Which surface a session is on.
+ *
+ * Null in the column means artist, so every session that predates migration
+ * 0023 — and every new one — starts where it should. `readMode` is the only
+ * reader, so an unrecognised value cannot become a third mode by accident.
+ */
+export type SessionMode = 'artist' | 'admin'
+
+export function readMode(raw: string | null | undefined): SessionMode {
+  return raw === 'admin' ? 'admin' : 'artist'
+}
+
+/**
+ * Move a session between surfaces.
+ *
+ * Whether it *may* move is decided by the caller — entering admin mode needs
+ * the owner role and a recent passkey assertion, and leaving needs neither,
+ * because giving up privilege is not a privileged act. This only writes it.
+ */
+export async function setSessionMode(env: Env, sessionId: string, mode: SessionMode): Promise<void> {
+  await getDb(env.DB)
+    .update(authSessions)
+    .set({ mode: mode === 'admin' ? 'admin' : null })
+    .where(eq(authSessions.id, sessionId))
+}
+
 export async function createSession(
   env: Env,
   input: { credentialId: string | null; label: string | null; userId: string | null; now?: Date },
@@ -189,6 +216,8 @@ export interface ActiveSession {
   expiresAt: string
   /** Last passkey touch, or null. Not the same as when it signed in. */
   elevatedAt: string | null
+  /** 'admin' or 'artist'. See src/lib/actor.ts — the tenant follows from it. */
+  mode: SessionMode
 }
 
 /**
@@ -234,6 +263,7 @@ export async function readSession(
     userId: row.userId,
     expiresAt: row.expiresAt,
     elevatedAt: row.elevatedAt,
+    mode: readMode(row.mode),
   }
 }
 
