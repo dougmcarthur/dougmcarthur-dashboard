@@ -208,6 +208,36 @@ tenant-scoped, and none of them ask. Admin mode is the next thing that will
 (`docs/multi-tenant-plan.md`); the client tries first and re-asserts only on
 refusal, so a burst of removals costs one touch, and retries exactly once.
 
+**`tenant_id` exists in the schema and nothing reads it yet.** Migration 0021
+is step 1 of `docs/multi-tenant-plan.md`: `tenants`, `users`, `invites` and
+`usage_daily`, a `tenant_id` on the fourteen domain tables, a `user_id` on the
+credential tables, and composite twins for 0018's indexes. The single-column
+indexes are kept alongside the composites until scoping ships, because a swap
+would leave today's unscoped reads with no usable index for however many
+deploys separate the two.
+
+The thing not to undo is the **default**. Every column added there defaults to
+the one tenant this database has ever had, so a write from a route not yet
+taught to pass a tenant — which is all of them, and includes the live Worker
+across the half-minute deploy gap — files correctly rather than as a NULL
+nobody scoped. **The scoping deploy drops the defaults**, and has to: past that
+point a write that did not say who it belongs to is a bug, and a default is
+precisely what would stop it looking like one.
+
+**A uniqueness constraint is an interface, and moves with the code that names
+it.** Four of the fourteen are unique on a value two artists can share —
+`gig_correspondents(kind, value)`, `google_grants(purpose)`,
+`notification_marks(dedupe_key)`, `notification_events(dedupe_key)` — and each
+must grow a leading `tenant_id`. None of that is in 0021, because live code
+names two of them in an upsert target and SQLite requires `ON CONFLICT` to
+match a unique constraint exactly: widening the key does not stale those
+statements, it errors them, under the old Worker. Keeping the narrow index as a
+prop is what would make the change pointless, since the narrow index is what
+forbids a second tenant. So they widen in the scoping deploy, next to the
+upserts. The opposite call was right for 0018's orderings — an index no
+statement names is invisible, so a twin costs nothing and buys a safe
+window.
+
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a
 passkey ceremony — WebAuthn has no non-interactive mode. `API_TOKEN` as a

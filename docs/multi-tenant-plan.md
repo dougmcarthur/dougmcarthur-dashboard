@@ -166,10 +166,73 @@ the old Worker. That forbids doing this in one step.
 4. **Make the column `NOT NULL`** in a later migration, once the code that
    fills it has been live long enough to trust.
 
-The indexes from migration 0018 all become composites with `tenant_id`
-first, in step 1 — an index that does not lead with the filtered column is one
-the planner declines to use, so leaving them alone would turn every scoped read
-into the full scan the index was added to prevent.
+The indexes from migration 0018 all gain a composite twin leading with
+`tenant_id`, in step 1 — an index that does not lead with the filtered column
+is one the planner declines to use, so leaving them alone would turn every
+scoped read into the full scan the index was added to prevent.
+
+**Twin, not replacement**, which is a correction to how this was first
+written. A swap in step 1 would leave the still-unscoped queries — which filter
+on nothing — with no usable index for however many deploys separate step 1
+from the scoping step, putting the pre-0018 full scan back for an unknown
+window in order to save six index entries per row on tables holding tens of
+rows. Migration 0021 adds the composites and keeps the singles; the scoping
+step drops the singles in the same change that makes the composites the ones
+actually used. Verified on the local
+database after 0021: the unscoped read still answers `SCAN … USING INDEX
+idx_gig_discovered`, and the scoped one answers `SEARCH … USING INDEX
+idx_gig_tenant_discovered (tenant_id=?)`.
+
+### The default is what makes step 1 safe
+
+The `tenant_id` columns migration 0021 adds are nullable, as staged above, and
+they also carry a **default: the one tenant this database has ever had**. That
+is what makes the column additive rather than merely tolerated. A write from
+the old Worker — which names no such column — lands in the right place instead
+of as a NULL nobody scoped, so every route not yet taught to pass a tenant
+keeps filing correctly, and SQLite backfills the existing rows as it adds the
+column rather than needing a separate `UPDATE` that could half-apply.
+
+That default is also the thing to remove, and the scoping step removes it. Past
+the point where scoping ships, a write that did not say who it belongs to is a
+bug, and a default is precisely what would stop it looking like one — the "a
+gig lands in the wrong tenant and nothing breaks visibly" failure this plan
+already warns about, wearing a different hat.
+
+The four auth tables get the same treatment for `user_id`, defaulting to the
+bootstrap owner — except `auth_challenges`, which is one round trip long and
+belongs to a ceremony rather than to a person.
+
+### Four uniqueness constraints move with the code that names them
+
+Four of the fourteen are unique on a value that is not distinctive between
+artists: `gig_correspondents` on `(kind, value)`, and two artists can
+correspond with the same festival address; `google_grants` on `purpose`, and
+both can hold a `gmail.compose` grant; `notification_marks` on `dedupe_key`,
+and both can raise the identical condition; `notification_events` on the same
+kind of key. Each has to grow a leading `tenant_id`, and two of them need the
+table rebuilt to do it, since SQLite cannot alter a primary key in place.
+
+The first draft of 0021 did all of that in step 1. It was wrong, and the reason
+generalises past this migration: **a uniqueness constraint is part of an
+interface, not just a storage detail.** Live code names two of these in an
+upsert target — `onConflictDoUpdate({ target: notificationMarks.dedupeKey })`
+and `target: googleGrants.purpose` — and SQLite requires an `ON CONFLICT`
+target to match a unique constraint exactly. Widening the key does not make
+those statements return something stale; it makes them *error*, under the old
+Worker, for the whole gap and for as long as a rollback leaves it running.
+
+The obvious prop is to keep the narrow unique index alongside the wider key.
+That works, and it is also what makes the change pointless: the narrow index is
+exactly what forbids a second tenant. So the constraint and the upsert that
+names it move together, in the scoping deploy. Step 1 adds only the column they
+will be widened onto.
+
+That is a different judgement from the one made about 0018's indexes two
+sections up, and the difference is the point: an ordering index is invisible to
+every statement, so a twin costs nothing and buys a safe window. A uniqueness
+constraint is visible to the statements that name it, so a twin buys nothing
+and hides the change it was supposed to stage.
 
 ### Where scoping actually lives
 
@@ -278,10 +341,14 @@ rule that took `gig-festival-scan` off the screen.
 
 ## Order of work
 
-1. `users`, `tenants`, `invites`, `usage_daily`; `tenant_id` added nullable and
-   backfilled; 0018's indexes rebuilt as composites.
+1. `users`, `tenants`, `invites`, `usage_daily`; `tenant_id` added nullable,
+   defaulted and thereby backfilled; `user_id` on the credential tables;
+   composite twins for 0018's indexes. **Done — migration 0021.** No code
+   reads any of it yet.
 2. Session resolves a tenant; domain reads and writes take it as an argument;
-   agent tokens become per-tenant.
+   agent tokens become per-tenant. The scoping migration that ships with it
+   drops the defaults and the single-column index twins, and widens the four
+   uniqueness constraints alongside the upserts that name them.
 3. Admin mode, reusing the elevation already built, then the `/admin` routes
    and screen.
 4. Invite issue / redeem, with the redemption event.
