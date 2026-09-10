@@ -25,11 +25,29 @@
 -- statements *error* under the old Worker rather than merely return something
 -- stale.
 --
--- What makes it safe now is that the statements no longer name a constraint at
--- all. `storeGrant` in `src/lib/googleGrant.ts` is a delete-then-insert, and
--- the two mark writers in `src/routes/notifications.ts` are an update followed
--- by an insert that conflicts to nothing. Both shapes work against the schema
--- on either side of this file, which is what the deploy gap requires.
+-- What makes it safe for the *new* code is that the statements no longer name a
+-- constraint at all. `storeGrant` in `src/lib/googleGrant.ts` is a
+-- delete-then-insert, and the two mark writers in `src/routes/notifications.ts`
+-- are an update followed by an insert that conflicts to nothing.
+--
+-- **That is not the whole question, and the first version of this file got it
+-- wrong.** The Worker running while these statements execute is the one already
+-- deployed, and this repository ships in branches: at the time of writing, the
+-- deployed Worker is from migration 0009 — everything since is unmerged and
+-- lands in a single CI run. So the code in the gap is not "the previous step",
+-- it is code that predates tenants entirely, and it names
+-- `notificationMarks.dedupeKey` as an `ON CONFLICT` target in two routes.
+--
+-- `notification_marks` is the one table where that matters, because it is the
+-- only one of the four that exists in the deployed database at all —
+-- `gig_correspondents` (0012), `google_grants` (0019) and every dedupe change
+-- to `notification_events` (whose writer has always been an untargeted
+-- `onConflictDoNothing`) are either not there yet or not named. So the narrow
+-- unique index is **kept** below, purely so the old target still resolves, and
+-- migration 0024 drops it. It forbids a second tenant, which is exactly why it
+-- cannot outlive this release — and cannot bite during it, since the thing that
+-- creates a second tenant is an invitation nobody can redeem until the deploy
+-- lands.
 
 -- `gig_correspondents`: two artists can correspond with the same festival
 -- address, and today that is one row that would move between them.
@@ -86,6 +104,13 @@ INSERT INTO notification_marks_new
   FROM notification_marks;
 DROP TABLE notification_marks;
 ALTER TABLE notification_marks_new RENAME TO notification_marks;
+
+-- The prop, and the only reason it exists: the currently-deployed Worker names
+-- this exact constraint in an `ON CONFLICT` target, and would error against the
+-- composite key above for the minute between this migration and the deploy.
+-- Dropped in 0024, in the same release, before any second tenant can exist.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_marks_dedupe
+  ON notification_marks(dedupe_key);
 
 ------------------------------------------------------------------------------
 -- 0018's single-column indexes, retired

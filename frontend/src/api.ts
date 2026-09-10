@@ -437,6 +437,12 @@ export interface RemovalResult {
   usersDeleted: number
 }
 
+/** Whether every row on the platform belongs to somebody. */
+export interface TenantHealth {
+  tables: Array<{ table: string; unscoped: number }>
+  unscoped: number
+}
+
 /** An invitation, as the oversight surface sees it. Never the token. */
 export interface InviteSummary {
   id: string
@@ -614,6 +620,8 @@ export const api = {
       apiFetch<RemovalPreview>(`/admin/artists/${encodeURIComponent(id)}/removal`),
     remove: (id: string) =>
       apiFetch<RemovalResult>(`/admin/artists/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    /** Rows with no owner, per table. Should be zero, and is worth checking. */
+    health: () => apiFetch<TenantHealth>('/admin/health'),
     invites: () => apiFetch<InviteList>('/admin/invites'),
     invite: (body: { email: string; displayName?: string }) =>
       apiFetch<IssuedInvite>('/admin/invites', { method: 'POST', body: JSON.stringify(body) }),

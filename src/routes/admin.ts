@@ -33,6 +33,7 @@ import { adminOf, type AdminEnv } from '../context'
 import { elevationState } from '../../shared/auth'
 import { previewRemoval, removeTenant } from '../lib/tenantRemoval'
 import { issueInvite, listInvites, revokeInvite } from '../lib/invites'
+import { readTenantHealth } from '../lib/tenantHealth'
 import { MEASURED_FIELDS } from '../lib/usage'
 
 const admin = new Hono<AdminEnv>()
@@ -146,6 +147,17 @@ admin.delete('/artists/:id', async (c) => {
 
   return c.json(await removeTenant(c.env, target))
 })
+
+/**
+ * Whether every row on the platform belongs to somebody.
+ *
+ * A count per domain table of rows with no tenant, which should be zero and is
+ * worth looking at rather than assuming — it is one of the three preconditions
+ * migration 0024 names before the `NOT NULL` pass on those tables can be
+ * finished. A count names no column and returns no row, which is the same
+ * standing the removal preview has on this surface.
+ */
+admin.get('/health', async (c) => c.json(await readTenantHealth(c.env)))
 
 /* --------------------------------------------------------------------- */
 /* Invitations                                                            */

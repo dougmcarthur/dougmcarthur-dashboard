@@ -10,10 +10,13 @@ part, and neither can exist before the thing they are about — an account that
 owns rows — exists underneath them.
 
 **Steps 1 to 4 are done** (migrations 0021–0023; invites needed none, because
-their table arrived with 0021). What is left is the `NOT NULL` pass at the end,
-and two things gated on mail — see the invites section. Each step's section
-below carries a note on what it actually did and where the plan turned out to
-be wrong, which is worth more than a plan that reads as though it was right.
+their table arrived with 0021), and step 5 is half done (0024). What is left is
+the `NOT NULL` pass on the fourteen domain tables, which is deferred with three
+stated conditions, and two things gated on mail. Each step's section below
+carries a note on what it actually did and where the plan turned out to be
+wrong, which is worth more than a plan that reads as though it was right — and
+step 5's note is the one to read first, because what it found applies to every
+migration in this release.
 
 ## Why not a library
 
@@ -534,6 +537,60 @@ rule that took `gig-festival-scan` off the screen.
    `sundogsmusic.ca` to Email Service.
 5. `tenant_id` to `NOT NULL` on the fourteen domain tables — and on `users`
    too, since every account owns a tenant now, including the owner's.
+   **Half done — migration 0024.** `users` is `NOT NULL`. The fourteen are
+   not, for reasons the migration spells out and this plan got wrong; see
+   below.
+
+### What step 5 found, and why it stopped halfway
+
+The plan's last step assumed each step reached production before the next was
+written. **It did not.** The deployed Worker is from migration 0009 —
+passkeys, the research agents in CI, Gmail drafting, tenants, the oversight
+surface and invitations are all unmerged, and they land in one CI run. That is
+one fact, and it changes three things.
+
+**It found a real bug in 0022.** That migration widens
+`notification_marks`'s primary key from `dedupe_key` to
+`(tenant_id, dedupe_key)`, and its own comment argued this was safe because the
+*new* code names no constraint. True, and beside the point: the code running
+during the migrate-then-deploy gap is the deployed one, which names
+`notificationMarks.dedupeKey` as an `ON CONFLICT` target in two routes, and
+`notification_marks` is the one of the four tables that already exists in
+production. So 0022 now keeps a narrow unique index on `dedupe_key` purely so
+that target still resolves, and 0024 drops it — inside the same release, before
+an invitation can be redeemed, which is the only thing that creates a second
+tenant. The step-2 note above argued against exactly this prop; it was right on
+the facts it had and wrong on the ones it did not.
+
+**`users` is `NOT NULL` and the fourteen are not.** `users` is created by 0021
+in this same release, so nothing outside this repository has ever written to it
+and its shape here is its shape everywhere. The fourteen are older than the
+ledger: production was built from `schema.sql` by hand, and 0006–0008 were
+hand-applied and back-filled. SQLite has no `ALTER COLUMN`, so `NOT NULL`
+means fourteen table rebuilds, and a rebuild transcribes a column list — one
+that can only come from the *local* database. A column that exists in
+production and not locally would be dropped by a statement that succeeds. That
+is not a trade worth making for the benefit, which is small: every one of those
+columns has a default, so a write cannot produce a NULL unless it passes one
+explicitly, which `withTenant` cannot and `test/tenantScope.test.ts` catches.
+
+**The precondition was never met anyway.** "Once the code that fills it has
+been live long enough to trust" cannot be true of code that has not been live
+at all. Doing the hardening pass in the same release as the thing it hardens is
+doing it for the wrong reason.
+
+So 0024 names three conditions — the release deployed and running, production's
+schema compared against what the migrations produce, and no row carrying a NULL
+tenant — and makes the third one *observable* rather than assumed:
+`GET /api/admin/health` counts rows with no owner, per table, and the oversight
+screen says so in a line. A claim nobody looks at is a claim, not a check.
+
+**One thing the change exposed about the guard.** `test/tenantScope.test.ts`
+matches a table by its export name, so it cannot see `.from(table)` where the
+table came from iterating `DOMAIN_TABLES` — which is how the three jobs that
+must visit all fourteen are written. The gap is now a named list: a fourth file
+reaching for `DOMAIN_TABLES` fails the suite until somebody writes down why it
+may. A guard with an invisible gap is worse than one with a stated gap.
 
 Steps 1 and 2 are the whole risk. Steps 3 and 4 are the part that was asked
 for, and they are small — which is the thing worth knowing before starting,

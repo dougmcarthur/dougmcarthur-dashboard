@@ -266,10 +266,29 @@ autoincrement and two artists cannot collide on one. 0022 also drops 0018's
 single-column indexes, whose window closed when the reads started leading with
 `tenant_id`.
 
-The `tenant_id` **defaults** from 0021 are still there and stay until the
-column goes `NOT NULL`. Dropping them in 0022 would leave the pre-scoping
-Worker writing NULLs across the migrate-then-deploy gap, and the default is
-only wrong once a second tenant exists.
+**The Worker in the migrate-then-deploy gap is the *deployed* one, which is
+much older than the previous step.** This repository ships in branches, and at
+the time of writing the deployed Worker is from migration 0009 — passkeys,
+agents in CI, Gmail drafting, tenants, oversight and invitations are all
+unmerged and land in one CI run. So "additive" is measured against production,
+not against the commit before. That is what makes 0022 keep a narrow unique
+index on `notification_marks(dedupe_key)`: the deployed Worker names it in an
+`ON CONFLICT` target, and `notification_marks` is the only one of the four
+widened tables that exists in production at all. Migration 0024 drops the prop,
+in the same release, before an invitation can create a second tenant.
+
+The `tenant_id` **defaults** from 0021 are still there, and so is the nullable
+column on the fourteen — migration 0024 makes only `users.tenant_id`
+`NOT NULL`, and says why at length. Three reasons, shortest first: with the
+defaults in place a write cannot produce a NULL anyway, so the constraint
+guards a state `withTenant` and `test/tenantScope.test.ts` already make
+unreachable; the plan's precondition ("live long enough to trust") cannot hold
+for code that has not been live; and SQLite has no `ALTER COLUMN`, so it means
+fourteen table rebuilds transcribing a column list that can only come from the
+*local* schema — while production predates the ledger and was partly
+hand-applied. A production-only column would be dropped by a statement that
+succeeds. `GET /api/admin/health` counts rows with no owner so the precondition
+is something to look at rather than assume.
 
 **The agents' token now belongs to somebody, and the old one still works.**
 `API_TOKEN` is a Worker secret with no tenant attached — correct with one

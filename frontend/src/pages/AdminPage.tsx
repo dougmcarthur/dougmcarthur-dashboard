@@ -23,6 +23,7 @@ import { relativeTime, shortDate } from '../format'
  */
 export function AdminPage() {
   const artists = useQuery({ queryKey: ['admin', 'artists'], queryFn: api.admin.artists })
+  const health = useQuery({ queryKey: ['admin', 'health'], queryFn: api.admin.health })
 
   if (artists.isLoading) {
     return <div className="h-40 bg-sunken rounded-xl animate-pulse" />
@@ -62,6 +63,20 @@ export function AdminPage() {
         Storage figures are sampled once a day by the overnight job, so a brand-new account
         shows nothing until tomorrow.
       </p>
+
+      {/* Should always read "every row has an owner". It is here because the
+          schema does not yet enforce it — see migration 0024 — and a claim
+          nobody looks at is a claim, not a check. */}
+      {health.data && (
+        <p className={`text-xs ${health.data.unscoped > 0 ? 'text-danger-fg' : 'text-faint'}`}>
+          {health.data.unscoped === 0
+            ? `Every row belongs to somebody, across ${health.data.tables.length} tables.`
+            : `${health.data.unscoped.toLocaleString()} rows have no owner: ${health.data.tables
+                .filter((t) => t.unscoped > 0)
+                .map((t) => `${tableLabel(t.table)} (${t.unscoped})`)
+                .join(', ')}.`}
+        </p>
+      )}
 
       <hr className="border-line" />
 

@@ -173,6 +173,51 @@ describe('tenant scoping', () => {
     }
   })
 
+  /**
+   * The blind spot, named and bounded.
+   *
+   * The rule above matches `.from(gigOpportunities)` — a table by its export
+   * name. It cannot see `.from(table)` where `table` came from iterating
+   * `DOMAIN_TABLES`, which is how the three jobs that must visit all fourteen
+   * are written. Those are safe for their own reasons, but not because of the
+   * check above, and a guard with an invisible gap is worse than one with a
+   * named gap.
+   *
+   * So the gap is a list. A fourth file reaching for `DOMAIN_TABLES` fails here
+   * until somebody writes down why it is allowed to.
+   */
+  it('names every file that reaches a domain table through the list', () => {
+    const ALLOWED: Record<string, string> = {
+      'db/scope.ts':
+        'Declares the list, beside the names the rule above matches. The two are ' +
+        'checked against each other below, so neither can quietly stop covering a ' +
+        'table the other has.',
+      'lib/usage.ts':
+        'Counts a tenant\'s rows for the daily rollup. Runs as the tenant and goes ' +
+        'through `scoped` on every count; it emits a number and never a row.',
+      'lib/tenantRemoval.ts':
+        'Counts and then deletes one tenant\'s rows. Scoped on every statement, and ' +
+        'the tenant is an argument the caller checked against `tenants` first.',
+      'lib/tenantHealth.ts':
+        'Deliberately unscoped, and that is the job: it counts rows with **no** ' +
+        'tenant, which a scoped query cannot find. A count, naming no column and ' +
+        'returning no row — one of the preconditions migration 0024 names before ' +
+        'the NOT NULL pass on the fourteen can be finished.',
+    }
+
+    const reaching = files
+      .map((path) => path.slice(SRC.length + 1))
+      .filter((rel) => stripComments(readFileSync(join(SRC, rel), 'utf8')).includes('DOMAIN_TABLES'))
+      .sort()
+
+    expect(reaching, 'a file reaches the fourteen through DOMAIN_TABLES without a written reason')
+      .toEqual(Object.keys(ALLOWED).sort())
+
+    for (const [file, why] of Object.entries(ALLOWED)) {
+      expect(why.length, file).toBeGreaterThan(40)
+    }
+  })
+
   it('lists exactly the tables that carry a tenant column', () => {
     // `SCOPED_TABLES` and the schema have to agree, or a table added with a
     // `tenant_id` is one the guard above silently ignores.
