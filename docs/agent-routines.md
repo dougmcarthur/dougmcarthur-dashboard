@@ -54,6 +54,15 @@ reads festival pages written by strangers.
 3. **`cli.ts` is named operations, not a general client.** It is the easy path,
    so the session takes it; the Worker is what holds if it does not.
 
+   That is not hypothetical. On the first routine run every request came back
+   401, because Node's `fetch` ignores `HTTPS_PROXY` and so never went through
+   the proxy that adds the credential. The session diagnosed it — correctly —
+   by calling Scout with its own `node -e "fetch(...)"`, which `routine.md`
+   says never to do. A model that is stuck steps outside a "never"; the
+   Worker's route list is why that cost nothing. `cli.ts` now re-runs itself
+   under `--use-env-proxy` when a proxy is configured, so no session has to go
+   looking.
+
 ## What is weaker than in CI, said plainly
 
 - **The heartbeat is the agent's job.** `run.ts` posts it in a `finally` that a
