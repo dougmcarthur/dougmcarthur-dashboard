@@ -452,40 +452,66 @@ actually carry the decision. Retention is likewise already handled where it
 churns — `notification_events` and `notification_marks` both prune at 30 days,
 and no other table grows fast enough to have a policy worth writing.
 
-**The research agents run in CI, and their instructions are files.** They were
-scheduled Claude sessions on one laptop until August 2026. Now
-`.github/workflows/agents.yml` holds the three schedules, `agent-run.yml` is
-the reusable mechanics, and `scripts/agents/run.ts` drives a tool-runner loop
-with server-side web search. The prompts are `scripts/agents/prompts/*.md` —
-in the repository on purpose: a change to how an agent behaves arrives as a
-diff somebody can read, and an agent that disappears leaves a hole in
-`git log` rather than in a UI nobody opens.
+**The research agents run as Claude Code routines, and their instructions are
+files.** They were scheduled Claude sessions on one laptop until August 2026,
+then GitHub Actions driving them through the Claude API — which worked, and
+whose first two runs spent $20 of API credit and filed nothing. Server-side
+web search puts every result into the same request and the model re-reads the
+growing context before each next search, so a sweep compounds; that is
+structural, not a bad week. The schedules are routines now: cloud sessions on
+the artist's Claude plan, with no machine that has to stay awake.
+`.github/workflows/agents.yml` is a hand-triggered, paid fallback. See
+`docs/agent-routines.md`.
 
-Four things about it that are not obvious:
+The prompts are `scripts/agents/prompts/*.md` — in the repository on purpose:
+a change to how an agent behaves arrives as a diff somebody can read, and an
+agent that disappears leaves a hole in `git log` rather than in a UI nobody
+opens. A routine's saved prompt only names an agent and points at
+`scripts/agents/routine.md`, for the same reason.
 
-- **The tool runner does not auto-resume `pause_turn`, and web search is what
-  triggers one.** Left alone, a long sweep stops mid-way and returns as if it
-  had finished — no error, no warning, a silently truncated answer that would
-  look like a quiet week. `run.ts` iterates the runner and pushes the paused
-  turn back; a run that still ends paused is recorded `incomplete`, never `ok`.
-- **The heartbeat is posted by the script, in a `finally`, not offered to the
-  agent as a tool.** An agent that crashed or forgot would leave no row, which
-  is exactly the invisibility that let three schedules die unnoticed. This is
-  what arms `shared/taskCadence.ts`, so it has to be something the agent
-  cannot skip. Verified: a run that dies on a bad API key still files a
-  `failed` row carrying the error.
-- **The agents get named, typed tools and never a general HTTP tool.** They
-  read a lot of festival pages, and a festival page is untrusted text written
-  by somebody else. `create_gig_opportunity` is one prompt injection away from
-  being safe; `http_request` would be one away from `DELETE /api/gigs/12`.
+Things about it that are not obvious:
+
+- **A routine has a shell, so the Worker decides what an agent may do.** In CI
+  the model held named tools and the script made every request. A routine is
+  a full Claude Code session reading festival pages written by strangers. Its
+  token is an API credential on the cloud environment, added by Anthropic's
+  proxy after a request leaves the VM, so the session cannot leak it — but the
+  proxy attaches it to *any* request for the host, so hiding it does not stop
+  `curl -X DELETE`. `shared/agentRoutes.ts` limits an issued token to seven
+  routes: three reads, three creates and the run log. The legacy `API_TOKEN`
+  is not limited — the CI runner has no shell and the route tests use it to
+  reach every router — and nothing that reads untrusted pages is given it.
+- **The agents get named, typed tools and never a general HTTP tool.**
+  `create_gig_opportunity` is one prompt injection away from being safe;
+  `http_request` would be one away from `DELETE /api/gigs/12`.
+  `scripts/agents/tools.ts` defines them once; `run.ts` hands them to the
+  model and `cli.ts` exposes the same names as subcommands for routines, so
+  the prompts mean the same thing under both runners.
+- **The heartbeat became the agent's job, and that is a real loss.** `run.ts`
+  posts it in a `finally` that a crash cannot skip — verified: a run that died
+  on a timeout still filed a `failed` row carrying the error. A routine has to
+  call `log_run` itself, and one that crashes or forgets leaves no row. What
+  still catches it is `shared/taskCadence.ts`: a schedule that goes quiet
+  raises a critical within its own cadence. One missed run is invisible; a
+  stopped schedule is not.
+- **`SCOUT_API_URL` falls back on empty, not just on unset.** GitHub renders a
+  missing repository variable as `""`, `??` passed it straight through, and
+  the first CI run died on `Failed to parse URL from /api/task-runs`.
+  `resolveBaseUrl` uses `||`.
+- **In `run.ts`, the tool runner does not auto-resume `pause_turn`, and web
+  search is what triggers one.** Left alone, a long sweep stops mid-way and
+  returns as if it had finished. `run.ts` iterates the runner and pushes the
+  paused turn back; a run that still ends paused is recorded `incomplete`,
+  never `ok`. It streams, because a turn full of server-side searches outlasts
+  the SDK's HTTP timeout — the second CI run died on exactly that.
 - **JSON Schema, not the Zod helper.** `betaZodTool` is built against Zod 4 and
   this repo is on Zod 3, which every route validator uses. Upgrading Zod to get
   nicer tool definitions would put the Worker's request validation in the blast
   radius of a script.
 
 Dry run is the default, as in `scripts/backfill-deadlines.ts`: nothing is
-written without `--apply`. A scheduled run always applies; a hand-triggered one
-applies only when asked.
+written without `--apply` — in `run.ts`, in `cli.ts`, and in
+`scripts/issue-agent-token.ts`.
 
 **Screens name things; they never print identifiers.** The bell shipped saying
 *"gig-festival-scan has not run in 28 days"* — that string is the `task_id` an
@@ -572,7 +598,7 @@ condition lasts a day; dismissing an event is permanent. See
 
 **The pipeline is a shape, not a free-for-all.** `nextGigStatuses` in
 `shared/gigStatus.ts` says which moves a status offers, and the PATCH route
-refuses anything else — the research agents PATCH that route too. The entry
+refuses anything else, whoever is calling it. The entry
 worth knowing: **there is no route from `invited` to `declined`.** Declining is
 their verb; turning down an invitation is `withdrawn`. One mis-click should not
 be able to record that you were rejected from a festival that wanted you.

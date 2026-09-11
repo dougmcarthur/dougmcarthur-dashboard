@@ -35,6 +35,7 @@ import { pruneUsage, recordUsage } from './lib/usage'
 import type { TenantId } from './db/scope'
 import type { RootEnv } from './context'
 import { originAllowed, relyingParty } from '../shared/auth'
+import { agentMayCall } from '../shared/agentRoutes'
 import { localParts } from '../shared/digestSchedule'
 
 const app = new Hono<RootEnv>()
@@ -119,6 +120,13 @@ app.use('/api/*', async (c, next) => {
     // surface outright rather than being asked to switch to something it cannot
     // have.
     if (wantsAdmin) return c.json({ error: 'not available to an agent token' }, 403)
+    // An issued token is limited to what research needs. The Worker decides
+    // that rather than the agent's tool list, because a routine has a shell and
+    // its credential rides on every request to this host — see
+    // shared/agentRoutes.ts.
+    if (agent.tokenId !== null && !agentMayCall(c.req.method, path)) {
+      return c.json({ error: 'not available to an agent token' }, 403)
+    }
     c.set('actor', agent)
     return next()
   }

@@ -14,6 +14,11 @@
 
 export interface ApiConfig {
   baseUrl: string
+  /**
+   * Empty in a Claude Code routine, where the session never holds the token:
+   * the cloud environment stores it as an API credential and Anthropic's proxy
+   * adds the header after the request leaves. See scripts/agents/cli.ts.
+   */
   token: string
   /** When false, writes are logged and not sent. See scripts/agents/run.ts. */
   apply: boolean
@@ -25,12 +30,30 @@ export class ApiError extends Error {
   }
 }
 
+export const DEFAULT_BASE_URL = 'https://scout.sundogsmusic.ca'
+
+/**
+ * The Worker's origin, from `SCOUT_API_URL` or the production default.
+ *
+ * `||`, not `??`. GitHub Actions renders an unset repository variable as an
+ * empty string rather than leaving it out, and `??` only falls back on
+ * undefined — so the first run from CI went out with a base URL of "" and died
+ * on `Failed to parse URL from /api/task-runs`.
+ */
+export function resolveBaseUrl(value: string | undefined): string {
+  return (value || DEFAULT_BASE_URL).replace(/\/$/, '')
+}
+
 async function request<T>(cfg: ApiConfig, path: string, init?: RequestInit): Promise<T> {
+  // No header at all when there is no token, rather than `Bearer ` with
+  // nothing after it: that is a credential the Worker refuses, sitting where
+  // the proxy's would go.
+  const auth: Record<string, string> = cfg.token ? { Authorization: `Bearer ${cfg.token}` } : {}
   const res = await fetch(`${cfg.baseUrl}/api${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${cfg.token}`,
+      ...auth,
       ...(init?.headers ?? {}),
     },
   })
