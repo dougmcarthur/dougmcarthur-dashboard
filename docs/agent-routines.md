@@ -100,6 +100,15 @@ default branch, and migration 0022 applied, because that is where
    repository, the *Scout agents* environment, **no connectors**, and a saved
    prompt of the form:
 
+   **No connectors has to be done, not assumed.** The routine form, and the
+   API when `mcp_connections` is left out, attach *every* connector on the
+   account — this happened when these were first created. A routine may use
+   any connector's tools, writes included, without asking, and connector
+   traffic goes through Anthropic's servers: around the environment's proxy
+   and around the Worker's route list. The Cloudflare connector alone can run
+   SQL against production. Remove them all in the form, or send
+   `clear_mcp_connections: true`, and check the saved routine lists none.
+
    > Run the Sun Dogs Music Scout research agent `gig-festival-scan`. Follow
    > `scripts/agents/routine.md` exactly.
 
