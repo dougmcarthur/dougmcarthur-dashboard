@@ -39,6 +39,7 @@
  * and say so in `log_run`.
  */
 
+import { spawnSync } from 'node:child_process'
 import {
   createGig,
   createPromoDraft,
@@ -60,6 +61,33 @@ import {
   type AgentId,
   type ToolName,
 } from './tools'
+
+/**
+ * Node's own `fetch` ignores `HTTPS_PROXY` unless Node was started with
+ * `--use-env-proxy`. In a routine that proxy is the only thing that adds the
+ * credential, so without the flag every request reached the Worker bare and
+ * came back 401 — the first routine run did exactly that, then found the flag
+ * itself by calling Scout outside this file. Re-running under the flag here
+ * means no session has to rediscover it, or step outside routine.md to do so.
+ *
+ * Only when a proxy is configured and this Node knows the flag, so a laptop
+ * and the GitHub runner are untouched. The warning it is disabled for says
+ * the proxy agent is experimental, once per process, on every command.
+ */
+function reexecUnderEnvProxy(): void {
+  const proxied = process.env.HTTPS_PROXY || process.env.https_proxy
+  const flags = process.allowedNodeEnvironmentFlags
+  const already = process.execArgv.includes('--use-env-proxy') || (process.env.NODE_OPTIONS ?? '').includes('--use-env-proxy')
+  if (!proxied || already || !flags.has('--use-env-proxy')) return
+
+  const quiet = flags.has('--disable-warning') ? ['--disable-warning=UNDICI-EHPA'] : []
+  const child = spawnSync(
+    process.execPath,
+    ['--use-env-proxy', ...quiet, ...process.execArgv, ...process.argv.slice(1)],
+    { stdio: 'inherit' },
+  )
+  process.exit(child.status ?? 1)
+}
 
 const LOG_RUN = 'log_run'
 
@@ -124,6 +152,7 @@ async function call(tool: ToolName, cfg: ApiConfig, body: Record<string, unknown
 }
 
 async function main(): Promise<void> {
+  reexecUnderEnvProxy()
   const args = process.argv.slice(2)
   const apply = args.includes('--apply')
   const fromStdin = args.includes('--stdin')

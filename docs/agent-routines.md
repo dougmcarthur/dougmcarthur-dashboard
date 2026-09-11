@@ -54,6 +54,15 @@ reads festival pages written by strangers.
 3. **`cli.ts` is named operations, not a general client.** It is the easy path,
    so the session takes it; the Worker is what holds if it does not.
 
+   That is not hypothetical. On the first routine run every request came back
+   401, because Node's `fetch` ignores `HTTPS_PROXY` and so never went through
+   the proxy that adds the credential. The session diagnosed it — correctly —
+   by calling Scout with its own `node -e "fetch(...)"`, which `routine.md`
+   says never to do. A model that is stuck steps outside a "never"; the
+   Worker's route list is why that cost nothing. `cli.ts` now re-runs itself
+   under `--use-env-proxy` when a proxy is configured, so no session has to go
+   looking.
+
 ## What is weaker than in CI, said plainly
 
 - **The heartbeat is the agent's job.** `run.ts` posts it in a `finally` that a
@@ -100,6 +109,15 @@ default branch, and migration 0022 applied, because that is where
    repository, the *Scout agents* environment, **no connectors**, and a saved
    prompt of the form:
 
+   **No connectors has to be done, not assumed.** The routine form, and the
+   API when `mcp_connections` is left out, attach *every* connector on the
+   account — this happened when these were first created. A routine may use
+   any connector's tools, writes included, without asking, and connector
+   traffic goes through Anthropic's servers: around the environment's proxy
+   and around the Worker's route list. The Cloudflare connector alone can run
+   SQL against production. Remove them all in the form, or send
+   `clear_mcp_connections: true`, and check the saved routine lists none.
+
    > Run the Sun Dogs Music Scout research agent `gig-festival-scan`. Follow
    > `scripts/agents/routine.md` exactly.
 
@@ -108,6 +126,13 @@ default branch, and migration 0022 applied, because that is where
    | `gig-festival-scan` | Mondays, 7am Winnipeg |
    | `sync-pitch-research` | Wednesdays, 7am Winnipeg |
    | `monthly-promo-checkin` | The 1st, 7am Winnipeg |
+
+   **Model: Sonnet 5**, to spend less of the plan's allowance. If a run shows
+   it struggling to parse things — `cli.ts` refusing its input again and
+   again, fields filed in the wrong place, a deadline or fee misread from a
+   page, a report that contradicts what it filed — move that routine to
+   Opus 5. The cost of a wrong row is a missed date, which is worth more than
+   the allowance.
 
 4. **Check one.** *Run now* on the routine, then read the run's transcript:
    a green status only means the session started and exited. A new row on
