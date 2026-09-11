@@ -20,16 +20,25 @@ import replies, { runReplyScan } from './routes/replies'
 import backfill, { runNotesBackfillOnce } from './routes/backfill'
 import auth from './routes/auth'
 import gmailDrafts from './routes/gmailDrafts'
+import agentTokens from './routes/agentTokens'
+import admin from './routes/admin'
+import profile from './routes/profile'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
 import { isDigestDue } from '../shared/digestSchedule'
 import { sendMail, mailerConfigured } from './lib/mailer'
 import { gmailConfigured } from './lib/gmail'
 import { recordEvent } from './lib/notificationEvents'
-import { bearerAuthorised, pruneAuth, readSession } from './lib/auth'
+import { pruneAuth, readSession } from './lib/auth'
+import { actorForBearer, actorForSession, listTenants, ownerTenant } from './lib/actor'
+import { pruneEvents } from './lib/notificationEvents'
+import { pruneUsage, recordUsage } from './lib/usage'
+import type { TenantId } from './db/scope'
+import type { RootEnv } from './context'
 import { originAllowed, relyingParty } from '../shared/auth'
+import { agentMayCall } from '../shared/agentRoutes'
 import { localParts } from '../shared/digestSchedule'
 
-const app = new Hono<{ Bindings: Env }>()
+const app = new Hono<RootEnv>()
 
 app.use('/api/*', logger())
 
@@ -75,18 +84,75 @@ const PUBLIC_API_PREFIXES = [
   '/api/auth/',
 ]
 
+/**
+ * The oversight surface, which is a different surface rather than a bigger one.
+ *
+ * A request under this prefix is served only to an owner whose session is in
+ * admin mode, and a request anywhere else is refused *to* that session. The two
+ * halves matter equally: without the second, admin mode would be an artist
+ * session with extra pages, and the guarantee made to an invited artist —
+ * that their gig notes are theirs — would rest on the owner not clicking a
+ * link. See docs/multi-tenant-plan.md.
+ *
+ * The routes check the role themselves as well. A hidden button is still a URL.
+ */
+const ADMIN_API_PREFIX = '/api/admin/'
+
 app.use('/api/*', async (c, next) => {
   const path = new URL(c.req.url).pathname
   if (PUBLIC_API_PREFIXES.some((prefix) => path.startsWith(prefix))) return next()
 
   // Two credentials, and they are for two different callers: a browser sends
   // the session cookie, the out-of-repo research agents send a bearer token.
-  // The token is checked first because it is a string compare and the session
-  // is a D1 read.
-  if (bearerAuthorised(c.env, c.req.header('Authorization'))) return next()
+  // The token is tried first because it is the cheaper lookup of the two and
+  // because an agent never sends a cookie.
+  //
+  // Both now answer the same question, and it is a wider one than they used to
+  // answer. Authenticating a request was enough while one artist owned every
+  // row; what a route needs now is **whose rows** — so the middleware resolves
+  // an actor rather than a boolean, and a credential that cannot be resolved
+  // to a tenant is refused. See src/lib/actor.ts.
+  const wantsAdmin = path.startsWith(ADMIN_API_PREFIX)
+
+  const agent = await actorForBearer(c.env, c.req.header('Authorization'))
+  if (agent) {
+    // A research agent has no account and no mode. It is refused the oversight
+    // surface outright rather than being asked to switch to something it cannot
+    // have.
+    if (wantsAdmin) return c.json({ error: 'not available to an agent token' }, 403)
+    // An issued token is limited to what research needs. The Worker decides
+    // that rather than the agent's tool list, because a routine has a shell and
+    // its credential rides on every request to this host — see
+    // shared/agentRoutes.ts.
+    if (agent.tokenId !== null && !agentMayCall(c.req.method, path)) {
+      return c.json({ error: 'not available to an agent token' }, 403)
+    }
+    c.set('actor', agent)
+    return next()
+  }
 
   const session = await readSession(c.env, c.req.header('Cookie'))
   if (!session) return c.json({ error: 'not signed in' }, 401)
+
+  const actor = await actorForSession(c.env, session)
+  // A valid session whose account resolves to no tenant. It should not happen
+  // — 0021 defaulted every existing row — and the answer to not knowing whose
+  // rows these are has to be none of them, never all of them.
+  if (!actor) return c.json({ error: 'not signed in' }, 401)
+
+  // The two refusals that make the surfaces separate. Each names the mode the
+  // request would need, because the honest answer to "why did that 403" is
+  // "you are on the other surface", and a client that knows which one can offer
+  // the switch instead of an error.
+  if (wantsAdmin && actor.kind !== 'admin') {
+    return c.json({ error: 'Switch to admin mode first.', needsMode: 'admin' }, 403)
+  }
+  if (!wantsAdmin && actor.kind === 'admin') {
+    return c.json({ error: 'This is not available in admin mode.', needsMode: 'artist' }, 403)
+  }
+
+  if (actor.kind === 'admin') c.set('admin', actor)
+  else c.set('actor', actor)
 
   // Second lock on cross-site writes. `SameSite=Lax` on the cookie is the
   // first and does most of the work; this catches a browser that sends the
@@ -105,6 +171,11 @@ app.use('/api/*', async (c, next) => {
 
 app.route('/api/auth', auth)
 app.route('/api/gmail', gmailDrafts)
+app.route('/api/agent-tokens', agentTokens)
+app.route('/api/profile', profile)
+// The oversight surface. See ADMIN_API_PREFIX above for what the middleware
+// does with it, in both directions.
+app.route('/api/admin', admin)
 app.route('/api/overview', overview)
 app.route('/api/review', review)
 // NOTE: before '/api/gigs', for the same reason the reconcile router is
@@ -154,7 +225,7 @@ app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))
  * nobody to report to, and an unhandled rejection here would be invisible
  * except as a retry.
  */
-async function runDigest(env: Env): Promise<void> {
+async function runDigest(env: Env, tenant: TenantId): Promise<void> {
   const settings = await readDigestSettings(env)
   if (!settings.enabled) return
   if (!mailerConfigured(env)) {
@@ -172,7 +243,7 @@ async function runDigest(env: Env): Promise<void> {
   })
   if (!due.due) return
 
-  const { digest: built, subject, html, text } = await composeDigest(env)
+  const { digest: built, subject, html, text } = await composeDigest(env, tenant)
   if (built.empty) return
 
   try {
@@ -188,7 +259,7 @@ async function runDigest(env: Env): Promise<void> {
     // about: the digest *is* the channel that reaches you when you are not
     // looking at the dashboard. So this is critical, and it is written before
     // the throw so the record survives the retry.
-    await recordEvent(env, {
+    await recordEvent(env, tenant, {
       kind: 'digest',
       tier: 'critical',
       title: 'Weekly digest failed to send',
@@ -200,13 +271,13 @@ async function runDigest(env: Env): Promise<void> {
     throw err
   }
 
-  await recordDigest(env, built)
+  await recordDigest(env, tenant, built)
   // Written only after the send resolves, for the same reason the reporting
   // marks are: a failed send must be retried on the next tick, not counted as
   // this week's.
   await writeSetting(env, DIGEST_KEYS.lastSentAt, new Date().toISOString())
 
-  await recordEvent(env, {
+  await recordEvent(env, tenant, {
     kind: 'digest',
     tier: 'info',
     title: `Weekly digest sent — ${built.focus.length} to act on`,
@@ -224,12 +295,31 @@ async function runDigest(env: Env): Promise<void> {
  * state, it cannot drift, and a tick missed at 3am costs a day of retention on
  * a table measured in tens of rows.
  */
-async function runHousekeeping(env: Env): Promise<void> {
+async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
   const settings = await readDigestSettings(env)
   if (localParts(new Date(), settings.schedule.timezone).hour !== 3) return
-  const pruned = await pruneNotifications(env)
-  if (pruned.marks || pruned.events) {
-    console.log(`pruned ${pruned.marks} marks, ${pruned.events} notification events`)
+
+  // Marks, per tenant. Deciding which are dead needs that tenant's live feed,
+  // so this is genuinely one artist at a time.
+  let marks = 0
+  for (const tenant of tenants) marks += (await pruneNotifications(env, tenant)).marks
+
+  // Today's usage sample, also per tenant and for a stronger reason: this is
+  // the one place code counts a tenant's rows on the owner's behalf, and it
+  // does it *as* the tenant and emits a number. See src/lib/usage.ts.
+  //
+  // The day is UTC rather than the artist's local date. A daily sample has to
+  // agree with itself across runs, and the alternative — each tenant's own
+  // midnight — would need a timezone this app does not ask anybody for.
+  const today = new Date().toISOString().slice(0, 10)
+  for (const tenant of tenants) await recordUsage(env, tenant, today)
+
+  // Events, once. Retention is one platform rule — "nothing older than thirty
+  // days" — and expressing it as N deletes would be N ways to get it wrong.
+  const events = await pruneEvents(env)
+  const samples = await pruneUsage(env)
+  if (marks || events || samples) {
+    console.log(`pruned ${marks} marks, ${events} notification events, ${samples} usage rows`)
   }
   // Expired sessions, spent challenges and dead setup codes. Not a
   // correctness matter — every one of them is checked against the clock when
@@ -267,7 +357,7 @@ export function isReplyScanHour(hour: number): boolean {
  * It does not move any row. Accepting a match is still yours, and so is the
  * transition after it. See docs/reply-matching-plan.md.
  */
-async function runReplyScanIfDue(env: Env): Promise<void> {
+async function runReplyScanIfDue(env: Env, tenant: TenantId): Promise<void> {
   if (!gmailConfigured(env)) return
   const settings = await readDigestSettings(env)
   const now = new Date()
@@ -277,10 +367,62 @@ async function runReplyScanIfDue(env: Env): Promise<void> {
   // window `planReplyScan` derives is measured from a date, so the date is
   // computed once here rather than read again downstream.
   const today = now.toISOString().slice(0, 10)
-  const result = await runReplyScan(env, today)
+  const result = await runReplyScan(env, tenant, today)
   if (result.stored > 0 || result.found > 0) {
     console.log(`reply scan: ${result.found} found, ${result.stored} stored, ${result.skipped} already decided`)
   }
+}
+
+/**
+ * The cron tick, and the one place scope is decided without a request behind
+ * it.
+ *
+ * Three different answers to "whose rows", and the differences are the point.
+ *
+ * **Housekeeping is every tenant**, because pruning marks is a per-artist
+ * question — which conditions are still live is derived from that artist's own
+ * feed. Event retention is not, and is done once beside it.
+ *
+ * **The digest and the reply scan are the owner's tenant only**, because their
+ * inputs are platform configuration rather than the tenant's: the schedule and
+ * recipient live in `app_settings`, and the mailbox is `GMAIL_REFRESH_TOKEN`,
+ * one Worker secret pointing at one inbox. Looping those over every tenant
+ * would mail the owner N times and scan the owner's mailbox on a stranger's
+ * behalf, which is worse than not running. Giving each artist their own digest
+ * schedule and their own mailbox grant is real work with a schema behind it
+ * (`docs/multi-tenant-plan.md` — it is not in this step, and it is not
+ * pretended to be).
+ *
+ * **The notes backfill is every tenant under one marker**, because it is a
+ * one-shot over rows that predate the extractor.
+ *
+ * Each job's errors are logged and swallowed, as before: a cron failure has
+ * nobody to report to, and a Gmail outage must not take the digest down with
+ * it.
+ */
+async function runScheduled(env: Env): Promise<void> {
+  const tenants = await listTenants(env)
+  const owner = await ownerTenant(env)
+
+  await Promise.all([
+    owner
+      ? runDigest(env, owner).catch((err) => {
+          console.error('digest run failed:', err)
+        })
+      : Promise.resolve(),
+    runHousekeeping(env, tenants).catch((err) => {
+      console.error('housekeeping failed:', err)
+    }),
+    // One-shot, and it un-arms itself. See runNotesBackfillOnce.
+    runNotesBackfillOnce(env, tenants).catch((err) => {
+      console.error('notes backfill failed:', err)
+    }),
+    owner
+      ? runReplyScanIfDue(env, owner).catch((err) => {
+          console.error('reply scan failed:', err)
+        })
+      : Promise.resolve(),
+  ])
 }
 
 /**
@@ -294,25 +436,6 @@ export default {
   fetch: app.fetch,
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     // waitUntil, so a slow send cannot be cut short when scheduled() returns.
-    ctx.waitUntil(
-      Promise.all([
-        runDigest(env).catch((err) => {
-          console.error('digest run failed:', err)
-        }),
-        runHousekeeping(env).catch((err) => {
-          console.error('housekeeping failed:', err)
-        }),
-        // One-shot, and it un-arms itself. See runNotesBackfillOnce.
-        runNotesBackfillOnce(env).catch((err) => {
-          console.error('notes backfill failed:', err)
-        }),
-        runReplyScanIfDue(env).catch((err) => {
-          // Logged and swallowed, like the others. A Gmail outage must not
-          // take the digest down with it — they share a tick and nothing
-          // else.
-          console.error('reply scan failed:', err)
-        }),
-      ]),
-    )
+    ctx.waitUntil(runScheduled(env))
   },
 }

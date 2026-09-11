@@ -162,6 +162,12 @@ header. Until both halves are done they will 401, and because they retry on
 their own schedule the symptom is gig rows quietly failing to arrive rather
 than anything announcing itself.
 
+A token issued into `agent_tokens` is narrower than `API_TOKEN`: it reaches the
+seven routes research needs and nothing else (`shared/agentRoutes.ts`). That is
+the credential the Claude Code routines hold, because a routine has a shell and
+its credential rides on every request to this host — see
+`docs/agent-routines.md`.
+
 ## Rolling this out, in the order that avoids a lockout
 
 Access is still what stands between the internet and this app until step 4,

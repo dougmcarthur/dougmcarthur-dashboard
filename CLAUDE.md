@@ -208,6 +208,187 @@ tenant-scoped, and none of them ask. Admin mode is the next thing that will
 (`docs/multi-tenant-plan.md`); the client tries first and re-asserts only on
 refusal, so a burst of removals costs one touch, and retries exactly once.
 
+**A request resolves to an artist before any route runs.** Fourteen tables
+hold rows that belong to one person, and `src/db/scope.ts` is the only way to
+reach them: `scoped(table, tenant, ...rest)` builds the `WHERE`, `withTenant`
+builds the values, and `TenantId` is a **branded** type with one constructor,
+so a user id or a label cannot be passed where a tenant belongs. The
+resolution happens once, in the middleware, exactly like authentication — a
+router added next month is scoped by doing nothing, or it is a hole. From a
+route inward the tenant is an *argument*, never fetched, for the reason
+`buildReviewQueue` takes `today` instead of reading the clock: a function that
+fetches its own scope can fetch the wrong one silently.
+
+Admin mode (`docs/multi-tenant-plan.md`) resolves to **null**, not a wildcard,
+and `TenantId` is not nullable — so an admin-mode request reaching for
+`gig_opportunities` fails to compile rather than returning a stranger's rows.
+
+**A missing filter is a test failure, not a leak.**
+`test/tenantScope.test.ts` reads the source and fails when one of the fourteen
+is named in a query that does not pass through `scoped` or `withTenant`. It
+has to be source-level: an unscoped query typechecks, runs, and returns the
+right rows for as long as there is one artist — it starts being wrong on the
+day nobody is re-reading these queries. Exemptions are a list with a written
+reason each, and there is one (event retention, which is a platform rule).
+
+**The two shapes that used to hide a missing scope.** A `.where()` that was
+skipped entirely when no filters applied — `conditions.length > 0 ? … : …` in
+the gig and sync list routes — is now one branch with the tenant
+unconditional. And an `inArray(id, ids)` where the ids came from the browser:
+the tenant filter beside it is not redundant, it is the whole check.
+
+**The cron has no request to read a scope from, and gives three answers.**
+Housekeeping runs per tenant, because which notification marks are dead is
+derived from that artist's own feed; event retention runs once beside it. The
+digest and the reply scan run for the **owner's tenant only**, because their
+inputs are platform configuration rather than the tenant's — the schedule and
+recipient live in `app_settings`, and the mailbox is one `GMAIL_REFRESH_TOKEN`
+pointing at one inbox. Looping those over every tenant would mail the owner N
+times and scan his mailbox on a stranger's behalf. Per-artist digests and
+mailbox grants are real work with schema behind them, and are not pretended to
+exist. The notes backfill runs for every tenant under one marker, because the
+marker is platform state and writing it after the first would record the job
+as done.
+
+**An `ON CONFLICT` target is part of an interface.** Four uniqueness
+constraints had to grow a leading `tenant_id` (`gig_correspondents(kind,
+value)`, `google_grants(purpose)`, `notification_marks(dedupe_key)`,
+`notification_events(dedupe_key)`) and migration 0021 deliberately left them
+alone: live code named two of them in an upsert target, and SQLite requires
+that target to match a unique constraint exactly, so widening the key would
+have *errored* those statements under the old Worker rather than staled them.
+Migration 0022 widens them — and it is only safe because the statements no
+longer name a constraint at all. `storeGrant` is a delete-then-insert, and the
+two mark writers are an update followed by an insert that conflicts to
+nothing; both work against the schema on either side of the migration.
+`digest_reports` keeps its target, because `entity_id` is a global
+autoincrement and two artists cannot collide on one. 0022 also drops 0018's
+single-column indexes, whose window closed when the reads started leading with
+`tenant_id`.
+
+**The Worker in the migrate-then-deploy gap is the *deployed* one, which is
+much older than the previous step.** This repository ships in branches, and at
+the time of writing the deployed Worker is from migration 0009 — passkeys,
+agents in CI, Gmail drafting, tenants, oversight and invitations are all
+unmerged and land in one CI run. So "additive" is measured against production,
+not against the commit before. That is what makes 0022 keep a narrow unique
+index on `notification_marks(dedupe_key)`: the deployed Worker names it in an
+`ON CONFLICT` target, and `notification_marks` is the only one of the four
+widened tables that exists in production at all. Migration 0024 drops the prop,
+in the same release, before an invitation can create a second tenant.
+
+The `tenant_id` **defaults** from 0021 are still there, and so is the nullable
+column on the fourteen — migration 0024 makes only `users.tenant_id`
+`NOT NULL`, and says why at length. Three reasons, shortest first: with the
+defaults in place a write cannot produce a NULL anyway, so the constraint
+guards a state `withTenant` and `test/tenantScope.test.ts` already make
+unreachable; the plan's precondition ("live long enough to trust") cannot hold
+for code that has not been live; and SQLite has no `ALTER COLUMN`, so it means
+fourteen table rebuilds transcribing a column list that can only come from the
+*local* schema — while production predates the ledger and was partly
+hand-applied. A production-only column would be dropped by a statement that
+succeeds. `GET /api/admin/health` counts rows with no owner so the precondition
+is something to look at rather than assume.
+
+**The agents' token now belongs to somebody, and the old one still works.**
+`API_TOKEN` is a Worker secret with no tenant attached — correct with one
+artist, wrong with two, and wrong invisibly: a gig filed to the wrong tenant
+just appears on a stranger's Overview. `agent_tokens` (migration 0022) is a
+hashed, revocable, per-tenant credential, issued and revoked through
+`/api/agent-tokens` behind a passkey touch, because minting a token that can
+write to your account is squarely "changes who can get in". An agent cannot
+manage tokens: a credential issuing its own successor makes revoking one a
+race rather than an ending.
+
+`actorForBearer` still accepts `API_TOKEN` and resolves it to the owner's
+tenant — the same "read both spellings" move `normaliseGigStatus` makes,
+because withdrawing it in this deploy would 401 every agent until three GitHub
+secrets were rotated. It goes when `.github/workflows/agents.yml` holds a row
+instead. **There is no Settings UI for these yet**; the screen is step 3's
+work and the routes are usable without one.
+
+**Admin mode is a different surface, not a bigger one.** The owner has two
+jobs and one account; `auth_sessions.mode` (migration 0023) says which surface
+a session is on. In artist mode it resolves to the owner's own tenant; in
+admin mode it resolves to **no tenant** — and that is a type rather than a
+null. `AppEnv` carries an `actor` and `AdminEnv` carries an `admin`, the two
+do not overlap, and `AdminActor` has no tenant field at all, so an oversight
+route reaching for `gig_opportunities` has nothing to hand `scoped()` and does
+not compile. `src/index.ts` is the only place that sets either.
+
+**Both refusals matter.** An artist-mode session is refused `/api/admin/*`,
+and an admin-mode session is refused everything else. Drop the second and
+admin mode becomes an artist session with extra pages, with the promise made
+to an invited artist resting on the owner not clicking a link. Each refusal
+names the mode the request would need (`needsMode`), so the client can offer
+the switch instead of an error — and the app renders one surface or the other,
+because a page of 403s is the design working and looking broken.
+
+Entering costs a passkey touch, which is the one thing a separate owner
+account would have bought that a mode does not: credential separation. Leaving
+costs nothing, because giving up privilege is not a privileged act. There is
+no impersonation and no "act as this artist", deliberately — a support tool
+that quietly breaks the promise is worse than no support tool, and
+`test/adminMode.test.ts` fails if the oversight screen so much as carries the
+vocabulary, or links to a route that surface cannot reach.
+
+**Oversight reads three tables and writes one thing.** `tenants`, `users` and
+the `usage_daily` rollup — the counts are written by the cron running *as the
+tenant*, which emits a number, and the owner reads the number. The one write
+that crosses the line is removing an artist: a tenant-scoped delete across the
+fourteen, previewed first as a **count per table**, which names no column and
+returns no row. The owner's own tenant is refused, because deleting it takes
+the account holding the surface with it. `test/adminMode.test.ts` fails if the
+admin router names one of the fourteen, or uses `asTenantId` more than the
+once that removal needs.
+
+**Three of the rollup's seven counters have no writer, and the API says so.**
+`domain_rows`, `gig_rows`, `promo_rows` and `agent_runs` are measured;
+`api_requests`, `gmail_drafts` and `ai_calls` are not. `MEASURED_FIELDS` names
+which, rather than shipping three zeroes a screen would render as "none". A
+request counter is a write per request, which is the shape this app keeps
+declining to build, so it needs somewhere outside D1 before it can be honest.
+
+**An invitation is a credential that grants an account.** The biggest one
+this app hands out — a passkey signs into an account that exists, this one
+brings one into being — so it gets the strictest handling. Stored hashed and
+shown **once**, like an agent token: nothing can print it again, and losing it
+costs a withdrawal and a reissue. Thirty days, single use, withdrawable until
+redeemed. The address is typed by the owner and fixed at issue, which is the
+signup half of the recovery-address rule: at signup there is nothing on file,
+so it has to come from somewhere trusted.
+
+**The token lives in the URL fragment, never the path.** `#join/<token>`. A
+fragment is never sent to the server, never lands in an access log and never
+appears in a `Referer` header; the client reads it and POSTs it in a body.
+`test/invites.test.ts` fails if a join call starts putting it in a path, or if
+the list route ever grows a `token` field.
+
+**Redemption spends the invitation last.** The tenant, the account and the
+first passkey are written in one flow, and the invite is marked used only after
+the credential verifies — so a cancelled prompt leaves the link working, which
+is what somebody whose browser gave up needs and costs nothing, because it is
+still single use once it lands. The owner finds out through the bell, as an
+**event**: "somebody joined on Tuesday" is not recoverable from Wednesday's
+state. The title says their name, never a tenant id and never an address.
+
+**A passkey user handle is per account now.** It was one fixed string — right
+for one user, a bug with two, because an authenticator *replaces* a credential
+sharing a handle and two people enrolling on one device would replace each
+other. The owner keeps the original string, since their authenticators already
+hold credentials under it and switching would leave a duplicate keychain entry
+for nothing; everybody else is keyed by their account id.
+
+**Scout cannot mail an invitation yet, and says so.** The `send_email` binding
+sends through an allowlist of two addresses, both the owner's — a real security
+property today, not a limitation: the Worker cannot mail anywhere else even if
+the code is wrong. The gate is a **domain**, not a plan; sending to an
+arbitrary recipient needs `sundogsmusic.ca` onboarded to Email Service. Until
+then the owner copies the link. The same prerequisite blocks per-artist
+recovery: the emailed setup code goes to the configured address and enrols the
+*owner's* account, which is safe — only the owner can read that inbox — but is
+not recovery for anybody else.
+
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a
 passkey ceremony — WebAuthn has no non-interactive mode. `API_TOKEN` as a
@@ -271,40 +452,66 @@ actually carry the decision. Retention is likewise already handled where it
 churns — `notification_events` and `notification_marks` both prune at 30 days,
 and no other table grows fast enough to have a policy worth writing.
 
-**The research agents run in CI, and their instructions are files.** They were
-scheduled Claude sessions on one laptop until August 2026. Now
-`.github/workflows/agents.yml` holds the three schedules, `agent-run.yml` is
-the reusable mechanics, and `scripts/agents/run.ts` drives a tool-runner loop
-with server-side web search. The prompts are `scripts/agents/prompts/*.md` —
-in the repository on purpose: a change to how an agent behaves arrives as a
-diff somebody can read, and an agent that disappears leaves a hole in
-`git log` rather than in a UI nobody opens.
+**The research agents run as Claude Code routines, and their instructions are
+files.** They were scheduled Claude sessions on one laptop until August 2026,
+then GitHub Actions driving them through the Claude API — which worked, and
+whose first two runs spent $20 of API credit and filed nothing. Server-side
+web search puts every result into the same request and the model re-reads the
+growing context before each next search, so a sweep compounds; that is
+structural, not a bad week. The schedules are routines now: cloud sessions on
+the artist's Claude plan, with no machine that has to stay awake.
+`.github/workflows/agents.yml` is a hand-triggered, paid fallback. See
+`docs/agent-routines.md`.
 
-Four things about it that are not obvious:
+The prompts are `scripts/agents/prompts/*.md` — in the repository on purpose:
+a change to how an agent behaves arrives as a diff somebody can read, and an
+agent that disappears leaves a hole in `git log` rather than in a UI nobody
+opens. A routine's saved prompt only names an agent and points at
+`scripts/agents/routine.md`, for the same reason.
 
-- **The tool runner does not auto-resume `pause_turn`, and web search is what
-  triggers one.** Left alone, a long sweep stops mid-way and returns as if it
-  had finished — no error, no warning, a silently truncated answer that would
-  look like a quiet week. `run.ts` iterates the runner and pushes the paused
-  turn back; a run that still ends paused is recorded `incomplete`, never `ok`.
-- **The heartbeat is posted by the script, in a `finally`, not offered to the
-  agent as a tool.** An agent that crashed or forgot would leave no row, which
-  is exactly the invisibility that let three schedules die unnoticed. This is
-  what arms `shared/taskCadence.ts`, so it has to be something the agent
-  cannot skip. Verified: a run that dies on a bad API key still files a
-  `failed` row carrying the error.
-- **The agents get named, typed tools and never a general HTTP tool.** They
-  read a lot of festival pages, and a festival page is untrusted text written
-  by somebody else. `create_gig_opportunity` is one prompt injection away from
-  being safe; `http_request` would be one away from `DELETE /api/gigs/12`.
+Things about it that are not obvious:
+
+- **A routine has a shell, so the Worker decides what an agent may do.** In CI
+  the model held named tools and the script made every request. A routine is
+  a full Claude Code session reading festival pages written by strangers. Its
+  token is an API credential on the cloud environment, added by Anthropic's
+  proxy after a request leaves the VM, so the session cannot leak it — but the
+  proxy attaches it to *any* request for the host, so hiding it does not stop
+  `curl -X DELETE`. `shared/agentRoutes.ts` limits an issued token to seven
+  routes: three reads, three creates and the run log. The legacy `API_TOKEN`
+  is not limited — the CI runner has no shell and the route tests use it to
+  reach every router — and nothing that reads untrusted pages is given it.
+- **The agents get named, typed tools and never a general HTTP tool.**
+  `create_gig_opportunity` is one prompt injection away from being safe;
+  `http_request` would be one away from `DELETE /api/gigs/12`.
+  `scripts/agents/tools.ts` defines them once; `run.ts` hands them to the
+  model and `cli.ts` exposes the same names as subcommands for routines, so
+  the prompts mean the same thing under both runners.
+- **The heartbeat became the agent's job, and that is a real loss.** `run.ts`
+  posts it in a `finally` that a crash cannot skip — verified: a run that died
+  on a timeout still filed a `failed` row carrying the error. A routine has to
+  call `log_run` itself, and one that crashes or forgets leaves no row. What
+  still catches it is `shared/taskCadence.ts`: a schedule that goes quiet
+  raises a critical within its own cadence. One missed run is invisible; a
+  stopped schedule is not.
+- **`SCOUT_API_URL` falls back on empty, not just on unset.** GitHub renders a
+  missing repository variable as `""`, `??` passed it straight through, and
+  the first CI run died on `Failed to parse URL from /api/task-runs`.
+  `resolveBaseUrl` uses `||`.
+- **In `run.ts`, the tool runner does not auto-resume `pause_turn`, and web
+  search is what triggers one.** Left alone, a long sweep stops mid-way and
+  returns as if it had finished. `run.ts` iterates the runner and pushes the
+  paused turn back; a run that still ends paused is recorded `incomplete`,
+  never `ok`. It streams, because a turn full of server-side searches outlasts
+  the SDK's HTTP timeout — the second CI run died on exactly that.
 - **JSON Schema, not the Zod helper.** `betaZodTool` is built against Zod 4 and
   this repo is on Zod 3, which every route validator uses. Upgrading Zod to get
   nicer tool definitions would put the Worker's request validation in the blast
   radius of a script.
 
 Dry run is the default, as in `scripts/backfill-deadlines.ts`: nothing is
-written without `--apply`. A scheduled run always applies; a hand-triggered one
-applies only when asked.
+written without `--apply` — in `run.ts`, in `cli.ts`, and in
+`scripts/issue-agent-token.ts`.
 
 **Screens name things; they never print identifiers.** The bell shipped saying
 *"gig-festival-scan has not run in 28 days"* — that string is the `task_id` an
@@ -391,7 +598,7 @@ condition lasts a day; dismissing an event is permanent. See
 
 **The pipeline is a shape, not a free-for-all.** `nextGigStatuses` in
 `shared/gigStatus.ts` says which moves a status offers, and the PATCH route
-refuses anything else — the research agents PATCH that route too. The entry
+refuses anything else, whoever is calling it. The entry
 worth knowing: **there is no route from `invited` to `declined`.** Declining is
 their verb; turning down an invitation is `withdrawn`. One mis-click should not
 be able to record that you were rejected from a festival that wanted you.

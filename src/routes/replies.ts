@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { eq, and, desc, isNull, inArray } from 'drizzle-orm'
+import { eq, desc, isNull, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigReplies, gigCorrespondents, gigOpportunities, artistAssets } from '../db/schema'
+import { scoped, withTenant, type TenantId } from '../db/scope'
+import { tenantOf, type AppEnv } from '../context'
 import { gmailConfigured, type GmailEnv } from '../lib/gmail'
 import { fetchReplies, planReplyScan } from '../lib/gmailReplies'
 import { recordEvent } from '../lib/notificationEvents'
@@ -29,7 +31,7 @@ import type { Env } from '../types'
  * offer. Two calls is the correct number — a wrong auto-transition here tells
  * you that you were rejected when you were not.
  */
-const replies = new Hono<{ Bindings: Env }>()
+const replies = new Hono<AppEnv>()
 
 function notConfigured(c: { json: Function; env: Env }) {
   return c.json(
@@ -48,9 +50,9 @@ function todayOf(c: { req: { query: (k: string) => string | undefined } }): stri
   return q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : new Date().toISOString().slice(0, 10)
 }
 
-async function loadBindings(env: Env): Promise<Binding[]> {
+async function loadBindings(env: Env, tenant: TenantId): Promise<Binding[]> {
   const db = getDb(env.DB)
-  const rows = await db.select().from(gigCorrespondents)
+  const rows = await db.select().from(gigCorrespondents).where(scoped(gigCorrespondents, tenant))
   return rows.map((r) => ({
     gigId: r.gigId,
     kind: r.kind === 'thread' ? 'thread' : 'address',
@@ -73,17 +75,21 @@ function toMatchable(row: typeof gigOpportunities.$inferSelect): MatchableGig {
 /** What was found, with the gig it points at resolved for display. */
 replies.get('/', async (c) => {
   const db = getDb(c.env.DB)
+  const tenant = tenantOf(c)
   const showResolved = c.req.query('resolved') === 'true'
 
   const rows = await db
     .select()
     .from(gigReplies)
-    .where(showResolved ? undefined : isNull(gigReplies.resolution))
+    .where(scoped(gigReplies, tenant, showResolved ? undefined : isNull(gigReplies.resolution)))
     .orderBy(desc(gigReplies.receivedAt))
 
   const gigIds = [...new Set(rows.map((r) => r.gigId).filter((id): id is number => id !== null))]
   const gigs = gigIds.length
-    ? await db.select().from(gigOpportunities).where(inArray(gigOpportunities.id, gigIds))
+    ? await db
+        .select()
+        .from(gigOpportunities)
+        .where(scoped(gigOpportunities, tenant, inArray(gigOpportunities.id, gigIds)))
     : []
   const byId = new Map(gigs.map((g) => [g.id, g]))
 
@@ -125,13 +131,17 @@ function safeJson(raw: string | null): unknown[] {
  * horizon depends on when it happened to run is a scan you cannot reason
  * about.
  */
-export async function runReplyScan(env: Env & GmailEnv, today: string): Promise<ReplyScanOutcome> {
+export async function runReplyScan(
+  env: Env & GmailEnv,
+  tenant: TenantId,
+  today: string,
+): Promise<ReplyScanOutcome> {
   const db = getDb(env.DB)
   const now = new Date().toISOString()
 
-  const allGigs = await db.select().from(gigOpportunities)
+  const allGigs = await db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant))
   const gigs = allGigs.map(toMatchable)
-  const bindings = await loadBindings(env)
+  const bindings = await loadBindings(env, tenant)
 
   const plan = planReplyScan({ gigs, bindings, today })
   if (plan.queries.length === 0) {
@@ -144,7 +154,13 @@ export async function runReplyScan(env: Env & GmailEnv, today: string): Promise<
     ? await db
         .select()
         .from(gigReplies)
-        .where(inArray(gigReplies.gmailMessageId, messages.map((m) => m.messageId)))
+        .where(
+          scoped(
+            gigReplies,
+            tenant,
+            inArray(gigReplies.gmailMessageId, messages.map((m) => m.messageId)),
+          ),
+        )
     : []
   const byMessage = new Map(existing.map((r) => [r.gmailMessageId, r]))
 
@@ -201,9 +217,9 @@ export async function runReplyScan(env: Env & GmailEnv, today: string): Promise<
     }
 
     if (prior) {
-      await db.update(gigReplies).set(values).where(eq(gigReplies.id, prior.id))
+      await db.update(gigReplies).set(values).where(scoped(gigReplies, tenant, eq(gigReplies.id, prior.id)))
     } else {
-      await db.insert(gigReplies).values(values)
+      await db.insert(gigReplies).values(withTenant(tenant, values))
       stored++
       fresh.push({
         subject: message.subject,
@@ -215,7 +231,7 @@ export async function runReplyScan(env: Env & GmailEnv, today: string): Promise<
 
   if (stored > 0) {
     const decisive = fresh.filter((f) => f.classification !== 'unclear' && f.classification !== 'acknowledged')
-    await recordEvent(env, {
+    await recordEvent(env, tenant, {
       kind: 'reconcile',
       tier: decisive.length > 0 ? 'attention' : 'info',
       title: stored === 1 ? 'One reply found in your mail' : `${stored} replies found in your mail`,
@@ -244,7 +260,7 @@ export type ReplyScanOutcome = ReturnType<typeof planReplyScan> & {
 
 replies.post('/scan', async (c) => {
   if (!gmailConfigured(c.env)) return notConfigured(c)
-  return c.json(await runReplyScan(c.env, todayOf(c)))
+  return c.json(await runReplyScan(c.env, tenantOf(c), todayOf(c)))
 })
 
 /**
@@ -259,10 +275,11 @@ replies.post('/scan', async (c) => {
  */
 replies.get('/:id/draft', async (c) => {
   const db = getDb(c.env.DB)
+  const tenant = tenantOf(c)
   const id = Number(c.req.param('id'))
   if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'A reply id is required.' }, 400)
 
-  const reply = await db.select().from(gigReplies).where(eq(gigReplies.id, id)).get()
+  const reply = await db.select().from(gigReplies).where(scoped(gigReplies, tenant, eq(gigReplies.id, id))).get()
   if (!reply) return c.json({ error: 'not found' }, 404)
 
   // Rows stored before migration 0015 carry no asks. Re-reading the snippet
@@ -273,9 +290,13 @@ replies.get('/:id/draft', async (c) => {
   const reading = stored ?? recogniseAsks([reply.snippet, reply.evidence].filter(Boolean).join('\n'))
 
   const gig = reply.gigId
-    ? await db.select().from(gigOpportunities).where(eq(gigOpportunities.id, reply.gigId)).get()
+    ? await db
+        .select()
+        .from(gigOpportunities)
+        .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, reply.gigId)))
+        .get()
     : null
-  const assets = await db.select().from(artistAssets)
+  const assets = await db.select().from(artistAssets).where(scoped(artistAssets, tenant))
 
   return c.json({
     replyId: reply.id,
@@ -326,8 +347,9 @@ replies.post('/:id/accept', zValidator('json', AcceptSchema), async (c) => {
   if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'A reply id is required.' }, 400)
 
   const db = getDb(c.env.DB)
+  const tenant = tenantOf(c)
   const body = c.req.valid('json')
-  const row = await db.select().from(gigReplies).where(eq(gigReplies.id, id)).get()
+  const row = await db.select().from(gigReplies).where(scoped(gigReplies, tenant, eq(gigReplies.id, id))).get()
   if (!row) return c.json({ error: 'not found' }, 404)
 
   const gigId = body.gigId ?? row.gigId
@@ -335,7 +357,14 @@ replies.post('/:id/accept', zValidator('json', AcceptSchema), async (c) => {
     return c.json({ error: 'Nothing matched this reply — say which application it is about.' }, 400)
   }
 
-  const gig = await db.select().from(gigOpportunities).where(eq(gigOpportunities.id, gigId)).get()
+  // Scoped, and this one matters more than most: `gigId` can come straight
+  // from the request body, so an unscoped lookup would let a reply be bound to
+  // a stranger's gig by guessing an integer.
+  const gig = await db
+    .select()
+    .from(gigOpportunities)
+    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, gigId)))
+    .get()
   if (!gig) return c.json({ error: 'That gig does not exist.' }, 404)
 
   const now = new Date().toISOString()
@@ -349,15 +378,24 @@ replies.post('/:id/accept', zValidator('json', AcceptSchema), async (c) => {
       // binding rather than leaving two that contradict each other.
       await db
         .delete(gigCorrespondents)
-        .where(and(eq(gigCorrespondents.kind, kind), eq(gigCorrespondents.value, value)))
-      await db.insert(gigCorrespondents).values({ gigId, kind, value, createdAt: now })
+        .where(
+          scoped(
+            gigCorrespondents,
+            tenant,
+            eq(gigCorrespondents.kind, kind),
+            eq(gigCorrespondents.value, value),
+          ),
+        )
+      await db
+        .insert(gigCorrespondents)
+        .values(withTenant(tenant, { gigId, kind, value, createdAt: now }))
     }
   }
 
   await db
     .update(gigReplies)
     .set({ gigId, resolution: 'accepted', resolvedAt: now })
-    .where(eq(gigReplies.id, id))
+    .where(scoped(gigReplies, tenant, eq(gigReplies.id, id)))
 
   return c.json({
     id,
@@ -376,13 +414,14 @@ replies.post('/:id/dismiss', async (c) => {
   if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'A reply id is required.' }, 400)
 
   const db = getDb(c.env.DB)
-  const row = await db.select().from(gigReplies).where(eq(gigReplies.id, id)).get()
+  const tenant = tenantOf(c)
+  const row = await db.select().from(gigReplies).where(scoped(gigReplies, tenant, eq(gigReplies.id, id))).get()
   if (!row) return c.json({ error: 'not found' }, 404)
 
   await db
     .update(gigReplies)
     .set({ resolution: 'dismissed', resolvedAt: new Date().toISOString() })
-    .where(eq(gigReplies.id, id))
+    .where(scoped(gigReplies, tenant, eq(gigReplies.id, id)))
 
   return c.json({ id, resolution: 'dismissed' })
 })

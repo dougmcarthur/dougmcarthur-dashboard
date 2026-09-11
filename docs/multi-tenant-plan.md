@@ -4,10 +4,19 @@ This is the plan for turning a one-person app into a platform with a small
 number of invited artists on it, and an owner who can see that they are there
 without being able to read what they are doing.
 
-Nothing here is built yet. It is written first because the order matters: the
+It was written before any of it was built, because the order matters: the
 oversight screens and the invite UI are the *visible* part and the smallest
 part, and neither can exist before the thing they are about — an account that
 owns rows — exists underneath them.
+
+**Steps 1 to 4 are done** (migrations 0021–0023; invites needed none, because
+their table arrived with 0021), and step 5 is half done (0024). What is left is
+the `NOT NULL` pass on the fourteen domain tables, which is deferred with three
+stated conditions, and two things gated on mail. Each step's section below
+carries a note on what it actually did and where the plan turned out to be
+wrong, which is worth more than a plan that reads as though it was right — and
+step 5's note is the one to read first, because what it found applies to every
+migration in this release.
 
 ## Why not a library
 
@@ -106,6 +115,59 @@ general rule it establishes: **an action that changes who can get in, or that
 destroys data across a boundary, asks for the key again** — and nothing else
 does, because a prompt you see constantly is one you stop reading.
 
+### What step 3 actually did, and where the guarantee ended up living
+
+**Done.** `auth_sessions.mode` (migration 0023) is the whole of the mode;
+`POST /api/auth/mode` moves a session between surfaces; `/api/admin/*` is the
+oversight surface; `src/lib/usage.ts` writes the daily rollup on the
+housekeeping tick; and the React app renders one surface or the other rather
+than nesting them.
+
+**The guarantee is a type, and that was not the original plan.** The plan said
+admin mode resolves to null and a domain read would "fail to compile", which
+implied a nullable tenant somewhere. A nullable tenant only refuses at the call
+sites somebody remembered to null-check. What shipped instead is two context
+types that do not overlap: a tenant-scoped router is `AppEnv` and can only
+reach an `actor`, the oversight router is `AdminEnv` and can only reach an
+`admin` — and `AdminActor` has **no tenant field at all**, so `scoped()` has
+nothing to be handed. `src/index.ts` is the one place that sets either, being
+the one place that decides which surface a request is on.
+
+**Both refusals matter, not just the obvious one.** An artist-mode session is
+refused `/api/admin/*`, and an admin-mode session is refused everything else.
+Without the second, admin mode would be an artist session with extra pages and
+the promise would rest on the owner not clicking a link. Each refusal names the
+mode the request would need, so the client can offer the switch rather than an
+error — and the app renders the admin screen alone, because a page of 403s is
+the design working and looking broken.
+
+**Two source-level guards, in `test/adminMode.test.ts`.** The oversight router
+must name none of the fourteen, and may use `asTenantId` exactly once — for the
+removal, which is the one operation that crosses the line. The oversight screen
+must link to no artist route and must not carry the vocabulary of
+impersonation, because offering the words is how the feature gets built by
+accident.
+
+**The removal previews.** A count per table, which names no column and returns
+no row: the size of the thing, not any of its content. Every other bulk write
+in this app previews first, and it matters most on the one that cannot be
+undone. The owner's own tenant is refused — deleting it would take the account
+holding the surface with it.
+
+**Three of the rollup's seven counters have no writer.** `domain_rows`,
+`gig_rows`, `promo_rows` and `agent_runs` are measured; `api_requests`,
+`gmail_drafts` and `ai_calls` are not, and the API says which is which rather
+than shipping three zeroes a screen would render as "none". A request counter
+in particular is the thing this plan already declined to build — it is a write
+per request — so it needs somewhere outside D1 to live before it can be honest.
+
+**One thing was added that the plan did not ask for**, because the screen made
+it obvious: `tenants.display_name` had no writer, so the oversight surface's
+identifying column was blank forever. `PATCH /api/profile` lets an artist name
+their own account. Deliberately not an owner-side rename — an owner who could
+rename an artist would be editing a row in an account they are otherwise not
+allowed to read, for no reason better than convenience.
+
 ### What oversight reads, and the one thing it writes
 
 `users`, `invites` and a `usage_daily` rollup, and nothing else. Counts the
@@ -166,10 +228,73 @@ the old Worker. That forbids doing this in one step.
 4. **Make the column `NOT NULL`** in a later migration, once the code that
    fills it has been live long enough to trust.
 
-The indexes from migration 0018 all become composites with `tenant_id`
-first, in step 1 — an index that does not lead with the filtered column is one
-the planner declines to use, so leaving them alone would turn every scoped read
-into the full scan the index was added to prevent.
+The indexes from migration 0018 all gain a composite twin leading with
+`tenant_id`, in step 1 — an index that does not lead with the filtered column
+is one the planner declines to use, so leaving them alone would turn every
+scoped read into the full scan the index was added to prevent.
+
+**Twin, not replacement**, which is a correction to how this was first
+written. A swap in step 1 would leave the still-unscoped queries — which filter
+on nothing — with no usable index for however many deploys separate step 1
+from the scoping step, putting the pre-0018 full scan back for an unknown
+window in order to save six index entries per row on tables holding tens of
+rows. Migration 0021 adds the composites and keeps the singles; the scoping
+step drops the singles in the same change that makes the composites the ones
+actually used. Verified on the local
+database after 0021: the unscoped read still answers `SCAN … USING INDEX
+idx_gig_discovered`, and the scoped one answers `SEARCH … USING INDEX
+idx_gig_tenant_discovered (tenant_id=?)`.
+
+### The default is what makes step 1 safe
+
+The `tenant_id` columns migration 0021 adds are nullable, as staged above, and
+they also carry a **default: the one tenant this database has ever had**. That
+is what makes the column additive rather than merely tolerated. A write from
+the old Worker — which names no such column — lands in the right place instead
+of as a NULL nobody scoped, so every route not yet taught to pass a tenant
+keeps filing correctly, and SQLite backfills the existing rows as it adds the
+column rather than needing a separate `UPDATE` that could half-apply.
+
+That default is also the thing to remove, and the scoping step removes it. Past
+the point where scoping ships, a write that did not say who it belongs to is a
+bug, and a default is precisely what would stop it looking like one — the "a
+gig lands in the wrong tenant and nothing breaks visibly" failure this plan
+already warns about, wearing a different hat.
+
+The four auth tables get the same treatment for `user_id`, defaulting to the
+bootstrap owner — except `auth_challenges`, which is one round trip long and
+belongs to a ceremony rather than to a person.
+
+### Four uniqueness constraints move with the code that names them
+
+Four of the fourteen are unique on a value that is not distinctive between
+artists: `gig_correspondents` on `(kind, value)`, and two artists can
+correspond with the same festival address; `google_grants` on `purpose`, and
+both can hold a `gmail.compose` grant; `notification_marks` on `dedupe_key`,
+and both can raise the identical condition; `notification_events` on the same
+kind of key. Each has to grow a leading `tenant_id`, and two of them need the
+table rebuilt to do it, since SQLite cannot alter a primary key in place.
+
+The first draft of 0021 did all of that in step 1. It was wrong, and the reason
+generalises past this migration: **a uniqueness constraint is part of an
+interface, not just a storage detail.** Live code names two of these in an
+upsert target — `onConflictDoUpdate({ target: notificationMarks.dedupeKey })`
+and `target: googleGrants.purpose` — and SQLite requires an `ON CONFLICT`
+target to match a unique constraint exactly. Widening the key does not make
+those statements return something stale; it makes them *error*, under the old
+Worker, for the whole gap and for as long as a rollback leaves it running.
+
+The obvious prop is to keep the narrow unique index alongside the wider key.
+That works, and it is also what makes the change pointless: the narrow index is
+exactly what forbids a second tenant. So the constraint and the upsert that
+names it move together, in the scoping deploy. Step 1 adds only the column they
+will be widened onto.
+
+That is a different judgement from the one made about 0018's indexes two
+sections up, and the difference is the point: an ordering index is invisible to
+every statement, so a twin costs nothing and buys a safe window. A uniqueness
+constraint is visible to the statements that name it, so a twin buys nothing
+and hides the change it was supposed to stage.
 
 ### Where scoping actually lives
 
@@ -191,6 +316,73 @@ environment variable. That is a change to `.github/workflows/agents.yml` and
 `scripts/agents/api.ts` as well, and it is the step most likely to be
 forgotten, because nothing breaks visibly when a gig lands in the wrong
 tenant — it just appears on a stranger's Overview.
+
+### What step 2 actually did, and the four things it taught
+
+**Done.** `src/db/scope.ts` holds the mechanism, `src/lib/actor.ts` resolves a
+request to an actor, and `src/context.ts` is the one place a route reads a
+scope off a request. `TenantId` is branded with a single constructor, so the
+"admin mode resolves to null and does not compile" guarantee above is a type
+rather than a convention.
+
+**A missing filter is a source-level test.** `test/tenantScope.test.ts` reads
+the tree and fails when one of the fourteen is queried without `scoped` or
+`withTenant`. It has to be source-level rather than behavioural, because with
+one artist an unscoped query returns exactly the right rows and every
+behavioural test passes — it starts being wrong on the day nobody is looking.
+Exemptions are a list with a written reason each; there is one.
+
+**Two shapes hid the missing scope, and both are gone.** A `.where()` that
+was skipped entirely when no filters applied — the
+`conditions.length > 0 ? … : …` in both list routes — is now one branch with
+the tenant unconditional. And an
+`inArray(id, ids)` where the ids came from the browser: the tenant filter
+beside it is not belt-and-braces, it is the only check there is.
+
+**A uniqueness constraint is part of an interface.** Four of them had to grow a
+leading `tenant_id`, and the reason 0021 could not do it is that live code
+named two in an upsert target: SQLite requires `ON CONFLICT` to match a unique
+constraint exactly, so widening the key *errors* the old statements rather than
+staling them. Migration 0022 widens them only because the statements no longer
+name a constraint — `storeGrant` is a delete-then-insert, and the two mark
+writers are an update followed by a conflict-to-nothing insert. Both work
+against the schema on either side of the gap.
+
+**The cron has no request to read a scope from**, which forced a decision the
+plan had not made. Housekeeping is per tenant, because which marks are dead is
+derived from that artist's feed; event retention runs once. The digest and the
+reply scan run for the **owner's tenant only**, because their inputs are
+platform configuration and not the tenant's — the schedule and recipient are
+in `app_settings`, the mailbox is one `GMAIL_REFRESH_TOKEN`. Looping those
+over every tenant would mail the owner N times and scan his mailbox on
+somebody else's behalf.
+
+That is a real gap rather than a decision: **an invited artist gets no digest
+and no reply scan.** Both need per-artist configuration — a digest schedule and
+recipient that are not platform state, and a mailbox grant per tenant like
+`google_grants` already is for drafting. It belongs before invites (step 4)
+ship, and it is not in this step.
+
+### Agent tokens: the table exists and the secret still works
+
+`agent_tokens` is per-tenant, hashed, revocable, and issued through
+`/api/agent-tokens` behind a passkey touch — minting a credential that can
+write to your account is squarely the "changes who can get in" rule. An agent
+is refused those routes: a credential that can issue its own successor makes
+revoking one a race rather than an ending.
+
+`API_TOKEN` is **not** withdrawn. `actorForBearer` still accepts it and
+resolves it to the owner's tenant, which is the same "read both spellings" move
+`normaliseGigStatus` makes for the agents' status vocabulary. Withdrawing it in
+the deploy that introduced the table would have 401'd every agent until three
+GitHub secrets were rotated — a coordination with no upside while there is one
+tenant. It goes when `.github/workflows/agents.yml` and `scripts/agents/api.ts`
+hold a row instead, and that is the step most likely to be forgotten for
+exactly the reason above: nothing breaks visibly when a gig lands in the wrong
+tenant.
+
+There is no Settings screen for these yet. The routes work without one, and the
+screen is step 3's.
 
 ## Usage: a daily rollup, not a meter
 
@@ -237,6 +429,50 @@ Rules, each with a reason:
   An account that exists but has no credential is a thing to reason about, and
   there is no reason to have one.
 
+### What step 4 actually did
+
+**Done, and it needed no migration** — `invites` has been sitting in the schema
+since 0021, which is what step 1 being done properly buys. `shared/invites.ts`
+holds the rules against a `now` it is handed, `src/lib/invites.ts` is the
+storage and the one flow that creates an account, `/api/admin/invites` issues,
+lists and withdraws, and `/api/auth/join/*` redeems.
+
+**The URL is `#join/<token>`, in the fragment.** The plan wrote `/join/<token>`
+and a path is the wrong place: a fragment is never sent to the server, never
+lands in an access log and never appears in a `Referer` header, which is
+exactly what a credential in a URL needs. The client reads it and POSTs it in a
+body — all three join requests take it that way, and
+`test/invites.test.ts` fails if one starts putting it in a path.
+
+**The link is shown once and handed over, not emailed.** Same bargain as an
+agent token, for the same reason: the column holds a hash, so nothing can print
+it again, and losing it costs a withdrawal and a reissue. Emailing it is
+blocked on the domain onboarding below, and the screen says so rather than
+offering a button that would throw.
+
+**Redemption is spent last.** The invitation is marked used only after the
+credential verifies — so a cancelled prompt or a failed ceremony leaves the
+link working, which is what somebody whose browser gave up needs and costs
+nothing, because it is still single use once it lands. The tenant, the account
+and the first passkey are written in that one flow.
+
+**A passkey handle is per account now.** It was one fixed string, which was
+right for one user and becomes a bug with two: an authenticator replaces a
+credential sharing a handle, so two people enrolling on one device would
+replace each other. The owner keeps the original string — their authenticators
+already hold credentials under it and switching would leave a duplicate
+keychain entry for nothing — and everybody else is keyed by their account id.
+
+**The redemption notification is an event in the owner's feed**, titled with
+the artist's name, exactly as planned. Recorded after the session is issued, so
+a failure to notify cannot cost somebody their signup.
+
+**Outstanding, and both wait on the same thing:** Scout cannot mail an
+invitation, and an invited artist has no recovery path — the emailed setup code
+goes to the configured address and enrols the *owner's* account, which is safe
+(only the owner can read that inbox) but is not recovery for anybody else. Both
+need the section below.
+
 ### Mail to an invited artist needs the allowlist gone first
 
 A prerequisite that is easy to miss because nothing about it is visible while
@@ -278,15 +514,83 @@ rule that took `gig-festival-scan` off the screen.
 
 ## Order of work
 
-1. `users`, `tenants`, `invites`, `usage_daily`; `tenant_id` added nullable and
-   backfilled; 0018's indexes rebuilt as composites.
+1. `users`, `tenants`, `invites`, `usage_daily`; `tenant_id` added nullable,
+   defaulted and thereby backfilled; `user_id` on the credential tables;
+   composite twins for 0018's indexes. **Done — migration 0021.** No code
+   reads any of it yet.
 2. Session resolves a tenant; domain reads and writes take it as an argument;
-   agent tokens become per-tenant.
+   agent tokens become per-tenant. **Done — migration 0022 plus the scoping
+   deploy.** It widened the four uniqueness constraints alongside the upserts
+   that name them and dropped the single-column index twins; the column
+   defaults stay until step 5, because dropping them here would leave the
+   pre-scoping Worker writing NULLs across the migrate-then-deploy gap.
+   Outstanding from this step: per-artist digest and mailbox configuration,
+   and retiring `API_TOKEN` once the agents hold rows.
 3. Admin mode, reusing the elevation already built, then the `/admin` routes
-   and screen.
-4. Invite issue / redeem, with the redemption event.
+   and screen. **Done — migration 0023 plus the oversight deploy.** The
+   guarantee turned out to be a type rather than a rule; see below. Outstanding
+   from this step: three of `usage_daily`'s seven counters have no writer, and
+   the invite list on the screen waits on step 4.
+4. Invite issue / redeem, with the redemption event. **Done — no migration
+   needed, since `invites` arrived with 0021.** Outstanding: mailing the
+   invitation, and per-artist recovery, both gated on onboarding
+   `sundogsmusic.ca` to Email Service.
 5. `tenant_id` to `NOT NULL` on the fourteen domain tables — and on `users`
    too, since every account owns a tenant now, including the owner's.
+   **Half done — migration 0024.** `users` is `NOT NULL`. The fourteen are
+   not, for reasons the migration spells out and this plan got wrong; see
+   below.
+
+### What step 5 found, and why it stopped halfway
+
+The plan's last step assumed each step reached production before the next was
+written. **It did not.** The deployed Worker is from migration 0009 —
+passkeys, the research agents in CI, Gmail drafting, tenants, the oversight
+surface and invitations are all unmerged, and they land in one CI run. That is
+one fact, and it changes three things.
+
+**It found a real bug in 0022.** That migration widens
+`notification_marks`'s primary key from `dedupe_key` to
+`(tenant_id, dedupe_key)`, and its own comment argued this was safe because the
+*new* code names no constraint. True, and beside the point: the code running
+during the migrate-then-deploy gap is the deployed one, which names
+`notificationMarks.dedupeKey` as an `ON CONFLICT` target in two routes, and
+`notification_marks` is the one of the four tables that already exists in
+production. So 0022 now keeps a narrow unique index on `dedupe_key` purely so
+that target still resolves, and 0024 drops it — inside the same release, before
+an invitation can be redeemed, which is the only thing that creates a second
+tenant. The step-2 note above argued against exactly this prop; it was right on
+the facts it had and wrong on the ones it did not.
+
+**`users` is `NOT NULL` and the fourteen are not.** `users` is created by 0021
+in this same release, so nothing outside this repository has ever written to it
+and its shape here is its shape everywhere. The fourteen are older than the
+ledger: production was built from `schema.sql` by hand, and 0006–0008 were
+hand-applied and back-filled. SQLite has no `ALTER COLUMN`, so `NOT NULL`
+means fourteen table rebuilds, and a rebuild transcribes a column list — one
+that can only come from the *local* database. A column that exists in
+production and not locally would be dropped by a statement that succeeds. That
+is not a trade worth making for the benefit, which is small: every one of those
+columns has a default, so a write cannot produce a NULL unless it passes one
+explicitly, which `withTenant` cannot and `test/tenantScope.test.ts` catches.
+
+**The precondition was never met anyway.** "Once the code that fills it has
+been live long enough to trust" cannot be true of code that has not been live
+at all. Doing the hardening pass in the same release as the thing it hardens is
+doing it for the wrong reason.
+
+So 0024 names three conditions — the release deployed and running, production's
+schema compared against what the migrations produce, and no row carrying a NULL
+tenant — and makes the third one *observable* rather than assumed:
+`GET /api/admin/health` counts rows with no owner, per table, and the oversight
+screen says so in a line. A claim nobody looks at is a claim, not a check.
+
+**One thing the change exposed about the guard.** `test/tenantScope.test.ts`
+matches a table by its export name, so it cannot see `.from(table)` where the
+table came from iterating `DOMAIN_TABLES` — which is how the three jobs that
+must visit all fourteen are written. The gap is now a named list: a fourth file
+reaching for `DOMAIN_TABLES` fails the suite until somebody writes down why it
+may. A guard with an invisible gap is worse than one with a stated gap.
 
 Steps 1 and 2 are the whole risk. Steps 3 and 4 are the part that was asked
 for, and they are small — which is the thing worth knowing before starting,

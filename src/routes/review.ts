@@ -4,9 +4,10 @@ import { z } from 'zod'
 import { desc, eq, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets, promoDrafts, reminders } from '../db/schema'
+import { scoped } from '../db/scope'
+import { tenantOf, type AppEnv } from '../context'
 import { buildReviewQueue, matchesFilter, summariseQueue, type ReviewFilter } from '../../shared/reviewQueue'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
-import type { Env } from '../types'
 
 /**
  * GET /api/review — the decision queue.
@@ -31,7 +32,7 @@ import type { Env } from '../types'
  * early or late relative to Winnipeg. Fine for triage; worth revisiting if
  * these numbers ever drive anything automated.
  */
-const review = new Hono<{ Bindings: Env }>()
+const review = new Hono<AppEnv>()
 
 const FILTERS: ReviewFilter[] = [
   'needs',
@@ -64,11 +65,12 @@ review.get('/', async (c) => {
   }
 
   const db = getDb(c.env.DB)
+  const tenant = tenantOf(c)
 
   const [gigs, sync, promo, [orphans]] = await Promise.all([
-    db.select().from(gigOpportunities).orderBy(desc(gigOpportunities.discoveredAt)),
-    db.select().from(syncTargets).orderBy(desc(syncTargets.discoveredAt)),
-    db.select().from(promoDrafts).orderBy(desc(promoDrafts.createdAt)),
+    db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant)).orderBy(desc(gigOpportunities.discoveredAt)),
+    db.select().from(syncTargets).where(scoped(syncTargets, tenant)).orderBy(desc(syncTargets.discoveredAt)),
+    db.select().from(promoDrafts).where(scoped(promoDrafts, tenant)).orderBy(desc(promoDrafts.createdAt)),
     // Reminders reference entities by (type, id) with no foreign key, so a
     // deleted gig leaves its reminders pointing at nothing. Both delete
     // handlers now clean up after themselves; this counts what is already
@@ -83,11 +85,23 @@ review.get('/', async (c) => {
     db
       .select({ count: sql<number>`count(*)` })
       .from(reminders)
-      .where(sql`
-        (${reminders.entityType} = 'gig'
-          AND ${reminders.entityId} NOT IN (SELECT id FROM gig_opportunities))
-        OR (${reminders.entityType} = 'sync'
-          AND ${reminders.entityId} NOT IN (SELECT id FROM sync_targets))`),
+      //
+      // The two subqueries are scoped as well, and have to be: an id that
+      // exists in a *stranger's* gigs would otherwise count as a live parent
+      // and hide a real orphan.
+      .where(
+        scoped(
+          reminders,
+          tenant,
+          sql`(
+            (${reminders.entityType} = 'gig'
+              AND ${reminders.entityId} NOT IN (
+                SELECT id FROM gig_opportunities WHERE tenant_id = ${tenant}))
+            OR (${reminders.entityType} = 'sync'
+              AND ${reminders.entityId} NOT IN (
+                SELECT id FROM sync_targets WHERE tenant_id = ${tenant})))`,
+        ),
+      ),
   ])
 
   const items = buildReviewQueue({
@@ -155,7 +169,11 @@ review.post('/snooze', zValidator('json', SnoozeSchema), async (c) => {
     : { snoozedUntil: until, snoozedAt: ts, updatedAt: ts }
 
   const table = kind === 'gig' ? gigOpportunities : syncTargets
-  const [row] = await db.update(table).set(values).where(eq(table.id, id)).returning({ id: table.id })
+  const [row] = await db
+    .update(table)
+    .set(values)
+    .where(scoped(table, tenantOf(c), eq(table.id, id)))
+    .returning({ id: table.id })
 
   if (!row) return c.json({ error: `no ${kind} with id ${id}` }, 404)
   return c.json({ kind, id, snoozedUntil: until })

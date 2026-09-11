@@ -1,28 +1,23 @@
 name: Agents
 
-# The three research agents, on a schedule that does not depend on anybody's
-# laptop being open.
+# The three research agents, run by hand through the Claude API.
 #
-# They ran as scheduled Claude sessions on one machine until August 2026, when
-# all three stopped within a week of each other and nothing noticed for a
-# month. Two things changed. They run here now — and their instructions are
-# files in this repository (scripts/agents/prompts/), so a change to how an
-# agent behaves arrives as a diff somebody can read, and an agent that
-# disappears leaves a hole in `git log` rather than in a UI nobody opens.
+# This file used to hold their schedules. It is now the paid fallback: the
+# schedules moved to Claude Code routines, which run on the artist's Claude
+# plan instead of API credit. Here a sweep costs several dollars in tokens, and
+# a pet project with no paying users does not carry that three times a week.
+# See docs/agent-routines.md.
 #
-# The app watches too: `shared/taskCadence.ts` measures each task's cadence
-# from its own run history and raises a critical notification when one goes
-# quiet for longer than its own habit. That check is armed by the heartbeat
-# `scripts/agents/run.ts` posts in a `finally`, so a crashed run still reports.
+# What stays is a runner that works without a routine: the same prompts
+# (scripts/agents/prompts/), the same named tools (scripts/agents/tools.ts), and
+# a heartbeat the script posts itself. Trigger it from the Actions tab when a
+# routine is down and a sweep cannot wait.
+#
+# The app watches either way: `shared/taskCadence.ts` measures each task's
+# cadence from its own run history and raises a critical notification when one
+# goes quiet for longer than its own habit.
 
 on:
-  schedule:
-    # UTC. Winnipeg is UTC-5 in summer and UTC-6 in winter, so these land
-    # between 6 and 7am local — early enough to be read over coffee, and
-    # staggered so three model runs never contend for the same minute.
-    - cron: '0 12 * * 1' # gig-festival-scan, Mondays
-    - cron: '0 12 * * 3' # sync-pitch-research, Wednesdays
-    - cron: '0 12 1 * *' # monthly-promo-checkin, the 1st
   workflow_dispatch:
     inputs:
       agent:
@@ -47,26 +42,25 @@ permissions:
 
 jobs:
   gig-festival-scan:
-    if: github.event.schedule == '0 12 * * 1' || inputs.agent == 'gig-festival-scan'
+    if: inputs.agent == 'gig-festival-scan'
     uses: ./.github/workflows/agent-run.yml
     with:
       agent: gig-festival-scan
-      # A scheduled run always writes; a hand-triggered one writes only if asked.
-      apply: ${{ github.event_name == 'schedule' || inputs.apply == true }}
+      apply: ${{ inputs.apply == true }}
     secrets: inherit
 
   sync-pitch-research:
-    if: github.event.schedule == '0 12 * * 3' || inputs.agent == 'sync-pitch-research'
+    if: inputs.agent == 'sync-pitch-research'
     uses: ./.github/workflows/agent-run.yml
     with:
       agent: sync-pitch-research
-      apply: ${{ github.event_name == 'schedule' || inputs.apply == true }}
+      apply: ${{ inputs.apply == true }}
     secrets: inherit
 
   monthly-promo-checkin:
-    if: github.event.schedule == '0 12 1 * *' || inputs.agent == 'monthly-promo-checkin'
+    if: inputs.agent == 'monthly-promo-checkin'
     uses: ./.github/workflows/agent-run.yml
     with:
       agent: monthly-promo-checkin
-      apply: ${{ github.event_name == 'schedule' || inputs.apply == true }}
+      apply: ${{ inputs.apply == true }}
     secrets: inherit

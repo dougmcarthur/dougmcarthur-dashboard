@@ -2,7 +2,8 @@ import { Hono } from 'hono'
 import { eq, and, lte, desc, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets, promoDrafts, taskRuns, reminders } from '../db/schema'
-import type { Env } from '../types'
+import { scoped } from '../db/scope'
+import { tenantOf, type AppEnv } from '../context'
 
 /**
  * GET /api/overview — totals, the automation log, and dated reminders.
@@ -18,10 +19,11 @@ import type { Env } from '../types'
  * from the notes rather than from statuses nothing sets. See
  * docs/notes-field-audit.md.
  */
-const overview = new Hono<{ Bindings: Env }>()
+const overview = new Hono<AppEnv>()
 
 overview.get('/', async (c) => {
   const db = getDb(c.env.DB)
+  const tenant = tenantOf(c)
 
   const in3Days = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10)
 
@@ -32,10 +34,10 @@ overview.get('/', async (c) => {
     recentRuns,
     dueReminders,
   ] = await Promise.all([
-    db.select({ count: sql<number>`count(*)` }).from(gigOpportunities),
-    db.select({ count: sql<number>`count(*)` }).from(syncTargets),
-    db.select({ count: sql<number>`count(*)` }).from(promoDrafts),
-    db.select().from(taskRuns).orderBy(desc(taskRuns.runAt)).limit(15),
+    db.select({ count: sql<number>`count(*)` }).from(gigOpportunities).where(scoped(gigOpportunities, tenant)),
+    db.select({ count: sql<number>`count(*)` }).from(syncTargets).where(scoped(syncTargets, tenant)),
+    db.select({ count: sql<number>`count(*)` }).from(promoDrafts).where(scoped(promoDrafts, tenant)),
+    db.select().from(taskRuns).where(scoped(taskRuns, tenant)).orderBy(desc(taskRuns.runAt)).limit(15),
     // Pending reminders due within 3 days, joined with gig name/deadline
     db
       .select({
@@ -49,15 +51,21 @@ overview.get('/', async (c) => {
         gigStatus: gigOpportunities.status,
       })
       .from(reminders)
+      // The join carries the tenant too. A reminder is already scoped by the
+      // WHERE below, but the row it joins to is reached by id alone, and an id
+      // is not a claim about who owns it — so the gig has to say so as well.
       .leftJoin(
         gigOpportunities,
         and(
           eq(reminders.entityType, 'gig'),
           eq(reminders.entityId, gigOpportunities.id),
+          eq(gigOpportunities.tenantId, tenant),
         ),
       )
       .where(
-        and(
+        scoped(
+          reminders,
+          tenant,
           eq(reminders.status, 'pending'),
           lte(reminders.scheduledFor, in3Days),
         ),

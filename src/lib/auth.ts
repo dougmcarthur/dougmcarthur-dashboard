@@ -157,9 +157,36 @@ export interface Session {
   maxAgeSeconds: number
 }
 
+/**
+ * Which surface a session is on.
+ *
+ * Null in the column means artist, so every session that predates migration
+ * 0023 — and every new one — starts where it should. `readMode` is the only
+ * reader, so an unrecognised value cannot become a third mode by accident.
+ */
+export type SessionMode = 'artist' | 'admin'
+
+export function readMode(raw: string | null | undefined): SessionMode {
+  return raw === 'admin' ? 'admin' : 'artist'
+}
+
+/**
+ * Move a session between surfaces.
+ *
+ * Whether it *may* move is decided by the caller — entering admin mode needs
+ * the owner role and a recent passkey assertion, and leaving needs neither,
+ * because giving up privilege is not a privileged act. This only writes it.
+ */
+export async function setSessionMode(env: Env, sessionId: string, mode: SessionMode): Promise<void> {
+  await getDb(env.DB)
+    .update(authSessions)
+    .set({ mode: mode === 'admin' ? 'admin' : null })
+    .where(eq(authSessions.id, sessionId))
+}
+
 export async function createSession(
   env: Env,
-  input: { credentialId: string | null; label: string | null; now?: Date },
+  input: { credentialId: string | null; label: string | null; userId: string | null; now?: Date },
 ): Promise<Session> {
   const now = input.now ?? new Date()
   const token = randomToken()
@@ -168,6 +195,11 @@ export async function createSession(
     id: await sha256Hex(token),
     credentialId: input.credentialId,
     label: input.label,
+    // Whose session this is, and therefore whose rows it reaches. Nullable in
+    // the column because migration 0021 added it to sessions that predate the
+    // idea; a session that resolves to no user resolves to no tenant, and
+    // `actorForSession` answers that with 401 rather than with everything.
+    userId: input.userId,
     createdAt: now.toISOString(),
     lastSeenAt: now.toISOString(),
     expiresAt: isoAfter(now, SESSION_TTL_DAYS * 86_400_000),
@@ -179,9 +211,13 @@ export interface ActiveSession {
   id: string
   label: string | null
   credentialId: string | null
+  /** The account this session belongs to. Null only on a row that predates 0021. */
+  userId: string | null
   expiresAt: string
   /** Last passkey touch, or null. Not the same as when it signed in. */
   elevatedAt: string | null
+  /** 'admin' or 'artist'. See src/lib/actor.ts — the tenant follows from it. */
+  mode: SessionMode
 }
 
 /**
@@ -224,8 +260,10 @@ export async function readSession(
     id: row.id,
     label: row.label,
     credentialId: row.credentialId,
+    userId: row.userId,
     expiresAt: row.expiresAt,
     elevatedAt: row.elevatedAt,
+    mode: readMode(row.mode),
   }
 }
 
@@ -236,9 +274,15 @@ export async function destroySession(env: Env, cookieHeader: string | null | und
   await db.delete(authSessions).where(eq(authSessions.id, await sha256Hex(token)))
 }
 
-/** Every session, everywhere. What "sign out everywhere" means. */
-export async function destroyAllSessions(env: Env): Promise<void> {
-  await getDb(env.DB).delete(authSessions)
+/**
+ * Every session this account has open. What "sign out everywhere" means.
+ *
+ * Scoped to the user, because "everywhere" means every browser of *yours* —
+ * signing a stranger out of their own account is not what the button on your
+ * settings screen offers to do.
+ */
+export async function destroyAllSessions(env: Env, userId: string): Promise<void> {
+  await getDb(env.DB).delete(authSessions).where(eq(authSessions.userId, userId))
 }
 
 /**
@@ -301,8 +345,28 @@ export async function consumeChallenge(
 /* Credentials                                                            */
 /* --------------------------------------------------------------------- */
 
+/**
+ * Every credential in the deployment, whoever holds it.
+ *
+ * Deliberately unscoped, and used for exactly one question: whether *anybody*
+ * has a passkey yet. The signed-out login screen asks it to decide between
+ * "sign in" and "set up", and it cannot be scoped because there is no session
+ * to scope it by. It returns a count's worth of information and no identity,
+ * which is the only reason that is safe.
+ */
 export async function listCredentials(env: Env) {
   return getDb(env.DB).select().from(passkeyCredentials)
+}
+
+/**
+ * One account's credentials. What every signed-in surface wants.
+ *
+ * Separate from the above rather than a parameter with a default, because a
+ * default here is the wrong answer arriving silently: a management screen that
+ * forgot to pass a user would list a stranger's authenticators.
+ */
+export async function credentialsForUser(env: Env, userId: string) {
+  return getDb(env.DB).select().from(passkeyCredentials).where(eq(passkeyCredentials.userId, userId))
 }
 
 export async function countCredentials(env: Env): Promise<number> {
@@ -357,7 +421,11 @@ export async function lastCodeIssuedAt(env: Env): Promise<string | null> {
  * One live code at a time, because two means a phone showing the older email
  * is a code that does not work and no way to tell which is which.
  */
-export async function issueEnrolmentCode(env: Env, now = new Date()): Promise<IssuedCode> {
+export async function issueEnrolmentCode(
+  env: Env,
+  input: { userId: string | null; now?: Date } = { userId: null },
+): Promise<IssuedCode> {
+  const now = input.now ?? new Date()
   const db = getDb(env.DB)
   await db.delete(authEnrolmentCodes)
 
@@ -369,6 +437,11 @@ export async function issueEnrolmentCode(env: Env, now = new Date()): Promise<Is
 
   await db.insert(authEnrolmentCodes).values({
     id,
+    // Whose account this code enrols a passkey for. Today it is the owner's,
+    // because `enrolmentRecipient` is deployment configuration and there is
+    // one address. When accounts arrive the typed address becomes a lookup
+    // key and this is the account it matched — never the address typed.
+    userId: input.userId,
     codeHash: await sha256Hex(code),
     attempts: 0,
     expiresAt,
@@ -378,7 +451,9 @@ export async function issueEnrolmentCode(env: Env, now = new Date()): Promise<Is
   return { id, code, expiresAt }
 }
 
-export type CodeCheck = { ok: true; id: string } | { ok: false; reason: EnrolmentCodeState | 'none' | 'wrong' }
+export type CodeCheck =
+  | { ok: true; id: string; userId: string | null }
+  | { ok: false; reason: EnrolmentCodeState | 'none' | 'wrong' }
 
 /**
  * Checks a code without spending it — the ceremony is two round trips, and a
@@ -407,7 +482,7 @@ export async function checkEnrolmentCode(env: Env, code: string, now = new Date(
     }
   }
 
-  return { ok: true, id: row.id }
+  return { ok: true, id: row.id, userId: row.userId }
 }
 
 export async function spendEnrolmentCode(env: Env, id: string, now = new Date()): Promise<void> {
@@ -424,10 +499,15 @@ export async function spendEnrolmentCode(env: Env, id: string, now = new Date())
 /**
  * The research agents' credential.
  *
- * Deliberately a shared secret rather than a second passkey: they run
- * headless and outside this repo, and WebAuthn has no non-interactive mode.
- * It is a Worker secret, so rotating it is `wrangler secret put` and not a
- * migration.
+ * Deliberately a shared secret rather than a second passkey: they run headless
+ * and outside this repo, and WebAuthn has no non-interactive mode.
+ *
+ * Answering *whether* a bearer is valid is no longer enough, because the
+ * answer a request needs is *whose rows it may write* — the agents POST gigs,
+ * and a gig belongs to somebody. `actorForBearer` in src/lib/actor.ts resolves
+ * a token to a tenant, and this remains only as the platform-secret half of
+ * that, kept while the agents still hold `API_TOKEN` rather than a per-tenant
+ * row.
  */
 export function bearerAuthorised(env: Env, header: string | null | undefined): boolean {
   const expected = env.API_TOKEN

@@ -380,14 +380,106 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json()
 }
 
+/** Which surface this session is on. See docs/multi-tenant-plan.md. */
+export type SessionMode = 'artist' | 'admin'
+
 /** Who is signed in, and what the login screen may offer. */
 export interface SessionState {
   authenticated: boolean
   label: string | null
+  /**
+   * 'owner' decides whether the mode switch is offered at all. Null when
+   * signed out. Not a grant — every admin route checks it again, because a
+   * hidden button is still a URL.
+   */
+  role: 'owner' | 'artist' | null
+  /** Which surface the app should render. Artist unless the session says so. */
+  mode: SessionMode
   /** Whether any passkey exists yet. False means set-up, not sign-in. */
   enrolled: boolean
   /** Whether an emailed setup code can be sent at all. */
   recoveryAvailable: boolean
+}
+
+/** One artist, as the oversight surface sees them: a name, a date, numbers. */
+export interface AdminArtist {
+  id: string
+  displayName: string | null
+  since: string
+  accounts: number
+  owner: boolean
+  usage: {
+    day: string
+    domainRows: number
+    gigRows: number
+    promoRows: number
+    agentRuns: number
+  } | null
+}
+
+export interface AdminArtists {
+  items: AdminArtist[]
+  /** Which usage fields have a writer. The rest are gaps, not zeroes. */
+  measured: string[]
+}
+
+/** What removing an artist would destroy: a size per table, never content. */
+export interface RemovalPreview {
+  tenantId: string
+  rows: Array<{ table: string; count: number }>
+  total: number
+  users: number
+}
+
+export interface RemovalResult {
+  tenantId: string
+  rowsDeleted: number
+  usersDeleted: number
+}
+
+/** Whether every row on the platform belongs to somebody. */
+export interface TenantHealth {
+  tables: Array<{ table: string; unscoped: number }>
+  unscoped: number
+}
+
+/** An invitation, as the oversight surface sees it. Never the token. */
+export interface InviteSummary {
+  id: string
+  email: string
+  displayName: string | null
+  state: 'valid' | 'redeemed' | 'revoked' | 'expired'
+  createdAt: string
+  expiresAt: string
+  redeemedAt: string | null
+  revokedAt: string | null
+}
+
+export interface InviteList {
+  items: InviteSummary[]
+  /** False while the mail binding's allowlist is the boundary. See the route. */
+  canMail: boolean
+}
+
+/** The one moment the token exists outside the invitee's browser. */
+export interface IssuedInvite {
+  id: string
+  token: string
+  expiresAt: string
+}
+
+/**
+ * What the join screen learns before asking anybody to touch anything.
+ *
+ * Only the success shape, deliberately. A dead invitation answers 404 or 410
+ * and `apiFetch` turns that into a thrown `Error` carrying the sentence the
+ * server wrote — so the refusal reaches the screen the same way every other
+ * refusal does, rather than as a second success type the caller has to
+ * remember to check.
+ */
+export interface JoinCheck {
+  email: string
+  displayName: string | null
 }
 
 export interface PasskeySummary {
@@ -463,6 +555,36 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    /**
+     * Move this session between the artist and oversight surfaces.
+     *
+     * Entering admin mode answers 403 with `needsElevation` until the passkey
+     * is touched, so callers wrap it in `withConfirmation` like any other
+     * action that changes who can get in.
+     */
+    setMode: (mode: SessionMode) =>
+      apiFetch<{ mode: SessionMode }>('/auth/mode', {
+        method: 'POST',
+        body: JSON.stringify({ mode }),
+      }),
+    /**
+     * Redeeming an invitation: signing up and signing in at once.
+     *
+     * The token travels in a body rather than a path, because a credential in
+     * a URL is a credential in an access log and a browser history.
+     */
+    joinCheck: (token: string) =>
+      apiFetch<JoinCheck>('/auth/join/check', { method: 'POST', body: JSON.stringify({ token }) }),
+    joinOptions: (token: string) =>
+      apiFetch<{ ceremony: string; options: Record<string, unknown> }>('/auth/join/options', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      }),
+    joinVerify: (body: { token: string; ceremony: string; response: unknown; label?: string }) =>
+      apiFetch<{ ok: boolean; label: string }>('/auth/join/verify', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     passkeys: () => apiFetch<{ items: PasskeySummary[] }>('/auth/passkeys'),
     revoke: (id: string) =>
       apiFetch<{ ok: boolean; remaining: number }>(`/auth/passkeys/${encodeURIComponent(id)}`, {
@@ -484,6 +606,38 @@ export const api = {
       }),
     disconnect: () => apiFetch<{ ok: boolean }>('/gmail/disconnect', { method: 'POST' }),
     connectHref: '/api/gmail/connect',
+  },
+  /**
+   * The oversight surface.
+   *
+   * Every call here 403s unless the session is in admin mode, and every call
+   * *outside* here 403s while it is — the two surfaces are separate rather
+   * than nested, so the app renders one or the other and never both.
+   */
+  admin: {
+    artists: () => apiFetch<AdminArtists>('/admin/artists'),
+    removalPreview: (id: string) =>
+      apiFetch<RemovalPreview>(`/admin/artists/${encodeURIComponent(id)}/removal`),
+    remove: (id: string) =>
+      apiFetch<RemovalResult>(`/admin/artists/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    /** Rows with no owner, per table. Should be zero, and is worth checking. */
+    health: () => apiFetch<TenantHealth>('/admin/health'),
+    invites: () => apiFetch<InviteList>('/admin/invites'),
+    invite: (body: { email: string; displayName?: string }) =>
+      apiFetch<IssuedInvite>('/admin/invites', { method: 'POST', body: JSON.stringify(body) }),
+    revokeInvite: (id: string) =>
+      apiFetch<{ id: string; revoked: boolean }>(`/admin/invites/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
+  },
+  /** What to call this artist. One field, set by them, read by oversight. */
+  profile: {
+    read: () => apiFetch<{ displayName: string | null }>('/profile'),
+    save: (displayName: string | null) =>
+      apiFetch<{ displayName: string | null }>('/profile', {
+        method: 'PATCH',
+        body: JSON.stringify({ displayName }),
+      }),
   },
   overview: () => apiFetch<Overview>('/overview'),
   review: (params?: { filter?: ReviewFilter; limit?: number }) => {

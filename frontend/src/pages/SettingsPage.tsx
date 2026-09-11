@@ -7,6 +7,9 @@ import { FIELD } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { NotesBackfillCard } from '../components/NotesBackfillCard'
 import { PasskeysCard } from '../components/PasskeysCard'
+import { AdminModeCard } from '../components/AdminModeCard'
+import { ProfileCard } from '../components/ProfileCard'
+import { useSession } from '../hooks/useSession'
 
 
 // ── Integration status card ───────────────────────────────────────────────────
@@ -282,6 +285,7 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
 
 export function SettingsPage() {
   const qc = useQueryClient()
+  const session = useSession()
 
   const { data: docs = [], isLoading } = useQuery({
     queryKey: ['referenceDocs'],
@@ -308,8 +312,12 @@ export function SettingsPage() {
           pinned to the left just banks empty pixels on a wide display. */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
         <div className="space-y-8 min-w-0">
+          <ProfileCard />
           <AppearanceSettings />
           <PasskeysCard />
+          {/* Owners only — and the route says the same thing again, because a
+              card that is merely not rendered is still a URL. */}
+          {session?.role === 'owner' && <AdminModeCard />}
         </div>
         <div className="space-y-8 min-w-0">
           <IntegrationCards />

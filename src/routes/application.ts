@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
 import { applicationFields, artistAssets, gigOpportunities } from '../db/schema'
+import { scoped, withTenant, type TenantId } from '../db/scope'
+import { tenantOf, type AppEnv } from '../context'
 import {
   buildApplication,
   normaliseAnswerState,
@@ -27,7 +29,7 @@ import type { Env } from '../types'
  * application itself is copied out by hand, on purpose. See
  * shared/application.ts.
  */
-const application = new Hono<{ Bindings: Env }>()
+const application = new Hono<AppEnv>()
 
 const PrepareSchema = z.object({
   /** Where the form is, when it is not the listing URL already on the row. */
@@ -87,15 +89,22 @@ function toWire(row: FieldRow): ApplicationField {
   }
 }
 
-async function loadPacket(env: Env, gigId: number, today: string) {
+async function loadPacket(env: Env, tenant: TenantId, gigId: number, today: string) {
   const db = getDb(env.DB)
 
-  const gig = await db.select().from(gigOpportunities).where(eq(gigOpportunities.id, gigId)).get()
+  const gig = await db
+    .select()
+    .from(gigOpportunities)
+    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, gigId)))
+    .get()
   if (!gig) return null
 
   const [rows, assets] = await Promise.all([
-    db.select().from(applicationFields).where(eq(applicationFields.gigId, gigId)),
-    db.select().from(artistAssets),
+    db
+      .select()
+      .from(applicationFields)
+      .where(scoped(applicationFields, tenant, eq(applicationFields.gigId, gigId))),
+    db.select().from(artistAssets).where(scoped(artistAssets, tenant)),
   ])
 
   const packet = buildApplication({
@@ -137,7 +146,7 @@ application.get('/', async (c) => {
   const gigId = gigIdOf(c.req.param('id'))
   if (gigId === null) return c.json({ error: 'A gig id is required.' }, 400)
 
-  const packet = await loadPacket(c.env, gigId, todayOf(c))
+  const packet = await loadPacket(c.env, tenantOf(c), gigId, todayOf(c))
   if (!packet) return c.json({ error: 'not found' }, 404)
   return c.json(packet)
 })
@@ -158,9 +167,14 @@ application.post('/prepare', zValidator('json', PrepareSchema), async (c) => {
 
   const body = c.req.valid('json')
   const db = getDb(c.env.DB)
+  const tenant = tenantOf(c)
   const now = new Date().toISOString()
 
-  const gig = await db.select().from(gigOpportunities).where(eq(gigOpportunities.id, gigId)).get()
+  const gig = await db
+    .select()
+    .from(gigOpportunities)
+    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, gigId)))
+    .get()
   if (!gig) return c.json({ error: 'not found' }, 404)
 
   const url = body.url ?? gig.applicationUrl ?? gig.url
@@ -175,13 +189,16 @@ application.post('/prepare', zValidator('json', PrepareSchema), async (c) => {
   }
 
   const outcome = await readApplicationForm(url)
-  const assets = (await db.select().from(artistAssets)) as ArtistAsset[]
+  const assets = (await db
+    .select()
+    .from(artistAssets)
+    .where(scoped(artistAssets, tenant))) as ArtistAsset[]
   const live = assets.filter((a) => !a.archived && a.value)
 
   const existing = (await db
     .select()
     .from(applicationFields)
-    .where(eq(applicationFields.gigId, gigId))) as FieldRow[]
+    .where(scoped(applicationFields, tenant, eq(applicationFields.gigId, gigId)))) as FieldRow[]
   const byKey = new Map(existing.map((r) => [r.fieldKey, r]))
 
   for (const field of outcome.fields) {
@@ -190,7 +207,7 @@ application.post('/prepare', zValidator('json', PrepareSchema), async (c) => {
 
     if (!prior) {
       const staged = stageAnswer(field, live)
-      await db.insert(applicationFields).values({
+      await db.insert(applicationFields).values(withTenant(tenant, {
         gigId,
         fieldKey: field.fieldKey,
         label: field.label,
@@ -206,7 +223,7 @@ application.post('/prepare', zValidator('json', PrepareSchema), async (c) => {
         answerState: staged.answerState,
         createdAt: now,
         updatedAt: now,
-      })
+      }))
       continue
     }
 
@@ -241,7 +258,7 @@ application.post('/prepare', zValidator('json', PrepareSchema), async (c) => {
             }
           : shape,
       )
-      .where(eq(applicationFields.id, prior.id))
+      .where(scoped(applicationFields, tenant, eq(applicationFields.id, prior.id)))
   }
 
   // Gone from the form, and nothing staged against it: a question that is no
@@ -250,7 +267,9 @@ application.post('/prepare', zValidator('json', PrepareSchema), async (c) => {
   const seen = new Set(outcome.fields.map((f) => f.fieldKey))
   const stale = existing.filter((r) => !seen.has(r.fieldKey) && !r.answer).map((r) => r.id)
   if (outcome.status === 'ready' && stale.length > 0) {
-    await db.delete(applicationFields).where(inArray(applicationFields.id, stale))
+    await db
+      .delete(applicationFields)
+      .where(scoped(applicationFields, tenant, inArray(applicationFields.id, stale)))
   }
 
   const updates: Record<string, unknown> = {
@@ -270,9 +289,12 @@ application.post('/prepare', zValidator('json', PrepareSchema), async (c) => {
     if (isGigTransitionAllowed(gig.status, 'preparing')) updates.status = 'preparing'
   }
 
-  await db.update(gigOpportunities).set(updates).where(eq(gigOpportunities.id, gigId))
+  await db
+    .update(gigOpportunities)
+    .set(updates)
+    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, gigId)))
 
-  const packet = await loadPacket(c.env, gigId, todayOf(c))
+  const packet = await loadPacket(c.env, tenant, gigId, todayOf(c))
   return c.json({ ...packet, read: { status: outcome.status, note: outcome.note, fields: outcome.fields.length } })
 })
 
@@ -282,12 +304,20 @@ application.patch('/fields/:fieldId', zValidator('json', FieldPatchSchema), asyn
   if (gigId === null || fieldId === null) return c.json({ error: 'A gig id and a field id are required.' }, 400)
 
   const db = getDb(c.env.DB)
+  const tenant = tenantOf(c)
   const b = c.req.valid('json')
 
   const row = await db
     .select()
     .from(applicationFields)
-    .where(and(eq(applicationFields.id, fieldId), eq(applicationFields.gigId, gigId)))
+    .where(
+      scoped(
+        applicationFields,
+        tenant,
+        eq(applicationFields.id, fieldId),
+        eq(applicationFields.gigId, gigId),
+      ),
+    )
     .get()
   if (!row) return c.json({ error: 'not found' }, 404)
 
@@ -299,7 +329,11 @@ application.patch('/fields/:fieldId', zValidator('json', FieldPatchSchema), asyn
       updates.answerAssetId = null
       updates.answerState = 'empty'
     } else {
-      const asset = await db.select().from(artistAssets).where(eq(artistAssets.id, b.useAssetId)).get()
+      const asset = await db
+        .select()
+        .from(artistAssets)
+        .where(scoped(artistAssets, tenant, eq(artistAssets.id, b.useAssetId)))
+        .get()
       if (!asset?.value) return c.json({ error: 'That asset has nothing to say.' }, 400)
       updates.answer = asset.value
       updates.answerAssetId = asset.id
@@ -321,9 +355,12 @@ application.patch('/fields/:fieldId', zValidator('json', FieldPatchSchema), asyn
   // suggestion is the common case and must not read as an edit.
   if (b.answerState !== undefined) updates.answerState = b.answerState
 
-  await db.update(applicationFields).set(updates).where(eq(applicationFields.id, fieldId))
+  await db
+    .update(applicationFields)
+    .set(updates)
+    .where(scoped(applicationFields, tenant, eq(applicationFields.id, fieldId)))
 
-  const packet = await loadPacket(c.env, gigId, todayOf(c))
+  const packet = await loadPacket(c.env, tenant, gigId, todayOf(c))
   return c.json(packet)
 })
 

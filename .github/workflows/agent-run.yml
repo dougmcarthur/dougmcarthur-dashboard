@@ -40,7 +40,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SCOUT_API_TOKEN: ${{ secrets.SCOUT_API_TOKEN }}
-          # Set this as a repository variable when the app moves to
-          # scout.sundogsmusic.ca. Until then the script's own default applies.
+          # Optional. An unset repository variable arrives as an empty string,
+          # not as nothing, and `resolveBaseUrl` falls back to production on
+          # either — the first run from CI died on exactly that difference.
           SCOUT_API_URL: ${{ vars.SCOUT_API_URL }}
         run: npx tsx scripts/agents/run.ts ${{ inputs.agent }} ${{ inputs.apply && '--apply' || '' }}

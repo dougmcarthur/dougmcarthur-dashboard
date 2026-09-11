@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { desc } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets, promoDrafts, digestReports } from '../db/schema'
+import { scoped, withTenant, type TenantId } from '../db/scope'
+import { tenantOf, type AppEnv } from '../context'
 import { buildReviewQueue } from '../../shared/reviewQueue'
 import { buildDigest, type Digest } from '../../shared/digest'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
@@ -22,16 +24,19 @@ import type { Env } from '../types'
  * what keeps previewing free of side effects: previewing twice must not make
  * the real send go quiet.
  */
-const digest = new Hono<{ Bindings: Env }>()
+const digest = new Hono<AppEnv>()
 
 /** Builds the digest and the mail bodies. Shared by preview, send and cron. */
-export async function composeDigest(env: Env): Promise<{ digest: Digest; subject: string; html: string; text: string }> {
+export async function composeDigest(
+  env: Env,
+  tenant: TenantId,
+): Promise<{ digest: Digest; subject: string; html: string; text: string }> {
   const db = getDb(env.DB)
   const [gigs, sync, promo, prior] = await Promise.all([
-    db.select().from(gigOpportunities).orderBy(desc(gigOpportunities.discoveredAt)),
-    db.select().from(syncTargets).orderBy(desc(syncTargets.discoveredAt)),
-    db.select().from(promoDrafts).orderBy(desc(promoDrafts.createdAt)),
-    db.select().from(digestReports),
+    db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant)).orderBy(desc(gigOpportunities.discoveredAt)),
+    db.select().from(syncTargets).where(scoped(syncTargets, tenant)).orderBy(desc(syncTargets.discoveredAt)),
+    db.select().from(promoDrafts).where(scoped(promoDrafts, tenant)).orderBy(desc(promoDrafts.createdAt)),
+    db.select().from(digestReports).where(scoped(digestReports, tenant)),
   ])
 
   const items = buildReviewQueue({
@@ -65,14 +70,19 @@ export async function composeDigest(env: Env): Promise<{ digest: Digest; subject
  * marking first would mean a failed send silently swallows a week of changes,
  * because the next run would consider them already reported.
  */
-export async function recordDigest(env: Env, built: Digest): Promise<void> {
+export async function recordDigest(env: Env, tenant: TenantId, built: Digest): Promise<void> {
   if (built.marks.length === 0) return
   const db = getDb(env.DB)
   const reportedAt = new Date().toISOString()
   for (const m of built.marks) {
+    // The one upsert in this codebase that keeps its `ON CONFLICT` target
+    // through the tenant change, because the key it names is still right:
+    // `entity_id` is a global autoincrement, so two artists cannot collide on
+    // one. That is why `digest_reports` is not among the four constraints the
+    // scoping migration widens.
     await db
       .insert(digestReports)
-      .values({ entityType: m.entityType, entityId: m.entityId, grp: m.grp, fingerprint: m.fingerprint, reportedAt })
+      .values(withTenant(tenant, { entityType: m.entityType, entityId: m.entityId, grp: m.grp, fingerprint: m.fingerprint, reportedAt }))
       .onConflictDoUpdate({
         target: [digestReports.entityType, digestReports.entityId],
         set: { grp: m.grp, fingerprint: m.fingerprint, reportedAt },
@@ -81,7 +91,7 @@ export async function recordDigest(env: Env, built: Digest): Promise<void> {
 }
 
 digest.get('/preview', async (c) => {
-  const { digest: built, subject, html, text } = await composeDigest(c.env)
+  const { digest: built, subject, html, text } = await composeDigest(c.env, tenantOf(c))
   const settings = await readDigestSettings(c.env)
   const now = new Date()
   return c.json({
@@ -110,7 +120,8 @@ digest.post('/send', async (c) => {
     return c.json({ error: 'This site cannot send email yet.' }, 503)
   }
 
-  const { digest: built, subject, html, text } = await composeDigest(c.env)
+  const tenant = tenantOf(c)
+  const { digest: built, subject, html, text } = await composeDigest(c.env, tenant)
 
   // An empty digest teaches you to ignore the full ones, so there is no way to
   // send one — not even by asking. A manual send of nothing is still nothing.
@@ -124,7 +135,7 @@ digest.post('/send', async (c) => {
     html,
   })
 
-  await recordDigest(c.env, built)
+  await recordDigest(c.env, tenant, built)
   return c.json({ sent: true, to: settings.recipient, subject, messageId: result.messageId })
 })
 

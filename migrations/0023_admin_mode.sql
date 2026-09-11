@@ -1,0 +1,31 @@
+-- Step 3 of `docs/multi-tenant-plan.md`: the owner's second job, as a mode
+-- rather than a second account.
+--
+-- One column. The whole of admin mode is "which of two surfaces is this
+-- session on", and the plan's argument for putting it here rather than in a
+-- second account is worth restating, because the column looks trivial and the
+-- decision was not.
+--
+-- A separate owner account holding no tenant would make "no access to personal
+-- data" structural. It would also buy that with a second passkey used once a
+-- month — the credential that is missing when it is finally needed — and a
+-- second recovery address that only ever gets exercised in an emergency.
+--
+-- A mode keeps the structural guarantee and pays neither cost, because the
+-- tenant is resolved *from the session*: in artist mode a session resolves to
+-- the owner's tenant, and in admin mode it resolves to no tenant at all. Not a
+-- wildcard, not a sentinel meaning "all" — the admin surface is a different
+-- type in `src/context.ts` with no tenant on it, so an admin route reaching
+-- for `gig_opportunities` fails to compile.
+--
+-- Nullable, and null is artist mode. That is what makes this additive: every
+-- session already open stays exactly where it was, and the currently-live
+-- Worker across the migrate-then-deploy gap reads a column it does not name.
+--
+-- What is *not* stored here is any grant of privilege. Entering admin mode
+-- needs the role and a fresh passkey assertion, both checked at the moment of
+-- the switch; the column only records which surface the session ended up on.
+-- A session that flipped to admin an hour ago is still in admin mode, and
+-- still cannot read anybody's rows, because there is nothing on that surface
+-- that reads them.
+ALTER TABLE auth_sessions ADD COLUMN mode TEXT;

@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["scripts/agents"]
+  "include": ["scripts/agents", "scripts/issue-agent-token.ts"]
 }
