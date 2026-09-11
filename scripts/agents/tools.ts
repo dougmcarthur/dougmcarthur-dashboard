@@ -86,7 +86,7 @@ export const TOOL_SPECS = {
         deadlineNote: { type: 'string', description: 'The deadline exactly as the page words it' },
         opensAt: { type: 'string', description: 'ISO date a submission window opens' },
         location: { type: 'string' },
-        country: { type: 'string' },
+        country: { type: 'string', description: 'CA, US or other — the codes the rows on file use' },
         paid: { type: 'boolean', description: 'True when entry costs money' },
         feeAmount: { type: 'number' },
         feeCurrency: { type: 'string' },
