@@ -109,6 +109,13 @@ default branch, and migration 0022 applied, because that is where
    | `sync-pitch-research` | Wednesdays, 7am Winnipeg |
    | `monthly-promo-checkin` | The 1st, 7am Winnipeg |
 
+   **Model: Sonnet 5**, to spend less of the plan's allowance. If a run shows
+   it struggling to parse things — `cli.ts` refusing its input again and
+   again, fields filed in the wrong place, a deadline or fee misread from a
+   page, a report that contradicts what it filed — move that routine to
+   Opus 5. The cost of a wrong row is a missed date, which is worth more than
+   the allowance.
+
 4. **Check one.** *Run now* on the routine, then read the run's transcript:
    a green status only means the session started and exited. A new row on
    History is the proof.
