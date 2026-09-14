@@ -14,7 +14,7 @@ import {
   resolveBaseUrl,
   type ApiConfig,
 } from '../scripts/agents/api'
-import { TOOL_SPECS, inputProblem } from '../scripts/agents/tools'
+import { TOOL_SPECS, fieldLines, inputProblem } from '../scripts/agents/tools'
 
 /**
  * An issued agent token reaches seven routes and nothing else.
@@ -136,5 +136,29 @@ describe('tool input, checked before a command line sends it', () => {
 
   it('refuses something that is not an object', () => {
     expect(inputProblem(gig, ['x'])).toContain('one JSON object')
+  })
+})
+
+/**
+ * A routine learns a tool from `cli.ts help`, not from the schema run.ts sends,
+ * so a field description that help drops is one no routine ever reads.
+ */
+describe('help carries every field description', () => {
+  it('prints each description beside its field', () => {
+    for (const spec of Object.values(TOOL_SPECS)) {
+      const lines = fieldLines(spec)
+      for (const [field, def] of Object.entries(spec.inputSchema.properties)) {
+        const line = lines.find((l) => l.startsWith(`${field}?:`) || l.startsWith(`${field}:`))
+        expect(line, `${spec.name}.${field}`).toBeDefined()
+        if ('description' in def && def.description) expect(line).toContain(def.description)
+      }
+    }
+  })
+
+  it('marks optional fields and leaves required ones bare', () => {
+    const lines = fieldLines(TOOL_SPECS.create_gig_opportunity)
+    expect(lines).toContain('name: string — The festival, venue or programme name')
+    expect(lines).toContain('organizer?: string')
+    expect(lines.find((l) => l.startsWith('country?:'))).toContain('CA, US')
   })
 })

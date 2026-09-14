@@ -55,6 +55,7 @@ import {
   AGENTS,
   TOOL_SPECS,
   TOOLS_BY_AGENT,
+  fieldLines,
   inputProblem,
   isAgentId,
   pitchLengthNote,
@@ -115,12 +116,7 @@ async function readStdin(): Promise<string> {
 function help(agent: AgentId): void {
   const tools: Array<{ tool: string; description: string; fields: string[] }> = TOOLS_BY_AGENT[agent].map((name) => {
     const spec = TOOL_SPECS[name]
-    const schema = spec.inputSchema
-    const required: readonly string[] = 'required' in schema ? schema.required : []
-    const fields = Object.entries(schema.properties).map(
-      ([field, def]) => `${field}${required.includes(field) ? '' : '?'}: ${def.type}`,
-    )
-    return { tool: name, description: spec.description, fields }
+    return { tool: name, description: spec.description, fields: fieldLines(spec) }
   })
   tools.push({
     tool: LOG_RUN,

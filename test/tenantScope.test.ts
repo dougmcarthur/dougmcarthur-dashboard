@@ -93,11 +93,20 @@ function stripComments(source: string): string {
   return out
 }
 
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((entry) => {
-    const path = join(dir, entry)
-    if (statSync(path).isDirectory()) return sourceFiles(path)
-    return path.endsWith('.ts') ? [path] : []
+/**
+ * Every `.ts` file under `src/`, relative to it and joined with `/` — the
+ * spelling `EXEMPT` and the allow-list below are keyed by.
+ *
+ * Built by hand rather than with `path.join`, which writes backslashes on
+ * Windows: every key then misses, and the guard fails on a laptop while
+ * passing on the Linux runner. Reads go through `join(SRC, rel)`, which
+ * accepts a forward slash on either platform.
+ */
+function sourceFiles(dir = ''): string[] {
+  return readdirSync(join(SRC, dir)).flatMap((entry) => {
+    const rel = dir ? `${dir}/${entry}` : entry
+    if (statSync(join(SRC, rel)).isDirectory()) return sourceFiles(rel)
+    return rel.endsWith('.ts') ? [rel] : []
   })
 }
 
@@ -132,7 +141,7 @@ function scopedLocals(source: string): Set<string> {
 }
 
 describe('tenant scoping', () => {
-  const files = sourceFiles(SRC)
+  const files = sourceFiles()
 
   it('finds the source tree it is meant to be reading', () => {
     expect(files.length).toBeGreaterThan(15)
@@ -142,9 +151,8 @@ describe('tenant scoping', () => {
     const tables = new Set<string>(SCOPED_TABLES)
     const unscoped: string[] = []
 
-    for (const path of files) {
-      const source = stripComments(readFileSync(path, 'utf8'))
-      const relative = path.slice(SRC.length + 1)
+    for (const relative of files) {
+      const source = stripComments(readFileSync(join(SRC, relative), 'utf8'))
       const locals = scopedLocals(source)
 
       for (const match of source.matchAll(/\.(from|insert|update|delete)\(\s*(\w+)\s*[,)]/g)) {
@@ -206,7 +214,6 @@ describe('tenant scoping', () => {
     }
 
     const reaching = files
-      .map((path) => path.slice(SRC.length + 1))
       .filter((rel) => stripComments(readFileSync(join(SRC, rel), 'utf8')).includes('DOMAIN_TABLES'))
       .sort()
 
