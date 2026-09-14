@@ -151,6 +151,24 @@ export const TOOLS_BY_AGENT: Record<AgentId, readonly ToolName[]> = {
 export const AGENTS_WITH_WEB_SEARCH: readonly AgentId[] = ['gig-festival-scan', 'sync-pitch-research']
 
 /**
+ * A tool's fields as `cli.ts help` prints them: `name?: type — description`.
+ *
+ * The description is the part that matters. `run.ts` hands the model the whole
+ * schema, so it always saw them; the command line printed name and type only,
+ * and every hint written into a field — which country codes the rows use, that
+ * `deadline` stays empty when the page gives prose — never reached a routine.
+ * The first scheduled scan after the country hint landed still wrote "Canada".
+ */
+export function fieldLines(spec: ToolSpec): string[] {
+  const schema = spec.inputSchema
+  const required: readonly string[] = schema.required ?? []
+  return Object.entries(schema.properties).map(([field, def]) => {
+    const head = `${field}${required.includes(field) ? '' : '?'}: ${def.type}`
+    return def.description ? `${head} — ${def.description}` : head
+  })
+}
+
+/**
  * Why an input does not fit a tool, or null when it does.
  *
  * `run.ts` never needed this — the Messages API checks tool input against the
