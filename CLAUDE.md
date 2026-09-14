@@ -120,7 +120,14 @@ every `/api` route now needs a credential. So the reason changed and the
 conclusion did not: a check that can only ever see the front door proves
 nothing and adds a way for a good deploy to go red. `wrangler deployments
 status` is the last step instead: it asks Cloudflare what is serving traffic
-rather than inferring it from an exit code.
+rather than inferring it from an exit code. It retries as well, since it runs
+the instant the deploy returns and once caught the API mid-switchover
+(`code: 10013`) after the new version was already live.
+
+The app is served at `scout.sundogsmusic.ca`. The old hostname,
+`dashboard.dougmcarthur.net`, still had an Access application in front of it
+in September 2026 with nothing using it — a request there lands on the Access
+login page, which says nothing about whether the Worker is healthy.
 
 `wrangler` is at 4.129.1 and `@cloudflare/workers-types` at 5. They move
 together — 4.129 peers on `^5`, so bumping one alone fails to resolve. The
