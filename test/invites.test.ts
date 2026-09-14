@@ -181,7 +181,7 @@ describe('the invite panel offers Copy and never a send', () => {
   })
 
   it('offers no mail handler', () => {
-    // Scout cannot mail an invitation until the sending domain is onboarded,
+    // Scout cannot mail an invitation while the allowlist holds only the owner,
     // and a compose window pre-filled with a credential would put one in a
     // drafts folder besides. The screen says so instead.
     expect(panel).not.toContain('mailto:')

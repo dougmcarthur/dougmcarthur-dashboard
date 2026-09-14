@@ -72,7 +72,7 @@ Some details worth knowing before changing any of it:
   enrolled — everyone would fall back to an emailed code and re-enrol.
 - **The session cookie is `__Host-` prefixed.** That pins it to this exact
   origin, requires `Secure` and `Path=/`, and stops any other host under
-  `dougmcarthur.net` from setting it.
+  `sundogsmusic.ca` from setting it.
 - **Passkeys are discoverable (resident).** The login screen asks for no
   username, so there is nothing to put in `allowCredentials` before you are
   signed in. A non-resident key would be unusable here.
@@ -189,10 +189,11 @@ step 2 leaves you locked out of a dashboard nobody can reach.
    - Confirm `[[send_email]]` in `wrangler.toml` still lists the address the
      setup code should go to. The binding is the real boundary: the Worker
      cannot mail an address that is not on that list, whatever the code says.
-   - `AUTH_EMAIL_SENDER` is `login@dougmcarthur.net`. Same domain as the
-     digest's sender, so it should need nothing new — but it has never sent a
-     message, and it is the only route to a first passkey. If the code never
-     arrives, that address is the first thing to look at.
+   - `AUTH_EMAIL_SENDER` is `login@sundogsmusic.ca` (it was
+     `login@dougmcarthur.net` until that domain stopped serving Scout). Same
+     domain as the digest's sender, and it is the only route to a first
+     passkey — if the code never arrives, the sending domain's Email Service
+     status is the first thing to look at.
 4. **Enrol a passkey — while Access is still on.** Sign in through Access as
    usual, land on the login screen, click *Email me a setup code*, and add a
    passkey. Then add a **second** one on another device. A single

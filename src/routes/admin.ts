@@ -190,11 +190,11 @@ admin.get('/invites', async (c) => {
      * Why the link is handed over rather than emailed.
      *
      * The `send_email` binding sends through an explicit allowlist in
-     * wrangler.toml — two entries, both the owner's — which is a real security
-     * property today rather than a limitation: the Worker cannot mail anywhere
-     * else even if the code is wrong. It stops working the moment somebody
-     * else needs mail, and the gate is a **domain**, not a plan: sending to an
-     * arbitrary recipient needs the sending domain onboarded to Email Service.
+     * wrangler.toml — one entry, the owner's — which is a real security
+     * property rather than a limitation: the Worker cannot mail anywhere else
+     * even if the code is wrong. It stops working the moment somebody else
+     * needs mail. `sundogsmusic.ca` is onboarded to Email Service, so the
+     * platform would deliver anywhere; the allowlist is the whole gate.
      *
      * Reported rather than assumed, so the screen says what it can actually do
      * instead of offering a button that would throw.

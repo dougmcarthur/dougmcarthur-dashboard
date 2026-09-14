@@ -477,7 +477,7 @@ need the section below.
 
 A prerequisite that is easy to miss because nothing about it is visible while
 there is one user. The `send_email` binding sends through an explicit
-`allowed_destination_addresses` list in `wrangler.toml` — two entries, both the
+`allowed_destination_addresses` list in `wrangler.toml` — one entry, the
 owner's. That is a genuine security property today rather than a limitation:
 the Worker cannot mail anywhere else even if the code is wrong, which no
 key-based sender can promise.
@@ -492,8 +492,11 @@ works immediately. This account is already on Workers Paid, so there is nothing
 to buy — the whole prerequisite is onboarding `sundogsmusic.ca`, which is also
 what would move the sender off `dougmcarthur.net`.
 
-So that onboarding is a prerequisite of step 4, not of anything before it —
-and the day it lands, the binding stops being the boundary. Whatever replaces
+**That onboarding landed on 2026-09-14**, and both senders moved to
+`sundogsmusic.ca` the same day. So the platform half of the prerequisite is
+done; what remains is ours. The allowlist is still in place and is now the
+*only* thing keeping mail to one inbox, and the day it is widened for
+invitations, the binding stops being the boundary. Whatever replaces
 it has to refuse to mail an address that is not on an invite or an account,
 because "send a code to this address" pointed at an arbitrary inbox is the
 account-takeover vector the recovery rule exists to prevent.

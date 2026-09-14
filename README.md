@@ -578,15 +578,11 @@ nothing here touches it.
 boundary: the Worker can send to those addresses and nowhere else, whatever
 this code does.
 
-| | |
-| --- | --- |
-| **Free** | Sending to a **verified destination address** on the account — free on every plan, does not touch the monthly quota |
-| **Paid** | Any other recipient — requires Workers Paid |
-
-`dougmcarthur0@gmail.com` is the free path and is the default. Whether
-`doug@dougmcarthur.net` also qualifies depends on it being added and verified
-under Email Routing → Destination Addresses; both are allowlisted so switching
-is a setting change, not a deploy.
+Mail goes out from `sundogsmusic.ca`, which is onboarded to Email Service —
+the digest from `digest@`, passkey setup codes from `login@`. The allowlist
+holds one address, `dougmcarthur0@gmail.com`, which receives both. Onboarding
+means the platform would deliver to anybody, so the list is the whole reason
+this Worker does not.
 
 Setup, once:
 

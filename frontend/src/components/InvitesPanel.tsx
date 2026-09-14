@@ -16,9 +16,10 @@ import { shortDate } from '../format'
  *
  * It is handed over rather than emailed, and that is a real limitation rather
  * than a preference: the `send_email` binding sends through an allowlist of
- * two addresses, both the owner's, which is a genuine security property today
- * — the Worker cannot mail anywhere else even if the code is wrong. Sending to
- * an arbitrary recipient needs the sending domain onboarded to Email Service.
+ * one address, the owner's, which is a genuine security property — the Worker
+ * cannot mail anywhere else even if the code is wrong. The sending domain is
+ * onboarded, so the allowlist is the whole gate now; widening it is the
+ * invitation-mail work, not a setting.
  * The screen says so rather than offering a button that would throw.
  */
 export function InvitesPanel() {
@@ -182,7 +183,7 @@ function IssuedLink({ url, email, onDone }: { url: string; email: string; onDone
       </div>
       <p className="text-xs text-muted">
         Scout cannot email this yet: its mail binding sends only to the owner&rsquo;s own
-        addresses until the sending domain is onboarded.
+        address, so copy the link and send it yourself.
       </p>
     </div>
   )

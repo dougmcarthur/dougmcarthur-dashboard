@@ -126,7 +126,7 @@ export function readSessionCookie(header: string | null | undefined): string | n
 /**
  * `__Host-` is the reason the attributes below are not negotiable: the prefix
  * is only honoured with `Secure`, `Path=/` and no `Domain`, and in exchange no
- * other host under `dougmcarthur.net` can set or overwrite this cookie.
+ * other host under `sundogsmusic.ca` can set or overwrite this cookie.
  *
  * `SameSite=Lax` and not `Strict` because `Strict` withholds the cookie on
  * the first navigation *into* the app from anywhere else — including from the

@@ -61,7 +61,7 @@ export interface DigestSettings {
 export const DIGEST_DEFAULTS: DigestSettings = {
   enabled: false,
   recipient: 'dougmcarthur0@gmail.com',
-  sender: 'digest@dougmcarthur.net',
+  sender: 'digest@sundogsmusic.ca',
   // Monday 08:00 local, which is what the hardcoded cron meant in practice.
   // Winnipeg rather than UTC because "Monday morning" is a claim about the
   // morning you are actually having.
