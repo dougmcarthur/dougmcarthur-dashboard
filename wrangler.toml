@@ -1,4 +1,8 @@
-name = "dougmcarthur-dashboard"
+# Renamed in the Cloudflare dashboard on 2026-09-14. This line has to match the
+# dashboard: `wrangler deploy` targets a Worker by name, so a stale name here
+# does not fail — it creates a second, empty Worker carrying the cron and the D1
+# binding. The rename's first CI run did exactly that.
+name = "sun-dogs-scout"
 main = "src/index.ts"
 compatibility_date = "2026-06-21"
 workers_dev = false
