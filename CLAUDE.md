@@ -731,6 +731,29 @@ Three properties the route keeps:
 to default, because Google returns a refresh token only on a fresh consent —
 without them the grant appears to work and stops an hour later.
 
+**Every email Scout sends goes through one template, and its footer is a
+claim.** `src/lib/emailTemplate.ts` is the header, the palette (the app's
+light tokens — a dark email is one clients re-colour unpredictably), the
+Outlook-proof markup, and a footer whose type makes the author pick a kind:
+`transactional` states in words that there is no unsubscribe, `notification`
+links to where it is switched off. Both identify the sender by name, mailing
+address (`MAIL_POSTAL_ADDRESS`) and web address. Neither the setup code nor
+the digest is marketing — transactional or relationship mail under CAN-SPAM,
+not a commercial electronic message under CASL — so the identification is
+carried because it is cheap and because the first message that *does* promote
+something needs an unsubscribe that works signed out, which a Settings link is
+not. `test/emailTemplate.test.ts` runs every rule against every email, and
+fails on a subject line typed at a call site: the product name leads every
+subject and the From display name, because "Scout" alone is the mark this
+product avoids.
+
+**The setup code email said the code was harmless, and it was not.** "Adding a
+passkey still needs your device to approve it" — the device being whichever
+one the code is typed into. Anybody who reads the code can enrol a passkey of
+their own. So the code stays out of the subject, the preheader and the first
+paragraph of the text body, which are what a locked phone shows, and the body
+says whoever enters it can add a passkey. `src/lib/authMail.ts`.
+
 **A draft can open a compose window, and that is still not sending.**
 `shared/mailto.ts` builds a `mailto:` or Gmail-compose URL from a subject and
 body; `DraftActions` mounts Copy beside them wherever a draft is rendered —

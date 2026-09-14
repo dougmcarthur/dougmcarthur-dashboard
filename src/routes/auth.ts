@@ -73,7 +73,8 @@ import {
   storeChallenge,
   utf8Bytes,
 } from '../lib/auth'
-import { mailerConfigured, sendMail } from '../lib/mailer'
+import { mailerConfigured, sendMail, senderIdentity } from '../lib/mailer'
+import { setupCodeEmail } from '../lib/authMail'
 import { findInvite, redeemInvite } from '../lib/invites'
 import { INVITE_REFUSALS, maskAddress } from '../../shared/invites'
 import { recordEvent } from '../lib/notificationEvents'
@@ -636,20 +637,16 @@ auth.post('/enrol/request', async (c) => {
   // it — that is the whole rule the recovery address exists under.
   const issued = await issueEnrolmentCode(c.env, { userId: await ownerUserId(c.env), now })
 
+  // What the email says about the code is a security claim — see authMail.ts.
+  const mail = setupCodeEmail({
+    code: issued.code,
+    ttlMinutes: ENROLMENT_CODE_TTL_MINUTES,
+    identity: senderIdentity(c.env),
+  })
   await sendMail(c.env, {
     to,
     from: c.env.AUTH_EMAIL_SENDER ?? 'login@sundogsmusic.ca',
-    subject: `Scout — passkey setup code ${issued.code}`,
-    text:
-      `Your Scout passkey setup code is ${issued.code}.\n\n` +
-      `It is good for ${ENROLMENT_CODE_TTL_MINUTES} minutes and lets you add one passkey.\n\n` +
-      `If you did not ask for this, you can ignore it — the code does nothing on its own, ` +
-      `and adding a passkey still needs your device to approve it.\n`,
-    html:
-      `<p>Your Scout passkey setup code is <strong style="font-size:1.4em;letter-spacing:.1em">${issued.code}</strong></p>` +
-      `<p>It is good for ${ENROLMENT_CODE_TTL_MINUTES} minutes and lets you add one passkey.</p>` +
-      `<p>If you did not ask for this, you can ignore it — the code does nothing on its own, ` +
-      `and adding a passkey still needs your device to approve it.</p>`,
+    ...mail,
   })
 
   return c.json({ sent: true, to: maskAddress(to), expiresAt: issued.expiresAt })

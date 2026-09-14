@@ -250,7 +250,7 @@ async function runDigest(env: Env, tenant: TenantId): Promise<void> {
     await sendMail(env, {
       to: settings.recipient,
       from: settings.sender,
-      subject: `Scout — ${subject}`,
+      subject,
       text,
       html,
     })

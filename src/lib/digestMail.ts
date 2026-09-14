@@ -11,39 +11,31 @@
  * items has not prioritised them, it has just moved the dashboard into your
  * inbox — and the dashboard is better at being the dashboard.
  *
- * On the markup: mail clients are not browsers. Outlook renders through Word,
- * which ignores `max-width` on a div, drops the `font` shorthand, and adds gaps
- * between table cells unless told not to. So the layout is tables, every CSS
- * property is longhand, every table carries `border-collapse`, and every
- * coloured surface repeats itself as a `bgcolor` attribute. It reads as
- * old-fashioned HTML because that is the format that survives the trip.
+ * The header, footer, palette and the Outlook-proofing all come from
+ * emailTemplate.ts, which every outgoing email shares. The digest is a
+ * `notification`: something the account holder switched on, so its footer
+ * says when it is sent and links to where it is switched off.
  */
 
 import type { Digest, DigestGroup, DigestLine, DigestRollup } from '../../shared/digest'
-
-const escape = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+import { describeSchedule, type Schedule } from '../../shared/digestSchedule'
+import {
+  button,
+  escapeHtml,
+  paragraph,
+  renderEmail,
+  rule,
+  sectionLabel,
+  type,
+  EMAIL_COLOURS as C,
+  type RenderedEmail,
+  type SenderIdentity,
+} from './emailTemplate'
 
 /** Names in the change section before it stops naming and starts counting. */
 const NAME_LIMIT = 4
 
-const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
-
-const INK = '#111827'
-const BODY = '#4b5563'
-const MUTED = '#9ca3af'
-const RULE = '#eceff2'
-const EDGE = '#e5e7eb'
-const PAPER = '#ffffff'
-const GROUND = '#f3f4f6'
-
-/** Longhand type, because Outlook drops the `font` shorthand entirely. */
-function type(size: number, weight: number, height: number, color: string): string {
-  return (
-    `font-family:${FONT};font-size:${size}px;font-weight:${weight};` +
-    `line-height:${height}px;color:${color};`
-  )
-}
+const TABLE = 'role="presentation" cellpadding="0" cellspacing="0" border="0"'
 
 /** Subject names the size of the ask, not the size of the backlog. */
 export function subjectFor(digest: Digest): string {
@@ -68,7 +60,13 @@ function changeSummary(g: DigestGroup): { heading: string; detail: string } {
   return { heading: `${g.heading} (${g.lines.length})`, detail }
 }
 
-export function renderText(digest: Digest, base: string): string {
+/** "America/Winnipeg" → "Winnipeg time". A zone id is an identifier, not a name. */
+function zoneName(timezone: string): string {
+  const city = timezone.split('/').pop() ?? timezone
+  return `${city.replace(/_/g, ' ')} time`
+}
+
+function bodyText(digest: Digest, base: string): string {
   const parts: string[] = []
 
   if (digest.focus.length > 0) {
@@ -105,40 +103,22 @@ export function renderText(digest: Digest, base: string): string {
   return parts.join('\n\n')
 }
 
-/**
- * The line Gmail shows beside the subject.
- *
- * Left alone it takes whatever text comes first, which was the standing
- * description of what the email is — the same words every week. Naming the top
- * item instead makes the preview say something the subject does not.
- */
-function preheader(digest: Digest): string {
-  const lead = digest.focus[0]?.title ?? 'Your weekly queue'
-  // The padding stops the client pulling body copy in after the preheader.
-  return `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${escape(lead)}</div>
-    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${'&zwnj;&nbsp;'.repeat(60)}</div>`
-}
-
-function sectionLabel(text: string): string {
-  return `<tr><td style="padding:0 0 12px 0;${type(11, 700, 14, MUTED)}letter-spacing:0.08em;text-transform:uppercase;">${escape(text)}</td></tr>`
-}
-
 /** A numbered focus row. Hairlines between rows rather than five boxes. */
 function focusRow(l: DigestLine, n: number, base: string, first: boolean): string {
-  const rule = first ? '' : `border-top:1px solid ${RULE};`
+  const divider = first ? '' : `border-top:1px solid ${C.line};`
   return `
-  <tr><td style="padding:${first ? '0 0 16px 0' : '16px 0'};${rule}">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+  <tr><td style="padding:${first ? '0 0 14px 0' : '14px 0'};${divider}">
+    <table ${TABLE} width="100%" style="border-collapse:collapse;">
       <tr>
         <td width="34" valign="top" style="width:34px;padding:1px 12px 0 0;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-            <tr><td width="22" height="22" align="center" valign="middle" bgcolor="${INK}"
-                    style="width:22px;height:22px;background-color:${INK};border-radius:5px;${type(11, 700, 22, PAPER)}">${n}</td></tr>
+          <table ${TABLE} style="border-collapse:collapse;">
+            <tr><td width="22" height="22" align="center" valign="middle" bgcolor="${C.ink}"
+                    style="width:22px;height:22px;background-color:${C.ink};border-radius:6px;${type(11, 700, 22, C.surface)}">${n}</td></tr>
           </table>
         </td>
         <td valign="top">
-          <a href="${escape(base)}/${escape(l.href)}" style="${type(16, 600, 22, INK)}text-decoration:none;">${escape(l.title)}</a>
-          <div style="${type(13, 400, 20, BODY)}padding:5px 0 0 0;">${escape(l.rationale)}</div>
+          <a href="${escapeHtml(base)}/${escapeHtml(l.href)}" style="${type(15, 600, 21, C.ink)}text-decoration:none;">${escapeHtml(l.title)}</a>
+          <div style="${type(13, 400, 20, C.body)}padding:4px 0 0 0;">${escapeHtml(l.rationale)}</div>
         </td>
       </tr>
     </table>
@@ -146,109 +126,84 @@ function focusRow(l: DigestLine, n: number, base: string, first: boolean): strin
 }
 
 function rollupRow(r: DigestRollup, base: string, first: boolean): string {
-  const rule = first ? '' : `border-top:1px solid ${RULE};`
+  const divider = first ? '' : `border-top:1px solid ${C.line};`
   return `
   <tr>
-    <td width="42" align="right" valign="top" style="width:42px;padding:${first ? '0' : '10px'} 12px 10px 0;${rule}${type(15, 700, 20, INK)}">${r.count}</td>
-    <td valign="top" style="padding:${first ? '0' : '10px'} 0 10px 0;${rule}">
-      <a href="${escape(base)}/${escape(r.href)}" style="${type(14, 400, 20, BODY)}text-decoration:none;">${escape(r.label)}</a>
+    <td width="42" align="right" valign="top" style="width:42px;padding:${first ? '0' : '10px'} 12px 10px 0;${divider}${type(15, 700, 20, C.ink)}">${r.count}</td>
+    <td valign="top" style="padding:${first ? '0' : '10px'} 0 10px 0;${divider}">
+      <a href="${escapeHtml(base)}/${escapeHtml(r.href)}" style="${type(14, 400, 20, C.accent)}text-decoration:none;">${escapeHtml(r.label)}</a>
     </td>
   </tr>`
 }
 
-function card(inner: string): string {
-  return `
-  <tr><td bgcolor="${PAPER}" style="background-color:${PAPER};border:1px solid ${EDGE};border-radius:10px;padding:24px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-      ${inner}
-    </table>
-  </td></tr>
-  <tr><td height="16" style="height:16px;line-height:16px;font-size:16px;">&nbsp;</td></tr>`
+function nested(rows: string): string {
+  return `<tr><td style="padding:0 0 8px 0;"><table ${TABLE} width="100%" style="border-collapse:collapse;">${rows}</table></td></tr>`
 }
 
-export function renderHtml(digest: Digest, base: string): string {
-  const cards: string[] = []
+function bodyHtml(digest: Digest, base: string): string {
+  const sections: string[] = []
 
   if (digest.focus.length > 0) {
-    cards.push(
-      card(
-        sectionLabel('Start here') +
-          digest.focus.map((l, i) => focusRow(l, i + 1, base, i === 0)).join(''),
-      ),
+    sections.push(
+      sectionLabel('Start here') +
+        nested(digest.focus.map((l, i) => focusRow(l, i + 1, base, i === 0)).join('')),
     )
   }
 
   if (digest.rollups.length > 0) {
-    cards.push(
-      card(
-        sectionLabel('Also in the queue') +
-          `<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-            ${digest.rollups.map((r, i) => rollupRow(r, base, i === 0)).join('')}
-          </table></td></tr>`,
-      ),
+    sections.push(
+      sectionLabel('Also in the queue') +
+        nested(digest.rollups.map((r, i) => rollupRow(r, base, i === 0)).join('')),
     )
   }
 
   if (digest.groups.length > 0) {
-    cards.push(
-      card(
-        sectionLabel('Since last time') +
+    sections.push(
+      sectionLabel('Since last time') +
+        nested(
           digest.groups
             .map((g) => {
               const { heading, detail } = changeSummary(g)
               return `<tr><td style="padding:0 0 10px 0;">
-                <div style="${type(13, 600, 19, INK)}">${escape(heading)}</div>
-                <div style="${type(13, 400, 19, BODY)}padding:2px 0 0 0;">${escape(detail)}</div>
+                <div style="${type(13, 600, 19, C.ink)}">${escapeHtml(heading)}</div>
+                <div style="${type(13, 400, 19, C.body)}padding:2px 0 0 0;">${escapeHtml(detail)}</div>
               </td></tr>`
             })
             .join(''),
-      ),
+        ),
     )
   }
 
-  const button = `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-      <tr><td align="center" bgcolor="${INK}" style="background-color:${INK};border-radius:6px;">
-        <a href="${escape(base)}/#overview" style="display:inline-block;padding:12px 22px;${type(14, 600, 14, PAPER)}text-decoration:none;">Open the dashboard</a>
-      </td></tr>
-    </table>`
+  return (
+    paragraph('What is worth your time first, then what is behind it.', { muted: true, bottom: 24 }) +
+    sections.join(rule()) +
+    rule() +
+    button('Open the dashboard', `${base}/#overview`)
+  )
+}
 
-  // `color-scheme: light` asks the client not to auto-invert. Without it a dark
-  // mode client repaints the greys and the hairlines vanish into the card.
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light">
-<meta name="supported-color-schemes" content="light">
-<title>Sun Dogs Music Scout</title>
-</head>
-<body style="margin:0;padding:0;background-color:${GROUND};">
-${preheader(digest)}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${GROUND}" style="border-collapse:collapse;background-color:${GROUND};">
-  <tr><td align="center" style="padding:28px 12px;">
-    <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="width:100%;max-width:600px;border-collapse:collapse;">
-
-      <tr><td style="padding:0 4px 18px 4px;">
-        <div style="${type(11, 700, 14, MUTED)}letter-spacing:0.1em;text-transform:uppercase;">Sun Dogs Music Scout</div>
-        <div style="${type(24, 700, 30, INK)}padding:6px 0 0 0;">${escape(subjectFor(digest))}</div>
-        <div style="${type(14, 400, 20, BODY)}padding:4px 0 0 0;">The five worth your time, and what is behind them.</div>
-      </td></tr>
-
-      ${cards.join('')}
-
-      <tr><td style="padding:4px 4px 0 4px;">${button}</td></tr>
-
-      <tr><td style="padding:22px 4px 0 4px;${type(12, 400, 18, MUTED)}">
-        Sent Monday mornings from your dashboard. Nothing is sent when the queue is clear.
-      </td></tr>
-
-    </table>
-    <!--[if mso]></td></tr></table><![endif]-->
-  </td></tr>
-</table>
-</body>
-</html>`
+export function renderDigestEmail(
+  digest: Digest,
+  opts: { base: string; schedule: Schedule; identity: SenderIdentity },
+): RenderedEmail {
+  const { base, schedule, identity } = opts
+  return renderEmail(
+    {
+      subject: subjectFor(digest),
+      // Naming the top item makes the preview say something the subject does not.
+      preheader: digest.focus[0]?.title ?? 'Your weekly queue',
+      heading: subjectFor(digest),
+      body: bodyHtml(digest, base),
+      text: bodyText(digest, base),
+    },
+    {
+      kind: 'notification',
+      reason:
+        `You received this because the weekly digest is turned on for your Sun Dogs Music Scout account. ` +
+        `It is sent ${describeSchedule(schedule)} ${zoneName(schedule.timezone)}, and only when there is something to report.`,
+      manageUrl: `${base}/#settings`,
+      manageLabel: 'Turn off the digest or change its schedule in Settings',
+    },
+    identity,
+  )
 }
