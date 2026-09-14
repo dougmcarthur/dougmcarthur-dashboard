@@ -12,11 +12,20 @@ standing alone. Say Scout, write Sun Dogs Music Scout. "Music Scout" is
 avoided on purpose: in the trade that phrase means an A&R person who scouts
 *talent*, which is the reverse of what this does.
 
-Infrastructure identifiers still carry the old name — the D1 database is
-`dougmcarthur-music-hq` and the Worker is `dougmcarthur-dashboard`. Neither is
-user-visible and neither can be renamed by editing a string: a D1 rename is a
-data migration, and a Worker rename is a new Worker with its domains and
-secrets re-attached. They stay until there is a reason worth that.
+The D1 database still carries the old name, `dougmcarthur-music-hq`: it is not
+user-visible, and a D1 rename is a data migration. The Worker is
+`sun-dogs-scout`, renamed in the Cloudflare dashboard on 2026-09-14, which kept
+its custom domain and secrets — cheaper than the new-Worker-plus-reattach this
+file used to predict.
+
+**A dashboard rename and `name` in `wrangler.toml` have to land together.**
+`wrangler deploy` finds its Worker by name, so a stale name does not fail: it
+creates a second Worker with no domain and no secrets, but with the D1 binding,
+the email binding and the hourly cron — a copy that runs the scheduled jobs
+against production beside the real one. The rename's first CI run did exactly
+that, and the stray `dougmcarthur-dashboard` had to be deleted by hand. The
+repository, `package.json` and `README.md` keep the old name; nothing deploys by
+those.
 
 ## Database changes go through wrangler migrations, applied by CI
 
