@@ -34,17 +34,17 @@ crons = ["0 * * * *"]
 # Cloudflare Email Service. The allowlist is the security boundary: the Worker
 # can send to these addresses and nowhere else, whatever the code says.
 #
-# Sending to a VERIFIED DESTINATION ADDRESS on the account is free on every
-# plan and does not touch the monthly quota; sending to any other recipient
-# needs Workers Paid. dougmcarthur0@gmail.com is the free path. Whether
-# doug@dougmcarthur.net also qualifies depends on it being added and verified
-# under Email Routing → Destination Addresses; both are listed so the choice is
-# a setting change rather than a deploy.
+# Mail is sent from sundogsmusic.ca, onboarded to Email Service on 2026-09-14.
+# Onboarding is what lets a Worker mail an arbitrary recipient, so from that
+# day this list — not the domain — is the only thing keeping Scout to one
+# inbox. It holds the one address both the digest and the passkey setup code
+# go to. Widening it is how invitation mail would start, and is a decision
+# about the recovery rule rather than a config tweak: see
+# docs/multi-tenant-plan.md, "Mail to an invited artist".
 [[send_email]]
 name = "EMAIL"
 allowed_destination_addresses = [
   "dougmcarthur0@gmail.com",
-  "doug@dougmcarthur.net",
 ]
 
 [vars]
@@ -58,7 +58,7 @@ DASHBOARD_URL = "https://scout.sundogsmusic.ca"
 # Where a passkey setup code is sent. Must be on the [[send_email]] allowlist
 # above — that binding is the boundary, not this var.
 AUTH_EMAIL = "dougmcarthur0@gmail.com"
-AUTH_EMAIL_SENDER = "login@dougmcarthur.net"
+AUTH_EMAIL_SENDER = "login@sundogsmusic.ca"
 
 # API_TOKEN is a secret, not a var: `wrangler secret put API_TOKEN`. It is the
 # research agents' credential, and it is the thing to set BEFORE switching

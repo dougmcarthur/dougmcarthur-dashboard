@@ -638,7 +638,7 @@ auth.post('/enrol/request', async (c) => {
 
   await sendMail(c.env, {
     to,
-    from: c.env.AUTH_EMAIL_SENDER ?? 'login@dougmcarthur.net',
+    from: c.env.AUTH_EMAIL_SENDER ?? 'login@sundogsmusic.ca',
     subject: `Scout — passkey setup code ${issued.code}`,
     text:
       `Your Scout passkey setup code is ${issued.code}.\n\n` +

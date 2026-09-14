@@ -396,11 +396,14 @@ hold credentials under it and switching would leave a duplicate keychain entry
 for nothing; everybody else is keyed by their account id.
 
 **Scout cannot mail an invitation yet, and says so.** The `send_email` binding
-sends through an allowlist of two addresses, both the owner's — a real security
-property today, not a limitation: the Worker cannot mail anywhere else even if
-the code is wrong. The gate is a **domain**, not a plan; sending to an
-arbitrary recipient needs `sundogsmusic.ca` onboarded to Email Service. Until
-then the owner copies the link. The same prerequisite blocks per-artist
+sends through an allowlist of one address, the owner's — a real security
+property, not a limitation: the Worker cannot mail anywhere else even if the
+code is wrong. The platform gate was a **domain**, not a plan, and it is open:
+`sundogsmusic.ca` was onboarded to Email Service on 2026-09-14 and both
+senders (`login@`, `digest@`) moved to it. What remains is the allowlist,
+which is now the only boundary — widening it is the invitation-mail work, and
+it has to come with something that refuses an address not on an invite or an
+account. Until then the owner copies the link. The same work blocks per-artist
 recovery: the emailed setup code goes to the configured address and enrols the
 *owner's* account, which is safe — only the owner can read that inbox — but is
 not recovery for anybody else.
