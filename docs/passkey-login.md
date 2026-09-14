@@ -3,7 +3,9 @@
 The dashboard authenticates in the Worker, with a WebAuthn passkey. There is
 no identity provider in front of it any more.
 
-- **App URL:** `https://dashboard.dougmcarthur.net/`
+- **App URL:** `https://scout.sundogsmusic.ca/` — its hostname is the
+  relying-party ID every passkey is bound to, so read `DASHBOARD_URL` below
+  before changing it
 - **Code:** `src/routes/auth.ts`, `src/lib/auth.ts`, `shared/auth.ts`,
   `frontend/src/components/LoginScreen.tsx`
 - **Schema:** migration `0017_passkey_auth.sql`

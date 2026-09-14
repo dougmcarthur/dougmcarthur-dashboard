@@ -56,7 +56,7 @@ export async function composeDigest(
     })),
   })
 
-  const base = env.DASHBOARD_URL ?? 'https://dashboard.dougmcarthur.net'
+  const base = env.DASHBOARD_URL ?? 'https://scout.sundogsmusic.ca'
   return {
     digest: built,
     subject: subjectFor(built),
