@@ -25,6 +25,15 @@ export type Env = {
   AUTH_EMAIL?: string
   AUTH_EMAIL_SENDER?: string
   /**
+   * The mailing address every email's footer prints, beside the house mark.
+   * Deployment configuration rather than a setting, like the recovery address:
+   * it identifies whoever operates this deployment, which is not something a
+   * signed-in session should be able to rewrite.
+   */
+  MAIL_POSTAL_ADDRESS?: string
+  /** Where replies go. The sending addresses have no mailbox behind them. */
+  MAIL_REPLY_TO?: string
+  /**
    * The research agents' credential — set with `wrangler secret put`.
    *
    * They POST and PATCH from outside a browser and outside this repo, so they
@@ -47,7 +56,8 @@ export type Env = {
  */
 export interface SendEmailBinding {
   send(message: {
-    from: string
+    from: string | { name: string; email: string }
+    replyTo?: string
     to: string
     subject: string
     text?: string

@@ -26,13 +26,23 @@
  */
 
 import type { Env } from '../types'
+import { PRODUCT_NAME, type SenderIdentity } from './emailTemplate'
 
 export interface Mail {
   to: string
+  /** The bare address. The display name is always the product's. */
   from: string
   subject: string
   text: string
   html: string
+}
+
+/** The footer's identification, read from configuration and nothing else. */
+export function senderIdentity(env: Env): SenderIdentity {
+  return {
+    siteUrl: env.DASHBOARD_URL ?? 'https://scout.sundogsmusic.ca',
+    postalAddress: env.MAIL_POSTAL_ADDRESS?.trim() || null,
+  }
 }
 
 export function mailerConfigured(env: Env): boolean {
@@ -47,8 +57,12 @@ export async function sendMail(env: Env, mail: Mail): Promise<{ messageId?: stri
   // Both bodies are sent. Plain text is not a fallback nobody sees: it is what
   // a phone notification previews, and a digest whose preview is raw markup
   // fails at the one job it has, which is getting you to open it.
+  // A display name on From, so an inbox lists "Sun Dogs Music Scout" rather
+  // than `login@` — the name a reader checks before trusting the message.
+  const replyTo = env.MAIL_REPLY_TO?.trim()
   return binding.send({
-    from: mail.from,
+    from: { name: PRODUCT_NAME, email: mail.from },
+    ...(replyTo ? { replyTo } : {}),
     to: mail.to,
     subject: mail.subject,
     text: mail.text,

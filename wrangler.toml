@@ -60,6 +60,13 @@ DASHBOARD_URL = "https://scout.sundogsmusic.ca"
 AUTH_EMAIL = "dougmcarthur0@gmail.com"
 AUTH_EMAIL_SENDER = "login@sundogsmusic.ca"
 
+# Every email's footer identifies the sender: the house mark, this address and
+# the site. test/emailTemplate.test.ts fails while it is unset — an email that
+# cannot say who sent it is not one to ship. See src/lib/emailTemplate.ts.
+# MAIL_POSTAL_ADDRESS = ""
+# Where a reply lands. login@ and digest@ have no mailbox behind them.
+# MAIL_REPLY_TO = ""
+
 # API_TOKEN is a secret, not a var: `wrangler secret put API_TOKEN`. It is the
 # research agents' credential, and it is the thing to set BEFORE switching
 # Cloudflare Access off — headless callers cannot do a passkey ceremony, so

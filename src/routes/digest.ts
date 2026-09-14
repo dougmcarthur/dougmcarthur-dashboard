@@ -9,8 +9,8 @@ import { tenantOf, type AppEnv } from '../context'
 import { buildReviewQueue } from '../../shared/reviewQueue'
 import { buildDigest, type Digest } from '../../shared/digest'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
-import { subjectFor, renderHtml, renderText } from '../lib/digestMail'
-import { sendMail, mailerConfigured } from '../lib/mailer'
+import { renderDigestEmail } from '../lib/digestMail'
+import { sendMail, mailerConfigured, senderIdentity } from '../lib/mailer'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from '../lib/settings'
 import { describeSchedule, nextRun } from '../../shared/digestSchedule'
 import type { Env } from '../types'
@@ -57,12 +57,11 @@ export async function composeDigest(
   })
 
   const base = env.DASHBOARD_URL ?? 'https://scout.sundogsmusic.ca'
-  return {
-    digest: built,
-    subject: subjectFor(built),
-    html: renderHtml(built, base),
-    text: renderText(built, base),
-  }
+  const settings = await readDigestSettings(env)
+  // `subject` is the whole subject line, product name included, so the preview
+  // shows exactly what an inbox will.
+  const mail = renderDigestEmail(built, { base, schedule: settings.schedule, identity: senderIdentity(env) })
+  return { digest: built, ...mail }
 }
 
 /**
@@ -130,7 +129,7 @@ digest.post('/send', async (c) => {
   const result = await sendMail(c.env, {
     to: settings.recipient,
     from: settings.sender,
-    subject: `Scout — ${subject}`,
+    subject,
     text,
     html,
   })
