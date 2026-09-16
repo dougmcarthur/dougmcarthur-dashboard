@@ -1,3 +1,4 @@
+import type { CredentialHealth } from '../../shared/credentialHealth'
 // Entity shapes live in shared/ because the Worker builds the review queue
 // from them too — see shared/types.ts. Re-exported here so UI code can keep
 // importing everything it needs from one module.
@@ -297,7 +298,16 @@ export interface HealthStatus {
   gmailConfigured: boolean
   gmailMissingSecrets: string[]
   emailConfigured: boolean
+  /**
+   * Whether each connection actually *works*, as last checked.
+   *
+   * The booleans above say the secrets are set, which a credential Google
+   * stopped accepting also satisfies. See `shared/credentialHealth.ts`.
+   */
+  credentials: CredentialHealth[]
 }
+
+export type { CredentialHealth, CredentialState } from '../../shared/credentialHealth'
 
 export type Weekday = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
 
@@ -791,6 +801,9 @@ export const api = {
     delete: (id: string) => apiFetch<{ ok: boolean }>(`/reference-docs/${id}`, { method: 'DELETE' }),
   },
   health: () => apiFetch<HealthStatus>('/health'),
+  /** Spend each refresh token once and record what Google said. */
+  checkCredentials: () =>
+    apiFetch<{ credentials: CredentialHealth[] }>('/health/check', { method: 'POST' }),
   notifications: {
     list: () => apiFetch<NotificationFeed>('/notifications'),
     read: (body: { keys?: string[]; all?: boolean }) =>

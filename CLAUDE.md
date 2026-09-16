@@ -578,6 +578,38 @@ configuration screen the variable name *is* the actionable fact and "some
 settings are missing" helps nobody. What went was the repository file path
 beside it: whoever reads that card may not hold the source.
 
+**Those cards asked whether a secret was set, which is not whether it works.**
+`gmailConfigured` checks that three environment variables exist, so a refresh
+token Google stopped accepting weeks ago painted the pill green while the reply
+scan quietly did nothing — the Artist page's lesson again, that a check which
+cannot answer you is how you conclude everything is fine.
+`shared/credentialHealth.ts` holds the states and `src/lib/credentialCheck.ts`
+does the asking. Four things decide the shape:
+
+- **The probe spends the credential rather than reading data.** Exchanging the
+  refresh token for an access token is one request, is what every real use does
+  first anyway, and tests the credential itself — a probe that lists a message
+  fails for reasons that are not the token.
+- **A failed probe is two different facts.** A refusal (400, 401, 403) is a
+  verdict about the credential and is yours to act on; a timeout or a 500 is a
+  fact about the network and *no* verdict at all. Only `rejected` reaches the
+  bell. Recording the second as the first would raise a critical row every time
+  a request lost a race, which is how a bell stops being read.
+- **`unverified` is a state, not a fault**, exactly as `unreviewed` is a state
+  apart from `overdue`: the absence of a check is not a negative claim.
+- **Sending is unprobeable and says so.** The only way to test a Worker binding
+  is to send something, and a health check that mails somebody every time you
+  open Settings is worse than not checking. That card reads `declared` and
+  explains why, rather than showing a tick that means less than it looks like.
+
+It runs on the **daily housekeeping tick**, which is what makes a dead
+credential findable at all — the jobs that break are the ones nobody watches,
+so waiting for somebody to open Settings and wonder is waiting indefinitely.
+`POST /api/health/check` is the same check on a button. Neither needs a passkey
+touch: it changes nothing about who can get in, and the worst it can do is tell
+you the truth. It is not in `AGENT_ROUTES`, so an issued agent token cannot
+reach it by doing nothing.
+
 **A stopped agent is a condition, and nothing was watching for it.** The three
 research agents — `gig-festival-scan`, `sync-pitch-research`,
 `monthly-promo-checkin` — ran on a cadence from June, stopped within a week of

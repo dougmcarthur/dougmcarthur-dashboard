@@ -37,6 +37,7 @@ import type { ReviewItem, QueueSummary } from './reviewQueue'
  */
 import { stalledTasks, type TaskHistory } from './taskCadence'
 import { taskLabel } from './taskLabels'
+import type { CredentialHealth, CredentialId } from './credentialHealth'
 
 export type Tier = 'critical' | 'attention' | 'info'
 
@@ -116,6 +117,16 @@ export interface HealthInput {
   calendarConfigured: boolean
   gmailConfigured: boolean
   emailConfigured: boolean
+  /**
+   * What the last probe found, when one has run.
+   *
+   * Optional and additive: the three booleans above answer "are the secrets
+   * set", which is a different question from "does the credential still work",
+   * and a caller that cannot answer the second should not be forced to pretend.
+   * Absent means no probe result is available, which raises nothing — the
+   * absence of a check is not a failure. See `shared/credentialHealth.ts`.
+   */
+  credentials?: CredentialHealth[]
 }
 
 /** What a condition generator returns; the rest is filled in from the marks. */
@@ -213,7 +224,46 @@ function connectionNotes(health: HealthInput): Draft[] {
       action: 'Reconnect',
     })
   }
+
+  // A credential that is set and no longer accepted.
+  //
+  // Deliberately a different row from "disconnected" above, with its own key:
+  // they are different problems with different fixes — one is a secret nobody
+  // set, the other is a secret that has stopped working — and dismissing one
+  // must not dismiss the other.
+  //
+  // Only `rejected` appears here. `unverified` is an absent claim and
+  // `unreachable` is a claim about the network; raising either would put a
+  // critical row on the bell for something nobody can act on, which is how a
+  // bell stops being read. `shared/credentialHealth.ts` holds that reasoning.
+  for (const credential of health.credentials ?? []) {
+    if (credential.state !== 'rejected') continue
+    out.push({
+      key: `connection:${credential.id}:rejected`,
+      kind: 'connection',
+      tier: 'critical',
+      title: `${CREDENTIAL_NAMES[credential.id]} is no longer accepted`,
+      body: `${CREDENTIAL_STOPPED[credential.id]} The secret is still set, so nothing looks wrong until you check.`,
+      href: '#settings',
+      action: 'Reconnect',
+    })
+  }
+
   return out
+}
+
+/** Product names, never the variable names — screens name things. */
+const CREDENTIAL_NAMES: Record<CredentialId, string> = {
+  calendar: 'The Google Calendar connection',
+  gmail: 'The Gmail connection',
+  email: 'Email sending',
+}
+
+/** What has actually stopped, because a refusal alone does not say. */
+const CREDENTIAL_STOPPED: Record<CredentialId, string> = {
+  calendar: 'Approving a gig will not create an event.',
+  gmail: 'The mailbox is no longer being scanned for replies.',
+  email: 'The weekly digest cannot be delivered.',
 }
 
 /**

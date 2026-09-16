@@ -37,6 +37,7 @@ import type { RootEnv } from './context'
 import { originAllowed, relyingParty } from '../shared/auth'
 import { agentMayCall } from '../shared/agentRoutes'
 import { localParts } from '../shared/digestSchedule'
+import { runCredentialChecks } from './lib/credentialCheck'
 
 const app = new Hono<RootEnv>()
 
@@ -325,6 +326,28 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
   // correctness matter — every one of them is checked against the clock when
   // it is read — so this only stops three tables growing without limit.
   await pruneAuth(env)
+
+  // Ask Google whether the stored credentials are still accepted.
+  //
+  // This is the part that makes a dead credential *findable*. A refresh token
+  // that Google stopped accepting breaks the reply scan and the calendar
+  // reconcile silently — there is no error anybody sees, because the jobs that
+  // would have failed are the ones nobody is watching. Checking on the same
+  // daily tick means the bell raises it within a day instead of whenever
+  // somebody happens to open Settings and wonder.
+  //
+  // Platform-level, like event retention beside it: these are Worker secrets,
+  // not any artist's rows, so there is no tenant to loop over.
+  //
+  // Errors are swallowed here as everywhere in the cron, and the probe itself
+  // already distinguishes a refusal from an unreachable Google — so a bad
+  // night for the network records "could not check" rather than inventing a
+  // verdict about the credential.
+  try {
+    await runCredentialChecks(env, new Date())
+  } catch (err) {
+    console.error('credential check failed:', err)
+  }
 }
 
 /**
