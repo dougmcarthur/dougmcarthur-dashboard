@@ -18,6 +18,7 @@
     "db:generate": "drizzle-kit generate",
     "db:bootstrap:local": "node scripts/bootstrap-local-db.mjs",
     "db:migrate:local": "npm run db:bootstrap:local && wrangler d1 migrations apply dougmcarthur-music-hq --local",
+    "db:seed:local": "node scripts/seed-local-db.mjs",
     "db:migrate:remote": "wrangler d1 migrations apply dougmcarthur-music-hq --remote",
     "typecheck:agents": "tsc -p tsconfig.scripts.json",
     "agent": "tsx scripts/agents/run.ts"

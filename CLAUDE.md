@@ -282,24 +282,39 @@ autoincrement and two artists cannot collide on one. 0022 also drops 0018's
 single-column indexes, whose window closed when the reads started leading with
 `tenant_id`.
 
-**The Worker in the migrate-then-deploy gap is the *deployed* one, which is
-much older than the previous step.** This repository ships in branches, and at
-the time of writing the deployed Worker is from migration 0009 — passkeys,
-agents in CI, Gmail drafting, tenants, oversight and invitations are all
-unmerged and land in one CI run. So "additive" is measured against production,
-not against the commit before. That is what makes 0022 keep a narrow unique
-index on `notification_marks(dedupe_key)`: the deployed Worker names it in an
-`ON CONFLICT` target, and `notification_marks` is the only one of the four
-widened tables that exists in production at all. Migration 0024 drops the prop,
-in the same release, before an invitation can create a second tenant.
+**The Worker in the migrate-then-deploy gap is the *deployed* one, which can be
+much older than the previous step.** This repository ships in branches, so
+"additive" is measured against production, not against the commit before. That
+is the rule, and it is the permanent part of this section.
+
+It was written when the deployed Worker was from migration 0009, with passkeys,
+agents in CI, Gmail drafting, tenants, oversight and invitations all unmerged
+and landing in one CI run. **That release shipped on 2026-09-11** (run 61,
+"Merge: tenants, the oversight surface, invitations, and agents as routines"),
+so production now runs the tenant-scoped Worker and migrations 0021–0024 are
+applied. The gap that paragraph described is closed, and the note is kept
+because the rule outlives the situation — the next long-lived branch recreates
+it exactly.
+
+What the old gap bought: 0022 kept a narrow unique index on
+`notification_marks(dedupe_key)` because the *then*-deployed Worker named it in
+an `ON CONFLICT` target, and `notification_marks` was the only one of the four
+widened tables that existed in production at all. 0024 dropped that prop in the
+same release, before an invitation could create a second tenant. Both applied in
+run 61, so the prop is gone and did its job.
 
 The `tenant_id` **defaults** from 0021 are still there, and so is the nullable
 column on the fourteen — migration 0024 makes only `users.tenant_id`
 `NOT NULL`, and says why at length. Three reasons, shortest first: with the
 defaults in place a write cannot produce a NULL anyway, so the constraint
 guards a state `withTenant` and `test/tenantScope.test.ts` already make
-unreachable; the plan's precondition ("live long enough to trust") cannot hold
-for code that has not been live; and SQLite has no `ALTER COLUMN`, so it means
+unreachable; the plan's precondition ("live long enough to trust") could not
+hold for code that had not been live — **it has been live since 2026-09-11, so
+that objection has started to expire**, and of 0024's three conditions the
+first is now met while the other two (comparing production's schema against
+what the migrations produce, and no row carrying a NULL tenant) are still
+unchecked; `GET /api/admin/health` answers the third. And SQLite has no
+`ALTER COLUMN`, so it means
 fourteen table rebuilds transcribing a column list that can only come from the
 *local* schema — while production predates the ledger and was partly
 hand-applied. A production-only column would be dropped by a statement that
@@ -1073,6 +1088,24 @@ Fixtures use dates relative to their own `TODAY`, never to the real clock. A
 suite that passes today and fails tomorrow is worse than one that fails now,
 because it fails in CI on somebody else's change. `TZ=Pacific/Auckland npm test`
 is a cheap check: it runs a day ahead.
+
+**The local database has a fixture, and it is shapes rather than data.**
+`npm run db:seed:local` prints what it would write; `-- --apply` writes it.
+Overview, Review and Gigs are screens about density and triage, so an empty
+local database renders empty states and a UI change cannot be judged against
+anything — the same trap as the chart whose bars were all width 0. The rows
+exist to produce *states*: a prose deadline, an application silent past
+`NO_REPLY_DAYS` both exactly and approximately, `info_requested` outranking a
+deadline, a visa risk, a stopped schedule beside a monthly one that is
+deliberately not flagged, an uncredited press photo, and one row on a second
+tenant that must never appear on the owner's screens.
+
+Its dates are **computed when it runs**, which is the opposite of the rule
+above and the same reasoning: a seeded row with a hardcoded date quietly stops
+being "due in nine days", and the screen stops showing the state it was seeded
+to show. It also seeds one enrolment code, because a fresh local database has
+no passkey and no mailer, so without it the fixture is a database nobody can
+sign in to look at. Local only — it refuses `--remote` rather than ignoring it.
 
 Some mistakes typecheck and render, so they need source-level tests rather than
 behavioural ones — see `test/uiConsistency.test.ts`, which reads the JSX and
