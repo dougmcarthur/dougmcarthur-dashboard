@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
 import { FIELD } from './ui/Field'
 import { Button } from './ui/Button'
+import { Explainer } from './ui/Explainer'
 
 /**
  * The one field the oversight surface reads, filled in by the person it is
@@ -42,13 +43,10 @@ export function ProfileCard() {
 
   return (
     <div className="bg-surface border border-line rounded-xl shadow-card p-4 space-y-3">
-      <div>
-        <h3 className="text-sm font-semibold text-ink">Your name</h3>
-        <p className="text-xs text-muted mt-0.5">
-          What this account is called. It is not printed on anything you send — drafts and
-          applications use the artist database — only on the account itself.
-        </p>
-      </div>
+      <Explainer title="Your name">
+        What this account is called. It is not printed on anything you send — drafts and
+        applications use the artist database — only on the account itself.
+      </Explainer>
 
       <label className="block">
         <span className="sr-only">Display name</span>

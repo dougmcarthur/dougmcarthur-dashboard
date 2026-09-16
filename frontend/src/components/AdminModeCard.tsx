@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import { api } from '../api'
 import { withConfirmation } from '../confirmIdentity'
 import { Button } from './ui/Button'
+import { Explainer } from './ui/Explainer'
 
 /**
  * The way in to the oversight surface, on the Settings screen.
@@ -44,14 +45,11 @@ export function AdminModeCard() {
 
   return (
     <div className="bg-surface border border-line rounded-xl shadow-card p-4 space-y-3">
-      <div>
-        <h3 className="text-sm font-semibold text-ink">Admin mode</h3>
-        <p className="text-xs text-muted mt-0.5">
-          Who is on the platform and what their accounts cost. It is a separate screen, not
-          a bigger version of this one — while you are in it, your own gigs, replies and
-          drafts are out of reach, and so is everybody else&rsquo;s work.
-        </p>
-      </div>
+      <Explainer title="Admin mode">
+        Who is on the platform and what their accounts cost. It is a separate screen, not
+        a bigger version of this one — while you are in it, your own gigs, replies and
+        drafts are out of reach, and so is everybody else&rsquo;s work.
+      </Explainer>
 
       <Button variant="neutral" onClick={() => enter.mutate()} disabled={enter.isPending}>
         {enter.isPending ? 'Confirming…' : 'Switch to admin mode'}

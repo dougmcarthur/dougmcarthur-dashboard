@@ -7,6 +7,7 @@ import {
   type ThemeChoice,
 } from '../appearance'
 import { Button } from './ui/Button'
+import { Explainer } from './ui/Explainer'
 
 /**
  * The appearance panel.
@@ -29,8 +30,9 @@ function Field({
     <div className="py-4 border-t border-line first:border-t-0 first:pt-0">
       <div className="sm:grid sm:grid-cols-[13rem,1fr] sm:gap-6 sm:items-start">
         <div className="mb-2 sm:mb-0">
-          <div className="text-sm font-medium text-ink">{label}</div>
-          {hint && <p className="text-xs text-muted mt-0.5 leading-relaxed">{hint}</p>}
+          <Explainer as="div" title={label} titleClassName="text-sm font-medium text-ink">
+            {hint}
+          </Explainer>
         </div>
         <div>{children}</div>
       </div>
@@ -115,14 +117,9 @@ export function AppearanceSettings() {
       className="rounded-xl border border-line bg-surface shadow-card p-5 sm:p-6"
     >
       <div className="flex items-start justify-between gap-4 mb-4">
-        <div>
-          <h2 id="appearance-heading" className="text-sm font-semibold text-ink">
-            Appearance
-          </h2>
-          <p className="text-xs text-muted mt-0.5">
-            Saved in this browser only — the dashboard itself is unchanged for anyone else.
-          </p>
-        </div>
+        <Explainer as="h2" id="appearance-heading" title="Appearance">
+          Saved in this browser only — the dashboard itself is unchanged for anyone else.
+        </Explainer>
         <Button variant="neutral"
           type="button"
           onClick={reset}
@@ -225,6 +222,23 @@ export function AppearanceSettings() {
           checked={a.highContrast}
           onChange={(highContrast) => set({ highContrast })}
           label="Higher contrast"
+        />
+      </Field>
+
+      {/*
+        Its own hint is deliberately still written, and vanishes with all the
+        others when this is switched off — the label says what it does, and a
+        row that kept explaining itself while silencing everything else would
+        be the one piece of hand-holding you cannot escape.
+      */}
+      <Field
+        label="Explanations"
+        hint="Puts an info button beside each setting, holding a sentence about what it does. Turn it off once you have read them — nothing is lost, and turning it back on brings every one of them back."
+      >
+        <Toggle
+          checked={a.showHints}
+          onChange={(showHints) => set({ showHints })}
+          label="Explanations"
         />
       </Field>
 

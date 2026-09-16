@@ -12,6 +12,8 @@ import {
 import { STATE_LABELS, STATE_NOTES, needsAttention } from '../../../shared/credentialHealth'
 import { Button } from './ui/Button'
 import { Modal } from './ui/Modal'
+import { Explainer, InfoGlyph } from './ui/Explainer'
+import { useAppearance } from '../hooks/useAppearance'
 
 /**
  * One list instead of a card each.
@@ -281,6 +283,8 @@ function DetailModal({ row, onClose }: { row: RowState | null; onClose: () => vo
 }
 
 function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
+  const { appearance } = useAppearance()
+  const showHints = appearance.showHints
   const connectHref = CONNECT_HREF[row.spec.id]
   const connectable = isConnectable(row.spec) && connectHref !== undefined
   const connected = row.grant?.connected ?? false
@@ -297,16 +301,33 @@ function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
         worked until the pill stopped always being there — and "what can this
         reach, and what can it not" is most worth reading *before* connecting,
         which is exactly when there is no pill to click.
+
+        The one-line purpose that used to sit under the name is gone from the
+        row rather than tucked behind its own icon: the modal already opens
+        with that exact sentence as its subtitle, so a second disclosure on
+        one row would have led to the same words. It carries the same glyph as
+        every other explanation on this screen, because it is the same promise
+        — press this, read why — even though this one opens a panel with four
+        lists in it instead of a sentence.
       */}
       <button
         type="button"
         onClick={onOpen}
-        className="min-w-0 flex-1 text-left rounded-md transition-opacity hover:opacity-80
+        className="group min-w-0 flex-1 flex items-center gap-1.5 text-left rounded-md
                    focus:outline-none focus:ring-2 focus:ring-accent"
-        aria-label={`${row.spec.name} — connection details`}
+        aria-label={`${row.spec.name} — what it can reach`}
       >
         <h3 className="text-sm font-medium text-ink">{row.spec.name}</h3>
-        <p className="text-xs text-muted">{row.spec.purpose}</p>
+        {/*
+          Hidden with the rest when explanations are off. The name still opens
+          the detail — what goes is the glyph offering it, exactly as the other
+          rows lose their icon and keep their sentence behind it.
+        */}
+        {showHints ? (
+          <span className="shrink-0 text-faint transition-colors group-hover:text-body">
+            <InfoGlyph />
+          </span>
+        ) : null}
       </button>
 
       <div className="flex shrink-0 items-center gap-2">
@@ -381,17 +402,24 @@ export function IntegrationsCard() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
-        <Button
-          variant="neutral"
-          className="whitespace-nowrap"
-          onClick={() => check.mutate()}
-          disabled={check.isPending}
+        <Explainer
+          as="div"
+          titleClassName=""
+          titleText="checking connections"
+          title={
+            <Button
+              variant="neutral"
+              className="whitespace-nowrap"
+              onClick={() => check.mutate()}
+              disabled={check.isPending}
+            >
+              {check.isPending ? 'Checking…' : 'Check connections'}
+            </Button>
+          }
         >
-          {check.isPending ? 'Checking…' : 'Check connections'}
-        </Button>
-        <p className="min-w-0 flex-1 text-xs text-faint">
-          Asks Google whether each credential is still accepted. Runs once a day on its own.
-        </p>
+          Asks Google whether each credential is still accepted. Runs once a day on its own, which
+          is what makes a credential that quietly stopped working findable at all.
+        </Explainer>
       </div>
       {check.isError ? (
         <p className="pt-2 text-xs text-danger-fg">

@@ -8,6 +8,7 @@ import {
   type NudgePreferences,
 } from '../../../shared/nudgeRouting'
 import { Select } from './ui/Field'
+import { Explainer } from './ui/Explainer'
 
 /**
  * What Scout puts where.
@@ -78,12 +79,11 @@ export function NudgeRoutingCard() {
   return (
     <div className="rounded-xl border border-line bg-surface shadow-card p-4 space-y-3">
       <div className="border-b border-line pb-3">
-        <h2 className="text-sm font-semibold text-ink">Where reminders go</h2>
-        <p className="mt-0.5 text-xs text-muted">
+        <Explainer as="h2" title="Where reminders go">
           A calendar entry means you have to be somewhere. A task means there is work to do. Scout
           keeps those apart so a form you have not filled in never looks like a festival you are
           playing.
-        </p>
+        </Explainer>
       </div>
 
       {missing.length ? (
@@ -100,8 +100,9 @@ export function NudgeRoutingCard() {
           return (
             <div key={spec.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-medium text-ink">{spec.label}</h3>
-                <p className="text-xs text-muted">{spec.describes}</p>
+                <Explainer title={spec.label} titleClassName="text-sm font-medium text-ink">
+                  {spec.describes}
+                </Explainer>
               </div>
               <Select
                 filter
@@ -133,35 +134,41 @@ export function NudgeRoutingCard() {
         sat alone above it — three columns' worth of content in one column's
         space. The reason is the substance here, so it gets the full width.
       */}
-      <div className="space-y-1.5 border-t border-line pt-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="opening-lead" className="text-xs text-muted">
-            Start the application
-          </label>
-          <Select
-            filter
-            id="opening-lead"
-            value={p.openingLeadDays}
-            disabled={patch.isPending}
-            onChange={(e) => patch.mutate({ openingLeadDays: Number(e.target.value) })}
-          >
-            {Array.from({ length: MAX_OPENING_LEAD_DAYS + 1 }, (_, d) => (
-              <option key={d} value={d}>
-                {d === 0 ? 'the day it opens' : d === 1 ? '1 day after it opens' : `${d} days after it opens`}
-              </option>
-            ))}
-          </Select>
-        </div>
+      <div className="border-t border-line pt-3">
         {/*
-          The reason, because the default looks arbitrary without it. A form
-          that was not accepting applications yesterday usually has no fields
-          to read until it is, so a reminder on the morning it opens sends you
-          to an application panel with nothing staged in it.
+          The select sits on the title line via `aside` rather than beside this
+          component, so the explanation opens as a block under the whole row.
+          As a flex sibling it would be trapped in the label's own narrow cell.
         */}
-        <p className="text-xs text-faint">
-          A day's grace, so the form has been read and your answers are staged by the time you open
-          it. Set it to the day itself if you would rather look first.
-        </p>
+        <Explainer
+          as="div"
+          titleClassName=""
+          titleText="the application head start"
+          title={
+            <label htmlFor="opening-lead" className="text-xs text-muted">
+              Start the application
+            </label>
+          }
+          aside={
+            <Select
+              filter
+              id="opening-lead"
+              value={p.openingLeadDays}
+              disabled={patch.isPending}
+              onChange={(e) => patch.mutate({ openingLeadDays: Number(e.target.value) })}
+            >
+              {Array.from({ length: MAX_OPENING_LEAD_DAYS + 1 }, (_, d) => (
+                <option key={d} value={d}>
+                  {d === 0 ? 'the day it opens' : d === 1 ? '1 day after it opens' : `${d} days after it opens`}
+                </option>
+              ))}
+            </Select>
+          }
+        >
+          A day&rsquo;s grace, so the form has been read and your answers are staged by the time
+          you open it. A form that was not accepting applications yesterday usually has no fields
+          to read until it is. Set it to the day itself if you would rather look first.
+        </Explainer>
       </div>
 
       {patch.isError ? (

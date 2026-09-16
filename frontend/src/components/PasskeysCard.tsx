@@ -6,6 +6,7 @@ import { api } from '../api'
 import { withConfirmation } from '../confirmIdentity'
 import { Button } from './ui/Button'
 import { relativeTime, shortDate } from '../format'
+import { Explainer } from './ui/Explainer'
 
 /**
  * What can sign in, and what it would cost to lose each one.
@@ -88,14 +89,11 @@ export function PasskeysCard() {
   return (
     <div className="rounded-xl border border-line bg-surface shadow-card p-4 space-y-3">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-sm font-semibold text-ink">Passkeys</h2>
-          <p className="text-xs text-muted mt-0.5">
-            What can sign in to this dashboard. Cloudflare Access and the emailed login code are
-            gone; a code now only ever adds a passkey. Adding or removing one asks for a passkey
-            first, even though you are signed in.
-          </p>
-        </div>
+        <Explainer as="h2" title="Passkeys">
+          What can sign in to this dashboard. Cloudflare Access and the emailed login code are
+          gone; a code now only ever adds a passkey. Adding or removing one asks for a passkey
+          first, even though you are signed in.
+        </Explainer>
         <Button variant="primary" className="shrink-0 whitespace-nowrap" disabled={add.isPending} onClick={() => add.mutate()}>
           {add.isPending ? 'Waiting…' : 'Add a passkey'}
         </Button>
