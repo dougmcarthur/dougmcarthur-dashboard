@@ -296,3 +296,68 @@ one, and turns a wrong match from a mystery into something correctable.
 
 Stages 1 and 2 are cheap and independent. Stage 4 is the one that fixes the
 screenshot, and it depends on 3.
+
+
+---
+
+## What was built, and one correction to the plan above
+
+Stages 1, 2 and 7 landed first: the query stopped asking for a bare city name,
+mail that declares itself automated is dropped before scoring, and the queue
+says how strong a match is instead of showing every one as the same grey
+caption.
+
+Stages 3 and 4 are the pair that fixes the measurement this document opens
+with. Rarity is measured through Gmail's `resultSizeEstimate`, banded in
+`shared/termRarity.ts`, and passed into `matchReply` as an argument — never
+fetched by it, for the reason `buildReviewQueue` takes `today`.
+
+Measured against the same four messages, with Gmail reporting 12,000 messages
+in a year, `winnipeg` in 2,400 of them and `sofar` in 9:
+
+```
+── before, threshold 26 ──
+  a pizza receipt       26 pts  Weak   "Winnipeg" in the body.
+  a utility bill        26 pts  Weak   "Winnipeg" in the body.
+  a city newsletter     26 pts  Weak   "Winnipeg" in the body.
+  a GENUINE reply       26 pts  Weak   "Winnipeg" in the body.
+
+── after ──
+  a pizza receipt      —  not shown at all
+  a utility bill       —  not shown at all
+  a city newsletter    —  not shown at all
+  a GENUINE reply       26 pts  Weak   "Sofar" in the body, which is rare here.
+```
+
+### Stage 4 was wrong, and running it is what showed that
+
+The plan said: *set the threshold above what any single body-only signal can
+score, so a lead needs two things to agree.* That was right about the problem
+and wrong about the mechanism, and it only became visible once stage 3 existed.
+
+With rarity measured, a common word no longer reaches the bar — it scores 2
+where it used to score 26 — so the junk is gone before any threshold change.
+Raising the bar now would remove only the thing left standing: a genuine reply
+whose sole evidence is a **rare** word, which is exactly the lead the feature
+exists to surface.
+
+So stage 4 became an **invariant** rather than a change: a word that is common
+in this mailbox must never carry a match by itself, however long it is, and
+`test/termRarity.test.ts` asserts it across a range of frequencies. The
+corroboration idea survives where it belongs — in what the screen says. A lone
+signal still reads *Weak*, because one mention with no domain and no thread is
+a lead rather than a match, and now the note beside it says whether the word it
+found was rare or everywhere.
+
+### What is still true, and unmeasured
+
+An unmeasured term keeps its full weight, so a deployment that has never
+reached Gmail scores exactly as it did before rather than slightly worse. The
+cache is monthly and platform-level, which is the same reasoning the reply scan
+already uses: one refresh token, one mailbox, one answer to "how common is this
+word". It moves with the scan when a second artist has a mailbox of their own.
+
+Two things this does not touch, both still open: the quoted receipt underneath
+a reply is still read when matching (stage 6), and nothing yet checks
+`In-Reply-To` against the artist's own sent mail, which is the strongest signal
+available and needs no new permission.

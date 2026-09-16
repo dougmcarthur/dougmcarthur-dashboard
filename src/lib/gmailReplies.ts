@@ -187,7 +187,7 @@ interface GmailListed {
   threadId: string
 }
 
-async function accessToken(env: GmailEnv, fetchImpl: typeof fetch): Promise<string> {
+export async function accessToken(env: GmailEnv, fetchImpl: typeof fetch = fetch): Promise<string> {
   const res = await fetchImpl('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

@@ -1,3 +1,5 @@
+import { rarityIndexFor } from '../lib/termRarity'
+import { significantWords } from '../../shared/replyMatch'
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
@@ -168,6 +170,15 @@ export async function runReplyScan(
   let skipped = 0
   const fresh: Array<{ subject: string | null; gigName: string | null; classification: string }> = []
 
+  // Measured once for the whole scan rather than per message: the question is
+  // about the mailbox, not about any one email, and the answer is cached for a
+  // month anyway. See src/lib/termRarity.ts.
+  const rarity = await rarityIndexFor(
+    env,
+    gigs.flatMap((g) => significantWords(g.name)),
+    new Date(),
+  )
+
   for (const message of messages) {
     const prior = byMessage.get(message.messageId)
     // A decision already made is not re-proposed. This is what makes the scan
@@ -191,7 +202,7 @@ export async function runReplyScan(
       continue
     }
 
-    const { candidates, ambiguous } = matchReply(message, gigs, bindings)
+    const { candidates, ambiguous } = matchReply(message, gigs, bindings, rarity)
     const best = candidates[0]
     const classification = classifyReply(message.body)
     // Read here, not on demand: this is the only moment the whole body

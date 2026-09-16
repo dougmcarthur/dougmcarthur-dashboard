@@ -34,6 +34,7 @@
  * Pure, like everything in shared/. Nothing here reads the clock or the network.
  */
 
+import { rarityLookup, rarestWord, weigh, type Rarity, type RarityIndex } from './termRarity'
 import { normaliseGigStatus } from './gigStatus'
 
 // ── Normalising a name ────────────────────────────────────────────────────────
@@ -136,24 +137,49 @@ export interface NameMatch {
   matched: string
   /** `subject` outranks `body` — a name in the subject line is deliberate. */
   where: 'subject' | 'body'
+  /** Set on a `distinctive` match: how much the word it matched is worth. */
+  rarity?: Rarity
 }
 
 /**
- * The longest word is the most distinctive one.
+ * The word of a name worth scoring on: the rarest, measured.
  *
- * Not a frequency table, which would need a corpus this app does not have.
- * Length is a decent proxy — "voyageur" and "highlands" beat "road" and "west"
- * — and it is stable, which matters more than being clever here.
+ * It used to be the longest, and the comment said why — a frequency table
+ * "would need a corpus this app does not have". It has one now: the artist's
+ * own mailbox, measured through Gmail's own result estimates. See
+ * `shared/termRarity.ts`.
+ *
+ * Length still decides when nothing has been measured, so an unmeasured
+ * deployment behaves exactly as it did before rather than slightly worse.
  */
-function distinctiveWord(name: string): string | null {
+function distinctiveWord(name: string, lookup: (term: string) => Rarity): string | null {
   const sig = significantWords(name).filter((w) => w.length >= 5)
   if (sig.length === 0) return null
-  return sig.reduce((best, w) => (w.length > best.length ? w : best))
+  return rarestWord(sig, lookup)
+}
+
+/**
+ * What a single-word match says, including how common that word is.
+ *
+ * The old line read `"winnipeg" in the body.` — true, and it read as a reason
+ * rather than as the coincidence it usually was. Saying the share is what lets
+ * somebody dismiss it without opening the message.
+ */
+function rarityNote(name: NameMatch): string {
+  const band = name.rarity?.band
+  const where = name.where
+  if (band === 'everywhere' || band === 'common') {
+    return `"${name.matched}" in the ${where} — a word that appears all over this mailbox.`
+  }
+  if (band === 'uncommon') return `"${name.matched}" in the ${where}, which is fairly distinctive.`
+  if (band === 'rare') return `"${name.matched}" in the ${where}, which is rare in this mailbox.`
+  return `"${name.matched}" in the ${where}.`
 }
 
 export function matchName(
   gigName: string,
   message: { subject: string; body: string },
+  lookup: (term: string) => Rarity = () => rarityLookup(null)(''),
 ): NameMatch | null {
   const fields: Array<['subject' | 'body', string]> = [
     ['subject', message.subject ?? ''],
@@ -165,7 +191,7 @@ export function matchName(
   // pattern built from the significant words alone ("folk", "rocks") would
   // have to guess at the two stopwords sitting between them.
   const squashedName = squash(gigName)
-  const distinctive = distinctiveWord(gigName)
+  const distinctive = distinctiveWord(gigName, lookup)
   const abbrevs = initialisms(gigName)
 
   // Ordered by how much each kind tells you, and each kind checked in the
@@ -178,7 +204,7 @@ export function matchName(
   for (const [where, text] of fields) {
     if (!text || !distinctive) continue
     const m = text.match(new RegExp(`\\b${escapeRe(distinctive)}\\b`, 'i'))
-    if (m) return { kind: 'distinctive', matched: m[0], where }
+    if (m) return { kind: 'distinctive', matched: m[0], where, rarity: lookup(distinctive) }
   }
   for (const [where, text] of fields) {
     if (!text) continue
@@ -400,7 +426,12 @@ export function isMatchableGig(gig: { status: string }): boolean {
   return MATCHABLE.has(normaliseGigStatus(gig.status))
 }
 
-function scoreGig(message: ReplyMessage, gig: MatchableGig, bindings: Binding[]): ReplyCandidate | null {
+function scoreGig(
+  message: ReplyMessage,
+  gig: MatchableGig,
+  bindings: Binding[],
+  lookup: (term: string) => Rarity,
+): ReplyCandidate | null {
   const signals: MatchSignal[] = []
   const mine = bindings.filter((b) => b.gigId === gig.id)
 
@@ -419,17 +450,23 @@ function scoreGig(message: ReplyMessage, gig: MatchableGig, bindings: Binding[])
   // `updated_at` would throw away real matches.
   if (gig.submittedAt && message.receivedAt < gig.submittedAt) return null
 
-  const name = matchName(gig.name, message)
+  const name = matchName(gig.name, message, lookup)
   if (name) {
+    // Only the single-word match is weighed. A full name and an abbreviation
+    // are distinctive by construction — "Folk On The Rocks" written out, or
+    // FOTR — so measuring how common they are would answer a question nobody
+    // asked and would punish a festival for having an ordinary name.
+    const base = POINTS.name[name.kind][name.where]
+    const points = name.kind === 'distinctive' && name.rarity ? weigh(base, name.rarity) : base
     signals.push({
       id: 'name',
-      points: POINTS.name[name.kind][name.where],
+      points,
       detail:
         name.kind === 'full'
           ? `"${gig.name}" appears in the ${name.where}.`
           : name.kind === 'initialism'
             ? `"${name.matched}" in the ${name.where} reads as an abbreviation of "${gig.name}".`
-            : `"${name.matched}" in the ${name.where}.`,
+            : rarityNote(name),
     })
   }
 
@@ -479,10 +516,17 @@ export function matchReply(
   message: ReplyMessage,
   gigs: MatchableGig[],
   bindings: Binding[] = [],
+  /**
+   * What the words of these names are worth in this mailbox. Passed in rather
+   * than fetched — see `shared/termRarity.ts`. Absent means unmeasured, which
+   * scores exactly as this did before rarity existed.
+   */
+  rarity?: RarityIndex | null,
 ): ReplyMatchResult {
+  const lookup = rarityLookup(rarity)
   const scored = gigs
     .filter(isMatchableGig)
-    .map((g) => scoreGig(message, g, bindings))
+    .map((g) => scoreGig(message, g, bindings, lookup))
     .filter((c): c is ReplyCandidate => c !== null && (c.bound || c.score >= MATCH_THRESHOLD))
     .sort((a, b) => b.score - a.score || a.gigName.localeCompare(b.gigName))
 
