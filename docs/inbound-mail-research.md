@@ -52,7 +52,7 @@ a research output.
 | 5 | Pre-filled link support per form platform (the extension doc's check list, item 1) | **done** — findings in `submission-assist-research.md` |
 | 6 | Costs and store rules: Browser Rendering pricing, model-driven browser cost, Chrome Web Store policy, WXT and the ports (check list, items 2–4) | **done** — findings in `submission-assist-research.md` |
 | 7 | Synthesis and critique — one recommendation, and what would make it wrong | **done** |
-| 8 | Self-hosting: what it fixes, and whether IMAP avoids Google's verification regime | **running** |
+| 8 | Self-hosting: what it fixes, and whether IMAP avoids Google's verification regime | **done** |
 
 ## What the research found
 
@@ -663,3 +663,99 @@ it does have users, and the change is worth recording.
 **That is the single fact this turns on, and it is being checked.** Findings go
 in below.
 
+### Phase 8 findings — IMAP with an app password does avoid the toll, and hands over a worse credential
+
+Read 2026-09-16 against Google's, Apple's and Microsoft's own support pages.
+
+**IMAP is always on.** Since January 2025 the enable/disable toggle is gone —
+removed as a setting, not as a feature
+(`support.google.com/mail/answer/7126229`).
+
+**App passwords survived**, and are the sanctioned replacement for what died.
+What Google killed on 2025-03-14 was signing in with your *real* account
+password ("less secure app access"). App passwords require 2-Step Verification,
+carry only a nudge — "aren't recommended and are unnecessary in most cases" —
+and **no deprecation date was found anywhere**
+(`support.google.com/accounts/answer/185833`).
+
+**And the path never touches OAuth.** IMAP `LOGIN` with an address and a
+sixteen-character string involves no client id, no consent screen and no
+`scope` parameter. Google's restricted-scope verification documentation
+addresses OAuth authorisation exclusively and never mentions IMAP or app
+passwords. Verification and CASA attach to a **scope request**, and this makes
+none — so there is structurally nothing for that pipeline to evaluate.
+
+That last step is an inference from what the documentation covers, not a
+sentence Google has written. It is rated high confidence, **not certain**, and
+it should be treated as the load-bearing assumption it is.
+
+**OAuth-based IMAP does not help.** XOAUTH2 needs the `https://mail.google.com/`
+scope, which is Restricted — the same tier, the same six weeks, the same annual
+assessment. Only basic auth with an app password sidesteps it.
+
+**The sting.** An app password is **not read-only and not IMAP-scoped**. It
+authenticates as the account holder for IMAP, SMTP and POP, so it can read,
+**send** and **delete**, and there is no way to mint a narrower one. It is
+individually revocable and dies when the main password changes, but otherwise
+**never expires**. Against a `gmail.readonly` refresh token — read-only as
+enforced by Google's own authorisation server, useless without the client
+secret, minting one-hour access tokens — it is a static, immediately usable,
+full-power credential sitting in a database.
+
+**Coverage is Gmail and iCloud only.** iCloud works the same way, with
+app-specific passwords and 2FA. **Outlook.com and Hotmail consumer accounts
+have no app-password path at all** — Microsoft cut basic auth for consumer
+accounts on 2024-09-16 and OAuth is mandatory there. An artist on Outlook has
+no free route, and that is a coverage gap rather than a detail.
+
+### What this does to the recommendation
+
+**It does not change "not yet".** The feature still has no users, and a cheaper
+credential does not create demand.
+
+**It does change what "later" looks like**, and it is worth writing down while
+the reasoning is fresh, because the trade is subtle in a way this repository
+has already thought carefully about once.
+
+Scout's habit is to make a guarantee **structural rather than behavioural**.
+The `send_email` allowlist means the Worker cannot mail elsewhere *even if the
+code is wrong*. The `gmail.compose` decision was taken knowing the scope also
+permits sending, and the guarantee was rebuilt by hand: no send call in
+`src/lib/googleGrant.ts`, and a test that fails if a Send button appears. The
+connect screen says so in words, because "a permission that protects less than
+the reader assumes is the kind of thing to write down rather than imply".
+
+An app password is that problem again, one notch worse: it permits reading
+everything, sending, *and deleting*, and Google will not narrow it. So if this
+route is ever taken, the guarantee has to be rebuilt structurally a second
+time, and the sidecar shape is what makes that possible:
+
+- **The credential never enters D1.** It lives on the box that polls, which is
+  the only thing that holds mail credentials and does nothing else. That is
+  strictly better than `google_grants`, where the refresh token sits in the
+  database beside the prose.
+- **The poller contains no SMTP client and no delete path**, so "Scout never
+  sends" stays a fact about what the binary can do rather than a promise about
+  what it chooses to do. Same move as `googleGrant.ts`, in a place where
+  Google has stopped helping.
+- **The artist is told what they are handing over, in plain words**, on the
+  screen where they hand it over. Not "connect your mailbox" — an app password
+  reads, sends and deletes, never expires, and is revoked in their Google
+  account rather than in Scout.
+- **Blast radius becomes "the box was breached" rather than "the code was
+  wrong"**, which is the trade this repository keeps choosing.
+
+Whether that is worth doing at all is a real question and not a foregone one.
+The alternative — paying about $540 a year — buys a scoped, expiring,
+Google-enforced read-only credential and no box to run. **Against a per-artist
+assessment cost, the cheapest honest summary is: $540/year buys a better
+credential and less operational surface; an app password buys neither, and is
+free.** That is a decision about risk appetite, and it should be made in those
+terms rather than on the price alone.
+
+### One more falsifier, added to phase 7's list
+
+7. **An artist on Outlook has no route at all.** Gmail and iCloud have app
+   passwords; consumer Microsoft accounts do not. Any plan resting on IMAP
+   should say which mailboxes it covers, rather than discovering the gap when
+   somebody is invited.
