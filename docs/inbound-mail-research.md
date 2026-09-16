@@ -340,3 +340,71 @@ Wufoo/Jotform notification, each both forwarded and sent directly. Read the
 `Authentication-Results` on what arrives and note what never does. A single
 synthetic message generalises to nothing.
 
+### Phase 3a — every Gmail scope this app uses is Restricted, including the one that only writes drafts
+
+Read 2026-09-16 against Google's own documentation
+(`support.google.com/cloud/answer/13464325`,
+`developers.google.com/workspace/gmail/api/auth/scopes`).
+
+`gmail.readonly`, `gmail.metadata`, `gmail.modify` **and `gmail.compose`** are
+all classified **Restricted**. Only bare `gmail.send` sits in the lighter
+Sensitive tier. `gmail.metadata` is Restricted despite returning headers only,
+and `gmail.compose` is Restricted despite granting no read access at all.
+
+This app holds both `gmail.readonly` (the owner's `GMAIL_REFRESH_TOKEN`, for
+the reply scan) and `gmail.compose` (the runtime grant in `google_grants`, for
+drafting).
+
+**To let anyone outside the developer's own account grant those**, Google
+requires brand verification (2–3 business days), restricted-scope data-access
+verification with a demo video and a Trust & Safety review — **Google's own FAQ
+says about six weeks** — and an **annual third-party CASA security
+assessment**, performed by an approved lab and paid for directly by the
+developer. Google charges nothing and controls nothing about that fee.
+
+**What CASA costs.** Google publishes no price list. Vendor rate cards
+(deepstrike.io, updated September 2026; switchlabs.dev) converge on **Tier 2 at
+roughly $500–$1,800 a year**, with **$540** the most-cited floor from Google's
+named preferred partner. Tier 3 runs $4,500–$8,000+. Recurring, annually.
+These are third-party figures, not Google's, and are labelled as such.
+
+**There is no small-app exemption.** Confirmed from Google's FAQ — the tier is
+set by data sensitivity and per-scope user volume, not revenue — and from
+third-party reporting. No hobby waiver was found.
+
+**The free path is OAuth Testing status**, and its terms matter: up to 100 test
+users, added by hand in the Cloud Console, with no verification and no CASA.
+The catch is that **refresh tokens expire seven days after consent**, on a
+fixed clock. A handful of invited musicians fits inside 100 easily; being
+walked through re-authorising every week, forever, does not fit inside anything.
+And the failure is silent — the token simply stops working.
+
+**No narrower scope reads a body.** `gmail.metadata` gives headers and labels
+only, is Restricted anyway, and would not serve reply matching, which extracts
+a deciding sentence and recognises asks from body text. Body access means a
+Restricted scope. There is no way around it.
+
+**Push is not worth it here.** `users.watch` with Pub/Sub needs a topic, IAM
+grants and a reachable subscriber, and **the watch expires after seven days
+with no automatic renewal and no warning** — mail arrives and nothing is
+delivered. For a mailbox swept three times a day, polling is the right answer,
+and it is already what the cron does. Quota is nowhere near a constraint.
+
+**What this means for work already built.** Gmail drafting exists, and
+`google_grants` was designed precisely so the *user* decides whether to
+connect. That design is right and the feature works — for the owner. Offering
+it to an invited artist is not a matter of writing a per-tenant grant row: it
+is six weeks of review and a recurring four-figure-at-worst assessment, or a
+token that dies every seven days. The multi-tenant plan lists per-artist
+mailbox grants as "real work with schema behind them"; the schema is the cheap
+part, and the plan should say so.
+
+**One thing this research did not settle, and it bears on the owner's current
+setup.** The finding presents Testing and verified Production as the only two
+options. There is a third state — **published but unverified** — which
+historically showed users an unverified-app warning and capped the app at a
+number of grants, without the seven-day token expiry. Which state this app's
+Cloud project is actually in decides whether `GMAIL_REFRESH_TOKEN` is quietly
+living on a seven-day clock today. **Check the Cloud Console before relying on
+any of this**, and treat the two-option framing as unconfirmed.
+
