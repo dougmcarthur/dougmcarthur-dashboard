@@ -52,6 +52,7 @@ a research output.
 | 5 | Pre-filled link support per form platform (the extension doc's check list, item 1) | **done** — findings in `submission-assist-research.md` |
 | 6 | Costs and store rules: Browser Rendering pricing, model-driven browser cost, Chrome Web Store policy, WXT and the ports (check list, items 2–4) | **done** — findings in `submission-assist-research.md` |
 | 7 | Synthesis and critique — one recommendation, and what would make it wrong | **done** |
+| 8 | Self-hosting: what it fixes, and whether IMAP avoids Google's verification regime | **running** |
 
 ## What the research found
 
@@ -571,3 +572,94 @@ re-deriving the argument.
 - iCloud and Outlook forwarding, beyond a first look.
 - Whether CloudMailin's free tier permits commercial use at scale later.
 - A live test of any of it. **Nothing here has been run against real mail.**
+
+## Phase 8 — what running your own server actually fixes
+
+Asked after phase 7: how much of this goes away if Scout stops leaning on
+Cloudflare and Google and runs on its own server?
+
+**The short answer is that it fixes one of the three obstacles completely, has
+nothing to say about the second, and is irrelevant to the third.** The one it
+fixes is the one that was blocking.
+
+| Obstacle | Own server? |
+| --- | --- |
+| Cloudflare rejects forwarded mail failing DMARC, per-sender, silently | **Fixed, completely.** Your MTA, your policy |
+| CloudMailin as a new vendor dependency | **Removed.** The server is the endpoint |
+| Gmail scopes are Restricted: 6 weeks + CASA | **Not fixed** — unless IMAP avoids OAuth entirely (being checked) |
+| Forwarding setup: ten steps, confirmation code | **Partly.** The code was already automatable |
+| Gmail filters cannot express "festival receipt" | **Not fixed.** Gmail-side |
+| Forwarding carries no history | **Not fixed** by an MTA — but IMAP would fix it outright |
+| Chrome Web Store review, permissions, privacy policy | **Irrelevant.** Nothing to do with hosting |
+| Form platforms hide their field ids | **Irrelevant.** Platform-side |
+| Browser Rendering cost | Already free on Workers Paid. Nothing to win |
+
+### The first row is the real prize
+
+Phase 2b's finding was that Cloudflare enforces DMARC on inbound mail, rejects
+on failure, offers no exception, and that the senders it rejects are exactly
+this mailbox's senders. **That is a policy decision made by somebody else about
+your mail.** An MTA you run has no such opinion unless you give it one: accept
+everything, record the authentication verdicts as data, and let Scout weigh
+them against the signal it actually trusts — the envelope sender matched
+against an address verified once against the account.
+
+That is the same thing CloudMailin's free tier does. The difference is that one
+costs a box and the other costs a vendor.
+
+**Receiving is the easy half of self-hosting mail.** The hard part is
+*sending*: IP reputation, warm-up, blocklists, DMARC alignment on your own
+outbound. Scout barely sends — a setup code and a digest — and that already
+works through Email Service, which can stay exactly where it is. An
+inbound-only MTA needs an MX record, a TLS certificate and spam filtering, and
+none of those depend on reputation you have to earn.
+
+### The two decisions are independent, and that matters
+
+Nothing here requires moving the app. **MX is a DNS record**: Cloudflare can
+keep serving DNS, the Worker can keep serving the app on
+`scout.sundogsmusic.ca`, D1 can keep holding the data, CI can keep deploying —
+while `mail.sundogsmusic.ca` points at a box that does one job. The
+architecture Scout already has for exactly this shape is
+`shared/agentRoutes.ts`: a hashed, revocable, per-tenant token limited to a
+named list of routes. A mail receiver is the same kind of client as a research
+agent — something outside the Worker that files rows through a narrow door.
+
+So the honest framing is not "own server *instead of* Cloudflare". It is **a
+sidecar that does the one job Cloudflare refuses to do**, holding no session,
+no passkey and no admin reach, writing through a token that can be revoked.
+
+### What it costs, stated plainly
+
+- **A box that must not fall over.** Mail arrives when it arrives; there is no
+  retry queue on your side of it. Scout's current failure modes are a red CI
+  run and a deploy that needs re-running. This adds patching, certificate
+  renewal, disk, backups and uptime — the class of work this app has
+  deliberately never had.
+- **A credential store with a real blast radius**, if the IMAP route is taken.
+- **Spam.** A published address receives what published addresses receive.
+- **It breaks a security property that is currently free.** The `send_email`
+  allowlist means the Worker cannot mail anywhere else *even if the code is
+  wrong*. A box you control can mail anywhere. That guarantee is not recovered
+  by intending not to send.
+
+### Recommendation
+
+**Do not run a server for this yet, and for the same reason phase 7 gave**: the
+feature it would serve has no users. But the answer changes what happens *when*
+it does have users, and the change is worth recording.
+
+- If the need is **forwarded mail only**, CloudMailin's free tier and a
+  self-hosted MTA do the same job. Take the vendor, because it is free and
+  there is no box.
+- If the need turns out to be **reading whole mailboxes with history** — and
+  history is the thing forwarding can never provide — then the question is
+  whether IMAP sidesteps Google's verification regime. If it does, a small
+  self-hosted IMAP poller is the only route that gets per-artist mail without
+  six weeks of review and a recurring assessment, and it becomes the strongest
+  option on the table rather than a fallback. If it does not, self-hosting buys
+  nothing against Google and the recommendation stands unchanged.
+
+**That is the single fact this turns on, and it is being checked.** Findings go
+in below.
+
