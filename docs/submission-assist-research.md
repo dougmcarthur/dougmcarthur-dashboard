@@ -193,3 +193,61 @@ types with `shared/`, built with an extension framework such as WXT
 3. What a model-driven browser actually costs per form.
 4. Chrome Web Store: host-permission review, remotely hosted code, privacy
    policy, unlisted listings. Plus WXT, and the Firefox and Safari ports.
+
+## What the research found
+
+### Check list item 1 — pre-fill is common; *discovering the field ids* is not
+
+Read 2026-09-16 against each platform's own documentation.
+
+| Platform | Pre-fill | Mechanism | Field ids from the public page? |
+| --- | --- | --- | --- |
+| Google Forms | Yes | `?entry.<id>=value` | **Yes** — the `name` attribute on the rendered inputs |
+| Airtable | Yes | `?prefill_<Field Label>=value` | **Yes**, by label |
+| Jotform | Yes | `?<uniqueName>=value` | No — the unique name is set in the builder |
+| Wufoo | Yes | `?field<N>=value` | No — needs the account's API info panel |
+| Cognito Forms | Yes | `?entry={JSON}` by internal name | No — internal name is not the label |
+| Formstack | Yes | `?<Field Label>=value` | Probably, by label (unconfirmed). No free plan |
+| Tally | Yes | URL param → hidden field → question's default answer | No — the author pre-declares the hidden field |
+| Fillout | Yes | Parameter registered in settings → default value | No — must be registered first |
+| Microsoft Forms | **No** | None official | — |
+| Typeform | **No** | Hidden fields recall into question *text* only | — |
+| Submittable | **No** | Nothing documented anywhere | — |
+
+**The plan's suggested order was wrong about step 1, and this is the
+correction.** It said: Google Forms first, "then the other platforms with URL
+parameters". But pre-fill support is not the binding constraint — **knowing
+what to call the fields is**. Only **Google Forms and Airtable** yield their
+field keys from the public form page. Every other supporting platform needs the
+internal name from the form's builder, which means the cooperation of whoever
+set the form up. A festival is not going to do that, and Scout will never have
+builder access.
+
+So the honest scope of "pre-filled links, no extension" is **Google Forms, plus
+Airtable**, plus any single form somebody reconnoitres by hand once. That is
+still worth building — it is free, it works on a phone, and Scout already reads
+Google Forms field ids — but it is one or two platforms, not a tier of them.
+
+**Typeform is a harder dead end than the brief guessed.** The brief marked it
+"URL parameters mostly cover hidden fields only (check)". It is worse: a hidden
+field can only be *recalled into question or description text*, never used to
+fill a visible answer. Confirmed from Typeform's developer documentation and
+corroborated in their community forum. It is also gated behind a paid plan. The
+extension is the only route there.
+
+**Submittable has no pre-fill at all**, and submitting requires an account.
+That is not a disappointment — it is the case *for* the extension. Submittable
+is a major arts and grants platform, and it is exactly the shape the extension
+handles best and links cannot touch at all: a real form behind a login the
+artist already has.
+
+**The leak note, which changes where this may be used.** Every URL mechanism
+puts answers in plaintext in the URL: browser history, the `Referer` header
+sent to the platform and to any analytics on the page, server logs, and
+anywhere the link is copied. There is no out-of-URL pre-fill channel on any
+platform. This is the same shape as the `mailto:` decision already made in this
+repository — the handler is offered where it is safe and Copy is never
+withheld — and it wants the same treatment: **pre-filled links for
+low-sensitivity fields, and Copy as the fallback for anything else**. A
+pre-filled link is not a private channel and should not be described as one.
+
