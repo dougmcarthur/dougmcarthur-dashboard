@@ -4,6 +4,7 @@ import { api, type CalendarGrant, type CredentialHealth, type CredentialState } 
 import {
   INTEGRATIONS,
   isConnectable,
+  rowNeedsAttention,
   stateNote,
   type IntegrationId,
   type IntegrationSpec,
@@ -283,34 +284,50 @@ function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
   const connectHref = CONNECT_HREF[row.spec.id]
   const connectable = isConnectable(row.spec) && connectHref !== undefined
   const connected = row.grant?.connected ?? false
+  // A Connect button already says the thing is not connected, so the pill
+  // beside it repeated it in two words and a colour. The button is the
+  // stronger signal — it is the thing you can act on — so the pill goes and
+  // the button stands alone.
+  const offeringConnect = connectable && !connected
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-      <div className="min-w-0 flex-1">
+      {/*
+        The name is the way in to the detail now. It used to be the pill, which
+        worked until the pill stopped always being there — and "what can this
+        reach, and what can it not" is most worth reading *before* connecting,
+        which is exactly when there is no pill to click.
+      */}
+      <button
+        type="button"
+        onClick={onOpen}
+        className="min-w-0 flex-1 text-left rounded-md transition-opacity hover:opacity-80
+                   focus:outline-none focus:ring-2 focus:ring-accent"
+        aria-label={`${row.spec.name} — connection details`}
+      >
         <h3 className="text-sm font-medium text-ink">{row.spec.name}</h3>
         <p className="text-xs text-muted">{row.spec.purpose}</p>
-      </div>
+      </button>
 
       <div className="flex shrink-0 items-center gap-2">
-        {connectable && !connected ? (
-          <Button variant="primary" className="whitespace-nowrap" onClick={() => { window.location.href = connectHref }}>
+        {offeringConnect ? (
+          <Button
+            variant="primary"
+            className="whitespace-nowrap"
+            onClick={() => { window.location.href = connectHref }}
+          >
             Connect
           </Button>
-        ) : null}
-        {/*
-          The status is the way in to the detail, for connectable rows and for
-          the two that are not: "what can this reach" is worth answering about
-          a server credential too, and a row you cannot click is a row that
-          looks broken.
-        */}
-        <button
-          type="button"
-          onClick={onOpen}
-          className="rounded-full transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent"
-          aria-label={`${row.spec.name} — connection details`}
-        >
-          <StatusPill state={row.state} />
-        </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpen}
+            className="rounded-full transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent"
+            aria-label={`${row.spec.name} — connection details`}
+          >
+            <StatusPill state={row.state} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -335,16 +352,25 @@ export function IntegrationsCard() {
   if (isLoading) return <div className="h-48 bg-sunken rounded-xl animate-pulse" />
 
   const rows = resolveRows(data)
-  const attention = rows.filter((r) => needsAttention(r.state)).length
+  // Not `needsAttention`: on a grant row, `unconfigured` means nobody has
+  // pressed Connect, which is a choice not yet made rather than a fault. See
+  // `rowNeedsAttention`.
+  const attention = rows.filter((r) => rowNeedsAttention(r.spec, r.state)).length
+  // Counted separately, because "nothing is broken" and "everything is
+  // connected" are different claims and the summary used to make the second
+  // when it could only support the first.
+  const unconnected = rows.filter((r) => r.state === 'unconfigured').length
 
   return (
     <div className="bg-surface border border-line rounded-xl shadow-card p-4">
       <div className="flex flex-col items-start gap-1.5 border-b border-line pb-3">
         <h2 className="text-sm font-semibold text-ink">Integrations</h2>
         <p className="text-xs text-muted">
-          {attention === 0
-            ? 'Everything Scout talks to is working.'
-            : `${attention} of ${rows.length} ${attention === 1 ? 'needs' : 'need'} attention.`}
+          {attention > 0
+            ? `${attention} of ${rows.length} ${attention === 1 ? 'needs' : 'need'} attention.`
+            : unconnected > 0
+              ? `${rows.length - unconnected} of ${rows.length} connected, and nothing is broken.`
+              : 'Everything Scout talks to is working.'}
         </p>
       </div>
 
