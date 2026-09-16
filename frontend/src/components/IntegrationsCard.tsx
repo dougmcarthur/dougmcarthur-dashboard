@@ -4,6 +4,7 @@ import { api, type CalendarGrant, type CredentialHealth, type CredentialState } 
 import {
   INTEGRATIONS,
   isConnectable,
+  stateNote,
   type IntegrationId,
   type IntegrationSpec,
 } from '../../../shared/integrations'
@@ -55,63 +56,128 @@ interface RowState {
   checkedAt: string | null
 }
 
+/** Everything the rows read, which is one query's worth. */
+type HealthLike =
+  | {
+      credentials?: CredentialHealth[]
+      calendarGrant?: CalendarGrant
+      gmailGrant?: CalendarGrant
+      tasksGrant?: CalendarGrant
+      primaryCalendarGrant?: CalendarGrant
+      primaryCalendarOffered?: boolean
+    }
+  | undefined
+
+/**
+ * Which grant answers for which row.
+ *
+ * A table rather than a chain of ifs, because the chain is what let the
+ * calendar row and the drafting row drift into two different ways of saying
+ * "connected". The three rows that are not here answer from something else —
+ * `calendar` has a secrets fallback, and the last two are a server credential
+ * and a binding, which no grant describes.
+ */
+const GRANT_ROWS: Partial<Record<IntegrationId, (h: HealthLike) => CalendarGrant | undefined>> = {
+  'gmail.drafts': (h) => h?.gmailGrant,
+  tasks: (h) => h?.tasksGrant,
+  'calendar.primary': (h) => h?.primaryCalendarGrant,
+}
+
+/** A grant is working when it exists and Google gave it the scope asked for. */
+function fromGrant(spec: IntegrationSpec, grant: CalendarGrant | undefined): RowState {
+  return {
+    spec,
+    state: grant?.connected ? (grant.canDraft ? 'working' : 'rejected') : 'unconfigured',
+    grant: grant ?? null,
+    detail: null,
+    checkedAt: grant?.grantedAt ?? null,
+  }
+}
+
 /**
  * What each row knows about itself.
  *
- * A grant answers from the grant; the other two answer from the credential
- * probe. Keeping the resolution in one function rather than in the markup is
- * what stops a row inventing a fourth way to be connected.
+ * A grant answers from the grant; the server credential and the binding answer
+ * from the probe. Keeping the resolution in one function rather than in the
+ * markup is what stops a row inventing a fifth way to be connected.
  */
-function resolveRows(
-  health: { credentials?: CredentialHealth[]; calendarGrant?: CalendarGrant; gmailGrant?: CalendarGrant } | undefined,
-): RowState[] {
+function resolveRows(health: HealthLike): RowState[] {
   const byId = new Map((health?.credentials ?? []).map((c) => [c.id, c]))
 
-  return INTEGRATIONS.map((spec): RowState => {
+  return INTEGRATIONS.flatMap((spec): RowState[] => {
+    // A gated row is hidden rather than shown disabled. A row you cannot use
+    // reads as broken, and on a deployment that has not declared the scope,
+    // pressing Connect would end at a Google error page rather than a consent
+    // screen — so there is nothing useful behind it to show.
+    if (spec.gated && !health?.primaryCalendarOffered) return []
+
+    const grantOf = GRANT_ROWS[spec.id]
+    if (grantOf) return [fromGrant(spec, grantOf(health))]
+
     if (spec.id === 'calendar') {
-      const grant = health?.calendarGrant ?? null
-      if (grant?.connected) {
-        return { spec, state: grant.canDraft ? 'working' : 'rejected', grant, detail: null, checkedAt: grant.grantedAt }
-      }
+      const grant = health?.calendarGrant
+      if (grant?.connected) return [fromGrant(spec, grant)]
       const cred = byId.get('calendar')
       // No grant: the server-secret path is the only other way in, and when it
       // is not configured either the honest answer is "not connected".
-      return {
-        spec,
-        state: cred?.state === 'working' ? 'working' : 'unconfigured',
-        grant,
-        detail: cred?.detail ?? null,
-        checkedAt: cred?.checkedAt ?? null,
-      }
-    }
-
-    if (spec.id === 'gmail.drafts') {
-      const grant = health?.gmailGrant ?? null
-      return {
-        spec,
-        state: grant?.connected ? (grant.canDraft ? 'working' : 'rejected') : 'unconfigured',
-        grant: grant ?? null,
-        detail: null,
-        checkedAt: grant?.grantedAt ?? null,
-      }
+      return [
+        {
+          spec,
+          state: cred?.state === 'working' ? 'working' : 'unconfigured',
+          grant: null,
+          detail: cred?.detail ?? null,
+          checkedAt: cred?.checkedAt ?? null,
+        },
+      ]
     }
 
     const cred = byId.get(spec.id === 'gmail.mailbox' ? 'gmail' : 'email')
-    return {
-      spec,
-      state: cred?.state ?? 'unverified',
-      grant: null,
-      detail: cred?.detail ?? null,
-      checkedAt: cred?.checkedAt ?? null,
-    }
+    return [
+      {
+        spec,
+        state: cred?.state ?? 'unverified',
+        grant: null,
+        detail: cred?.detail ?? null,
+        checkedAt: cred?.checkedAt ?? null,
+      },
+    ]
   })
+}
+
+/**
+ * Where a row's Connect button goes, and what Disconnect calls.
+ *
+ * Tables rather than ternaries for the reason the resolution above is one: a
+ * fourth grant turned a two-way ternary into a nested one, and the nesting is
+ * where a row ends up pointed at the wrong consent screen.
+ */
+const CONNECT_HREF: Partial<Record<IntegrationId, string>> = {
+  calendar: api.calendar.connectUrl,
+  'calendar.primary': api.calendar.primaryConnectUrl,
+  tasks: api.tasks.connectUrl,
+  'gmail.drafts': api.gmail.connectHref,
+}
+
+const DISCONNECT: Partial<Record<IntegrationId, () => Promise<{ ok: boolean }>>> = {
+  calendar: () => api.calendar.disconnect(),
+  'calendar.primary': () => api.calendar.disconnectPrimary(),
+  tasks: () => api.tasks.disconnect(),
+  'gmail.drafts': () => api.gmail.disconnect(),
+}
+
+/** What each grant leaves behind when it is disconnected. */
+const LEAVES_BEHIND: Partial<Record<IntegrationId, string>> = {
+  calendar: 'The calendar stays in your account with everything already in it.',
+  'calendar.primary':
+    'Entries Scout already wrote stay in your calendar. Removing them would mean reaching into a calendar you have just said Scout may not touch.',
+  tasks: 'The list and everything on it stay in your account.',
+  'gmail.drafts': 'Drafts already written stay in your mailbox.',
 }
 
 function DetailModal({ row, onClose }: { row: RowState | null; onClose: () => void }) {
   const queryClient = useQueryClient()
   const disconnect = useMutation({
-    mutationFn: async (id: IntegrationId) =>
-      id === 'calendar' ? api.calendar.disconnect() : api.gmail.disconnect(),
+    mutationFn: async (id: IntegrationId) => DISCONNECT[id]?.() ?? Promise.resolve({ ok: true }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['health'] })
       onClose()
@@ -126,7 +192,7 @@ function DetailModal({ row, onClose }: { row: RowState | null; onClose: () => vo
       <div className="space-y-4">
         <div className="flex flex-col items-start gap-1.5">
           <StatusPill state={state} />
-          <p className="text-xs text-muted">{STATE_NOTES[state]}</p>
+          <p className="text-xs text-muted">{stateNote(spec, state, STATE_NOTES[state])}</p>
           {/*
             Google's own words, but only where they are about *this* state. An
             unconfigured row can still carry the detail of an older probe
@@ -155,6 +221,17 @@ function DetailModal({ row, onClose }: { row: RowState | null; onClose: () => vo
           </dl>
         ) : row.checkedAt ? (
           <p className="text-xs text-faint">Last checked {onDate(row.checkedAt)}</p>
+        ) : null}
+
+        {/*
+          The one row whose permission is bigger than its purpose says so
+          before the consent rather than after it. Warn rather than danger: it
+          is a trade somebody may legitimately want to make, not a mistake.
+        */}
+        {spec.gated ? (
+          <p className="rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg">
+            {spec.gated.reason}
+          </p>
         ) : null}
 
         <div className="space-y-1.5">
@@ -194,11 +271,7 @@ function DetailModal({ row, onClose }: { row: RowState | null; onClose: () => vo
             >
               {disconnect.isPending ? 'Disconnecting…' : 'Disconnect'}
             </Button>
-            <p className="min-w-0 flex-1 text-xs text-faint">
-              {spec.id === 'calendar'
-                ? 'The calendar stays in your account with everything already in it.'
-                : 'Drafts already written stay in your mailbox.'}
-            </p>
+            <p className="min-w-0 flex-1 text-xs text-faint">{LEAVES_BEHIND[spec.id]}</p>
           </div>
         ) : null}
       </div>
@@ -207,8 +280,8 @@ function DetailModal({ row, onClose }: { row: RowState | null; onClose: () => vo
 }
 
 function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
-  const connectHref = row.spec.id === 'calendar' ? api.calendar.connectUrl : api.gmail.connectHref
-  const connectable = isConnectable(row.spec)
+  const connectHref = CONNECT_HREF[row.spec.id]
+  const connectable = isConnectable(row.spec) && connectHref !== undefined
   const connected = row.grant?.connected ?? false
 
   return (

@@ -1,7 +1,7 @@
 /**
  * What each integration is, in words a person reads.
  *
- * Four of them, and they are not the same kind of thing: two are grants the
+ * Six of them, and they are not the same kind of thing: four are grants the
  * artist makes in their browser, one is a credential somebody set on the
  * server, and one is a Worker binding that exists or does not. The Settings
  * screen shows them in one list anyway, because "what is Scout connected to"
@@ -15,7 +15,13 @@
  * words, or if a raw scope URL reaches a screen.
  */
 
-export type IntegrationId = 'calendar' | 'gmail.drafts' | 'gmail.mailbox' | 'email.sending'
+export type IntegrationId =
+  | 'calendar'
+  | 'calendar.primary'
+  | 'tasks'
+  | 'gmail.drafts'
+  | 'gmail.mailbox'
+  | 'email.sending'
 
 /**
  * How the connection is made, which is what decides the row's affordance.
@@ -46,13 +52,23 @@ export interface IntegrationSpec {
   cannot: string[]
   /** What stops working when this is not connected. */
   breaks: string
+  /**
+   * A row that is not offered unless the deployment says so, and the sentence
+   * explaining why anybody would want it.
+   *
+   * Only the primary-calendar grant has one. It is hidden rather than shown
+   * disabled, because a row you cannot use is a row that reads as broken —
+   * and because on a deployment that has not declared the scope, pressing it
+   * would end at a Google error page rather than at a consent screen.
+   */
+  gated?: { reason: string }
 }
 
 export const INTEGRATIONS: IntegrationSpec[] = [
   {
     id: 'calendar',
     name: 'Google Calendar',
-    purpose: 'Puts deadlines, opening dates and booked shows in your calendar.',
+    purpose: 'Puts the shows you have been booked for in your calendar.',
     kind: 'grant',
     access: [
       'Create a calendar in your account, called Sun Dogs Music Scout.',
@@ -62,7 +78,45 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       'Read the rest of your calendar — Google does not give it the permission, so this holds even if the code is wrong.',
       'Touch an event it did not create.',
     ],
-    breaks: 'Booked gigs and deadlines go nowhere near your calendar.',
+    breaks: 'Booked shows go nowhere near your calendar.',
+  },
+  {
+    id: 'calendar.primary',
+    name: 'Your own calendar',
+    purpose: 'Writes shows straight into your main calendar instead of a separate one.',
+    kind: 'grant',
+    // No softening. This is the one grant in the list where Google enforces
+    // nothing about which of the artist's calendars Scout touches, and the
+    // screen has to say that before the consent rather than after it.
+    access: [
+      'See, create, change and delete events on every calendar you own — not only the ones Scout made.',
+      'Write Scout entries into your main calendar, which is the reason to turn it on.',
+    ],
+    // Deliberately empty. There is no guarantee to make here, and inventing a
+    // reassuring line would be exactly the thing the Gmail row exists to warn
+    // against: a permission that protects less than the reader assumes.
+    cannot: [],
+    breaks: 'Shows go on the separate Scout calendar instead, which is the default.',
+    gated: {
+      reason:
+        'Off unless this deployment has been set up for it. The permission it needs covers every calendar you own, so it has to be reviewed by Google before it can be offered.',
+    },
+  },
+  {
+    id: 'tasks',
+    name: 'Google Tasks',
+    purpose: 'Puts deadlines, opening windows and replies you owe on your task list.',
+    kind: 'grant',
+    access: [
+      'Create a task list in your account, called Sun Dogs Music Scout.',
+      'Add, change and remove tasks on that one list.',
+      // The `gmail.compose` disclosure again, because it is the same trade.
+      // Google offers read-only or everything and nothing in between, so the
+      // limit above is kept by this code rather than by the permission.
+      'Read and change every other task list you have — Google includes that in the same permission. Scout never does: it only ever names the one list it made.',
+    ],
+    cannot: [],
+    breaks: 'Deadlines and replies you owe are only visible inside Scout.',
   },
   {
     id: 'gmail.drafts',
@@ -101,6 +155,32 @@ export const INTEGRATIONS: IntegrationSpec[] = [
     breaks: 'No digest, and no way back in if you lose every passkey.',
   },
 ]
+
+/**
+ * The sentence under the status pill, which depends on the row's *kind* and
+ * not only on its state.
+ *
+ * `STATE_NOTES` was written for the credential probe, where every state is
+ * about a secret somebody set on the server. On a grant row that makes
+ * `unconfigured` say "the secrets for this connection are not set", which is
+ * wrong in a way that matters: it sends somebody looking for a Worker secret
+ * when the thing to do is press Connect. Same defect as the panel that once
+ * showed "the secrets are not set" beside Google's own `invalid_client` — two
+ * claims in one box, and the reader believes the specific one.
+ *
+ * Only the two states that can differ are overridden. Everything else already
+ * means the same thing on both kinds of row, and a second copy of a sentence
+ * is a second place for it to drift.
+ */
+const GRANT_NOTES: Partial<Record<string, string>> = {
+  unconfigured: 'Not connected yet. Nothing is written until you connect it.',
+  rejected: 'Google refused the permission, or it was withdrawn. Connect it again to fix that.',
+}
+
+export function stateNote(spec: IntegrationSpec, state: string, fallback: string): string {
+  if (spec.kind !== 'grant') return fallback
+  return GRANT_NOTES[state] ?? fallback
+}
 
 export function integrationSpec(id: IntegrationId): IntegrationSpec {
   const found = INTEGRATIONS.find((i) => i.id === id)

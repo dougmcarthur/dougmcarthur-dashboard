@@ -4,8 +4,10 @@ import {
   INTEGRATIONS,
   integrationSpec,
   isConnectable,
+  stateNote,
   type IntegrationSpec,
 } from '../shared/integrations'
+import { STATE_NOTES } from '../shared/credentialHealth'
 
 const text = (spec: IntegrationSpec) =>
   [spec.name, spec.purpose, spec.breaks, ...spec.access, ...spec.cannot].join(' ')
@@ -68,14 +70,40 @@ describe('the disclosures that must not quietly disappear', () => {
   it('says the mailbox credential is read-only', () => {
     expect(integrationSpec('gmail.mailbox').cannot.join(' ')).toMatch(/read-only/i)
   })
+
+  it('says out loud that the Tasks permission reaches every other list', () => {
+    // The `gmail.compose` trade again, and worse: Google offers `tasks` or
+    // `tasks.readonly` and nothing between them, so there is no narrow scope
+    // to hide behind. The limit is src/lib/googleTasks.ts naming one list.
+    const spec = integrationSpec('tasks')
+    expect(spec.access.join(' ')).toMatch(/every other task list/i)
+    expect(spec.access.join(' ')).toMatch(/never|only ever/i)
+  })
+
+  it('makes no promise at all about the primary-calendar grant', () => {
+    // The two grants that *can* promise something do. This one cannot, and an
+    // empty list is the honest version — a reassuring line invented to fill
+    // the space would protect less than the reader assumes.
+    const spec = integrationSpec('calendar.primary')
+    expect(spec.cannot).toEqual([])
+    expect(spec.access.join(' ')).toMatch(/every calendar you own/i)
+  })
 })
 
 describe('what a row may offer', () => {
-  it('offers connecting only for the two things a person can actually connect', () => {
+  it('offers connecting only for the things a person can actually connect', () => {
     // A secret and a binding are set on the server. A Connect button beside
     // either is a button that cannot work, which is worse than no button.
     const connectable = INTEGRATIONS.filter(isConnectable).map((s) => s.id)
-    expect(connectable.sort()).toEqual(['calendar', 'gmail.drafts'])
+    expect(connectable.sort()).toEqual(['calendar', 'calendar.primary', 'gmail.drafts', 'tasks'])
+  })
+
+  it('gates exactly the one row whose permission is bigger than its purpose', () => {
+    // Writing to the artist's own calendar needs read and write over every
+    // calendar they own, to place a handful of all-day entries a year. That
+    // trade is theirs to make, but it is not one to make by default and not
+    // one to offer on a deployment that cannot complete it.
+    expect(INTEGRATIONS.filter((s) => s.gated).map((s) => s.id)).toEqual(['calendar.primary'])
   })
 
   it('types each integration by how it is actually made', () => {
@@ -97,5 +125,37 @@ describe('the card reads the spec rather than restating it', () => {
     expect(card).toContain('spec.access')
     expect(card).toContain('spec.cannot')
     expect(card).toContain('INTEGRATIONS')
+  })
+})
+
+describe('the sentence under the status pill', () => {
+  it('never tells somebody to go and set a secret for a grant', () => {
+    // `STATE_NOTES` is written for the credential probe, where every state is
+    // about a value somebody set on the server. On a grant row it sends the
+    // reader looking for a Worker secret when the thing to do is press
+    // Connect — the same two-contradictory-claims defect as the panel that
+    // once showed "the secrets are not set" beside an `invalid_client` error.
+    for (const spec of INTEGRATIONS.filter((s) => s.kind === 'grant')) {
+      const note = stateNote(spec, 'unconfigured', STATE_NOTES.unconfigured)
+      expect(note, spec.id).not.toMatch(/secret/i)
+      expect(note, spec.id).toMatch(/connect/i)
+    }
+  })
+
+  it('leaves the probe\'s own wording alone on a secret or a binding', () => {
+    // A second copy of a sentence is a second place for it to drift, so only
+    // the states that genuinely differ are overridden.
+    for (const spec of INTEGRATIONS.filter((s) => s.kind !== 'grant')) {
+      for (const state of Object.keys(STATE_NOTES) as Array<keyof typeof STATE_NOTES>) {
+        expect(stateNote(spec, state, STATE_NOTES[state]), spec.id).toBe(STATE_NOTES[state])
+      }
+    }
+  })
+
+  it('says nothing of its own about a state both kinds agree on', () => {
+    const grant = integrationSpec('calendar')
+    for (const state of ['working', 'unverified', 'unreachable', 'declared'] as const) {
+      expect(stateNote(grant, state, STATE_NOTES[state])).toBe(STATE_NOTES[state])
+    }
   })
 })

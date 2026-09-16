@@ -49,7 +49,7 @@ describe('session mode', () => {
 })
 
 describe('the oversight surface reads no domain table', () => {
-  it('names none of the fourteen', () => {
+  it('names none of the scoped tables', () => {
     const src = withoutComments(source(ADMIN_ROUTER))
     const named = SCOPED_TABLES.filter((table) => new RegExp(`\\b${table}\\b`).test(src))
     expect(
@@ -100,7 +100,7 @@ describe('the oversight screen offers nothing it cannot do', () => {
   })
 })
 
-describe('the two lists of the fourteen agree', () => {
+describe('the two lists of scoped tables agree', () => {
   it('has the same tables by name and by object', () => {
     // `SCOPED_TABLES` is what the source-level guard can match; `DOMAIN_TABLES`
     // is what a query can use. Two lists is two places to forget a table, so

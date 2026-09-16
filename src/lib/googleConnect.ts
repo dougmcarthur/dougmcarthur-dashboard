@@ -17,11 +17,18 @@ import {
   type GrantPurpose,
 } from './googleGrant'
 import { createScoutCalendar } from './googleCalendar'
+import { createScoutTaskList } from './googleTasks'
 import type { TenantId } from '../db/scope'
 import type { Env } from '../types'
 
 /** What the calendar is called in the artist's own Google account. */
 export const SCOUT_CALENDAR_NAME = 'Sun Dogs Music Scout'
+
+/**
+ * And the task list. The same name on purpose: they are two halves of one
+ * thing, and two names would be a thing to explain on the Integrations screen.
+ */
+export const SCOUT_TASK_LIST_NAME = 'Sun Dogs Music Scout'
 
 export async function completeGrant(
   env: Env,
@@ -44,8 +51,14 @@ export async function completeGrant(
       return 'missing_scope'
     }
 
+    // Two purposes have something to make before the grant is usable, and for
+    // the same reason in each case: there is nothing to write to until Scout
+    // makes it. `calendar.primary` is the exception — the artist already has
+    // the calendar, which is the whole point of choosing it.
     const calendarId =
       purpose === 'calendar' ? await createScoutCalendar(accessToken, SCOUT_CALENDAR_NAME) : null
+    const tasksListId =
+      purpose === 'tasks' ? await createScoutTaskList(accessToken, SCOUT_TASK_LIST_NAME) : null
 
     await storeGrant(env, tenant, {
       refreshToken,
@@ -53,6 +66,7 @@ export async function completeGrant(
       scopes,
       purpose,
       calendarId,
+      tasksListId,
     })
     return 'connected'
   } catch (err) {

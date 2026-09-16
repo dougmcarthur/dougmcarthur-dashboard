@@ -1,14 +1,14 @@
 /**
  * Does every row belong to somebody?
  *
- * It should. Every `tenant_id` on the fourteen carries a default, so a write
+ * It should. Every scoped `tenant_id` carries a default, so a write
  * that omits the column cannot produce a NULL; `withTenant` returns a
  * `TenantId` and cannot pass one; and `test/tenantScope.test.ts` fails on any
  * query that goes around `withTenant`. Three mechanisms, all of which say the
  * answer is zero.
  *
  * Which is exactly why it is worth counting. Migration 0024 defers the
- * `NOT NULL` pass on those fourteen tables, and one of its three preconditions
+ * `NOT NULL` pass on those tables, and one of its three preconditions
  * is that no row has a NULL tenant — a claim currently resting on reasoning
  * rather than on anything anybody has looked at. This turns it into a number.
  *

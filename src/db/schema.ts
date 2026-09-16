@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core'
 
 export const gigOpportunities = sqliteTable('gig_opportunities', {
   /** Which artist's row this is. See migration 0021 and src/db/scope.ts. */
@@ -27,6 +27,17 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   opensEventId: text('opens_event_id'),
   /** Calendar id for the performance itself. Only ever set once booked. */
   showEventId: text('show_event_id'),
+  /**
+   * Google Tasks ids, beside the three event ids above. See migration 0026 and
+   * `shared/nudgeRouting.ts` — the work goes to Tasks and the show stays on the
+   * calendar, so two of these have a calendar counterpart and one does not.
+   *
+   * `replyTaskId` is the one that does not: a reply you owe has no date it
+   * happens on, only a date it is late by, so it can never be a calendar entry.
+   */
+  opensTaskId: text('opens_task_id'),
+  deadlineTaskId: text('deadline_task_id'),
+  replyTaskId: text('reply_task_id'),
   /** When you are actually on stage. Null until something reaches `booked`. */
   performanceStart: text('performance_start'),
   performanceEnd: text('performance_end'),
@@ -330,6 +341,31 @@ export const appSettings = sqliteTable('app_settings', {
 })
 
 /**
+ * The same idea, per artist. See migration 0026.
+ *
+ * Apart from `app_settings` rather than a `tenant_id` column added to it,
+ * because the two hold different kinds of fact and merging them would make
+ * every read have to say which it wanted. `app_settings` is about the
+ * deployment — the digest schedule, the one-shot markers, the rarity cache —
+ * and has one right answer. This table is about an artist, and two artists
+ * want different answers about their own calendars.
+ *
+ * It is the fifteenth scoped table, so it goes through `src/db/scope.ts` like
+ * the fourteen before it, and `test/tenantScope.test.ts` fails on a query that
+ * forgets.
+ */
+export const tenantSettings = sqliteTable(
+  'tenant_settings',
+  {
+    tenantId: text('tenant_id'),
+    key: text('key').notNull(),
+    value: text('value').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.tenantId, t.key] }) }),
+)
+
+/**
  * Passkey login. See migration 0017 and docs/passkey-login.md.
  *
  * Single-user by design, so there is no `users` table: a registered
@@ -418,6 +454,15 @@ export const googleGrants = sqliteTable('google_grants', {
    * only one it may touch. Null for every other purpose. See migration 0025.
    */
   calendarId: text('calendar_id'),
+  /**
+   * For a `tasks` grant: the list Scout made and is the only one it writes to.
+   * Null for every other purpose. See migration 0026.
+   *
+   * Its own column rather than a reuse of `calendarId`: a column named for
+   * calendars holding a task list id is a name that lies, and this table is
+   * keyed by purpose precisely so the two cannot be confused.
+   */
+  tasksListId: text('tasks_list_id'),
 })
 
 /* --------------------------------------------------------------------- */
@@ -504,6 +549,7 @@ export type TaskRun = typeof taskRuns.$inferSelect
 export type Reminder = typeof reminders.$inferSelect
 export type DigestReport = typeof digestReports.$inferSelect
 export type AppSetting = typeof appSettings.$inferSelect
+export type TenantSetting = typeof tenantSettings.$inferSelect
 export type NotificationMark = typeof notificationMarks.$inferSelect
 export type NotificationEvent = typeof notificationEvents.$inferSelect
 export type PasskeyCredentialRow = typeof passkeyCredentials.$inferSelect

@@ -47,13 +47,57 @@ export const GMAIL_COMPOSE_SCOPE = 'https://www.googleapis.com/auth/gmail.compos
 export const CALENDAR_APP_SCOPE = 'https://www.googleapis.com/auth/calendar.app.created'
 
 /**
- * Grants are keyed by purpose so revoking one does not revoke the others —
- * disconnecting drafting must not blind the reply matcher, and neither should
- * touch the calendar.
+ * Google Tasks, where there is no narrow option at all.
+ *
+ * `tasks.readonly` cannot write and `tasks` is read and write over every list
+ * in the account. There is no `tasks.app.created`, so the structural
+ * guarantee the calendar grant enjoys is simply not on offer. This is the
+ * `gmail.compose` trade again: the limit moves from Google into
+ * `src/lib/googleTasks.ts`, which names one list and never enumerates, and
+ * the connect screen says so rather than implying a protection that is not
+ * there.
  */
-export type GrantPurpose = 'gmail.compose' | 'calendar'
+export const TASKS_SCOPE = 'https://www.googleapis.com/auth/tasks'
 
-export const GRANT_PURPOSES: GrantPurpose[] = ['gmail.compose', 'calendar']
+/**
+ * Writing to the artist's **own** calendars, which is the opt-in this app
+ * spent a release arguing itself out of needing.
+ *
+ * The narrowest scope that can reach a primary calendar. It is still far
+ * wider than `calendar.app.created`: it is read *and* write over every event
+ * on every calendar the artist owns, and Google enforces nothing about which
+ * of those Scout touches. There is no version of this that is only "add an
+ * entry to primary".
+ *
+ * Three things keep it from being a quiet widening of what Scout already has:
+ *
+ * - It is its **own purpose**, so the narrow grant is untouched and this one
+ *   is revocable on its own. Choosing primary means a second consent screen
+ *   naming this scope, not a bigger version of the first.
+ * - It is **off unless the deployment turns it on** (`PRIMARY_CALENDAR_OPT_IN`).
+ *   Declaring this scope on the OAuth client puts it in front of Google's
+ *   verification review for *every* user of the deployment, including the
+ *   ones who will never opt in — so a deployment that has not done that work
+ *   does not offer the row, rather than offering a button that 403s.
+ * - It has **nothing in its `cannot` list**, because there is no guarantee to
+ *   make. Saying nothing is better than implying a limit that does not exist.
+ */
+export const CALENDAR_OWNED_SCOPE = 'https://www.googleapis.com/auth/calendar.events.owned'
+
+/**
+ * Grants are keyed by purpose so revoking one does not revoke the others —
+ * disconnecting drafting must not blind the reply matcher, neither should
+ * touch the calendar, and giving up the primary-calendar grant must leave the
+ * Scout calendar working rather than disconnecting everything.
+ */
+export type GrantPurpose = 'gmail.compose' | 'calendar' | 'calendar.primary' | 'tasks'
+
+export const GRANT_PURPOSES: GrantPurpose[] = [
+  'gmail.compose',
+  'calendar',
+  'calendar.primary',
+  'tasks',
+]
 
 /** The purpose `gmailDrafts.ts` has always meant, named so its callers read. */
 export const GRANT_PURPOSE: GrantPurpose = 'gmail.compose'
@@ -61,6 +105,20 @@ export const GRANT_PURPOSE: GrantPurpose = 'gmail.compose'
 const SCOPE_FOR: Record<GrantPurpose, string> = {
   'gmail.compose': GMAIL_COMPOSE_SCOPE,
   calendar: CALENDAR_APP_SCOPE,
+  'calendar.primary': CALENDAR_OWNED_SCOPE,
+  tasks: TASKS_SCOPE,
+}
+
+/**
+ * Whether this deployment offers the broad calendar grant at all.
+ *
+ * Unset means no, and no is the state to be in: the scope has to be declared
+ * on the OAuth client and reviewed by Google before a consent naming it will
+ * complete for anybody outside the test users list. A missing input is never
+ * a guess — same rule `enrolmentRecipient` follows.
+ */
+export function primaryCalendarOffered(env: Env): boolean {
+  return (env.PRIMARY_CALENDAR_OPT_IN ?? '').trim() === 'true'
 }
 
 export function scopeFor(purpose: GrantPurpose): string {
@@ -142,6 +200,8 @@ export interface GrantStatus {
   canDraft: boolean
   /** The calendar Scout made, on a `calendar` grant. Null on every other. */
   calendarId: string | null
+  /** The list Scout made, on a `tasks` grant. Null on every other. */
+  tasksListId: string | null
   /** Whether the deployment is even able to offer this. */
   configured: boolean
 }
@@ -170,7 +230,7 @@ export async function readGrant(
   if (!row) {
     return {
       connected: false, accountEmail: null, grantedAt: null, lastUsedAt: null,
-      canDraft: false, calendarId: null, configured,
+      canDraft: false, calendarId: null, tasksListId: null, configured,
     }
   }
   return {
@@ -183,6 +243,7 @@ export async function readGrant(
     // in the middle of a bulk write.
     canDraft: row.scopes.includes(SCOPE_FOR[purpose]),
     calendarId: row.calendarId ?? null,
+    tasksListId: row.tasksListId ?? null,
     configured,
   }
 }
@@ -214,6 +275,8 @@ export async function storeGrant(
     purpose?: GrantPurpose
     /** Only a calendar grant carries one: the calendar Scout made. */
     calendarId?: string | null
+    /** Only a tasks grant carries one: the list Scout made. */
+    tasksListId?: string | null
   },
 ): Promise<void> {
   const purpose = input.purpose ?? GRANT_PURPOSE
@@ -228,6 +291,7 @@ export async function storeGrant(
     grantedAt: now,
     lastUsedAt: null,
     calendarId: input.calendarId ?? null,
+    tasksListId: input.tasksListId ?? null,
   }))
 }
 

@@ -5,6 +5,7 @@ import {
   CALENDAR_APP_SCOPE,
   GMAIL_COMPOSE_SCOPE,
   GRANT_PURPOSES,
+  primaryCalendarOffered,
   requestedScopes,
   scopeFor,
 } from '../src/lib/googleGrant'
@@ -19,11 +20,25 @@ describe('the calendar scope', () => {
     expect(scopeFor('calendar')).toBe('https://www.googleapis.com/auth/calendar.app.created')
   })
 
+  it('is the only calendar scope the default connect flow can reach', () => {
+    // The `calendar.primary` purpose exists and asks for something far wider
+    // (see below), so "never the broad one" stopped being true and had to be
+    // replaced by something narrower rather than deleted. What still holds:
+    // connecting *the calendar* means the app-created scope and nothing else.
+    expect(requestedScopes('calendar')).toBe(
+      'https://www.googleapis.com/auth/calendar.app.created openid email',
+    )
+  })
+
   it('is never the broad one, anywhere in the Worker', () => {
+    // `calendar.events.owned` is deliberately absent from this list and is
+    // checked separately: it is reachable, but only through its own purpose,
+    // its own consent screen and a deployment that turned it on.
     const broad = [
       'https://www.googleapis.com/auth/calendar"',
       "https://www.googleapis.com/auth/calendar'",
-      'auth/calendar.events',
+      'auth/calendar.events"',
+      "auth/calendar.events'",
       'auth/calendar.readonly',
     ]
     const files = (function walk(dir: string): string[] {
@@ -55,6 +70,35 @@ describe('the calendar scope', () => {
     expect(requestedScopes('calendar')).not.toContain(GMAIL_COMPOSE_SCOPE)
   })
 
+  it('keeps the broad one behind its own purpose and its own switch', () => {
+    // Writing to the artist's own calendar needs a scope Google enforces
+    // nothing about: read and write over every event on every calendar they
+    // own. Three things stop that being a quiet widening of the narrow grant,
+    // and this pins all three.
+    expect(scopeFor('calendar.primary')).toBe(
+      'https://www.googleapis.com/auth/calendar.events.owned',
+    )
+    // It is a separate purpose, so the Scout-calendar grant is untouched by it
+    // and either can be revoked without the other.
+    expect(requestedScopes('calendar')).not.toContain('calendar.events.owned')
+    // And it is off unless the deployment says otherwise, because declaring
+    // the scope puts it in front of Google's review for every user of the
+    // deployment — including everybody who will never opt in.
+    expect(primaryCalendarOffered({} as never)).toBe(false)
+    expect(primaryCalendarOffered({ PRIMARY_CALENDAR_OPT_IN: 'false' } as never)).toBe(false)
+    expect(primaryCalendarOffered({ PRIMARY_CALENDAR_OPT_IN: 'true' } as never)).toBe(true)
+  })
+
+  it('keeps Tasks honest about having no narrow option at all', () => {
+    // Google offers `tasks.readonly` and `tasks`, and nothing in between —
+    // no `tasks.app.created`. So this is the `gmail.compose` trade: the limit
+    // is src/lib/googleTasks.ts naming one list and never enumerating, not
+    // something Google enforces. The integration spec has to say so, and
+    // test/integrations.test.ts checks that it does.
+    expect(scopeFor('tasks')).toBe('https://www.googleapis.com/auth/tasks')
+    expect(requestedScopes('tasks')).not.toContain('tasks.readonly')
+  })
+
   it('names every purpose it supports, so adding one cannot skip a scope', () => {
     for (const purpose of GRANT_PURPOSES) {
       expect(scopeFor(purpose), purpose).toMatch(/^https:\/\/www\.googleapis\.com\/auth\//)
@@ -75,10 +119,21 @@ describe('the consent state', () => {
     expect(unpackState('nonce.gmail.compose')?.nonce).toBe('nonce')
   })
 
+  it('round-trips the two purposes added since', () => {
+    expect(unpackState(packState('n', 'tasks'))).toEqual({ nonce: 'n', purpose: 'tasks' })
+    expect(unpackState(packState('n', 'calendar.primary'))).toEqual({
+      nonce: 'n',
+      purpose: 'calendar.primary',
+    })
+  })
+
   it('refuses a purpose it does not know rather than guessing one', () => {
     expect(unpackState('abc.calendars')).toBeNull()
     expect(unpackState('abc.drive')).toBeNull()
     expect(unpackState('abc.')).toBeNull()
+    // A near-miss on a real purpose is the one worth naming: it would be read
+    // as the narrow calendar grant and complete a consent for the wide one.
+    expect(unpackState('abc.calendar.primary.extra')).toBeNull()
   })
 
   it('refuses a state with no purpose at all', () => {

@@ -18,7 +18,13 @@
 import type { Context } from 'hono'
 import type { AppEnv } from '../context'
 import { randomToken } from './auth'
-import { grantConfigured, redirectUri, requestedScopes, type GrantPurpose } from './googleGrant'
+import {
+  GRANT_PURPOSES,
+  grantConfigured,
+  redirectUri,
+  requestedScopes,
+  type GrantPurpose,
+} from './googleGrant'
 import type { Env } from '../types'
 
 /** Ten minutes is longer than a consent screen takes and shorter than a day. */
@@ -55,8 +61,12 @@ export function unpackState(state: string | null): { nonce: string; purpose: Gra
   if (dot < 1) return null
   const nonce = state.slice(0, dot)
   const purpose = state.slice(dot + 1)
-  if (purpose !== 'gmail.compose' && purpose !== 'calendar') return null
-  return { nonce, purpose }
+  // Checked against the list rather than by hand, so a purpose added in
+  // googleGrant.ts cannot silently fail to survive the round trip — and a
+  // near-miss like `calendar.primary.extra` is refused rather than read as the
+  // narrow calendar grant, which would complete a consent for the wrong one.
+  if (!(GRANT_PURPOSES as string[]).includes(purpose)) return null
+  return { nonce, purpose: purpose as GrantPurpose }
 }
 
 /**
@@ -116,6 +126,11 @@ export function checkCallback(c: Context<AppEnv>): CallbackCheck {
 /** Where the browser lands afterwards, with a word about how it went. */
 export function settingsRedirect(env: Env, purpose: GrantPurpose | null, outcome: string): string {
   const base = `${(env.DASHBOARD_URL ?? '').replace(/\/$/, '')}/#settings`
-  const key = purpose === 'calendar' ? 'calendar' : 'gmail'
+  const key =
+    purpose === 'calendar' || purpose === 'calendar.primary'
+      ? 'calendar'
+      : purpose === 'tasks'
+        ? 'tasks'
+        : 'gmail'
   return `${base}?${key}=${encodeURIComponent(outcome)}`
 }

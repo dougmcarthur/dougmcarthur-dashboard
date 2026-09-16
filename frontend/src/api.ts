@@ -1,4 +1,5 @@
 import type { CredentialHealth } from '../../shared/credentialHealth'
+import type { NudgePreferences } from '../../shared/nudgeRouting'
 // Entity shapes live in shared/ because the Worker builds the review queue
 // from them too — see shared/types.ts. Re-exported here so UI code can keep
 // importing everything it needs from one module.
@@ -311,6 +312,12 @@ export interface HealthStatus {
   calendarGrant: CalendarGrant
   /** The Gmail drafting grant, the other thing the artist connects themselves. */
   gmailGrant: CalendarGrant
+  /** Google Tasks, where the application work goes. */
+  tasksGrant: CalendarGrant
+  /** The opt-in that writes into the artist's own calendars. */
+  primaryCalendarGrant: CalendarGrant
+  /** Whether this deployment offers that opt-in at all. */
+  primaryCalendarOffered: boolean
 }
 
 export interface CalendarGrant {
@@ -322,6 +329,8 @@ export interface CalendarGrant {
   canDraft: boolean
   /** The calendar Scout made and is the only one it may write to. */
   calendarId: string | null
+  /** The task list Scout made and is the only one it writes to. */
+  tasksListId: string | null
   /** Whether this deployment can offer connecting at all. */
   configured: boolean
 }
@@ -823,10 +832,25 @@ export const api = {
   /** Spend each refresh token once and record what Google said. */
   checkCredentials: () =>
     apiFetch<{ credentials: CredentialHealth[] }>('/health/check', { method: 'POST' }),
+  tasks: {
+    status: () => apiFetch<CalendarGrant>('/tasks/status'),
+    connectUrl: '/api/tasks/connect',
+    disconnect: () => apiFetch<{ ok: boolean }>('/tasks/disconnect', { method: 'POST' }),
+  },
+
+  nudges: {
+    get: () => apiFetch<NudgePreferences>('/nudges'),
+    patch: (body: Partial<NudgePreferences>) =>
+      apiFetch<NudgePreferences>('/nudges', { method: 'PATCH', body: JSON.stringify(body) }),
+  },
+
   calendar: {
     /** A full page load, not a fetch: the browser has to go to Google. */
     connectUrl: '/api/calendar/connect',
     disconnect: () => apiFetch<{ ok: true }>('/calendar/disconnect', { method: 'POST' }),
+    primaryConnectUrl: '/api/calendar/connect/primary',
+    disconnectPrimary: () =>
+      apiFetch<{ ok: true }>('/calendar/disconnect/primary', { method: 'POST' }),
   },
   notifications: {
     list: () => apiFetch<NotificationFeed>('/notifications'),

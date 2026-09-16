@@ -25,6 +25,17 @@ export type Env = {
   AUTH_EMAIL?: string
   AUTH_EMAIL_SENDER?: string
   /**
+   * `'true'` offers the primary-calendar grant on the Integrations screen.
+   *
+   * Deployment configuration rather than a setting, and off unless it says
+   * otherwise. The scope it unlocks (`calendar.events.owned`) has to be
+   * declared on the OAuth client and reviewed by Google before a consent
+   * naming it completes for anybody outside the test-user list — so offering
+   * the row on a deployment that has not done that work is offering a button
+   * that fails. See `primaryCalendarOffered` in src/lib/googleGrant.ts.
+   */
+  PRIMARY_CALENDAR_OPT_IN?: string
+  /**
    * The mailing address every email's footer prints, beside the house mark.
    * Deployment configuration rather than a setting, like the recovery address:
    * it identifies whoever operates this deployment, which is not something a

@@ -3,7 +3,7 @@ import { calendarConfigured } from '../lib/googleCalendar'
 import { gmailConfigured } from '../lib/gmail'
 import { mailerConfigured } from '../lib/mailer'
 import { readCredentialHealth, runCredentialChecks } from '../lib/credentialCheck'
-import { readGrant } from '../lib/googleGrant'
+import { primaryCalendarOffered, readGrant } from '../lib/googleGrant'
 import { tenantOf, type AppEnv } from '../context'
 
 const health = new Hono<AppEnv>()
@@ -55,6 +55,14 @@ health.get('/', async (c) => {
     // The drafting grant, which lived only on the Sync page until the
     // Integrations list existed. Same shape, different purpose.
     gmailGrant: await readGrant(c.env, tenantOf(c), 'gmail.compose'),
+    // Where the work goes, as opposed to where the shows do. Same shape again.
+    tasksGrant: await readGrant(c.env, tenantOf(c), 'tasks'),
+    // The opt-in that writes to the artist's own calendars. `offered` is a
+    // deployment fact rather than a grant one, and it decides whether the row
+    // appears at all — a Connect button that cannot complete is worse than no
+    // row, because the failure happens on Google's side of the redirect.
+    primaryCalendarGrant: await readGrant(c.env, tenantOf(c), 'calendar.primary'),
+    primaryCalendarOffered: primaryCalendarOffered(c.env),
   })
 })
 
