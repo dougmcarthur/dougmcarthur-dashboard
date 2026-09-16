@@ -34,8 +34,8 @@ function StatusPill({ state }: { state: CredentialState }) {
     state === 'working' ? 'bg-success-solid' : needsAttention(state) ? 'bg-warn-fg' : 'bg-muted'
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${tone}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${tone}`}>
+      <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${dot}`} />
       {STATE_LABELS[state]}
     </span>
   )
@@ -79,7 +79,14 @@ function IntegrationCard({
 
   return (
     <div className="bg-surface border border-line rounded-xl shadow-card p-4">
-      <div className="flex items-center justify-between mb-2">
+      {/*
+        Stacked rather than title-left / pill-right. These cards sit in a
+        narrow column, and "No longer accepted" beside a two-word title
+        overflowed its row and collided with the heading — found by looking at
+        it, which is the only way that class of fault is ever found. A column
+        cannot overlap at any width.
+      */}
+      <div className="flex flex-col items-start gap-1.5 mb-2">
         <h3 className="text-sm font-semibold text-ink">{title}</h3>
         <StatusPill state={state} />
       </div>
@@ -164,11 +171,11 @@ function IntegrationCards() {
         />
       </div>
 
-      <div className="flex items-center gap-3">
-        <Button variant="neutral" onClick={() => check.mutate()} disabled={check.isPending}>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="neutral" className="whitespace-nowrap" onClick={() => check.mutate()} disabled={check.isPending}>
           {check.isPending ? 'Checking…' : 'Check connections'}
         </Button>
-        <p className="text-xs text-faint">
+        <p className="min-w-0 flex-1 text-xs text-faint">
           Asks Google whether each credential is still accepted. Runs once a day on its own.
         </p>
       </div>
