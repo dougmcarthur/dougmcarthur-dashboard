@@ -46,7 +46,7 @@ a research output.
 | # | Phase | Status |
 | --- | --- | --- |
 | 1 | Cloudflare inbound: Email Routing, the Worker email binding, per-address and catch-all, what forwarding does to SPF/DKIM/DMARC, limits, cost | **done** |
-| 2 | Third-party inbound services: Postmark, Mailgun, SendGrid, ImprovMX and peers — webhook shape, pricing, retention | pending |
+| 2 | Third-party inbound services, and whether Cloudflare inbound honours ARC on a forward | **running** |
 | 3 | Google side: Gmail watch/push versus polling, per-artist OAuth scopes, and what setting up an auto-forward rule actually costs a person | pending |
 | 4 | The product pattern: how TripIt, Expensify and peers verify a forwarded message, and user-forwards versus Scout-collects | pending |
 | 5 | Pre-filled link support per form platform (the extension doc's check list, item 1) | pending |
@@ -130,4 +130,82 @@ the only one nobody has confirmed. **Test it deliberately** (throw in a test
 handler and watch what the sender sees) before depending on any retry
 behaviour. A submission receipt silently dropped is exactly the failure this
 whole feature exists to prevent.
+
+### Phase 1b — a `From` header is not evidence, and forwarding breaks the things that are
+
+Standards sources plus practical ones, read 2026-09-16. Confidence is the
+researcher's, and is reported here because it varies a lot by question.
+
+**The answer the design turns on**: SPF, DKIM and ARC cannot bind a forwarded
+message to the person who forwarded it. Only **account-level verification**
+can. Every service that accepts forwarded mail does the same two things:
+
+1. **Verify the forwarding address once**, at signup or in settings, with a
+   confirmation code or link sent to that address. Expensify requires the
+   sender be a primary or secondary login on the account; TripIt accepts
+   forwards from any address already on the account.
+2. **On every message, check the envelope sender** — the connecting SMTP
+   identity — against that pre-verified list. **Never the `From:` header**,
+   which is content inside the message and is written by whoever composed it.
+
+That gap is not theoretical. *Forward Pass* (IEEE EuroS&P 2023, best paper,
+arXiv:2302.07287) demonstrated `From`-header spoofing at scale against real
+forwarding services, impersonating `state.gov` and others, by abusing exactly
+this trust. A per-user **secret** inbound address is the third layer, so a
+guessable public address cannot be used to spam rows into somebody's account.
+
+That maps onto Scout's existing vocabulary cleanly. It is the recovery-address
+rule again: the address is never typed by the person asking, it is read from
+something already trusted. Here the trusted thing is an address verified once
+against an account that already exists.
+
+The mechanics underneath, briefly:
+
+- **SPF fails on forwarded mail by design.** It authenticates the envelope
+  `MAIL FROM` against the connecting IP, and a forwarder is an IP the original
+  domain never listed. SRS fixes the check by rewriting the envelope — and
+  breaks DMARC *alignment* with the original `From` domain, so DKIM has to
+  carry alignment instead. RFC 7208 §2.2, §10.3 and Appendix D warn about
+  precisely this.
+- **DKIM survives a clean relay and dies on a touched one.** It signs headers
+  and a body hash, independent of the connecting IP (RFC 6376 §3.4), so a
+  forwarder that changes nothing leaves it valid. Footer injection, subject
+  rewriting, MIME re-encoding and mailing-list transforms all break it;
+  relaxed canonicalisation forgives whitespace and case, not inserted content.
+- **ARC exists for this and is optional.** RFC 8617 lets an intermediary sign
+  what authentication evaluated to at its hop, so a later receiver can honour
+  it. Honouring is a MAY, per receiver policy. Gmail is the consistently cited
+  signer and validator; Microsoft 365 and Yahoo are cited as validating.
+- **Gmail's auto-forward**: DKIM commonly survives, the envelope sender is
+  expected to be rewritten, and the `X-Forwarded-For` / `X-Forwarded-To`
+  headers are reported by users rather than documented by Google. Low to
+  medium confidence, and labelled as such.
+- **A manual forward usually arrives as quoted prose.** Gmail and Apple Mail
+  both default to inlining the original; both offer *forward as attachment*,
+  which produces a real `message/rfc822` with untouched headers. Since inline
+  is the default, most hand-forwarded mail would have to be recovered by
+  parsing prose.
+
+That last point is a direct hit on something this repository has already
+decided. Recovering a sender and a date from quoted text is prose parsing, and
+`reviewParse.ts` is the debt the codebase is trying to delete rather than
+repeat. **A hand-forwarded message should be treated as the weak path**:
+accept it, mark what was recovered as approximate — the same treatment a
+deadline recovered from prose gets — and prefer *forward as attachment* or an
+auto-forward rule, which is a rule set once rather than a habit maintained.
+
+### Where 1a and 1b collide, and it is the central risk
+
+Cloudflare enforces SPF/DKIM/DMARC on inbound mail, mandatorily, with no
+documented way to relax it. Forwarding is the thing that breaks SPF and can
+break DKIM. **So the forward-to-Scout pattern and the Cloudflare inbound path
+may be in direct conflict**, and the whole question is whether Email Routing
+honours ARC, or is lenient where DKIM survives a clean forward.
+
+Nothing found so far answers that, and it is the single fact that decides
+between Cloudflare and a third-party inbound service. It goes into phase 2 as
+its own question, and it wants a **live test** — forward a real message
+through a Gmail rule to a plus-addressed Cloudflare address and see whether it
+arrives — rather than another documentation search. Documentation cannot
+settle a question about somebody else's enforcement thresholds.
 
