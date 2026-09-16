@@ -251,3 +251,81 @@ withheld — and it wants the same treatment: **pre-filled links for
 low-sensitivity fields, and Copy as the fallback for anything else**. A
 pre-filled link is not a private channel and should not be described as one.
 
+### Check list items 2–4 — the headless reader is free, and the model-driven browser fails on accuracy before cost
+
+Read 2026-09-16.
+
+**Browser Rendering is now "Browser Run"** (rebranded 2026-04-15, same product
+and API), and **Workers Paid already includes 10 browser-hours a month and 10
+concurrent browsers**. Beyond that it is **$0.09 per browser-hour** and **$2
+per additional concurrent browser** — the latter only for stateful sessions
+through the binding, not stateless REST calls. Opening one form, reading the
+rendered DOM and closing it, at this app's volume, stays inside the included
+allowance comfortably.
+
+So the brief's "(check current pricing)" resolves in the most favourable way
+available: **the headless pre-reader costs nothing**, on a plan already being
+paid for, and it is cheaper per hour than Browserbase, Steel or Browserless,
+none of which beat an allowance that is already included.
+
+**The model-driven browser's cost could not be corroborated, and something
+worse than cost showed up.** No independent per-form benchmark exists — a real
+gap, recorded rather than filled. The closest measured figures are Browser
+Use's own benchmark (2026-08-01, 106 hard live-site tasks, cost per task
+*solved*): from $0.17 at 82% success for their own agent, through $1.55 at 59%,
+to $3.40 at 62% for a general computer-use model. The brief's $0.30–$0.65
+estimate sits inside that range and is not contradicted — **treat it as
+reasonable and still unverified**.
+
+But the number to look at is not the dollars, it is the **success rate: 37% to
+82% on general web tasks, on a vendor's own benchmark**. The brief argued
+against a model-driven browser on cost, credentials and CAPTCHAs. The stronger
+argument was available and not made: at those rates, roughly one application in
+four goes wrong, and a festival application is not a task you retry — a wrong
+answer submitted is submitted. Cost was never the real case against it.
+
+**Chrome Web Store, four rules that bear on the design:**
+
+1. **Config-as-data is allowed, and this is the favourable one.** Chrome's
+   remotely-hosted-code policy says explicitly that it "does not include data
+   or things like JSON or CSS". So fetching **field-mapping rules as JSON**
+   from Scout at runtime is permitted — which is what the brief hoped. The
+   limit is sharp and worth respecting: a mini scripting language fetched as
+   data and interpreted by the extension is explicitly closed. Keep remote
+   JSON flat and declarative, keep every interpreter inside the package.
+2. **Unlisted and private listings get the same review.** Only discoverability
+   differs. For invited artists, **private** — restricted to named Google
+   accounts — is the right fit. It buys audience control, not leniency.
+3. **Broad host permissions are a scrutiny risk, not a rejection risk.**
+   `<all_urls>` triggers a dashboard warning that review may be delayed and a
+   frightening install prompt; `activeTab` with optional host permissions
+   avoids both, and runtime-granted permissions are reported to convert about
+   30% better at install. A form filler will land in manual review either way,
+   but the per-site design is still right.
+4. **The privacy regime tightened on 2026-08-01 and is live now.** All data
+   collection must be prominently disclosed regardless of how close it is to
+   the extension's single purpose, changes must be disclosed proactively, and a
+   privacy policy link is mandatory. An extension holding form answers is
+   squarely in scope.
+
+**The rest, confirmed:** the $5 registration fee is unchanged; review runs from
+about two days to a few weeks, with broad-permission extensions at the slow
+end; **WXT is actively maintained** and is the current cross-browser MV3
+consensus; the Firefox port is mostly mechanical; and **Safari still requires an
+app wrapper and the $99/year Apple Developer Program** — WWDC 2026 removed the
+Xcode-and-a-Mac requirement for building and submitting, not the wrapper or the
+fee.
+
+### The check list, resolved
+
+1. **Pre-fill support** — resolved, and it narrowed the plan. Google Forms and
+   Airtable only, without form-owner cooperation. Typeform and Submittable are
+   dead ends for links.
+2. **Browser Rendering** — resolved. Included with Workers Paid at this volume;
+   effectively free.
+3. **Model-per-form cost** — *not* resolved, and downgraded in importance. No
+   task-matched figure exists; the accuracy rates are the disqualifying number.
+4. **Chrome Web Store** — resolved. Config-as-data is allowed, private listing
+   is the right distribution, per-site permissions are worth it, and the
+   privacy disclosure regime is live.
+

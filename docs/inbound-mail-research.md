@@ -50,8 +50,8 @@ a research output.
 | 3 | Google side: Gmail watch/push versus polling, per-artist OAuth scopes, and what setting up an auto-forward rule actually costs a person | **done** |
 | 4 | The product pattern: how TripIt, Expensify and peers verify a forwarded message, and user-forwards versus Scout-collects | **folded into 7** — 1b answered the first half, and the second is a decision, not a question |
 | 5 | Pre-filled link support per form platform (the extension doc's check list, item 1) | **done** — findings in `submission-assist-research.md` |
-| 6 | Costs and store rules: Browser Rendering pricing, model-driven browser cost, Chrome Web Store policy, WXT and the ports (check list, items 2–4) | **running** |
-| 7 | Synthesis and critique — one recommendation, and what would make it wrong | pending |
+| 6 | Costs and store rules: Browser Rendering pricing, model-driven browser cost, Chrome Web Store policy, WXT and the ports (check list, items 2–4) | **done** — findings in `submission-assist-research.md` |
+| 7 | Synthesis and critique — one recommendation, and what would make it wrong | **running** |
 
 ## What the research found
 
