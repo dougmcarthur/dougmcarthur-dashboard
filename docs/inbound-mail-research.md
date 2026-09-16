@@ -51,7 +51,7 @@ a research output.
 | 4 | The product pattern: how TripIt, Expensify and peers verify a forwarded message, and user-forwards versus Scout-collects | **folded into 7** — 1b answered the first half, and the second is a decision, not a question |
 | 5 | Pre-filled link support per form platform (the extension doc's check list, item 1) | **done** — findings in `submission-assist-research.md` |
 | 6 | Costs and store rules: Browser Rendering pricing, model-driven browser cost, Chrome Web Store policy, WXT and the ports (check list, items 2–4) | **done** — findings in `submission-assist-research.md` |
-| 7 | Synthesis and critique — one recommendation, and what would make it wrong | **running** |
+| 7 | Synthesis and critique — one recommendation, and what would make it wrong | **done** |
 
 ## What the research found
 
@@ -469,3 +469,105 @@ extension's confirmation-page signal is free, needs no scope, no vendor and no
 setup by the artist. That argument belongs in the synthesis, with the
 comparison in front of it.
 
+## Phase 7 — synthesis
+
+### The recommendation: do not build per-artist inbound mail yet
+
+Not because it cannot be done — phases 1 and 2 found a way — but because the
+thing it was wanted for has a better answer, and the thing it is *actually*
+needed for has no users yet.
+
+**Submission evidence does not need mail.** The receipt email is the
+*strongest* signal; the confirmation page is *strong*. The confirmation page
+costs nothing, needs no scope, no vendor, no DNS change and nothing set up by
+the artist — it falls out of the extension the moment it exists. Mail would
+upgrade strong to strongest for **$500–$1,800 a year** or **ten steps of
+artist friction** plus a filter that cannot express its own criterion. That is
+a bad trade, and it is the central finding of this research.
+
+**Reply matching is the real customer for inbound mail, and it has no free
+path** — but it also has no users. The owner's own reply scan already works,
+on `gmail.readonly` against his own mailbox. Every artist who would need
+another route is hypothetical: tenants, invitations and oversight are all
+unmerged, and production is still running the Worker from migration 0009. This
+repository has a settled habit about exactly this — per-artist digests and
+mailbox grants "are real work with schema behind them, and are not pretended to
+exist". Inbound mail belongs in the same sentence.
+
+**When it is needed, the path is known and nearly free**, which is what makes
+deferring it safe rather than lazy:
+
+- **Forwarded mail → CloudMailin**, free tier, which delivers with an
+  authentication verdict instead of rejecting. **Not Cloudflare**, which
+  rejects on DMARC failure, per-sender and silently, and would drop precisely
+  the Wufoo/Jotform/personal-Gmail senders this mailbox actually receives.
+- **Mail sent directly to a Scout address** — where a form's notification
+  field can take one — can go through **Cloudflare Email Routing**, free, with
+  per-artist plus-addressing.
+- **Authenticate on the envelope sender against an address verified once
+  against the account.** Never the `From` header. Per-user secret addresses.
+- **Hand-forwarding is a legitimate mode, not a fallback to apologise for.**
+  At this volume — a handful of applications a month — forwarding three
+  messages by hand is less work than maintaining a Gmail filter that cannot
+  describe what it is looking for. It is also how TripIt is really used.
+
+One detail that makes hand-forwarding work better here than phase 1b's warning
+suggests: `shared/replyMatch.ts` scores the **event's name** in the subject or
+body, and a quoted forward carries the original body along with it. So matching
+survives a hand-forward. What does not survive is the **sender address**, which
+is what `gig_correspondents` binds on — so hand-forwarded mail loses the
+confirm-once-then-remember optimisation without losing the match itself. That
+is a graceful degradation, and worth knowing before anybody treats quoted-prose
+forwards as unusable.
+
+### What this changes about work already planned
+
+- **The multi-tenant plan under-prices per-artist mailboxes.** It lists them as
+  outstanding work with schema behind it. The schema is the cheap part; the
+  price is six weeks of Google review and a recurring assessment.
+- **`gmail.compose` is Restricted too.** Gmail drafting, already built and
+  working for the owner, cannot be offered to an invited artist without the
+  same toll. The `google_grants` design is right and the feature is real — its
+  reach is one account.
+- **The extension's step 1 narrows.** Pre-filled links mean Google Forms and
+  Airtable, not a tier of platforms.
+- **Submittable is the extension's best argument**, not an awkward case: a
+  major arts-and-grants platform, login-only, with no pre-fill at all.
+
+### What would make this recommendation wrong
+
+Written down so that a later change of mind has something to check rather than
+re-deriving the argument.
+
+1. **If the Cloud project is in OAuth Testing status**, the owner's
+   `GMAIL_REFRESH_TOKEN` is already on a seven-day clock and the reply scan is
+   quietly dying every week. That would make this urgent rather than
+   deferrable, and it is unverified — phase 3a's two-state framing omitted
+   *published but unverified*. **Check the Console.** This is the one open
+   question that could invert the recommendation.
+2. **If Email Routing cannot coexist with the current MX** on
+   `sundogsmusic.ca`, where `send_email` already sends from, the
+   direct-address half evaporates and only CloudMailin remains.
+3. **If CASA lands at tier 3** ($4,500–$8,000) rather than tier 2, the paid
+   path is not merely expensive, it is closed. The tier is set by data
+   sensitivity, and mail bodies are not obviously low-sensitivity. The tier-2
+   figures are vendor rate cards, not Google's.
+4. **The `reply()` question is a security decision nobody has made.** An
+   inbound handler gives the Worker a way to send mail that the one-address
+   allowlist does not govern. It should be decided deliberately, in the terms
+   CLAUDE.md already uses about that allowlist, not acquired as a side effect.
+5. **Two unverified anecdotes** carry more weight than they should: that
+   plus-addressed routing has an edge case, and that the browser-agent success
+   rates generalise from a vendor's own benchmark to filling a form.
+6. **If an artist is invited before any of this**, they get gig tracking,
+   application prep and drafting, and no reply matching. That is a smaller,
+   honest product rather than a broken one — but it should be a stated
+   limitation on the invitation, not something discovered.
+
+### What was not researched, and should not be assumed
+
+- Whether any festival platform lets an applicant add a second notification
+  address. If common, direct-send gets much better and forwarding matters less.
+- iCloud and Outlook forwarding, beyond a first look.
+- Whether CloudMailin's free tier permits commercial use at scale later.
+- A live test of any of it. **Nothing here has been run against real mail.**
