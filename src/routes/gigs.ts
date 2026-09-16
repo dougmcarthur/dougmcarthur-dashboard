@@ -6,7 +6,8 @@ import { getDb } from '../db'
 import { gigOpportunities, reminders } from '../db/schema'
 import { scoped, withTenant } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
-import { syncGigCalendar, removeGigCalendar, type GigRow } from '../lib/gigCalendar'
+import { syncGigNudges, removeGigNudges, type GigRow } from '../lib/gigNudges'
+import { readNudgePreferences } from '../lib/nudgeSettings'
 import {
   normaliseGigStatus,
   isGigSettled,
@@ -247,17 +248,25 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
     updates.submittedAt = updates.updatedAt
   }
 
-  // The calendar is reconciled against the row's resulting state rather than
-  // driven by the transition. Transition handlers missed a row that arrived
-  // already shortlisted, and happily updated an event on a row you had passed
-  // on. See src/lib/gigCalendar.ts for what the three entries are allowed to
-  // say — in particular, that deciding to apply is not a date in your diary.
+  // The calendar and the task list are reconciled against the row's resulting
+  // state rather than driven by the transition. Transition handlers missed a
+  // row that arrived already shortlisted, and happily updated an event on a
+  // row you had passed on. See shared/nudgeRouting.ts for which of the five
+  // entries goes where — in particular, that deciding to apply is a piece of
+  // work rather than a date in your diary.
   const after: GigRow = {
     ...(before as unknown as GigRow),
     ...(b as Partial<GigRow>),
     status: newStatus,
   }
-  Object.assign(updates, await syncGigCalendar(c.env, after))
+  Object.assign(
+    updates,
+    await syncGigNudges(c.env, after, {
+      tenant: tenantOf(c),
+      prefs: await readNudgePreferences(c.env, tenantOf(c)),
+      today: new Date().toISOString().slice(0, 10),
+    }),
+  )
 
   await db.update(gigOpportunities).set(updates).where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
 
@@ -312,20 +321,23 @@ gigs.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const tenant = tenantOf(c)
 
-  // A gig can own three calendar entries now, not one. Deleting only the
-  // deadline reminder would leave an orphaned show on the calendar for a gig
-  // that no longer exists.
+  // A gig can own six entries now, across two surfaces. Deleting only the
+  // deadline reminder would leave an orphaned show on the calendar, and an
+  // orphaned chore in Tasks, for a gig that no longer exists.
   const row = await db
     .select({
       googleEventId: gigOpportunities.googleEventId,
       opensEventId: gigOpportunities.opensEventId,
       showEventId: gigOpportunities.showEventId,
+      opensTaskId: gigOpportunities.opensTaskId,
+      deadlineTaskId: gigOpportunities.deadlineTaskId,
+      replyTaskId: gigOpportunities.replyTaskId,
     })
     .from(gigOpportunities)
     .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
     .get()
 
-  if (row) await removeGigCalendar(c.env, row)
+  if (row) await removeGigNudges(c.env, row, tenantOf(c))
 
   // Reminders reference gigs by (entity_type, entity_id) with no foreign key,
   // so deleting the gig alone leaves them behind pointing at nothing. That is

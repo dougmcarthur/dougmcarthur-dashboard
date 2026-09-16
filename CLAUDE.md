@@ -224,7 +224,7 @@ tenant-scoped, and none of them ask. Admin mode is the next thing that will
 (`docs/multi-tenant-plan.md`); the client tries first and re-asserts only on
 refusal, so a burst of removals costs one touch, and retries exactly once.
 
-**A request resolves to an artist before any route runs.** Fourteen tables
+**A request resolves to an artist before any route runs.** Fifteen tables
 hold rows that belong to one person, and `src/db/scope.ts` is the only way to
 reach them: `scoped(table, tenant, ...rest)` builds the `WHERE`, `withTenant`
 builds the values, and `TenantId` is a **branded** type with one constructor,
@@ -240,7 +240,7 @@ and `TenantId` is not nullable — so an admin-mode request reaching for
 `gig_opportunities` fails to compile rather than returning a stranger's rows.
 
 **A missing filter is a test failure, not a leak.**
-`test/tenantScope.test.ts` reads the source and fails when one of the fourteen
+`test/tenantScope.test.ts` reads the source and fails when one of the fifteen
 is named in a query that does not pass through `scoped` or `withTenant`. It
 has to be source-level: an unscoped query typechecks, runs, and returns the
 right rows for as long as there is one artist — it starts being wrong on the
@@ -304,7 +304,7 @@ same release, before an invitation could create a second tenant. Both applied in
 run 61, so the prop is gone and did its job.
 
 The `tenant_id` **defaults** from 0021 are still there, and so is the nullable
-column on the fourteen — migration 0024 makes only `users.tenant_id`
+column on the scoped tables — migration 0024 makes only `users.tenant_id`
 `NOT NULL`, and says why at length. Three reasons, shortest first: with the
 defaults in place a write cannot produce a NULL anyway, so the constraint
 guards a state `withTenant` and `test/tenantScope.test.ts` already make
@@ -315,7 +315,7 @@ first is now met while the other two (comparing production's schema against
 what the migrations produce, and no row carrying a NULL tenant) are still
 unchecked; `GET /api/admin/health` answers the third. And SQLite has no
 `ALTER COLUMN`, so it means
-fourteen table rebuilds transcribing a column list that can only come from the
+a table rebuild each, transcribing a column list that can only come from the
 *local* schema — while production predates the ledger and was partly
 hand-applied. A production-only column would be dropped by a statement that
 succeeds. `GET /api/admin/health` counts rows with no owner so the precondition
@@ -367,10 +367,10 @@ vocabulary, or links to a route that surface cannot reach.
 the `usage_daily` rollup — the counts are written by the cron running *as the
 tenant*, which emits a number, and the owner reads the number. The one write
 that crosses the line is removing an artist: a tenant-scoped delete across the
-fourteen, previewed first as a **count per table**, which names no column and
+fifteen, previewed first as a **count per table**, which names no column and
 returns no row. The owner's own tenant is refused, because deleting it takes
 the account holding the surface with it. `test/adminMode.test.ts` fails if the
-admin router names one of the fourteen, or uses `asTenantId` more than the
+admin router names one of the fifteen, or uses `asTenantId` more than the
 once that removal needs.
 
 **Three of the rollup's seven counters have no writer, and the API says so.**
@@ -736,6 +736,103 @@ photographer credit is unusable the day it is added.
 differently per audience and reports what is stale or missing inside it. A file
 exported in March cannot tell you its photo credit went missing in April, which
 is the whole reason this is assembled on read.
+
+**A calendar entry means you show up; a task means there is work to do.**
+Everything used to go on the calendar — the day a window opened, the day it
+closed, the show — and two of the three were the wrong shape. Nothing happens
+at 9am on a deadline except that a form closes, and a diary entry for it sits
+beside a festival you are playing looking identical, which is the `🎵 {name}`
+mistake again. Some of what Scout knows is not a date at all: a reply you owe
+wants chasing, and an all-day entry claiming an hour is a lie about a time.
+
+So confirmed shows go to the calendar and the work — deadlines, windows
+opening, replies owed — goes to **Google Tasks**. `shared/nudgeRouting.ts`
+holds the rules, reads no clock and no database, and is where the tests are;
+`src/lib/gigNudges.ts` reconciles the plan against what exists, on two
+surfaces, with the same wanted-against-present shape `syncGigCalendar` had.
+Preferences are per tenant (`tenant_settings`, the fifteenth scoped table) and
+are **passed into the reconcile, never fetched by it** — the rule `scoped()`
+and `buildReviewQueue` already hold, and what makes the whole thing testable
+without a database. See `docs/nudge-routing.md`.
+
+**The available destinations differ per kind, and it is typed.** A show cannot
+become a task and a reply cannot become a calendar entry, so
+`NUDGE_KINDS[].choices` is the list, the PATCH route validates against it, and
+the select reads it — a screen cannot offer a combination the writer refuses.
+Same rule as `nextGigStatuses`: a control naming a destination is a claim about
+legality.
+
+**The opening task is due a day late on purpose.** A form that was not
+accepting applications yesterday has no fields to read until it is, so on the
+morning a window opens the prep agent has not scraped it and
+`ApplicationPanel` has nothing staged — a task due that morning sends you to
+an empty panel. `openingLeadDays` is a preference rather than a constant
+because the agents' cadence lives outside this repo.
+
+**Four of the five nudges follow from an edit and one does not.** An
+application crosses `NO_REPLY_DAYS` because *time passed*, and nothing writes
+to the row on the day it does, so reconciling on PATCH can never notice it —
+waiting for an edit to spot silence is waiting for the thing silence is the
+absence of. `reconcileAllGigs` runs on the daily housekeeping tick, per tenant,
+and also catches connecting Tasks for the first time and changing where a kind
+of reminder goes. It is idempotent, which is what makes nightly affordable.
+
+**Tasks has no narrow scope, and there is no pretending otherwise.**
+`tasks.readonly` cannot write and `tasks` is read and write over every list in
+the account; there is no `tasks.app.created`. So it is the `gmail.compose`
+trade rather than the `calendar.app.created` one: `src/lib/googleTasks.ts`
+names one list, takes its id as an argument and never enumerates, and the
+Integrations row says out loud that the permission reaches every other list.
+`test/integrations.test.ts` fails if that disclosure goes. A task you ticked
+off is left ticked — a completed task still exists, which is the only way
+`readTaskOn` can tell "done" from "deleted".
+
+**Writing to the artist's own calendar is an opt-in, and a bad trade stated
+plainly.** The narrowest scope that reaches a primary calendar is
+`calendar.events.owned` — read and write over every event on every calendar
+they own — to place the handful of all-day entries a year the calendar now
+carries. It is its own grant purpose, its own consent screen, and `cannot: []`
+because there is no guarantee to make. It is also gated on
+`PRIMARY_CALENDAR_OPT_IN`: declaring that scope on the OAuth client puts it in
+front of Google's review for *every* user of the deployment, including
+everybody who never opts in, so a deployment that has not done that work hides
+the row rather than offering a button that ends at an error page.
+`test/calendarGrant.test.ts` pins all three, and still fails on the genuinely
+broad scopes.
+
+**The calendar is connected with a button, and Google enforces the limit.**
+Calendar wanted `GOOGLE_REFRESH_TOKEN` and `GOOGLE_CALENDAR_ID` as Worker
+secrets, got by hand at a terminal — and **they were never set in production**,
+so every booked gig silently created no event from the day the feature shipped.
+`/api/calendar/connect` is one press: consent in the browser, the token written
+to `google_grants` under the `calendar` purpose, no key to obtain and nothing
+to paste.
+
+The scope is `calendar.app.created`, and choosing it is the interesting part.
+It permits making *secondary* calendars and editing events on those — so Scout
+creates one called **Sun Dogs Music Scout** and can reach nothing else. It
+cannot read the artist's own calendar and cannot alter an event it did not
+create, **whatever this code does**. That is the exact inverse of the
+`gmail.compose` trade below, where Google offered nothing narrow enough and the
+guarantee had to be rebuilt by hand; here the structural version was available
+and is what `test/calendarGrant.test.ts` pins — it fails if the broad
+`calendar` or `calendar.events` scope appears anywhere in `src/`.
+
+Two consequences worth knowing. `GOOGLE_CALENDAR_ID` stops being configuration,
+because under that scope there is only one calendar Scout can reach and it made
+it — migration 0025 hangs the id off the grant, so a new grant is a new
+calendar. And **the redirect URI does not change**: it is registered in the
+Google console, so a second one would be a thing somebody has to configure,
+which is the cost the button exists to avoid. Both purposes return to
+`/api/gmail/callback` and `state` carries which grant is being completed
+(`src/lib/googleOAuth.ts`) — the path is named after the feature that
+registered it rather than what it now does, deliberately.
+
+The secrets path still works. `calendarTarget` in `src/lib/gigCalendar.ts`
+prefers a grant and falls back to it, the same "read both spellings" move
+`normaliseGigStatus` makes. A grant that exists but is refused writes nowhere
+rather than falling back — the artist connected a calendar, and writing to the
+owner's instead would be worse than writing nothing.
 
 **Gmail drafting is a grant the person makes, not a secret somebody pasted.**
 Every Google token before this one was obtained at a terminal and stored with

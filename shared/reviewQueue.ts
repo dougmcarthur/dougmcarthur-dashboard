@@ -246,7 +246,7 @@ export function submissionSilence(
  * you learn to scroll past. Ninety days is where "still deciding" stops being
  * the likeliest explanation.
  */
-const NO_REPLY_DAYS = 45
+export const NO_REPLY_DAYS = 45
 const NO_REPLY_STALE_DAYS = 90
 
 function flagsFor(

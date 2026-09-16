@@ -354,6 +354,98 @@ for (const off of [-35, -65, -95]) {
 // tick retries it.
 taskRuns.push({ task_id: 'gig-festival-scan', run_at: stamp(-1), status: 'failed', summary: 'Timed out fetching a listing page after 30s.', items_added: 0, tenant_id: OWNER })
 
+/**
+ * Replies, which is the screen this fixture most needs to be able to show.
+ *
+ * The Review queue's fault was that a match resting on one common word looked
+ * exactly like a match resting on a confirmed thread, so these are seeded as
+ * the three readings a person has to tell apart: a weak one that should be
+ * dismissible at a glance, a strong one, and two that match equally well.
+ * `match_signals` is the shape the route stores — the candidates, with the
+ * evidence that produced them.
+ */
+const signals = (rows) => JSON.stringify(rows)
+
+const replies = [
+  {
+    gmail_message_id: 'msg-weak-1',
+    gmail_thread_id: 'thr-weak-1',
+    gig_id: gigRows.findIndex((g) => g.name.includes('Assiniboine')) + 1,
+    from_address: 'noreply@localpizza.example',
+    from_name: 'Pizza Place',
+    subject: 'Your order is confirmed',
+    snippet: 'Thanks for ordering from our Winnipeg location. Your order is on its way and should arrive in 30 minutes.',
+    received_at: stamp(-2),
+    in_spam: 0,
+    classification: 'unclear',
+    class_confidence: 'low',
+    evidence: null,
+    proposed_status: null,
+    match_score: 26,
+    match_signals: signals([
+      { gigId: 4, gigName: 'Assiniboine House Concert Series', score: 26, confidence: 'low', bound: false,
+        signals: [{ id: 'name', points: 26, detail: '"Winnipeg" in the body.' }] },
+    ]),
+    match_ambiguous: 0,
+    resolution: null,
+    created_at: stamp(-2),
+    tenant_id: OWNER,
+  },
+  {
+    gmail_message_id: 'msg-strong-1',
+    gmail_thread_id: 'thr-strong-1',
+    gig_id: 3,
+    from_address: 'programming@northernlights.example',
+    from_name: 'Northern Lights Folk Festival',
+    subject: 'Re: Northern Lights Folk Festival — Emerging Artist',
+    snippet: 'Thanks for your application. We would love to have you on the Saturday afternoon stage — can you send a stage plot?',
+    received_at: stamp(-1),
+    in_spam: 0,
+    classification: 'invitation',
+    class_confidence: 'high',
+    evidence: 'We would love to have you on the Saturday afternoon stage',
+    proposed_status: 'invited',
+    match_score: 80,
+    match_signals: signals([
+      { gigId: 3, gigName: 'Northern Lights Folk Festival — Emerging Artist', score: 80, confidence: 'high', bound: false,
+        signals: [
+          { id: 'name', points: 50, detail: '"Northern Lights Folk Festival — Emerging Artist" appears in the subject.' },
+          { id: 'domain', points: 30, detail: 'Sent from northernlights.example, the same domain as the listing.' },
+        ] },
+    ]),
+    match_ambiguous: 0,
+    resolution: null,
+    created_at: stamp(-1),
+    tenant_id: OWNER,
+  },
+  {
+    gmail_message_id: 'msg-ambiguous-1',
+    gmail_thread_id: 'thr-ambiguous-1',
+    gig_id: null,
+    from_address: 'submissions@wufoo.example',
+    from_name: 'Form Receipt',
+    subject: 'Your submission has been received',
+    snippet: 'This confirms we received your performer submission. Someone will be in touch after the programming committee meets.',
+    received_at: stamp(-4),
+    in_spam: 0,
+    classification: 'acknowledgement',
+    class_confidence: 'medium',
+    evidence: 'This confirms we received your performer submission',
+    proposed_status: null,
+    match_score: 34,
+    match_signals: signals([
+      { gigId: 12, gigName: 'West End Cultural Centre — Performer Applications', score: 34, confidence: 'low', bound: false,
+        signals: [{ id: 'name', points: 34, detail: '"performer" in the subject.' }] },
+      { gigId: 6, gigName: 'Winnipeg Folk Festival 2027 — Performer Submissions', score: 34, confidence: 'low', bound: false,
+        signals: [{ id: 'name', points: 34, detail: '"performer" in the subject.' }] },
+    ]),
+    match_ambiguous: 1,
+    resolution: null,
+    created_at: stamp(-4),
+    tenant_id: OWNER,
+  },
+]
+
 // ---------------------------------------------------------------------------
 // The enrolment code. Without this the fixture is a database nobody can log in
 // to look at: a fresh local database has no passkey, and the emailed-code path
@@ -374,6 +466,7 @@ const codeRow = {
 // ---------------------------------------------------------------------------
 
 const OWNED_TABLES = [
+  'gig_replies',
   'task_runs', 'artist_assets', 'reference_docs', 'promo_drafts',
   'sync_targets', 'gig_opportunities', 'auth_enrolment_codes', 'users', 'tenants',
 ]
@@ -388,6 +481,7 @@ const statements = [
   ...insert('artist_assets', assetRows),
   ...insert('reference_docs', referenceDocs),
   ...insert('task_runs', taskRuns),
+  ...insert('gig_replies', replies),
   ...insert('auth_enrolment_codes', [codeRow]),
 ]
 
@@ -400,6 +494,7 @@ const counts = {
   artist_assets: assetRows.length,
   reference_docs: referenceDocs.length,
   task_runs: taskRuns.length,
+  gig_replies: replies.length,
 }
 
 console.log('Local fixture — shapes, not data. Dates are relative to today.\n')

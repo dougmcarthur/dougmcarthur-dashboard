@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, type ReferenceDoc, type CredentialHealth, type CredentialState } from '../api'
-import { STATE_LABELS, STATE_NOTES, needsAttention } from '../../../shared/credentialHealth'
+import { api, type ReferenceDoc } from '../api'
+import { IntegrationsCard } from '../components/IntegrationsCard'
+import { NudgeRoutingCard } from '../components/NudgeRoutingCard'
 import { AppearanceSettings } from '../components/AppearanceSettings'
 import { DigestSettingsCard } from '../components/DigestSettingsCard'
 import { FIELD } from '../components/ui/Field'
@@ -12,179 +13,6 @@ import { AdminModeCard } from '../components/AdminModeCard'
 import { ProfileCard } from '../components/ProfileCard'
 import { useSession } from '../hooks/useSession'
 
-
-// ── Integration status card ───────────────────────────────────────────────────
-
-/**
- * A connection's state, not just whether somebody set a secret.
- *
- * The pill used to read "Connected" whenever the environment variables were
- * present, which a refresh token Google stopped accepting weeks ago satisfies
- * perfectly. The states come from `shared/credentialHealth.ts` so this screen
- * and the bell cannot disagree about what one means.
- */
-function StatusPill({ state }: { state: CredentialState }) {
-  const tone =
-    state === 'working'
-      ? 'bg-success-bg text-success-fg'
-      : needsAttention(state)
-        ? 'bg-warn-bg text-warn-fg'
-        : 'bg-sunken text-muted'
-  const dot =
-    state === 'working' ? 'bg-success-solid' : needsAttention(state) ? 'bg-warn-fg' : 'bg-muted'
-
-  return (
-    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${tone}`}>
-      <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${dot}`} />
-      {STATE_LABELS[state]}
-    </span>
-  )
-}
-
-/**
- * "Checked 2 hours ago", or nothing at all.
- *
- * Relative rather than a timestamp because the useful question is whether the
- * answer is current, and nobody reads an ISO string to find that out.
- */
-function checkedAgo(at: string | null, now: number): string | null {
-  if (!at) return null
-  const ms = now - Date.parse(at)
-  if (Number.isNaN(ms)) return null
-  const mins = Math.round(ms / 60_000)
-  if (mins < 2) return 'Checked just now'
-  if (mins < 60) return `Checked ${mins} minutes ago`
-  const hours = Math.round(mins / 60)
-  if (hours < 24) return `Checked ${hours} ${hours === 1 ? 'hour' : 'hours'} ago`
-  const days = Math.round(hours / 24)
-  return `Checked ${days} ${days === 1 ? 'day' : 'days'} ago`
-}
-
-function IntegrationCard({
-  title,
-  health,
-  missingSecrets,
-  working,
-  now,
-}: {
-  title: string
-  health: CredentialHealth | undefined
-  missingSecrets: string[] | undefined
-  /** What this connection does for you when it is working. */
-  working: string
-  now: number
-}) {
-  const state = health?.state ?? 'unverified'
-  const ago = checkedAgo(health?.checkedAt ?? null, now)
-
-  return (
-    <div className="bg-surface border border-line rounded-xl shadow-card p-4">
-      {/*
-        Stacked rather than title-left / pill-right. These cards sit in a
-        narrow column, and "No longer accepted" beside a two-word title
-        overflowed its row and collided with the heading — found by looking at
-        it, which is the only way that class of fault is ever found. A column
-        cannot overlap at any width.
-      */}
-      <div className="flex flex-col items-start gap-1.5 mb-2">
-        <h3 className="text-sm font-semibold text-ink">{title}</h3>
-        <StatusPill state={state} />
-      </div>
-
-      {state === 'unconfigured' ? (
-        <div className="space-y-1.5">
-          <p className="text-xs text-muted">Missing secrets:</p>
-          <div className="flex flex-wrap gap-1">
-            {missingSecrets?.map((sec) => (
-              <code key={sec} className="text-xs bg-sunken text-body px-1.5 py-0.5 rounded">{sec}</code>
-            ))}
-          </div>
-          <p className="text-xs text-muted">Set these on the server, then reload.</p>
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          <p className="text-xs text-muted">{state === 'working' ? working : STATE_NOTES[state]}</p>
-          {/* Google's own words. A reading you cannot check is one you should not trust. */}
-          {health?.detail && state !== 'working' ? (
-            <p className="text-xs text-muted break-words">{health.detail}</p>
-          ) : null}
-          {ago ? (
-            <p className="text-xs text-faint">
-              {ago}
-              {health?.stale ? ' — the daily check may not be running.' : ''}
-            </p>
-          ) : null}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function IntegrationCards() {
-  const queryClient = useQueryClient()
-  const { data, isLoading } = useQuery({
-    queryKey: ['health'],
-    queryFn: api.health,
-    staleTime: 60_000,
-  })
-
-  const check = useMutation({
-    mutationFn: api.checkCredentials,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['health'] })
-      // A credential that just came back rejected is a condition the bell
-      // raises, so the feed is no longer accurate either.
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    },
-  })
-
-  if (isLoading) return <div className="h-24 bg-sunken rounded-lg animate-pulse" />
-
-  const byId = new Map((data?.credentials ?? []).map((c) => [c.id, c]))
-  // Rendered once per render rather than per card, so three cards cannot
-  // disagree about what "now" is by a few milliseconds.
-  const now = Date.now()
-
-  return (
-    <div className="space-y-3">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <IntegrationCard
-          title="Google Calendar"
-          health={byId.get('calendar')}
-          missingSecrets={data?.calendarMissingSecrets}
-          working="Gig approvals create Calendar events automatically."
-          now={now}
-        />
-        <IntegrationCard
-          title="Gmail"
-          health={byId.get('gmail')}
-          missingSecrets={data?.gmailMissingSecrets}
-          working="The mailbox is scanned for organiser replies, and the Sync page can reconcile pitches."
-          now={now}
-        />
-        <IntegrationCard
-          title="Email sending"
-          health={byId.get('email')}
-          missingSecrets={[]}
-          working="The weekly digest and setup codes can be delivered."
-          now={now}
-        />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="neutral" className="whitespace-nowrap" onClick={() => check.mutate()} disabled={check.isPending}>
-          {check.isPending ? 'Checking…' : 'Check connections'}
-        </Button>
-        <p className="min-w-0 flex-1 text-xs text-faint">
-          Asks Google whether each credential is still accepted. Runs once a day on its own.
-        </p>
-      </div>
-      {check.isError ? (
-        <p className="text-xs text-danger-fg">The check could not be run. That is about this request, not the credentials.</p>
-      ) : null}
-    </div>
-  )
-}
 
 // ── Reference doc editor ─────────────────────────────────────────────────────
 
@@ -423,7 +251,10 @@ export function SettingsPage() {
           {session?.role === 'owner' && <AdminModeCard />}
         </div>
         <div className="space-y-8 min-w-0">
-          <IntegrationCards />
+          <IntegrationsCard />
+          {/* Directly under Integrations: the two are one decision read top to
+              bottom — what is connected, then what each connection is for. */}
+          <NudgeRoutingCard />
           <DigestSettingsCard />
         </div>
       </div>

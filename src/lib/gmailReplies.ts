@@ -17,6 +17,7 @@
  * was found there, so nothing pretends it arrived normally.
  */
 
+import { automationVerdict, type AutomationVerdict } from '../../shared/bulkMail'
 import type { Binding, MatchableGig, ReplyMessage } from '../../shared/replyMatch'
 import { significantWords, initialisms, isMatchableGig } from '../../shared/replyMatch'
 import { decodeBase64, extractPlainText, type GmailEnv } from './gmail'
@@ -52,14 +53,39 @@ function daysBetween(fromIso: string, toIso: string): number {
   return Math.ceil((b - a) / 86_400_000)
 }
 
-/** The terms that would find mail about this gig, as Gmail search syntax. */
+/**
+ * The terms that would find mail about this gig, as Gmail search syntax.
+ *
+ * This used to add the single longest word of the name as a bare term, so
+ * *Sofar Sounds Winnipeg* asked Gmail for every message containing "winnipeg"
+ * — which, for somebody who lives in Winnipeg, is most of their mail. The same
+ * word then scored a match on its own. See `docs/reply-matching-precision.md`.
+ *
+ * A **conjunction** replaces it: two significant words that must both appear.
+ * "winnipeg sounds" is a vanishingly different question from "winnipeg", and
+ * it still finds a reply that says *"thanks for applying to Sofar Sounds"*
+ * without ever naming the gig exactly, which is why the quoted full name
+ * cannot be the only term.
+ *
+ * One bare word survives, and only where it is the whole name: "JIMWEEK" is
+ * findable by nothing else, and a name that reduces to one common word is
+ * better served by its domain and by a confirmed binding than by searching for
+ * it.
+ */
 export function gigTerms(gig: { name: string }): string[] {
   const sig = significantWords(gig.name)
   const terms: string[] = []
+
   if (sig.length >= 2) terms.push(`"${gig.name.replace(/"/g, '')}"`)
-  const distinctive = sig.filter((w) => w.length >= 5).sort((a, b) => b.length - a.length)[0]
-  if (distinctive) terms.push(distinctive)
+
+  // Longest first, because until rarity is measured length is the only proxy
+  // available — but two of them, so neither has to carry the query alone.
+  const ranked = [...sig].sort((a, b) => b.length - a.length)
+  const pair = ranked.filter((w) => w.length >= 4).slice(0, 2)
+  if (pair.length === 2) terms.push(`(${pair.join(' ')})`)
+
   for (const a of initialisms(gig.name)) terms.push(a)
+
   // A one-word name with no long word left — "JIMWEEK" survives this, "Folk"
   // would not, and searching for "folk" alone is searching for nothing.
   if (terms.length === 0 && sig.length === 1 && sig[0].length >= 4) terms.push(sig[0])
@@ -95,28 +121,61 @@ export function planReplyScan(input: {
     Math.max(MIN_WINDOW_DAYS, input.windowDays ?? derived),
   )
 
-  const terms = new Set<string>()
-  for (const g of gigs) for (const t of gigTerms(g)) terms.add(t)
+  /**
+   * Two kinds of term, searched over two different parts of the mailbox.
+   *
+   * **Precise** terms — the full name in quotes, an abbreviation, an address
+   * already known to write about a gig — identify a message nearly on their
+   * own. Those are searched with `in:anywhere`, because a rejection auto-filed
+   * as spam is exactly the silence this phase exists to end, and a message
+   * carrying the festival's whole name is worth digging out of the spam folder.
+   *
+   * **Loose** terms — a conjunction of two words from the name — are a good
+   * net and a bad filter. Searching spam with those is what filled the queue
+   * with everything a person in Winnipeg receives, so they are asked only of
+   * `category:primary`, where Gmail's own classifier has already set aside
+   * promotions, social and updates.
+   *
+   * That split keeps the property the old query had, and drops the one nobody
+   * wanted. See `docs/reply-matching-precision.md`.
+   */
+  const precise = new Set<string>()
+  const loose = new Set<string>()
+
+  for (const g of gigs) {
+    for (const t of gigTerms(g)) {
+      // A conjunction is the only loose shape this produces; a quoted name and
+      // an abbreviation are both precise.
+      if (t.startsWith('(')) loose.add(t)
+      else precise.add(t)
+    }
+  }
   for (const b of input.bindings ?? []) {
-    if (b.kind === 'address') terms.add(`from:${b.value}`)
+    if (b.kind === 'address') precise.add(`from:${b.value}`)
   }
 
-  // `in:anywhere` reaches spam and trash; `-in:sent -in:draft` keeps your own
-  // outbound mail out, which the sync reconciler already reads separately.
-  const prefix = `in:anywhere -in:sent -in:draft newer_than:${windowDays}d `
+  const window = `newer_than:${windowDays}d`
+  const PRECISE_PREFIX = `in:anywhere -in:sent -in:draft ${window} `
+  const LOOSE_PREFIX = `category:primary -in:spam -in:trash -in:sent -in:draft ${window} `
+
   const queries: string[] = []
-  let batch: string[] = []
 
-  const flush = () => {
-    if (batch.length) queries.push(`${prefix}{${batch.join(' ')}}`)
-    batch = []
+  const batchInto = (prefix: string, terms: Set<string>) => {
+    let batch: string[] = []
+    const flush = () => {
+      if (batch.length) queries.push(`${prefix}{${batch.join(' ')}}`)
+      batch = []
+    }
+    for (const term of terms) {
+      const next = [...batch, term].join(' ')
+      if (prefix.length + next.length + 2 > MAX_QUERY_CHARS) flush()
+      batch.push(term)
+    }
+    flush()
   }
-  for (const term of terms) {
-    const next = [...batch, term].join(' ')
-    if (prefix.length + next.length + 2 > MAX_QUERY_CHARS) flush()
-    batch.push(term)
-  }
-  flush()
+
+  batchInto(PRECISE_PREFIX, precise)
+  batchInto(LOOSE_PREFIX, loose)
 
   return { queries, windowDays, oldestSubmission, gigCount: gigs.length }
 }
@@ -128,7 +187,7 @@ interface GmailListed {
   threadId: string
 }
 
-async function accessToken(env: GmailEnv, fetchImpl: typeof fetch): Promise<string> {
+export async function accessToken(env: GmailEnv, fetchImpl: typeof fetch = fetch): Promise<string> {
   const res = await fetchImpl('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -156,6 +215,14 @@ export function parseFrom(header: string): { address: string; name: string | nul
 export interface FetchedReply extends ReplyMessage {
   /** Gmail had filed it as spam. Said rather than hidden. */
   inSpam: boolean
+  /**
+   * What the headers say about whether a person wrote this. See
+   * `shared/bulkMail.ts` — `automated` is excluded before scoring, `bulk` is
+   * kept and weighed, because a festival that mails through a platform is
+   * still a festival.
+   */
+  /** The full verdict, reasons included — the tier alone is what scoring reads. */
+  automationVerdict: AutomationVerdict
   snippet: string
 }
 
@@ -212,6 +279,9 @@ export async function fetchReplies(
       const header = (name: string) =>
         headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? ''
       const { address, name } = parseFrom(header('from'))
+      const verdict = automationVerdict(
+        Object.fromEntries(headers.map((h) => [h.name.toLowerCase(), h.value])),
+      )
       return {
         messageId: d.id,
         threadId: d.threadId,
@@ -221,6 +291,8 @@ export async function fetchReplies(
         body: extractPlainText(d.payload),
         receivedAt: new Date(Number(d.internalDate)).toISOString(),
         inSpam: (d.labelIds ?? []).includes('SPAM'),
+        automationVerdict: verdict,
+        automation: verdict.tier,
         snippet: d.snippet ?? '',
       }
     })
@@ -228,3 +300,47 @@ export async function fetchReplies(
 }
 
 export { decodeBase64 }
+
+/**
+ * The threads the artist has written in, inside the scan's window.
+ *
+ * The strongest signal available for "is this a reply to something I actually
+ * sent" is `In-Reply-To` matched against your own `Message-ID`s (RFC 5322
+ * §3.6.4) — and Gmail answers the same question more cheaply, because it has
+ * already done the threading. One search of Sent mail gives the thread ids;
+ * an inbound message in one of them is part of a conversation you took part in.
+ *
+ * What it is worth is limited and worth being precise about. **It says nothing
+ * about which application a message concerns**, so it corroborates rather than
+ * identifies, and `scoreGig` only counts it where something else already
+ * pointed at a gig. It is also silent for the common case: most applications
+ * begin at a web form, so the receipt arrives in a thread of its own and this
+ * returns nothing. That makes it a large positive where it fires and never a
+ * filter — a message not in one of these threads is not thereby suspicious.
+ */
+export async function sentThreadIds(
+  env: GmailEnv,
+  windowDays: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Set<string>> {
+  const out = new Set<string>()
+  try {
+    const token = await accessToken(env, fetchImpl)
+    const params = new URLSearchParams({
+      q: `in:sent newer_than:${windowDays}d`,
+      maxResults: '200',
+    })
+    const res = await fetchImpl(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    if (!res.ok) return out
+    const { messages = [] } = await res.json<{ messages?: Array<{ threadId: string }> }>()
+    for (const m of messages) out.add(m.threadId)
+  } catch (err) {
+    // Precision, not correctness: without this the matcher scores as it did
+    // before the signal existed.
+    console.error('sent thread lookup failed:', err)
+  }
+  return out
+}

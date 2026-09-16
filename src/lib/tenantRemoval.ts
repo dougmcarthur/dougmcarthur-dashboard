@@ -77,7 +77,7 @@ export interface RemovalResult {
  * Delete everything belonging to one tenant.
  *
  * Not a transaction, because D1 has no interactive one and a batch would not
- * survive the fourteen statements plus the account rows anyway. A run that
+ * survive the per-table statements plus the account rows anyway. A run that
  * dies halfway leaves fewer rows than it started with and can be run again —
  * which is the right failure mode for a delete, and the reason the tenant row
  * itself goes **last**: while it exists, the removal is resumable and the

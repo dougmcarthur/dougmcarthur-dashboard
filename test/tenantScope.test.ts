@@ -11,7 +11,7 @@
  * and for the same reason: some mistakes typecheck and render.
  *
  * The rule: every `.from` / `.insert` / `.update` / `.delete` naming one of the
- * fourteen scoped tables must pass through `scoped()` or `withTenant()` in the
+ * scoped tables must pass through `scoped()` or `withTenant()` in the
  * same chain — or through a local whose value came from `scoped()`, which is
  * how a query builds an optional filter list.
  *
@@ -186,7 +186,7 @@ describe('tenant scoping', () => {
    *
    * The rule above matches `.from(gigOpportunities)` — a table by its export
    * name. It cannot see `.from(table)` where `table` came from iterating
-   * `DOMAIN_TABLES`, which is how the three jobs that must visit all fourteen
+   * `DOMAIN_TABLES`, which is how the three jobs that must visit them all
    * are written. Those are safe for their own reasons, but not because of the
    * check above, and a guard with an invisible gap is worse than one with a
    * named gap.
@@ -210,14 +210,14 @@ describe('tenant scoping', () => {
         'Deliberately unscoped, and that is the job: it counts rows with **no** ' +
         'tenant, which a scoped query cannot find. A count, naming no column and ' +
         'returning no row — one of the preconditions migration 0024 names before ' +
-        'the NOT NULL pass on the fourteen can be finished.',
+        'the NOT NULL pass on the scoped tables can be finished.',
     }
 
     const reaching = files
       .filter((rel) => stripComments(readFileSync(join(SRC, rel), 'utf8')).includes('DOMAIN_TABLES'))
       .sort()
 
-    expect(reaching, 'a file reaches the fourteen through DOMAIN_TABLES without a written reason')
+    expect(reaching, 'a file reaches the scoped tables through DOMAIN_TABLES without a written reason')
       .toEqual(Object.keys(ALLOWED).sort())
 
     for (const [file, why] of Object.entries(ALLOWED)) {

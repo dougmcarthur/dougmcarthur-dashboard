@@ -57,13 +57,46 @@ export interface CalendarEvent {
   htmlLink: string
 }
 
-export async function createCalendarEvent(
-  env: CalendarEnv,
+/**
+ * Where an event is going, and what may write it.
+ *
+ * The three calls below used to derive both from `env`, which meant they could
+ * only ever write to the one calendar a Worker secret named. A grant the
+ * artist made in their browser carries its own token and its own calendar, so
+ * the pair became an argument. The env-based wrappers are kept underneath, so
+ * a deployment still configured the old way is unaffected.
+ */
+export interface CalendarTarget {
+  accessToken: string
+  calendarId: string
+}
+
+/**
+ * Make the calendar Scout writes to.
+ *
+ * Under `calendar.app.created` this is the only calendar Scout can reach — it
+ * cannot see the artist's own, and cannot touch an event it did not create.
+ * So creating one is not a convenience, it is the whole of what that scope
+ * grants, and the id it returns is what makes the grant usable.
+ */
+export async function createScoutCalendar(
+  accessToken: string,
+  summary: string,
+  timeZone?: string,
+): Promise<string> {
+  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(timeZone ? { summary, timeZone } : { summary }),
+  })
+  if (!res.ok) throw new Error(`Calendar create failed: ${await res.text()}`)
+  return (await res.json<{ id: string }>()).id
+}
+
+export async function createEventOn(
+  target: CalendarTarget,
   input: CalendarEventInput,
 ): Promise<CalendarEvent> {
-  const token = await getAccessToken(env)
-  const calId = encodeURIComponent(env.GOOGLE_CALENDAR_ID)
-
   const body = {
     summary: input.summary,
     description: input.description ?? '',
@@ -77,25 +110,64 @@ export async function createCalendarEvent(
       ],
     },
   }
-
   const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${calId}/events`,
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(target.calendarId)}/events`,
     {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${target.accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     },
   )
-
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Calendar event create failed: ${err}`)
-  }
-
+  if (!res.ok) throw new Error(`Calendar event create failed: ${await res.text()}`)
   return res.json<CalendarEvent>()
+}
+
+export async function updateEventOn(
+  target: CalendarTarget,
+  eventId: string,
+  input: Partial<CalendarEventInput>,
+): Promise<void> {
+  const body: Record<string, unknown> = {}
+  if (input.summary) body.summary = input.summary
+  if (input.description !== undefined) body.description = input.description
+  if (input.date) {
+    body.start = { date: input.date }
+    // Always sent alongside the start, so shortening a run from three nights
+    // to one moves the end back instead of leaving the old span in place.
+    body.end = { date: input.endDateExclusive ?? input.date }
+  }
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(target.calendarId)}/events/${eventId}`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${target.accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+  if (!res.ok) throw new Error(`Calendar event update failed: ${await res.text()}`)
+}
+
+export async function deleteEventOn(target: CalendarTarget, eventId: string): Promise<void> {
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(target.calendarId)}/events/${eventId}`,
+    { method: 'DELETE', headers: { Authorization: `Bearer ${target.accessToken}` } },
+  )
+  // 404 = already deleted, 204 = success — both are fine.
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Calendar event delete failed: ${await res.text()}`)
+  }
+}
+
+/** The stored-secret path, unchanged in behaviour, now expressed through the pair above. */
+export async function targetFromEnv(env: CalendarEnv): Promise<CalendarTarget> {
+  return { accessToken: await getAccessToken(env), calendarId: env.GOOGLE_CALENDAR_ID }
+}
+
+export async function createCalendarEvent(
+  env: CalendarEnv,
+  input: CalendarEventInput,
+): Promise<CalendarEvent> {
+  return createEventOn(await targetFromEnv(env), input)
 }
 
 export async function updateCalendarEvent(
@@ -103,57 +175,11 @@ export async function updateCalendarEvent(
   eventId: string,
   input: Partial<CalendarEventInput>,
 ): Promise<void> {
-  const token = await getAccessToken(env)
-  const calId = encodeURIComponent(env.GOOGLE_CALENDAR_ID)
-
-  const body: Record<string, unknown> = {}
-  if (input.summary) body.summary = input.summary
-  if (input.description !== undefined) body.description = input.description
-  if (input.date) {
-    body.start = { date: input.date }
-    // Always sent alongside the start, so shortening a run from three nights to
-    // one moves the end back instead of leaving the old span in place.
-    body.end = { date: input.endDateExclusive ?? input.date }
-  }
-
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${calId}/events/${eventId}`,
-    {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    },
-  )
-
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Calendar event update failed: ${err}`)
-  }
+  return updateEventOn(await targetFromEnv(env), eventId, input)
 }
 
-export async function deleteCalendarEvent(
-  env: CalendarEnv,
-  eventId: string,
-): Promise<void> {
-  const token = await getAccessToken(env)
-  const calId = encodeURIComponent(env.GOOGLE_CALENDAR_ID)
-
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${calId}/events/${eventId}`,
-    {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  )
-
-  // 404 = already deleted, 204 = success — both are fine
-  if (!res.ok && res.status !== 404) {
-    const err = await res.text()
-    throw new Error(`Calendar event delete failed: ${err}`)
-  }
+export async function deleteCalendarEvent(env: CalendarEnv, eventId: string): Promise<void> {
+  return deleteEventOn(await targetFromEnv(env), eventId)
 }
 
 // Returns true if all required Google secrets are present.

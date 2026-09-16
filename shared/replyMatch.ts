@@ -34,6 +34,8 @@
  * Pure, like everything in shared/. Nothing here reads the clock or the network.
  */
 
+import type { AutomationTier } from './bulkMail'
+import { rarityLookup, rarestWord, weigh, type Rarity, type RarityIndex } from './termRarity'
 import { normaliseGigStatus } from './gigStatus'
 
 // ── Normalising a name ────────────────────────────────────────────────────────
@@ -136,24 +138,49 @@ export interface NameMatch {
   matched: string
   /** `subject` outranks `body` — a name in the subject line is deliberate. */
   where: 'subject' | 'body'
+  /** Set on a `distinctive` match: how much the word it matched is worth. */
+  rarity?: Rarity
 }
 
 /**
- * The longest word is the most distinctive one.
+ * The word of a name worth scoring on: the rarest, measured.
  *
- * Not a frequency table, which would need a corpus this app does not have.
- * Length is a decent proxy — "voyageur" and "highlands" beat "road" and "west"
- * — and it is stable, which matters more than being clever here.
+ * It used to be the longest, and the comment said why — a frequency table
+ * "would need a corpus this app does not have". It has one now: the artist's
+ * own mailbox, measured through Gmail's own result estimates. See
+ * `shared/termRarity.ts`.
+ *
+ * Length still decides when nothing has been measured, so an unmeasured
+ * deployment behaves exactly as it did before rather than slightly worse.
  */
-function distinctiveWord(name: string): string | null {
+function distinctiveWord(name: string, lookup: (term: string) => Rarity): string | null {
   const sig = significantWords(name).filter((w) => w.length >= 5)
   if (sig.length === 0) return null
-  return sig.reduce((best, w) => (w.length > best.length ? w : best))
+  return rarestWord(sig, lookup)
+}
+
+/**
+ * What a single-word match says, including how common that word is.
+ *
+ * The old line read `"winnipeg" in the body.` — true, and it read as a reason
+ * rather than as the coincidence it usually was. Saying the share is what lets
+ * somebody dismiss it without opening the message.
+ */
+function rarityNote(name: NameMatch): string {
+  const band = name.rarity?.band
+  const where = name.where
+  if (band === 'everywhere' || band === 'common') {
+    return `"${name.matched}" in the ${where} — a word that appears all over this mailbox.`
+  }
+  if (band === 'uncommon') return `"${name.matched}" in the ${where}, which is fairly distinctive.`
+  if (band === 'rare') return `"${name.matched}" in the ${where}, which is rare in this mailbox.`
+  return `"${name.matched}" in the ${where}.`
 }
 
 export function matchName(
   gigName: string,
   message: { subject: string; body: string },
+  lookup: (term: string) => Rarity = () => rarityLookup(null)(''),
 ): NameMatch | null {
   const fields: Array<['subject' | 'body', string]> = [
     ['subject', message.subject ?? ''],
@@ -165,7 +192,7 @@ export function matchName(
   // pattern built from the significant words alone ("folk", "rocks") would
   // have to guess at the two stopwords sitting between them.
   const squashedName = squash(gigName)
-  const distinctive = distinctiveWord(gigName)
+  const distinctive = distinctiveWord(gigName, lookup)
   const abbrevs = initialisms(gigName)
 
   // Ordered by how much each kind tells you, and each kind checked in the
@@ -178,7 +205,7 @@ export function matchName(
   for (const [where, text] of fields) {
     if (!text || !distinctive) continue
     const m = text.match(new RegExp(`\\b${escapeRe(distinctive)}\\b`, 'i'))
-    if (m) return { kind: 'distinctive', matched: m[0], where }
+    if (m) return { kind: 'distinctive', matched: m[0], where, rarity: lookup(distinctive) }
   }
   for (const [where, text] of fields) {
     if (!text) continue
@@ -259,6 +286,22 @@ export interface ReplyMessage {
   body: string
   /** ISO datetime. */
   receivedAt: string
+  /**
+   * What the headers said about whether a person wrote this
+   * (`shared/bulkMail.ts`). `automated` never reaches here — the scan drops
+   * it — but `bulk` does, deliberately, to be weighed rather than excluded.
+   */
+  automation?: AutomationTier
+  /**
+   * Whether this message sits in a thread the artist has written in.
+   *
+   * Gmail's own threading answers it: one search of Sent mail gives the set of
+   * threads they took part in. It says nothing about *which* gig, so it is
+   * worth the same to every candidate — but a stranger's marketing is not in a
+   * conversation you started, which is exactly the corroboration a lone rare
+   * word was missing.
+   */
+  inYourThread?: boolean
 }
 
 export interface MatchableGig {
@@ -278,7 +321,7 @@ export interface Binding {
   value: string
 }
 
-export type SignalId = 'thread' | 'address' | 'name' | 'domain' | 'organizer' | 'relay'
+export type SignalId = 'thread' | 'address' | 'name' | 'domain' | 'organizer' | 'relay' | 'replied' | 'bulk'
 
 export interface MatchSignal {
   id: SignalId
@@ -310,7 +353,87 @@ const POINTS = {
   domain: 30,
   organizer: 12,
   relay: 12,
+  /**
+   * A thread the artist wrote in. Enough to lift a genuine lead over the bar
+   * beside one other signal, and not enough to put anything there on its own —
+   * being in a conversation says nothing about which application it concerns.
+   */
+  replied: 24,
+  /**
+   * Bulk mail, as a subtraction.
+   *
+   * Never an exclusion, for the reason `shared/bulkMail.ts` gives at length: a
+   * festival that mails through a platform is still a festival, and its
+   * acceptance letter carries the same headers a newsletter does. Sized to sink
+   * a lone weak lead without touching a message that names the application
+   * outright — which is the case where being bulk is beside the point.
+   */
+  bulk: -20,
 } as const
+
+/**
+ * How much the evidence is actually worth, in a word.
+ *
+ * The queue showed a score and a run-on sentence of signal details, which
+ * meant a match resting on one common word looked exactly like a match resting
+ * on a confirmed thread. Both were grey captions. Somebody triaging cannot act
+ * on that, and the measured version of this problem is in
+ * `docs/reply-matching-precision.md`: a pizza receipt and a real organiser
+ * reply scored identically, and the screen gave no way to tell.
+ *
+ * Derived from the signals rather than from a second set of thresholds, so
+ * this cannot drift away from what the scoring actually did.
+ */
+export type MatchStrength = 'confirmed' | 'strong' | 'possible' | 'weak'
+
+export function matchStrength(candidate: Pick<ReplyCandidate, 'signals' | 'score' | 'bound'>): MatchStrength {
+  // A binding is not evidence weighed against other evidence — it is a thing
+  // somebody already confirmed.
+  if (candidate.bound) return 'confirmed'
+
+  // One signal, worth no more than a single ordinary word appearing somewhere
+  // in a body. This is the case that filled the queue.
+  const lone = candidate.signals.length === 1 ? candidate.signals[0] : null
+  if (lone && lone.points <= POINTS.name.distinctive.body) return 'weak'
+
+  if (candidate.score >= POINTS.name.full.subject || candidate.signals.length >= 2) return 'strong'
+  return 'possible'
+}
+
+export const STRENGTH_LABELS: Record<MatchStrength, string> = {
+  confirmed: 'Confirmed',
+  strong: 'Likely',
+  possible: 'Possible',
+  weak: 'Weak',
+}
+
+/**
+ * What to say beside the label, so the word is a claim somebody can check.
+ *
+ * `weak` says what the *only* evidence was, because that is the fact that
+ * makes it dismissible at a glance.
+ */
+export function strengthNote(
+  strength: MatchStrength,
+  candidate: Pick<ReplyCandidate, 'signals'>,
+): string {
+  switch (strength) {
+    case 'confirmed':
+      return 'You have already confirmed this sender or thread writes about this one.'
+    case 'strong':
+      return candidate.signals.length >= 2
+        ? 'More than one thing points at this application.'
+        : 'The application is named outright.'
+    case 'possible':
+      return 'Some evidence, but nothing decisive.'
+    case 'weak':
+      return `The only evidence is ${lowerFirst(candidate.signals[0]?.detail ?? 'a single weak signal.')}`
+  }
+}
+
+function lowerFirst(s: string): string {
+  return s.length ? s[0].toLowerCase() + s.slice(1) : s
+}
 
 /** Below this, a candidate is a coincidence rather than a lead. */
 export const MATCH_THRESHOLD = 26
@@ -336,7 +459,12 @@ export function isMatchableGig(gig: { status: string }): boolean {
   return MATCHABLE.has(normaliseGigStatus(gig.status))
 }
 
-function scoreGig(message: ReplyMessage, gig: MatchableGig, bindings: Binding[]): ReplyCandidate | null {
+function scoreGig(
+  message: ReplyMessage,
+  gig: MatchableGig,
+  bindings: Binding[],
+  lookup: (term: string) => Rarity,
+): ReplyCandidate | null {
   const signals: MatchSignal[] = []
   const mine = bindings.filter((b) => b.gigId === gig.id)
 
@@ -355,17 +483,23 @@ function scoreGig(message: ReplyMessage, gig: MatchableGig, bindings: Binding[])
   // `updated_at` would throw away real matches.
   if (gig.submittedAt && message.receivedAt < gig.submittedAt) return null
 
-  const name = matchName(gig.name, message)
+  const name = matchName(gig.name, message, lookup)
   if (name) {
+    // Only the single-word match is weighed. A full name and an abbreviation
+    // are distinctive by construction — "Folk On The Rocks" written out, or
+    // FOTR — so measuring how common they are would answer a question nobody
+    // asked and would punish a festival for having an ordinary name.
+    const base = POINTS.name[name.kind][name.where]
+    const points = name.kind === 'distinctive' && name.rarity ? weigh(base, name.rarity) : base
     signals.push({
       id: 'name',
-      points: POINTS.name[name.kind][name.where],
+      points,
       detail:
         name.kind === 'full'
           ? `"${gig.name}" appears in the ${name.where}.`
           : name.kind === 'initialism'
             ? `"${name.matched}" in the ${name.where} reads as an abbreviation of "${gig.name}".`
-            : `"${name.matched}" in the ${name.where}.`,
+            : rarityNote(name),
     })
   }
 
@@ -389,6 +523,25 @@ function scoreGig(message: ReplyMessage, gig: MatchableGig, bindings: Binding[])
     if (org.length >= 5 && squash(hay).includes(org)) {
       signals.push({ id: 'organizer', points: POINTS.organizer, detail: `Names the organiser, ${gig.organizer}.` })
     }
+  }
+
+  // About the message rather than about this gig, so every candidate gets the
+  // same answer. Added only where something else already pointed here: on its
+  // own, "you have written in this thread" identifies no application at all.
+  if (message.inYourThread && signals.length > 0) {
+    signals.push({
+      id: 'replied',
+      points: POINTS.replied,
+      detail: 'Part of a conversation you took part in.',
+    })
+  }
+
+  if (message.automation === 'bulk' && signals.length > 0) {
+    signals.push({
+      id: 'bulk',
+      points: POINTS.bulk,
+      detail: 'Sent as bulk mail, which an organiser writing to you personally would not be.',
+    })
   }
 
   const score = signals.reduce((n, s) => n + s.points, 0)
@@ -415,10 +568,17 @@ export function matchReply(
   message: ReplyMessage,
   gigs: MatchableGig[],
   bindings: Binding[] = [],
+  /**
+   * What the words of these names are worth in this mailbox. Passed in rather
+   * than fetched — see `shared/termRarity.ts`. Absent means unmeasured, which
+   * scores exactly as this did before rarity existed.
+   */
+  rarity?: RarityIndex | null,
 ): ReplyMatchResult {
+  const lookup = rarityLookup(rarity)
   const scored = gigs
     .filter(isMatchableGig)
-    .map((g) => scoreGig(message, g, bindings))
+    .map((g) => scoreGig(message, g, bindings, lookup))
     .filter((c): c is ReplyCandidate => c !== null && (c.bound || c.score >= MATCH_THRESHOLD))
     .sort((a, b) => b.score - a.score || a.gigName.localeCompare(b.gigName))
 

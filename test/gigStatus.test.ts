@@ -77,30 +77,74 @@ describe('settled and submitted are different questions', () => {
   })
 })
 
-// ── The calendar ──────────────────────────────────────────────────────────────
+// ── Where a gig's dates end up ────────────────────────────────────────────────
 
-const calls: Array<{ op: string; id?: string; summary?: string; date?: string }> = []
+const calls: Array<{ surface: 'calendar' | 'tasks'; op: string; id?: string; summary?: string; date?: string }> = []
 
+/**
+ * Two surfaces now, and which one a given entry lands on is the thing under
+ * test. `prefs` is an argument rather than a database read for the reason
+ * `buildReviewQueue` takes `today`: same inputs, same answer, every run.
+ *
+ * The calendar seam is `{ accessToken, calendarId }`, so a grant can point it
+ * at the artist's own calendar; these drive the stored-secret path, which is
+ * still exactly what they were written to cover.
+ */
 vi.mock('../src/lib/googleCalendar', () => ({
   calendarConfigured: () => true,
-  createCalendarEvent: async (_env: unknown, input: { summary: string; date: string }) => {
+  targetFromEnv: async () => ({ accessToken: 'test-token', calendarId: 'test-calendar' }),
+  createEventOn: async (_t: unknown, input: { summary: string; date: string }) => {
     // A sentinel so a test can force a real Calendar failure rather than a
     // skip. An unparseable date is not a failure — it is a date we decline to
     // guess at, and it exercises a different branch entirely.
     if (input.summary.includes('BOOM')) throw new Error('calendar exploded')
-    calls.push({ op: 'create', summary: input.summary, date: input.date })
+    calls.push({ surface: 'calendar', op: 'create', summary: input.summary, date: input.date })
     return { id: `evt-${calls.length}` }
   },
-  updateCalendarEvent: async (_env: unknown, id: string, input: { summary?: string; date?: string }) => {
-    calls.push({ op: 'update', id, summary: input.summary, date: input.date })
+  updateEventOn: async (_t: unknown, id: string, input: { summary?: string; date?: string }) => {
+    calls.push({ surface: 'calendar', op: 'update', id, summary: input.summary, date: input.date })
   },
-  deleteCalendarEvent: async (_env: unknown, id: string) => {
-    calls.push({ op: 'delete', id })
+  deleteEventOn: async (_t: unknown, id: string) => {
+    calls.push({ surface: 'calendar', op: 'delete', id })
   },
 }))
 
-const { syncGigCalendar } = await import('../src/lib/gigCalendar')
-type Row = Parameters<typeof syncGigCalendar>[1]
+vi.mock('../src/lib/googleTasks', () => ({
+  createTaskOn: async (_t: unknown, input: { title: string; due: string }) => {
+    if (input.title.includes('BOOM')) throw new Error('tasks exploded')
+    calls.push({ surface: 'tasks', op: 'create', summary: input.title, date: input.due })
+    return { id: `task-${calls.length}`, status: 'needsAction' }
+  },
+  updateTaskOn: async (_t: unknown, id: string, input: { title?: string; due?: string }) => {
+    calls.push({ surface: 'tasks', op: 'update', id, summary: input.title, date: input.due })
+  },
+  // `gone` is the sentinel for a task somebody deleted in Google. Null and
+  // "completed" are the two answers this function exists to tell apart.
+  readTaskOn: async (_t: unknown, id: string) =>
+    id.includes('gone') ? null : { id, status: completed ? 'completed' : 'needsAction' },
+  deleteTaskOn: async (_t: unknown, id: string) => {
+    calls.push({ surface: 'tasks', op: 'delete', id })
+  },
+}))
+
+/** Flipped by the one test about a task somebody already ticked off. */
+let completed = false
+
+vi.mock('../src/lib/googleGrant', () => ({
+  // A tasks grant that works, so the tasks half of the reconcile is reachable
+  // without a database. The calendar half goes through the secrets path above.
+  readGrant: async (_e: unknown, _t: unknown, purpose: string) =>
+    purpose === 'tasks'
+      ? { connected: true, canDraft: true, tasksListId: 'list-1', calendarId: null }
+      : { connected: false, canDraft: false, tasksListId: null, calendarId: null },
+  accessTokenForGrant: async () => 'tasks-token',
+}))
+
+const { syncGigNudges } = await import('../src/lib/gigNudges')
+const { NUDGE_DEFAULTS } = await import('../shared/nudgeRouting')
+type Row = Parameters<typeof syncGigNudges>[1]
+
+const TODAY = '2026-09-16'
 
 function row(o: Partial<Row> = {}): Row {
   return {
@@ -109,120 +153,254 @@ function row(o: Partial<Row> = {}): Row {
     fitRationale: null, fitNotes: null,
     deadline: '2027-01-15', opensAt: '2026-11-01',
     performanceStart: null, performanceEnd: null,
+    submittedAt: null, updatedAt: `${TODAY}T00:00:00Z`,
     googleEventId: null, opensEventId: null, showEventId: null,
+    opensTaskId: null, deadlineTaskId: null, replyTaskId: null,
     ...o,
   } as Row
 }
 
 const env = {} as never
-const created = () => calls.filter((c) => c.op === 'create')
+const TENANT = 'doug' as never
 
-describe('what the calendar is allowed to say', () => {
-  beforeEach(() => { calls.length = 0 })
+/** The defaults: shows on the calendar, the work in Tasks. */
+const sync = (r: Row, prefs = NUDGE_DEFAULTS) =>
+  syncGigNudges(env, r, { tenant: TENANT, prefs, today: TODAY })
 
-  it('puts nothing on the calendar for an opportunity nobody has decided on', async () => {
-    expect(await syncGigCalendar(env, row({ status: 'discovered' }))).toEqual({})
+/** Everything to a calendar, which is what the app did before this split. */
+const ALL_CALENDAR = { ...NUDGE_DEFAULTS, deadline: 'calendar', opens: 'calendar', reply: 'off' } as const
+
+const created = (surface?: 'calendar' | 'tasks') =>
+  calls.filter((c) => c.op === 'create' && (!surface || c.surface === surface))
+
+describe('what goes on a calendar and what goes in a task list', () => {
+  beforeEach(() => { calls.length = 0; completed = false })
+
+  it('puts nothing anywhere for an opportunity nobody has decided on', async () => {
+    expect(await sync(row({ status: 'discovered' }))).toEqual({})
     expect(calls).toEqual([])
   })
 
-  it('never writes a show event just because you said you would apply', async () => {
-    // The bug this whole change exists to fix: `🎵 {name}` on the submission
-    // deadline is indistinguishable from a booked gig on a phone.
-    const patch = await syncGigCalendar(env, row({ status: 'shortlisted' }))
-    expect(patch.showEventId).toBeUndefined()
-    expect(created().map((c) => c.summary)).toEqual([
-      'Applications open — Winnipeg Folk Festival',
+  it('sends the application work to Tasks and leaves the calendar alone', async () => {
+    // The split this release exists for. A deadline is a piece of work; a
+    // calendar entry is a claim that you have to be somewhere.
+    const patch = await sync(row({ status: 'shortlisted' }))
+    expect(created('calendar')).toEqual([])
+    expect(created('tasks').map((c) => c.summary)).toEqual([
+      'Start the application — Winnipeg Folk Festival',
       'Apply by — Winnipeg Folk Festival',
     ])
-    // No emoji, no bare name — every entry says it is about applying.
-    expect(created().every((c) => /^(Applications open|Apply by) — /.test(c.summary!))).toBe(true)
+    expect(patch.opensTaskId).toBeTruthy()
+    expect(patch.deadlineTaskId).toBeTruthy()
+    expect(patch.showEventId).toBeUndefined()
   })
 
-  it('writes the show only once an agreement exists', async () => {
-    const patch = await syncGigCalendar(
-      env,
-      row({ status: 'booked', performanceStart: '2027-07-09' }),
-    )
+  it('holds the opening task back a day, so the prep exists when you look', async () => {
+    // A form that was not accepting applications yesterday has no fields to
+    // read until it is, so a task due the morning it opens sends you to an
+    // empty panel. See DEFAULT_OPENING_LEAD_DAYS.
+    await sync(row({ status: 'shortlisted', opensAt: '2026-11-01' }))
+    expect(created('tasks')[0].date).toBe('2026-11-02')
+  })
+
+  it('honours a zero lead time for a deployment whose agents run hourly', async () => {
+    await sync(row({ status: 'shortlisted' }), { ...NUDGE_DEFAULTS, openingLeadDays: 0 })
+    expect(created('tasks')[0].date).toBe('2026-11-01')
+  })
+
+  it('still puts the application work on the calendar when asked to', async () => {
+    const patch = await sync(row({ status: 'shortlisted' }), ALL_CALENDAR)
+    expect(created('tasks')).toEqual([])
+    expect(created('calendar').map((c) => c.summary)).toEqual([
+      'Start the application — Winnipeg Folk Festival',
+      'Apply by — Winnipeg Folk Festival',
+    ])
+    expect(patch.showEventId).toBeUndefined()
+  })
+
+  it('never writes a show event just because you said you would apply', async () => {
+    // The bug the entry names exist to fix: `🎵 {name}` on the submission
+    // deadline is indistinguishable from a booked gig on a phone.
+    const patch = await sync(row({ status: 'shortlisted' }), ALL_CALENDAR)
+    expect(patch.showEventId).toBeUndefined()
+    expect(created('calendar').every((c) => /^(Start the application|Apply by) — /.test(c.summary!))).toBe(true)
+  })
+
+  it('writes the show only once an agreement exists, and only to a calendar', async () => {
+    const patch = await sync(row({ status: 'booked', performanceStart: '2027-07-09' }))
     expect(patch.showEventId).toBeTruthy()
-    const show = created().find((c) => c.date === '2027-07-09')
+    const show = created('calendar').find((c) => c.date === '2027-07-09')
     // The one entry with no prefix, because it is the only one that is a gig.
     expect(show?.summary).toBe('Winnipeg Folk Festival')
+    expect(created('tasks')).toEqual([])
   })
 
   it('does not write a show for a booked gig with no date yet', async () => {
-    const patch = await syncGigCalendar(env, row({ status: 'booked', performanceStart: null }))
+    const patch = await sync(row({ status: 'booked', performanceStart: null }))
     expect(patch.showEventId).toBeUndefined()
   })
 
+  it('raises a task when the ball is back with you', async () => {
+    // `info_requested` is the state that exists because it stalls if nobody
+    // notices, so it is the one that most needs a nudge. Due today: it is not
+    // an appointment, it is a thing already waiting on you.
+    const patch = await sync(row({ status: 'info_requested' }))
+    expect(patch.replyTaskId).toBeTruthy()
+    const reply = created('tasks').find((c) => c.summary?.startsWith('Reply —'))
+    expect(reply?.date).toBe(TODAY)
+  })
+
+  it('raises one for an application that has gone quiet, dated when it went quiet', async () => {
+    // Silence is the only signal that is an absence. The due date is the day
+    // the threshold was crossed, which is in the past — an overdue task is
+    // exactly the right shape for "this should have been chased weeks ago".
+    const patch = await sync(row({ status: 'submitted', submittedAt: '2026-06-01T00:00:00Z' }))
+    expect(patch.replyTaskId).toBeTruthy()
+    expect(created('tasks').find((c) => c.summary?.startsWith('Reply —'))?.date).toBe('2026-07-16')
+  })
+
+  it('says nothing about an application that is merely waiting', async () => {
+    const patch = await sync(row({ status: 'submitted', submittedAt: `${TODAY}T00:00:00Z` }))
+    expect(patch.replyTaskId).toBeUndefined()
+  })
+
   it('tears the reminders down when you pass', async () => {
-    const patch = await syncGigCalendar(
-      env,
-      row({ status: 'passed', googleEventId: 'evt-a', opensEventId: 'evt-b' }),
+    const patch = await sync(
+      row({ status: 'passed', opensTaskId: 'task-a', deadlineTaskId: 'task-b' }),
     )
-    expect(patch).toEqual({ opensEventId: null, googleEventId: null })
-    expect(calls.map((c) => c.id).sort()).toEqual(['evt-a', 'evt-b'])
+    expect(patch).toEqual({ opensTaskId: null, deadlineTaskId: null })
+    expect(calls.map((c) => c.id).sort()).toEqual(['task-a', 'task-b'])
   })
 
   it('tears them down when they decline, too', async () => {
     // Previously only an explicit rejection cleared anything, so a gig that
     // closed any other way left its deadline on the calendar forever.
-    const patch = await syncGigCalendar(env, row({ status: 'declined', googleEventId: 'evt-a' }))
-    expect(patch.googleEventId).toBeNull()
+    const patch = await sync(row({ status: 'declined', deadlineTaskId: 'task-a' }))
+    expect(patch.deadlineTaskId).toBeNull()
+  })
+
+  it('leaves a task you already ticked off alone', async () => {
+    // Re-dating a finished chore is how an app starts nagging about work that
+    // is done. A completed task still exists, which is the only reason this
+    // can be told apart from a task somebody deleted.
+    completed = true
+    const first = row({ status: 'shortlisted' })
+    const patch = await sync(first)
+    calls.length = 0
+    await sync({ ...first, ...patch } as Row)
+    expect(calls).toEqual([])
+  })
+
+  it('forgets a task somebody deleted, rather than updating a ghost', async () => {
+    // Null from `readTaskOn` means gone. Clearing the column is what lets the
+    // next reconcile make a fresh one instead of PATCHing a 404 forever.
+    const patch = await sync(row({ status: 'shortlisted', deadlineTaskId: 'task-gone' }))
+    expect(patch.deadlineTaskId).toBeNull()
   })
 
   it('skips prose where a date should be instead of handing it to Google', async () => {
     // 26 of 34 production rows hold things like "None — rolling intake".
-    await syncGigCalendar(
-      env,
-      row({ status: 'shortlisted', deadline: 'None — rolling artist roster intake', opensAt: null }),
-    )
+    await sync(row({ status: 'shortlisted', deadline: 'None — rolling artist roster intake', opensAt: null }))
     expect(created()).toEqual([])
   })
 
   it('recovers a date buried in that prose', async () => {
-    await syncGigCalendar(
-      env,
-      row({ status: 'shortlisted', deadline: 'Applications close 2027-01-15 (rolling)', opensAt: null }),
-    )
+    await sync(row({ status: 'shortlisted', deadline: 'Applications close 2027-01-15 (rolling)', opensAt: null }))
     expect(created()).toHaveLength(1)
     expect(created()[0].date).toBe('2027-01-15')
   })
 
   it('updates rather than duplicating when the row is synced again', async () => {
-    // Reconcile, not transition: running twice must not leave two events.
+    // Reconcile, not transition: running twice must not leave two of anything.
     const first = row({ status: 'shortlisted' })
-    const patch = await syncGigCalendar(env, first)
+    const patch = await sync(first)
     calls.length = 0
-    await syncGigCalendar(env, { ...first, ...patch } as Row)
+    await sync({ ...first, ...patch } as Row)
     expect(created()).toEqual([])
     expect(calls.every((c) => c.op === 'update')).toBe(true)
   })
 
   it('gives a legacy approved row the same treatment as shortlisted', async () => {
     // Rows arriving from the research agents still say `approved`.
-    await syncGigCalendar(env, row({ status: 'approved' }))
+    await sync(row({ status: 'approved' }))
     expect(created()).toHaveLength(2)
   })
 
-  it('keeps going when one entry fails, so a Calendar blip loses at most one', async () => {
-    // The opens-at entry throws; the deadline entry after it must still land.
-    const patch = await syncGigCalendar(
-      env,
-      row({ status: 'shortlisted', name: 'BOOM Festival', deadline: '2027-01-15' }),
-    )
-    expect(patch.opensEventId).toBeUndefined()
-    expect(patch.googleEventId).toBeUndefined()
+  it('keeps going when one entry fails, so a blip loses at most one', async () => {
+    const patch = await sync(row({ status: 'shortlisted', name: 'BOOM Festival' }))
+    expect(patch.opensTaskId).toBeUndefined()
+    expect(patch.deadlineTaskId).toBeUndefined()
     // Both entries carry the name, so both throw — prove the failure is
     // contained rather than thrown, which is what a status change depends on.
     expect(created()).toEqual([])
   })
 
-  it('does not save a status change hostage to the calendar', async () => {
-    // syncGigCalendar resolving rather than rejecting is what lets the route
-    // write the row even when Google is down.
-    await expect(
-      syncGigCalendar(env, row({ status: 'shortlisted', name: 'BOOM' })),
-    ).resolves.toBeTruthy()
+  it('does not save a status change hostage to Google', async () => {
+    // Resolving rather than rejecting is what lets the route write the row
+    // even when Google is down.
+    await expect(sync(row({ status: 'shortlisted', name: 'BOOM' }))).resolves.toBeTruthy()
+  })
+})
+
+describe('the daily reconcile, which is what notices silence', () => {
+  beforeEach(() => { calls.length = 0; completed = false })
+
+  it('raises a reply task for a row nobody has touched since it went quiet', async () => {
+    // The gap this exists to close. Four of the five nudges follow from an
+    // edit; this one follows from time passing, and nothing writes to the row
+    // on the day it crosses the threshold. Waiting for an edit to notice
+    // silence is waiting for the thing silence is the absence of.
+    const { reconcileAllGigs } = await import('../src/lib/gigNudges')
+    const saved: Array<{ id: number; patch: Record<string, unknown> }> = []
+
+    const result = await reconcileAllGigs(
+      env,
+      {
+        gigs: async () => [row({ id: 7, status: 'submitted', submittedAt: '2026-06-01T00:00:00Z' })],
+        save: async (id, patch) => { saved.push({ id, patch: patch as Record<string, unknown> }) },
+      },
+      { tenant: TENANT, prefs: NUDGE_DEFAULTS, today: TODAY },
+    )
+
+    expect(result.changed).toBe(1)
+    expect(saved[0].id).toBe(7)
+    expect(saved[0].patch.replyTaskId).toBeTruthy()
+  })
+
+  it('writes nothing for a row already in the right shape', async () => {
+    // Idempotent, which is what makes running this every night affordable.
+    const { reconcileAllGigs } = await import('../src/lib/gigNudges')
+    const saved: number[] = []
+    const settled = row({ id: 8, status: 'archived' })
+
+    const result = await reconcileAllGigs(
+      env,
+      { gigs: async () => [settled], save: async (id) => { saved.push(id) } },
+      { tenant: TENANT, prefs: NUDGE_DEFAULTS, today: TODAY },
+    )
+    expect(result.changed).toBe(0)
+    expect(saved).toEqual([])
+  })
+
+  it('keeps going when one gig fails, so one bad row does not stop the sweep', async () => {
+    const { reconcileAllGigs } = await import('../src/lib/gigNudges')
+    const saved: number[] = []
+
+    const result = await reconcileAllGigs(
+      env,
+      {
+        gigs: async () => [
+          row({ id: 1, status: 'shortlisted', name: 'BOOM Festival' }),
+          row({ id: 2, status: 'shortlisted' }),
+        ],
+        save: async (id) => { saved.push(id) },
+      },
+      { tenant: TENANT, prefs: NUDGE_DEFAULTS, today: TODAY },
+    )
+    // The first writes nothing because both its entries threw; the second is
+    // reconciled normally rather than abandoned.
+    expect(saved).toEqual([2])
+    expect(result.changed).toBe(1)
   })
 })
 

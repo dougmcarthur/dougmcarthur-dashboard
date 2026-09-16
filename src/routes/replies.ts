@@ -1,3 +1,5 @@
+import { rarityIndexFor } from '../lib/termRarity'
+import { significantWords } from '../../shared/replyMatch'
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
@@ -7,7 +9,7 @@ import { gigReplies, gigCorrespondents, gigOpportunities, artistAssets } from '.
 import { scoped, withTenant, type TenantId } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
 import { gmailConfigured, type GmailEnv } from '../lib/gmail'
-import { fetchReplies, planReplyScan } from '../lib/gmailReplies'
+import { fetchReplies, planReplyScan, sentThreadIds } from '../lib/gmailReplies'
 import { recordEvent } from '../lib/notificationEvents'
 import {
   matchReply,
@@ -168,6 +170,20 @@ export async function runReplyScan(
   let skipped = 0
   const fresh: Array<{ subject: string | null; gigName: string | null; classification: string }> = []
 
+  // Measured once for the whole scan rather than per message: the question is
+  // about the mailbox, not about any one email, and the answer is cached for a
+  // month anyway. See src/lib/termRarity.ts.
+  // One search, reused for every message in the scan.
+  const sentThreads = gmailConfigured(env)
+    ? await sentThreadIds(env, plan.windowDays)
+    : new Set<string>()
+
+  const rarity = await rarityIndexFor(
+    env,
+    gigs.flatMap((g) => significantWords(g.name)),
+    new Date(),
+  )
+
   for (const message of messages) {
     const prior = byMessage.get(message.messageId)
     // A decision already made is not re-proposed. This is what makes the scan
@@ -177,7 +193,26 @@ export async function runReplyScan(
       continue
     }
 
-    const { candidates, ambiguous } = matchReply(message, gigs, bindings)
+    // Mail that says in its own headers it was not written by a person.
+    // Dropped before scoring rather than weighed, because the two signals
+    // behind this verdict are reliable by specification — a mailing list and
+    // an auto-responder both declare themselves, and an organiser's reply
+    // declares neither. See shared/bulkMail.ts.
+    //
+    // Deliberately before the resolution check above is not possible and
+    // deliberately after it is: a message somebody already decided about stays
+    // decided, whatever its headers say now.
+    if (message.automation === 'automated') {
+      skipped++
+      continue
+    }
+
+    const { candidates, ambiguous } = matchReply(
+      { ...message, inYourThread: sentThreads.has(message.threadId) },
+      gigs,
+      bindings,
+      rarity,
+    )
     const best = candidates[0]
     const classification = classifyReply(message.body)
     // Read here, not on demand: this is the only moment the whole body
@@ -207,6 +242,9 @@ export async function runReplyScan(
           gigName: cand.gigName,
           score: cand.score,
           confidence: matchConfidence(cand),
+          // Carried so the screen can say "confirmed" rather than re-deriving
+          // it from the signals and getting a different answer.
+          bound: cand.bound,
           signals: cand.signals,
         })),
       ),

@@ -13,6 +13,8 @@ import application from './routes/application'
 import taskRuns from './routes/taskRuns'
 import reminders from './routes/reminders'
 import health from './routes/health'
+import calendarConnect from './routes/calendarConnect'
+import tasksConnect, { routing as nudgeRouting } from './routes/tasksConnect'
 import notifications, { pruneNotifications } from './routes/notifications'
 import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
@@ -32,7 +34,12 @@ import { pruneAuth, readSession } from './lib/auth'
 import { actorForBearer, actorForSession, listTenants, ownerTenant } from './lib/actor'
 import { pruneEvents } from './lib/notificationEvents'
 import { pruneUsage, recordUsage } from './lib/usage'
-import type { TenantId } from './db/scope'
+import { eq } from 'drizzle-orm'
+import { getDb } from './db'
+import { gigOpportunities } from './db/schema'
+import { scoped, type TenantId } from './db/scope'
+import { reconcileAllGigs, type GigRow } from './lib/gigNudges'
+import { readNudgePreferences } from './lib/nudgeSettings'
 import type { RootEnv } from './context'
 import { originAllowed, relyingParty } from '../shared/auth'
 import { agentMayCall } from '../shared/agentRoutes'
@@ -195,6 +202,9 @@ app.route('/api/task-runs', taskRuns)
 app.route('/api/reminders', reminders)
 app.route('/api/backfill', backfill)
 app.route('/api/health', health)
+app.route('/api/calendar', calendarConnect)
+app.route('/api/tasks', tasksConnect)
+app.route('/api/nudges', nudgeRouting)
 app.route('/api/replies', replies)
 app.route('/api/notifications', notifications)
 app.route('/api/digest', digest)
@@ -348,6 +358,53 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
   } catch (err) {
     console.error('credential check failed:', err)
   }
+
+  // Bring each artist's calendar and task list back into line with their rows.
+  //
+  // Per tenant, because the plan is derived from that artist's own rows and
+  // their own preferences — there is nothing platform-level to share here, so
+  // this is genuinely one artist at a time like the marks above.
+  //
+  // It runs daily rather than on edit because one of the five nudges does not
+  // follow from an edit at all: an application crosses `NO_REPLY_DAYS` because
+  // time passed, and nothing writes to the row on the day it does. It also
+  // catches connecting Tasks for the first time and changing where a kind of
+  // reminder goes, neither of which touches a gig row. See
+  // `reconcileAllGigs`.
+  for (const tenant of tenants) {
+    try {
+      await reconcileGigNudges(env, tenant, today)
+    } catch (err) {
+      console.error('nudge reconcile failed:', err)
+    }
+  }
+}
+
+/** The daily reconcile, with its queries. See `reconcileAllGigs`. */
+async function reconcileGigNudges(env: Env, tenant: TenantId, today: string): Promise<void> {
+  const db = getDb(env.DB)
+  const prefs = await readNudgePreferences(env, tenant)
+  const { changed } = await reconcileAllGigs(
+    env,
+    {
+      gigs: async () =>
+        (await db
+          .select()
+          .from(gigOpportunities)
+          .where(scoped(gigOpportunities, tenant))) as unknown as GigRow[],
+      save: async (id, patch) => {
+        // `updated_at` is deliberately left alone. Recording where a reminder
+        // went is not a change to the gig, and touching it would wake every
+        // snooze in the table — the same rule the notes backfill follows.
+        await db
+          .update(gigOpportunities)
+          .set(patch)
+          .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
+      },
+    },
+    { tenant, prefs, today },
+  )
+  if (changed) console.log(`reconciled reminders on ${changed} gigs for ${tenant}`)
 }
 
 /**
