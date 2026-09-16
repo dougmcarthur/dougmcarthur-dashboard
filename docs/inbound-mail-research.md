@@ -1,5 +1,27 @@
 # How Scout would receive an artist's mail
 
+> **Status: parked, 2026-09-16.** The research is finished; the feature is not
+> being built. Forwarding and parsing mail costs too much right now — in time,
+> in operational surface and in money — against core features and UI that serve
+> the artist today. Nothing here is abandoned: the question is answered, the
+> options are priced, and this file is the thing that means picking it up later
+> costs a read rather than a re-derivation.
+>
+> **What would bring it back**, in the order it would bite:
+> 1. An invited artist who needs reply matching. The owner's own scan works
+>    today; nobody else's does.
+> 2. Finding the Cloud project sits in OAuth Testing status — then the owner's
+>    existing token is already dying every seven days and this is a repair, not
+>    a feature. **Worth checking in the Console regardless of this decision.**
+> 3. Submission evidence turning out to need the receipt email after all —
+>    which it should not, because the extension's confirmation page is free.
+>
+> **The shortest path when it returns**: CloudMailin's free tier for forwarded
+> mail, Cloudflare Email Routing for mail sent directly, envelope-sender
+> authentication against an address verified once against the account. Phases 7
+> and 8 hold the reasoning and the seven things that would make it wrong.
+
+
 Scout reads one mailbox today: the owner's, through one `GMAIL_REFRESH_TOKEN`
 pointing at one inbox, on the cron, three times a day. That is why the digest
 and the reply scan run for the owner's tenant only — the mailbox is platform

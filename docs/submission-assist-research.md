@@ -1,5 +1,14 @@
 # Filling an application, and how Scout would know it was sent
 
+> **Status: researched, not scheduled, 2026-09-16.** The extension is not being
+> built yet either. One piece of it is cheap and separable whenever it is
+> wanted: **pre-filled links for Google Forms**, where Scout already reads the
+> field ids, needs no extension, no store review and no new permission, and is
+> the only route that works on a phone. Airtable is the same mechanism. Every
+> other platform needs field names from the form's builder, so the rest of the
+> plan does not follow from that first step being easy.
+
+
 Phase 3 reads a form and stages an answer per field. It stops there, because
 an application filed by automation is a good way to be blacklisted. This
 document is about the step after that one: getting the staged answers *into*
