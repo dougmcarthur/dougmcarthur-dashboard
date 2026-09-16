@@ -47,10 +47,10 @@ a research output.
 | --- | --- | --- |
 | 1 | Cloudflare inbound: Email Routing, the Worker email binding, per-address and catch-all, what forwarding does to SPF/DKIM/DMARC, limits, cost | **done** |
 | 2 | Third-party inbound services, and whether Cloudflare inbound honours ARC on a forward | **done** |
-| 3 | Google side: Gmail watch/push versus polling, per-artist OAuth scopes, and what setting up an auto-forward rule actually costs a person | **running** |
-| 4 | The product pattern: how TripIt, Expensify and peers verify a forwarded message, and user-forwards versus Scout-collects | pending |
-| 5 | Pre-filled link support per form platform (the extension doc's check list, item 1) | pending |
-| 6 | Costs and store rules: Browser Rendering pricing, model-driven browser cost, Chrome Web Store policy, WXT and the ports (check list, items 2–4) | pending |
+| 3 | Google side: Gmail watch/push versus polling, per-artist OAuth scopes, and what setting up an auto-forward rule actually costs a person | **done** |
+| 4 | The product pattern: how TripIt, Expensify and peers verify a forwarded message, and user-forwards versus Scout-collects | **folded into 7** — 1b answered the first half, and the second is a decision, not a question |
+| 5 | Pre-filled link support per form platform (the extension doc's check list, item 1) | **running** |
+| 6 | Costs and store rules: Browser Rendering pricing, model-driven browser cost, Chrome Web Store policy, WXT and the ports (check list, items 2–4) | **running** |
 | 7 | Synthesis and critique — one recommendation, and what would make it wrong | pending |
 
 ## What the research found
@@ -407,4 +407,65 @@ number of grants, without the seven-day token expiry. Which state this app's
 Cloud project is actually in decides whether `GMAIL_REFRESH_TOKEN` is quietly
 living on a seven-day clock today. **Check the Cloud Console before relying on
 any of this**, and treat the two-option framing as unconfirmed.
+
+### Phase 3b — the forwarding rule is about ten steps, and cannot express what it needs to
+
+**The confirmation code is still required** in 2026, with no bypass for a new
+destination address. The flow: add the destination in Gmail's forwarding
+settings → Google mails that destination a code → open *that* inbox, take the
+code → return to the source account's settings, paste it, confirm → only then
+can "forward a copy of incoming mail" be selected → save. **Nine to eleven
+steps across two mailboxes**, then another five to seven clicks per filter.
+
+**One real shortcut exists, and it collapses back into phase 3a.** If Scout
+controls the destination it can read the confirmation code itself, so nobody
+has to fetch it. And with the `gmail.settings.sharing` scope it could create
+the forwarding address and confirm it server-side, making the whole thing
+invisible. That is a Gmail scope on the *artist's* account — so it carries the
+same verification and CASA cost as reading the mailbox, for a narrower benefit.
+The shortcut is only available to an app that has already paid the toll.
+
+**The filter cannot say what needs saying.** Gmail filters match sender,
+subject and keywords. "Anything that looks like a festival application receipt"
+is not expressible in those terms, and this repository already knows why: of
+eight real organiser replies, they came from Wufoo, Jotform, a portal, a parent
+organisation and two personal Gmail addresses. No sender-or-subject filter
+anticipates that set without being maintained by hand, forever, by the artist.
+
+Three more properties, each of which is a defect on its own:
+
+- **No history.** Forwarding applies only to mail arriving after setup.
+  Receipts already in the mailbox are invisible to it.
+- **Spam is excluded by design**, and forwarding itself can break SPF and DKIM
+  and get the forwarded copy spam-foldered at the destination. Both documented
+  by Google. This is phase 2b's finding arriving from the other direction.
+- **It stops silently.** Forwarding switching itself off is a well-reported
+  failure with no notification; the only way to find out is to reopen settings
+  and look, or to notice something never arrived.
+
+Apps Script is not an easier route: it hits the same verification gate and adds
+an unverified-app warning on top. iCloud's documentation does not describe a
+destination-verification step (unconfirmed); Outlook's is muddier.
+
+### Phase 4 is answered, and is folded into the synthesis
+
+Phase 4 was to cover how TripIt and Expensify verify a forward, and
+user-forwards versus Scout-collects. **Phase 1b answered the first** — verify
+the address once against the account, then check the envelope sender, never the
+`From` header. **The second is now a decision rather than a research
+question**, and both of its options have been priced:
+
+- **Scout collects**: six weeks of review and $500–$1,800 a year, or a token
+  that dies every seven days.
+- **The artist forwards**: ten steps, a filter that cannot express the
+  criterion, no history, and silent failure.
+
+Running a phase to compare two options that are already this well characterised
+would be spending session on a conclusion that is already available. It goes to
+phase 7 instead, where there is a third option to weigh them against — because
+the strongest thing this research has turned up is that **mail may not be the
+right instrument for the submission-evidence problem at all**, and the
+extension's confirmation-page signal is free, needs no scope, no vendor and no
+setup by the artist. That argument belongs in the synthesis, with the
+comparison in front of it.
 
