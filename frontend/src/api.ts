@@ -307,6 +307,8 @@ export interface HealthStatus {
   credentials: CredentialHealth[]
   /** The artist's own calendar grant. When connected, this is what gets used. */
   calendarGrant: CalendarGrant
+  /** The Gmail drafting grant, the other thing the artist connects themselves. */
+  gmailGrant: CalendarGrant
 }
 
 export interface CalendarGrant {

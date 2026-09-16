@@ -52,6 +52,9 @@ health.get('/', async (c) => {
     // than folded together, because "you connected this" and "somebody set a
     // secret on the server" are different claims and the card says which.
     calendarGrant: await readGrant(c.env, tenantOf(c), 'calendar'),
+    // The drafting grant, which lived only on the Sync page until the
+    // Integrations list existed. Same shape, different purpose.
+    gmailGrant: await readGrant(c.env, tenantOf(c), 'gmail.compose'),
   })
 })
 
