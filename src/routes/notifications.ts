@@ -25,6 +25,7 @@ import {
 import { calendarConfigured } from '../lib/googleCalendar'
 import { gmailConfigured } from '../lib/gmail'
 import { mailerConfigured } from '../lib/mailer'
+import { readCredentialHealth } from '../lib/credentialCheck'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
 import type { Env } from '../types'
 
@@ -113,6 +114,10 @@ export async function composeFeed(env: Env, tenant: TenantId, now = new Date()) 
       calendarConfigured: calendarConfigured(env),
       gmailConfigured: gmailConfigured(env),
       emailConfigured: mailerConfigured(env),
+      // Read, never probed. The bell is polled every five minutes and a probe
+      // spends a refresh token, so this reports what the daily cron last
+      // found rather than asking Google on every poll.
+      credentials: await readCredentialHealth(env, now),
     },
     marks,
     events,
