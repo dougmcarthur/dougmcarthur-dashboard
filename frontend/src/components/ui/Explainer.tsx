@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { useAppearance } from '../../hooks/useAppearance'
 
 /**
@@ -58,7 +58,7 @@ export interface ExplainerProps {
   /** The sentence being tucked away. Nothing renders if this is absent. */
   children?: ReactNode
   /** Heading level, or `div` for a row label that is not a heading. */
-  as?: 'h2' | 'h3' | 'div'
+  as?: 'h1' | 'h2' | 'h3' | 'div'
   /** Passed to the heading, for `aria-labelledby`. */
   id?: string
   /** Classes for the heading itself. */
@@ -86,35 +86,34 @@ export function Explainer({
 }: ExplainerProps) {
   const [open, setOpen] = useState(false)
   const panelId = useId()
-  const wrap = useRef<HTMLDivElement>(null)
   const { appearance } = useAppearance()
   // Read after the hooks above, never before: bailing out early would change
   // how many hooks this component calls between renders.
   const offered = appearance.showHints && Boolean(children)
 
-  // Escape closes, and a click anywhere else closes. Both are listened for
-  // only while something is open, so a page of twenty of these costs nothing
-  // until one is used.
+  // Escape closes. Clicking elsewhere deliberately does *not*, and that is the
+  // difference between this and a popover: a panel that floats over the page
+  // has to get out of the way of the next click, and one that expands in place
+  // is obstructing nothing, so closing it would be taking something away for
+  // no reason. It also cost the thing this component claims to allow — a
+  // click-away handler closes the previous panel, so two could never be open,
+  // and comparing two settings is exactly when you want both.
+  //
+  // Listened for only while something is open, so a page of twenty of these
+  // costs nothing until one is used.
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
-    const onDown = (e: MouseEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false)
-    }
     document.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onDown)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.removeEventListener('mousedown', onDown)
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [open])
 
   const name = titleText ?? (typeof title === 'string' ? title : '')
 
   return (
-    <div ref={wrap}>
+    <div>
       <div className="flex flex-wrap items-center gap-1.5">
         <Tag id={id} className={titleClassName}>
           {title}

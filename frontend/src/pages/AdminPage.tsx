@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button'
 import { Disclosure } from '../components/ui/Disclosure'
 import { InvitesPanel } from '../components/InvitesPanel'
 import { relativeTime, shortDate } from '../format'
+import { Explainer } from '../components/ui/Explainer'
 
 /**
  * The oversight surface: who is on the platform, and what their account costs.
@@ -42,11 +43,11 @@ export function AdminPage() {
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-xl font-semibold text-ink tracking-tight">Artists</h1>
-        <p className="text-sm text-muted">
+        <Explainer as="h1" title="Artists" titleClassName="text-xl font-semibold text-ink tracking-tight">
           Everyone on the platform, how long they have been here, and how much they are
-          storing. Nothing on this screen can open their work.
-        </p>
+          storing. Nothing on this screen can open their work. Storage figures are sampled once
+          a day by the overnight job, so a brand-new account shows nothing until tomorrow.
+        </Explainer>
       </header>
 
       {items.length === 0 ? (
@@ -58,11 +59,6 @@ export function AdminPage() {
           ))}
         </ul>
       )}
-
-      <p className="text-xs text-faint">
-        Storage figures are sampled once a day by the overnight job, so a brand-new account
-        shows nothing until tomorrow.
-      </p>
 
       {/* Should always read "every row has an owner". It is here because the
           schema does not yet enforce it — see migration 0024 — and a claim

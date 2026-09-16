@@ -4,6 +4,7 @@ import { api, type ReconcilePreview, type ReconcileResult } from '../api'
 import { StatusBadge } from './StatusBadge'
 import { PitchDiff } from './PitchDiff'
 import { Button } from './ui/Button'
+import { Explainer } from './ui/Explainer'
 
 type LearnChoice = 'keep' | 'learn'
 
@@ -191,12 +192,9 @@ export function ReconcilePanel({ onClose }: { onClose: () => void }) {
     <div className="bg-surface border border-line rounded-xl shadow-card overflow-hidden">
       {/* Panel header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-line">
-        <div>
-          <h2 className="text-sm font-semibold text-ink">Gmail Reconciliation</h2>
-          <p className="text-xs text-muted mt-0.5">
-            Check sent mail against sync targets — update statuses and learn from your edits.
-          </p>
-        </div>
+        <Explainer as="h2" title="Gmail Reconciliation">
+          Check sent mail against sync targets — update statuses and learn from your edits.
+        </Explainer>
         <button onClick={onClose} className="text-muted hover:text-body text-lg leading-none">×</button>
       </div>
 

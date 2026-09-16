@@ -463,11 +463,16 @@ describe('an explanation is offered, never imposed', () => {
     expect(explainer).toContain('onClick')
   })
 
-  it('can be closed from the keyboard and by clicking away', () => {
-    // A panel with no way out but the button that opened it is a panel people
-    // leave open, and these sit inline where an open one shifts the layout.
+  it('closes on Escape, and deliberately not on a click elsewhere', () => {
+    // The difference between this and a popover. One that floats over the page
+    // has to get out of the way of the next click; one that expands in place
+    // obstructs nothing, so closing it would take something away for no
+    // reason. A click-away handler also closes the *previous* panel, so two
+    // could never be open — and comparing two settings is exactly when you
+    // want both. That was the shipped behaviour until a browser run caught it
+    // contradicting the comment above it.
     expect(explainer).toContain("'Escape'")
-    expect(explainer).toContain('mousedown')
+    expect(explainer).not.toContain('mousedown')
   })
 
   it('says whether it is open, so it is not a mystery to a screen reader', () => {

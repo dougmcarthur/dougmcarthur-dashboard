@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { SUBMISSION_METHODS } from './constants'
 import { performanceDateProblem } from '../../../../shared/performance'
 import { TRAVEL_BANDS, LODGING_TIERS } from '../../../../shared/gigCost'
+import { Explainer } from '../../components/ui/Explainer'
 
 /** Editing an existing row in place, inside its expanded table row. */
 export function EditGigPanel({
@@ -149,10 +150,9 @@ export function EditGigPanel({
           show, and they are the only ones the calendar writes as an event.
         */}
         <div className="col-span-2 pt-1">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide">Performance dates</p>
-          <p className="text-xs text-faint mt-0.5">
+          <Explainer as="div" title="Performance dates" titleClassName="text-xs font-semibold text-muted uppercase tracking-wide">
             When you are on stage. Goes on your calendar once this is booked, and not before.
-          </p>
+          </Explainer>
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">First day</label>
@@ -173,11 +173,10 @@ export function EditGigPanel({
           estimate with its gaps on screen instead of a confident wrong number.
         */}
         <div className="col-span-2 pt-1">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide">The trip</p>
-          <p className="text-xs text-faint mt-0.5">
-            What it costs to get there. Leave a band empty and it is guessed from the location, and
-            labelled as guessed.
-          </p>
+          <Explainer as="div" title="The trip" titleClassName="text-xs font-semibold text-muted uppercase tracking-wide">
+            What it costs to get there. Every field is optional. Leave a band empty and it is
+            guessed from the location, and labelled as guessed.
+          </Explainer>
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Where</label>

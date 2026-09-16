@@ -12,6 +12,7 @@ import { FILTER } from '../components/ui/Field'
 import { AssetRow } from './artist/AssetRow'
 import { AssetForm } from './artist/AssetForm'
 import { SourcePanel } from './artist/SourcePanel'
+import { Explainer } from '../components/ui/Explainer'
 
 const AUDIENCES: Array<{ id: EpkAudience; label: string; blurb: string }> = [
   { id: 'festival', label: 'Festival', blurb: 'Live video, stage plot, the practical facts.' },
@@ -78,10 +79,9 @@ export function ArtistPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-ink tracking-tight">Artist</h1>
-          <p className="text-sm text-muted mt-0.5">
+          <Explainer as="h1" title="Artist" titleClassName="text-2xl font-bold text-ink tracking-tight">
             Everything a programmer could ask for, so no application starts from a blank page.
-          </p>
+          </Explainer>
         </div>
         <div className="flex items-center gap-2">
           <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)} className={FILTER}>
