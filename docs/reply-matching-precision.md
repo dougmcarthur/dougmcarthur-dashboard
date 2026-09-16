@@ -357,7 +357,47 @@ cache is monthly and platform-level, which is the same reasoning the reply scan
 already uses: one refresh token, one mailbox, one answer to "how common is this
 word". It moves with the scan when a second artist has a mailbox of their own.
 
-Two things this does not touch, both still open: the quoted receipt underneath
-a reply is still read when matching (stage 6), and nothing yet checks
-`In-Reply-To` against the artist's own sent mail, which is the strongest signal
-available and needs no new permission.
+Two things it did not touch at the time, both since closed by stages 5 and 6
+below: reading the quoted receipt, and checking the artist's own sent mail.
+
+### Stage 5 landed as arithmetic, not as a rule
+
+`List-Unsubscribe`, `Feedback-ID` and `Precedence: bulk` are worth **−20**, and
+the thumb on the scale is the whole design. A lone weak lead — one rare word in
+a body, 26 points — falls under the bar and disappears, which is the newsletter
+case. A message naming the application in its subject scores 50 and is untouched,
+which is the acceptance letter that happened to go out through Mailchimp. The
+two cases want opposite treatment and a filter can only give them the same one.
+
+The negative is added in `scoreGig` only when something already matched, so it
+can sink a candidate but never invent one, and never drive a score below what
+having no signal at all would produce.
+
+The signal that pulls the other way arrived with it: **`replied: 24`** for a
+message in a thread the artist has sent to. That is the `In-Reply-To` idea from
+the research, resolved the cheap way — `sentThreadIds` runs one
+`in:sent newer_than:Nd` search per scan and hands the matcher a set of thread
+ids. No new scope, one extra request for the whole scan, and it needs no header
+parsing. A bulk-marked message in your own thread nets +4 over a plain one,
+which is the right answer: you wrote to them, and they replied through a
+platform.
+
+### Stage 6 was already true, and the comment above it was the bug
+
+The plan said to compute classification and the ask reading from the top post
+only. `classifyReply` already did. `recogniseAsks` already did too — it opens
+with `stripQuoted` and has since it shipped — but its doc comment said the
+opposite in so many words: *"Runs over the whole body at scan time — unlike
+classification."*
+
+So the change is a corrected comment and three tests, and that is a better
+outcome than the code change would have been. The hazard here was never the
+code: it was that the only written record of this function's behaviour said it
+did the dangerous thing, so the next person to read it either trusts a false
+statement or "fixes" working code. `test/replyPrecision.test.ts` now pins all
+three cases — asks found when the sender makes them, none found under a `>`
+prefix, and none found under an unprefixed `On … wrote:` block, since the
+marker line is what ends the top post rather than the angle bracket.
+
+Matching still reads the whole body, deliberately and unchanged: the quoted
+receipt is often the only place the festival is named.

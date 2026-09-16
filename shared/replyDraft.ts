@@ -120,9 +120,14 @@ const REQUEST_SHAPE =
 /**
  * What the organiser asked for.
  *
- * Runs over the whole body at scan time — unlike classification, which reads
- * only the top post. An ask can sit under a greeting, in a list, or three
- * paragraphs down, and none of those is the quoted receipt underneath.
+ * Runs at scan time, because that is the only moment the whole body exists —
+ * but over the *top post*, like classification and unlike matching. An ask
+ * can sit under a greeting, in a list, or three paragraphs down, and all of
+ * those are things this sender wrote. What sits under the quote marker is
+ * usually the mail you sent *them*, quoted back: reading "could you send a
+ * stage plot" out of your own application produces a request nobody made.
+ * Matching reads the whole body for the opposite reason — the quoted receipt
+ * is often the only place the festival is named.
  */
 export function recogniseAsks(body: string): AskReading {
   const text = stripQuoted(body)

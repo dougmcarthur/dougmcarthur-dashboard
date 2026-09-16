@@ -34,6 +34,7 @@
  * Pure, like everything in shared/. Nothing here reads the clock or the network.
  */
 
+import type { AutomationTier } from './bulkMail'
 import { rarityLookup, rarestWord, weigh, type Rarity, type RarityIndex } from './termRarity'
 import { normaliseGigStatus } from './gigStatus'
 
@@ -285,6 +286,22 @@ export interface ReplyMessage {
   body: string
   /** ISO datetime. */
   receivedAt: string
+  /**
+   * What the headers said about whether a person wrote this
+   * (`shared/bulkMail.ts`). `automated` never reaches here — the scan drops
+   * it — but `bulk` does, deliberately, to be weighed rather than excluded.
+   */
+  automation?: AutomationTier
+  /**
+   * Whether this message sits in a thread the artist has written in.
+   *
+   * Gmail's own threading answers it: one search of Sent mail gives the set of
+   * threads they took part in. It says nothing about *which* gig, so it is
+   * worth the same to every candidate — but a stranger's marketing is not in a
+   * conversation you started, which is exactly the corroboration a lone rare
+   * word was missing.
+   */
+  inYourThread?: boolean
 }
 
 export interface MatchableGig {
@@ -304,7 +321,7 @@ export interface Binding {
   value: string
 }
 
-export type SignalId = 'thread' | 'address' | 'name' | 'domain' | 'organizer' | 'relay'
+export type SignalId = 'thread' | 'address' | 'name' | 'domain' | 'organizer' | 'relay' | 'replied' | 'bulk'
 
 export interface MatchSignal {
   id: SignalId
@@ -336,6 +353,22 @@ const POINTS = {
   domain: 30,
   organizer: 12,
   relay: 12,
+  /**
+   * A thread the artist wrote in. Enough to lift a genuine lead over the bar
+   * beside one other signal, and not enough to put anything there on its own —
+   * being in a conversation says nothing about which application it concerns.
+   */
+  replied: 24,
+  /**
+   * Bulk mail, as a subtraction.
+   *
+   * Never an exclusion, for the reason `shared/bulkMail.ts` gives at length: a
+   * festival that mails through a platform is still a festival, and its
+   * acceptance letter carries the same headers a newsletter does. Sized to sink
+   * a lone weak lead without touching a message that names the application
+   * outright — which is the case where being bulk is beside the point.
+   */
+  bulk: -20,
 } as const
 
 /**
@@ -490,6 +523,25 @@ function scoreGig(
     if (org.length >= 5 && squash(hay).includes(org)) {
       signals.push({ id: 'organizer', points: POINTS.organizer, detail: `Names the organiser, ${gig.organizer}.` })
     }
+  }
+
+  // About the message rather than about this gig, so every candidate gets the
+  // same answer. Added only where something else already pointed here: on its
+  // own, "you have written in this thread" identifies no application at all.
+  if (message.inYourThread && signals.length > 0) {
+    signals.push({
+      id: 'replied',
+      points: POINTS.replied,
+      detail: 'Part of a conversation you took part in.',
+    })
+  }
+
+  if (message.automation === 'bulk' && signals.length > 0) {
+    signals.push({
+      id: 'bulk',
+      points: POINTS.bulk,
+      detail: 'Sent as bulk mail, which an organiser writing to you personally would not be.',
+    })
   }
 
   const score = signals.reduce((n, s) => n + s.points, 0)

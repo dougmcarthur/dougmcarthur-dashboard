@@ -131,3 +131,106 @@ describe('how strong a match is, said out loud', () => {
     }
   })
 })
+
+// ── Stages 5 and 6, and the corroboration that replaced stage 4 ──────────────
+
+import { matchReply, MATCH_THRESHOLD as BAR, type MatchableGig, type ReplyMessage } from '../shared/replyMatch'
+import type { RarityIndex } from '../shared/termRarity'
+import { recogniseAsks } from '../shared/replyDraft'
+
+const RARITY: RarityIndex = { corpusSize: 12000, counts: { winnipeg: 2400, sofar: 9, sounds: 300 } }
+const GIGS = [
+  { id: 10, name: 'Sofar Sounds Winnipeg — Artist Application', status: 'shortlisted', url: null, organizer: null, submittedAt: '2026-08-01' },
+] as unknown as MatchableGig[]
+
+const msg = (over: Partial<ReplyMessage>): ReplyMessage =>
+  ({
+    messageId: 'm', threadId: 't', from: 'x@example.com', subject: 'hello',
+    body: 'A note about Sofar.', receivedAt: '2026-09-16T00:00:00Z', ...over,
+  }) as ReplyMessage
+
+describe('bulk mail is weighed, never excluded', () => {
+  it('sinks a lone weak lead', () => {
+    const plain = matchReply(msg({}), GIGS, [], RARITY).candidates[0]
+    expect(plain.score).toBeGreaterThanOrEqual(BAR)
+
+    const bulk = matchReply(msg({ automation: 'bulk' }), GIGS, [], RARITY)
+    expect(bulk.candidates).toEqual([])
+  })
+
+  it('does not touch a message that names the application outright', () => {
+    // The whole reason this is a weight: a festival mailing through a platform
+    // is still a festival, and its acceptance letter carries the same headers
+    // a newsletter does.
+    const r = matchReply(
+      msg({ subject: 'Sofar Sounds Winnipeg — Artist Application', automation: 'bulk' }),
+      GIGS, [], RARITY,
+    )
+    expect(r.candidates[0]).toBeTruthy()
+    expect(r.candidates[0].score).toBeGreaterThanOrEqual(BAR)
+  })
+
+  it('never invents a candidate out of a penalty', () => {
+    // Nothing pointed at this gig, so there is nothing to subtract from.
+    const r = matchReply(msg({ body: 'entirely unrelated', automation: 'bulk' }), GIGS, [], RARITY)
+    expect(r.candidates).toEqual([])
+  })
+})
+
+describe('a thread you wrote in corroborates, and identifies nothing', () => {
+  it('lifts a genuine lead and makes it read as more than one reason', () => {
+    const r = matchReply(msg({ inYourThread: true }), GIGS, [], RARITY)
+    expect(r.candidates[0].signals.map((s) => s.id)).toContain('replied')
+    expect(r.candidates[0].signals.length).toBeGreaterThan(1)
+  })
+
+  it('puts nothing in the queue on its own', () => {
+    // Being in a conversation says nothing about which application it is about.
+    const r = matchReply(msg({ body: 'entirely unrelated', inYourThread: true }), GIGS, [], RARITY)
+    expect(r.candidates).toEqual([])
+  })
+
+  it('rescues nothing that bulk sank, which is the right order', () => {
+    const r = matchReply(msg({ inYourThread: true, automation: 'bulk' }), GIGS, [], RARITY)
+    // 26 rare word + 24 thread − 20 bulk = 30, still a lead. Recorded because
+    // the arithmetic is the design: bulk is a thumb on the scale, not a veto.
+    expect(r.candidates[0]?.score).toBe(30)
+  })
+})
+
+describe('an ask quoted back at you is not an ask', () => {
+  // `recogniseAsks` has stripped the quote since it shipped; its doc comment
+  // said the opposite, which is why this needed checking rather than reading.
+  // Pinned here because the comment was the only record and it was wrong.
+  const topPost = 'Thanks — we have everything we need.'
+  const quoted = [
+    'On Tue, 2 Sep 2026, Doug McArthur wrote:',
+    '> Could you please send a stage plot and a press photo?',
+  ].join('\n')
+
+  it('finds the asks when the sender is the one making them', () => {
+    const reading = recogniseAsks('Could you please send a stage plot and a press photo?')
+    expect(reading.asks.length).toBeGreaterThan(0)
+  })
+
+  it('finds none of them under a quote marker', () => {
+    const reading = recogniseAsks([topPost, '', quoted].join('\n'))
+    expect(reading.asks).toEqual([])
+    // And the only sentence it weighed at all was the one they wrote.
+    expect(reading.unrecognised).toEqual([topPost])
+  })
+
+  it('stops at the marker, not at the angle bracket', () => {
+    // Plenty of clients quote without prefixing a thing. The marker line is
+    // what ends the top post, so an unprefixed quote is stripped as well.
+    const reading = recogniseAsks(
+      [
+        topPost,
+        '',
+        'On Tue, 2 Sep 2026, Doug McArthur wrote:',
+        'Could you please send a stage plot and a press photo?',
+      ].join('\n'),
+    )
+    expect(reading.asks).toEqual([])
+  })
+})

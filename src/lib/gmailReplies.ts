@@ -221,7 +221,8 @@ export interface FetchedReply extends ReplyMessage {
    * kept and weighed, because a festival that mails through a platform is
    * still a festival.
    */
-  automation: AutomationVerdict
+  /** The full verdict, reasons included — the tier alone is what scoring reads. */
+  automationVerdict: AutomationVerdict
   snippet: string
 }
 
@@ -278,6 +279,9 @@ export async function fetchReplies(
       const header = (name: string) =>
         headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? ''
       const { address, name } = parseFrom(header('from'))
+      const verdict = automationVerdict(
+        Object.fromEntries(headers.map((h) => [h.name.toLowerCase(), h.value])),
+      )
       return {
         messageId: d.id,
         threadId: d.threadId,
@@ -287,9 +291,8 @@ export async function fetchReplies(
         body: extractPlainText(d.payload),
         receivedAt: new Date(Number(d.internalDate)).toISOString(),
         inSpam: (d.labelIds ?? []).includes('SPAM'),
-        automation: automationVerdict(
-          Object.fromEntries(headers.map((h) => [h.name.toLowerCase(), h.value])),
-        ),
+        automationVerdict: verdict,
+        automation: verdict.tier,
         snippet: d.snippet ?? '',
       }
     })
@@ -297,3 +300,47 @@ export async function fetchReplies(
 }
 
 export { decodeBase64 }
+
+/**
+ * The threads the artist has written in, inside the scan's window.
+ *
+ * The strongest signal available for "is this a reply to something I actually
+ * sent" is `In-Reply-To` matched against your own `Message-ID`s (RFC 5322
+ * §3.6.4) — and Gmail answers the same question more cheaply, because it has
+ * already done the threading. One search of Sent mail gives the thread ids;
+ * an inbound message in one of them is part of a conversation you took part in.
+ *
+ * What it is worth is limited and worth being precise about. **It says nothing
+ * about which application a message concerns**, so it corroborates rather than
+ * identifies, and `scoreGig` only counts it where something else already
+ * pointed at a gig. It is also silent for the common case: most applications
+ * begin at a web form, so the receipt arrives in a thread of its own and this
+ * returns nothing. That makes it a large positive where it fires and never a
+ * filter — a message not in one of these threads is not thereby suspicious.
+ */
+export async function sentThreadIds(
+  env: GmailEnv,
+  windowDays: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Set<string>> {
+  const out = new Set<string>()
+  try {
+    const token = await accessToken(env, fetchImpl)
+    const params = new URLSearchParams({
+      q: `in:sent newer_than:${windowDays}d`,
+      maxResults: '200',
+    })
+    const res = await fetchImpl(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    if (!res.ok) return out
+    const { messages = [] } = await res.json<{ messages?: Array<{ threadId: string }> }>()
+    for (const m of messages) out.add(m.threadId)
+  } catch (err) {
+    // Precision, not correctness: without this the matcher scores as it did
+    // before the signal existed.
+    console.error('sent thread lookup failed:', err)
+  }
+  return out
+}
