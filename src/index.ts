@@ -13,6 +13,7 @@ import application from './routes/application'
 import taskRuns from './routes/taskRuns'
 import reminders from './routes/reminders'
 import health from './routes/health'
+import calendarConnect from './routes/calendarConnect'
 import notifications, { pruneNotifications } from './routes/notifications'
 import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
@@ -195,6 +196,7 @@ app.route('/api/task-runs', taskRuns)
 app.route('/api/reminders', reminders)
 app.route('/api/backfill', backfill)
 app.route('/api/health', health)
+app.route('/api/calendar', calendarConnect)
 app.route('/api/replies', replies)
 app.route('/api/notifications', notifications)
 app.route('/api/digest', digest)

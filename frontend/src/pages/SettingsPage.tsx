@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, type ReferenceDoc, type CredentialHealth, type CredentialState } from '../api'
+import { api, type ReferenceDoc, type CredentialHealth, type CredentialState, type CalendarGrant } from '../api'
 import { STATE_LABELS, STATE_NOTES, needsAttention } from '../../../shared/credentialHealth'
 import { AppearanceSettings } from '../components/AppearanceSettings'
 import { DigestSettingsCard } from '../components/DigestSettingsCard'
@@ -120,6 +120,105 @@ function IntegrationCard({
   )
 }
 
+/**
+ * The calendar, which has two ways in that answer differently.
+ *
+ * `GOOGLE_REFRESH_TOKEN` and `GOOGLE_CALENDAR_ID` are the old path — obtained
+ * at a terminal, stored with `wrangler secret put`, and never actually set in
+ * production, which is why every booked gig has silently created no event. A
+ * grant is the artist's own: one button, consent in their browser, nothing to
+ * paste.
+ *
+ * When a grant exists it is what gets used, so it is what this card shows. The
+ * secrets view is only the fallback, and only when there is no grant.
+ */
+function CalendarCard({
+  grant,
+  health,
+  missingSecrets,
+  now,
+}: {
+  grant: CalendarGrant | undefined
+  health: CredentialHealth | undefined
+  missingSecrets: string[] | undefined
+  now: number
+}) {
+  const queryClient = useQueryClient()
+  const disconnect = useMutation({
+    mutationFn: api.calendar.disconnect,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['health'] }),
+  })
+
+  if (grant?.connected) {
+    const state: CredentialState = grant.canDraft ? 'working' : 'rejected'
+    return (
+      <div className="bg-surface border border-line rounded-xl shadow-card p-4">
+        <div className="flex flex-col items-start gap-1.5 mb-2">
+          <h3 className="text-sm font-semibold text-ink">Google Calendar</h3>
+          <StatusPill state={state} />
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted">
+            {grant.canDraft
+              ? 'Booked gigs, deadlines and opening dates go to a calendar Scout made in your account.'
+              : 'Google did not grant the calendar permission. Connect again and approve it.'}
+          </p>
+          {grant.accountEmail ? (
+            <p className="text-xs text-muted break-words">Connected as {grant.accountEmail}</p>
+          ) : null}
+          <p className="text-xs text-faint">
+            Scout can only see the calendar it made. It cannot read the rest of your calendar.
+          </p>
+          <div className="pt-1">
+            <Button variant="quiet" onClick={() => disconnect.mutate()} disabled={disconnect.isPending}>
+              {disconnect.isPending ? 'Disconnecting…' : 'Disconnect'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // No grant. Offer one, and fall back to describing the secrets path only if
+  // somebody has configured it.
+  const secretsWork = health?.state === 'working'
+  return (
+    <div className="bg-surface border border-line rounded-xl shadow-card p-4">
+      <div className="flex flex-col items-start gap-1.5 mb-2">
+        <h3 className="text-sm font-semibold text-ink">Google Calendar</h3>
+        <StatusPill state={secretsWork ? 'working' : 'unconfigured'} />
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-xs text-muted">
+          {secretsWork
+            ? 'Configured on the server. Connecting your own account replaces that and needs nothing pasted.'
+            : 'Nothing is writing gig dates to a calendar. Connect one and Scout will keep it in step.'}
+        </p>
+        <p className="text-xs text-faint">
+          Scout makes its own calendar in your Google account and can only write there — it cannot
+          read the rest of your calendar.
+        </p>
+        {!secretsWork && missingSecrets?.length ? (
+          <p className="text-xs text-faint">
+            The server route wants {missingSecrets.join(' and ')}, which nothing has set.
+          </p>
+        ) : null}
+        <div className="pt-1">
+          {grant?.configured ? (
+            <Button variant="primary" onClick={() => { window.location.href = api.calendar.connectUrl }}>
+              Connect with Google
+            </Button>
+          ) : (
+            <p className="text-xs text-muted">
+              Connecting is unavailable until the deployment has Google client credentials.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function IntegrationCards() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({
@@ -148,11 +247,10 @@ function IntegrationCards() {
   return (
     <div className="space-y-3">
       <div className="grid gap-4 sm:grid-cols-2">
-        <IntegrationCard
-          title="Google Calendar"
+        <CalendarCard
+          grant={data?.calendarGrant}
           health={byId.get('calendar')}
           missingSecrets={data?.calendarMissingSecrets}
-          working="Gig approvals create Calendar events automatically."
           now={now}
         />
         <IntegrationCard

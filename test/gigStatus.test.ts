@@ -81,9 +81,17 @@ describe('settled and submitted are different questions', () => {
 
 const calls: Array<{ op: string; id?: string; summary?: string; date?: string }> = []
 
+/**
+ * The seam moved when a connected calendar arrived: the three calls take a
+ * `{ accessToken, calendarId }` target now rather than deriving both from
+ * `env`, so a grant can point them at the artist's own calendar. These tests
+ * drive the stored-secret path — `syncGigCalendar` with no tenant — which is
+ * still exactly what they were written to cover.
+ */
 vi.mock('../src/lib/googleCalendar', () => ({
   calendarConfigured: () => true,
-  createCalendarEvent: async (_env: unknown, input: { summary: string; date: string }) => {
+  targetFromEnv: async () => ({ accessToken: 'test-token', calendarId: 'test-calendar' }),
+  createEventOn: async (_target: unknown, input: { summary: string; date: string }) => {
     // A sentinel so a test can force a real Calendar failure rather than a
     // skip. An unparseable date is not a failure — it is a date we decline to
     // guess at, and it exercises a different branch entirely.
@@ -91,10 +99,10 @@ vi.mock('../src/lib/googleCalendar', () => ({
     calls.push({ op: 'create', summary: input.summary, date: input.date })
     return { id: `evt-${calls.length}` }
   },
-  updateCalendarEvent: async (_env: unknown, id: string, input: { summary?: string; date?: string }) => {
+  updateEventOn: async (_target: unknown, id: string, input: { summary?: string; date?: string }) => {
     calls.push({ op: 'update', id, summary: input.summary, date: input.date })
   },
-  deleteCalendarEvent: async (_env: unknown, id: string) => {
+  deleteEventOn: async (_target: unknown, id: string) => {
     calls.push({ op: 'delete', id })
   },
 }))

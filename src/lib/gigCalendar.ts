@@ -1,13 +1,48 @@
 import {
-  createCalendarEvent,
-  updateCalendarEvent,
-  deleteCalendarEvent,
+  createEventOn,
+  updateEventOn,
+  deleteEventOn,
+  targetFromEnv,
   calendarConfigured,
+  type CalendarTarget,
 } from './googleCalendar'
+import { accessTokenForGrant, readGrant } from './googleGrant'
+import type { TenantId } from '../db/scope'
 import { normaliseGigStatus } from '../../shared/gigStatus'
 import { splitDeadline } from '../../shared/reviewParse'
 import { showSpan } from '../../shared/performance'
 import type { Env } from '../types'
+
+/**
+ * Which calendar this artist's events go to, and what may write them.
+ *
+ * Two ways in, and the order is the point. A **grant** the artist made in
+ * their browser wins: it carries its own token and its own calendar, and it
+ * needs nothing set at a terminal. The **Worker secrets** are the older path,
+ * kept because a deployment already configured that way must not break — the
+ * same "read both spellings" move `normaliseGigStatus` makes for statuses.
+ *
+ * Null means neither is available, which is a perfectly ordinary state: it is
+ * what every gig has silently hit since the calendar shipped, because the
+ * secrets were never set in production.
+ */
+export async function calendarTarget(env: Env, tenant: TenantId | null): Promise<CalendarTarget | null> {
+  if (tenant) {
+    const grant = await readGrant(env, tenant, 'calendar')
+    if (grant.connected && grant.calendarId && grant.canDraft) {
+      try {
+        return { accessToken: await accessTokenForGrant(env, tenant, 'calendar'), calendarId: grant.calendarId }
+      } catch (err) {
+        // A refused grant is not a reason to fall back to somebody else's
+        // calendar: the artist connected one, and writing to the owner's
+        // instead would be worse than writing nowhere.
+        console.error('calendar grant unusable:', err)
+        return null
+      }
+    }
+  }
+  return calendarConfigured(env) ? targetFromEnv(env) : null
+}
 
 /**
  * What the calendar is allowed to say about an opportunity.
@@ -99,8 +134,10 @@ function dateOf(raw: string | null): string | null {
 export async function syncGigCalendar(
   env: Env,
   row: GigRow,
+  tenant: TenantId | null = null,
 ): Promise<CalendarPatch> {
-  if (!calendarConfigured(env)) return {}
+  const target = await calendarTarget(env, tenant)
+  if (!target) return {}
 
   const patch: CalendarPatch = {}
   const description = describe(row)
@@ -152,7 +189,7 @@ export async function syncGigCalendar(
 
     try {
       if (w.date && !existing) {
-        const event = await createCalendarEvent(env, {
+        const event = await createEventOn(target, {
           summary: w.summary,
           description,
           date: w.date,
@@ -161,13 +198,13 @@ export async function syncGigCalendar(
         })
         patch[w.field] = event.id
       } else if (w.date && existing) {
-        await updateCalendarEvent(env, existing, {
+        await updateEventOn(target, existing, {
           summary: w.summary,
           date: w.date,
           endDateExclusive: w.endDateExclusive ?? undefined,
         })
       } else if (!w.date && existing) {
-        await deleteCalendarEvent(env, existing)
+        await deleteEventOn(target, existing)
         patch[w.field] = null
       }
     } catch (err) {
@@ -182,12 +219,17 @@ export async function syncGigCalendar(
 }
 
 /** Everything this gig owns, for deletion. */
-export async function removeGigCalendar(env: Env, row: Partial<GigRow>): Promise<void> {
-  if (!calendarConfigured(env)) return
+export async function removeGigCalendar(
+  env: Env,
+  row: Partial<GigRow>,
+  tenant: TenantId | null = null,
+): Promise<void> {
+  const target = await calendarTarget(env, tenant)
+  if (!target) return
   for (const id of [row.googleEventId, row.opensEventId, row.showEventId]) {
     if (!id) continue
     try {
-      await deleteCalendarEvent(env, id)
+      await deleteEventOn(target, id)
     } catch (err) {
       console.error('calendar delete failed:', err)
     }

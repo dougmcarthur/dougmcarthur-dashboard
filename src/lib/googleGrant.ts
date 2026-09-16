@@ -28,13 +28,55 @@ import { scoped, withTenant, type TenantId } from '../db/scope'
 import type { Env } from '../types'
 
 export const GMAIL_COMPOSE_SCOPE = 'https://www.googleapis.com/auth/gmail.compose'
-export const GRANT_PURPOSE = 'gmail.compose'
+
+/**
+ * The narrowest calendar scope that can do the job: "make secondary Google
+ * calendars, and see, create, change, and delete events" — on the calendars
+ * *this app made*, and nowhere else.
+ *
+ * That is the opposite of the compromise above. `gmail.compose` had to permit
+ * sending because Google offers nothing narrower, so the promise that nothing
+ * goes out on its own is kept by this code rather than by the permission.
+ * Here Google does the enforcing: Scout cannot read the artist's own calendar
+ * and cannot touch an event it did not create, whatever this code does.
+ *
+ * It is also what removes the configuration. `GOOGLE_CALENDAR_ID` existed
+ * because somebody had to decide which calendar to write to; under this scope
+ * there is only one Scout can reach, and it makes it itself.
+ */
+export const CALENDAR_APP_SCOPE = 'https://www.googleapis.com/auth/calendar.app.created'
+
+/**
+ * Grants are keyed by purpose so revoking one does not revoke the others —
+ * disconnecting drafting must not blind the reply matcher, and neither should
+ * touch the calendar.
+ */
+export type GrantPurpose = 'gmail.compose' | 'calendar'
+
+export const GRANT_PURPOSES: GrantPurpose[] = ['gmail.compose', 'calendar']
+
+/** The purpose `gmailDrafts.ts` has always meant, named so its callers read. */
+export const GRANT_PURPOSE: GrantPurpose = 'gmail.compose'
+
+const SCOPE_FOR: Record<GrantPurpose, string> = {
+  'gmail.compose': GMAIL_COMPOSE_SCOPE,
+  calendar: CALENDAR_APP_SCOPE,
+}
+
+export function scopeFor(purpose: GrantPurpose): string {
+  return SCOPE_FOR[purpose]
+}
 
 /** The scopes the connect flow asks for. `openid email` is only so the screen
  *  can name the account it will write to — connecting the wrong Google
  *  account is an easy mistake and an invisible one until drafts appear
  *  somewhere unexpected. */
-export const REQUESTED_SCOPES = [GMAIL_COMPOSE_SCOPE, 'openid', 'email'].join(' ')
+export function requestedScopes(purpose: GrantPurpose): string {
+  return [SCOPE_FOR[purpose], 'openid', 'email'].join(' ')
+}
+
+/** What `gmailDrafts.ts` imported before there was more than one purpose. */
+export const REQUESTED_SCOPES = requestedScopes('gmail.compose')
 
 /* --------------------------------------------------------------------- */
 /* Encryption                                                             */
@@ -98,6 +140,8 @@ export interface GrantStatus {
   lastUsedAt: string | null
   /** False when Google handed back less than was asked for. */
   canDraft: boolean
+  /** The calendar Scout made, on a `calendar` grant. Null on every other. */
+  calendarId: string | null
   /** Whether the deployment is even able to offer this. */
   configured: boolean
 }
@@ -111,16 +155,23 @@ export function redirectUri(env: Env): string {
   return `${base}/api/gmail/callback`
 }
 
-export async function readGrant(env: Env, tenant: TenantId): Promise<GrantStatus> {
+export async function readGrant(
+  env: Env,
+  tenant: TenantId,
+  purpose: GrantPurpose = GRANT_PURPOSE,
+): Promise<GrantStatus> {
   const configured = grantConfigured(env)
   const row = await getDb(env.DB)
     .select()
     .from(googleGrants)
-    .where(scoped(googleGrants, tenant, eq(googleGrants.purpose, GRANT_PURPOSE)))
+    .where(scoped(googleGrants, tenant, eq(googleGrants.purpose, purpose)))
     .get()
 
   if (!row) {
-    return { connected: false, accountEmail: null, grantedAt: null, lastUsedAt: null, canDraft: false, configured }
+    return {
+      connected: false, accountEmail: null, grantedAt: null, lastUsedAt: null,
+      canDraft: false, calendarId: null, configured,
+    }
   }
   return {
     connected: true,
@@ -130,7 +181,8 @@ export async function readGrant(env: Env, tenant: TenantId): Promise<GrantStatus
     // Google may grant less than was asked for. A grant quietly missing the
     // scope it needs should be readable here rather than inferred from a 403
     // in the middle of a bulk write.
-    canDraft: row.scopes.includes(GMAIL_COMPOSE_SCOPE),
+    canDraft: row.scopes.includes(SCOPE_FOR[purpose]),
+    calendarId: row.calendarId ?? null,
     configured,
   }
 }
@@ -155,25 +207,38 @@ export async function readGrant(env: Env, tenant: TenantId): Promise<GrantStatus
 export async function storeGrant(
   env: Env,
   tenant: TenantId,
-  input: { refreshToken: string; accountEmail: string | null; scopes: string },
+  input: {
+    refreshToken: string
+    accountEmail: string | null
+    scopes: string
+    purpose?: GrantPurpose
+    /** Only a calendar grant carries one: the calendar Scout made. */
+    calendarId?: string | null
+  },
 ): Promise<void> {
+  const purpose = input.purpose ?? GRANT_PURPOSE
   const now = new Date().toISOString()
   const db = getDb(env.DB)
-  await db.delete(googleGrants).where(scoped(googleGrants, tenant, eq(googleGrants.purpose, GRANT_PURPOSE)))
+  await db.delete(googleGrants).where(scoped(googleGrants, tenant, eq(googleGrants.purpose, purpose)))
   await db.insert(googleGrants).values(withTenant(tenant, {
-    purpose: GRANT_PURPOSE,
+    purpose,
     refreshToken: await encryptToken(env, input.refreshToken),
     accountEmail: input.accountEmail,
     scopes: input.scopes,
     grantedAt: now,
     lastUsedAt: null,
+    calendarId: input.calendarId ?? null,
   }))
 }
 
-export async function forgetGrant(env: Env, tenant: TenantId): Promise<void> {
+export async function forgetGrant(
+  env: Env,
+  tenant: TenantId,
+  purpose: GrantPurpose = GRANT_PURPOSE,
+): Promise<void> {
   await getDb(env.DB)
     .delete(googleGrants)
-    .where(scoped(googleGrants, tenant, eq(googleGrants.purpose, GRANT_PURPOSE)))
+    .where(scoped(googleGrants, tenant, eq(googleGrants.purpose, purpose)))
 }
 
 /* --------------------------------------------------------------------- */
@@ -207,13 +272,17 @@ export async function exchangeCode(
 }
 
 /** A short-lived access token for the stored grant. */
-export async function accessTokenForGrant(env: Env, tenant: TenantId): Promise<string> {
+export async function accessTokenForGrant(
+  env: Env,
+  tenant: TenantId,
+  purpose: GrantPurpose = GRANT_PURPOSE,
+): Promise<string> {
   const row = await getDb(env.DB)
     .select()
     .from(googleGrants)
-    .where(scoped(googleGrants, tenant, eq(googleGrants.purpose, GRANT_PURPOSE)))
+    .where(scoped(googleGrants, tenant, eq(googleGrants.purpose, purpose)))
     .get()
-  if (!row) throw new Error('Gmail is not connected')
+  if (!row) throw new Error(`${purpose} is not connected`)
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -225,7 +294,7 @@ export async function accessTokenForGrant(env: Env, tenant: TenantId): Promise<s
       grant_type: 'refresh_token',
     }),
   })
-  if (!res.ok) throw new Error(`Gmail token refresh failed: ${await res.text()}`)
+  if (!res.ok) throw new Error(`Google token refresh failed: ${await res.text()}`)
   return (await res.json<{ access_token: string }>()).access_token
 }
 

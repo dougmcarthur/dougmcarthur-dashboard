@@ -305,6 +305,21 @@ export interface HealthStatus {
    * stopped accepting also satisfies. See `shared/credentialHealth.ts`.
    */
   credentials: CredentialHealth[]
+  /** The artist's own calendar grant. When connected, this is what gets used. */
+  calendarGrant: CalendarGrant
+}
+
+export interface CalendarGrant {
+  connected: boolean
+  accountEmail: string | null
+  grantedAt: string | null
+  lastUsedAt: string | null
+  /** Whether Google actually granted the scope that was asked for. */
+  canDraft: boolean
+  /** The calendar Scout made and is the only one it may write to. */
+  calendarId: string | null
+  /** Whether this deployment can offer connecting at all. */
+  configured: boolean
 }
 
 export type { CredentialHealth, CredentialState } from '../../shared/credentialHealth'
@@ -804,6 +819,11 @@ export const api = {
   /** Spend each refresh token once and record what Google said. */
   checkCredentials: () =>
     apiFetch<{ credentials: CredentialHealth[] }>('/health/check', { method: 'POST' }),
+  calendar: {
+    /** A full page load, not a fetch: the browser has to go to Google. */
+    connectUrl: '/api/calendar/connect',
+    disconnect: () => apiFetch<{ ok: true }>('/calendar/disconnect', { method: 'POST' }),
+  },
   notifications: {
     list: () => apiFetch<NotificationFeed>('/notifications'),
     read: (body: { keys?: string[]; all?: boolean }) =>

@@ -1,64 +1,61 @@
-# Google Calendar Setup
+# Connecting a calendar
 
-One-time setup to enable Calendar sync on gig approval.
+**Open Settings and press *Connect with Google*.** That is the whole of it —
+there is no key to obtain, nothing to paste, and no `wrangler secret put`.
 
-## 1. Create a Google Cloud project
+Scout asks for one scope, `calendar.app.created`: *"make secondary Google
+calendars, and see, create, change, and delete events."* On consent it creates
+a calendar called **Sun Dogs Music Scout** in the artist's own account and
+writes there. Under that scope it is the only calendar Scout can reach — it
+cannot read the rest of the calendar, and cannot alter an event it did not
+create, whatever the code does. That guarantee is Google's rather than this
+repository's, which is the opposite of the trade the Gmail drafting grant had
+to make.
 
-1. Go to console.cloud.google.com → New Project → name it "Doug Dashboard"
-2. Enable the **Google Calendar API**: APIs & Services → Library → search Calendar → Enable
+Disconnecting forgets the grant and leaves the calendar alone. Deleting it
+would take every event with it, and "disconnect" is not the same request as
+"remove what you already told me".
 
-## 2. Create OAuth credentials
+## What lands in it
 
-1. APIs & Services → Credentials → Create Credentials → OAuth client ID
-2. Application type: **Web application**
-3. Add `http://localhost:3000` to Authorized redirect URIs (for the one-time auth step)
-4. Download the JSON — you need `client_id` and `client_secret`
+Three entries per gig, and only the last is a gig — see `src/lib/gigCalendar.ts`:
 
-## 3. Get a refresh token (one-time)
+| entry | when | reminder |
+| --- | --- | --- |
+| Applications open — *name* | `opens_at`, while the row is still being decided | on the day |
+| Apply by — *name* | the deadline, when it is a real date | a week ahead |
+| *name* | the performance span, once it is booked | a day ahead |
 
-Run this in your terminal, substituting your values:
+A deadline that is prose rather than a date gets no entry, because
+`splitDeadline` returns null rather than guessing. A half-filled or backwards
+performance pair removes the entry rather than writing a nonsense one.
 
-```bash
-# Step 1: open this URL in a browser and log in as yourself
-echo "https://accounts.google.com/o/oauth2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=http://localhost:3000&response_type=code&scope=https://www.googleapis.com/auth/calendar&access_type=offline&prompt=consent"
+## The older path, which still works
 
-# Step 2: after you approve, Google redirects to localhost:3000?code=XXXX
-# Copy the code from the URL, then exchange it:
-curl -X POST https://oauth2.googleapis.com/token \
-  -d "code=PASTE_CODE_HERE" \
-  -d "client_id=YOUR_CLIENT_ID" \
-  -d "client_secret=YOUR_CLIENT_SECRET" \
-  -d "redirect_uri=http://localhost:3000" \
-  -d "grant_type=authorization_code"
+Before the button, Calendar needed four Worker secrets — `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` and `GOOGLE_CALENDAR_ID` — with
+the refresh token obtained by hand at a terminal. **They were never set in
+production**, which is why every booked gig quietly created no event from the
+day the feature shipped until the connect button existed.
 
-# The response contains "refresh_token" — copy it
-```
+That path is still read, so a deployment configured the old way keeps working.
+A grant wins when one exists: `calendarTarget` in `src/lib/gigCalendar.ts`
+prefers it and falls back to the secrets, the same "read both spellings" move
+`normaliseGigStatus` makes for statuses.
 
-## 4. Store as Worker secrets
+Worth knowing if you ever set the secrets anyway: `GOOGLE_REFRESH_TOKEN` is a
+different token from `GMAIL_REFRESH_TOKEN`, even though they share a client.
 
-```bash
-wrangler secret put GOOGLE_CLIENT_ID
-wrangler secret put GOOGLE_CLIENT_SECRET
-wrangler secret put GOOGLE_REFRESH_TOKEN
-wrangler secret put GOOGLE_CALENDAR_ID
-# For GOOGLE_CALENDAR_ID: use "primary" for your main calendar,
-# or find a specific calendar ID in Google Calendar → Settings → [calendar] → Calendar ID
-```
+## What the deployment still needs
 
-## 5. Verify
+Connecting is offered only when the Worker has `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET` and `TOKEN_ENCRYPTION_KEY` — the app's own OAuth client
+and the key its refresh tokens are encrypted with. Those are already set,
+because Gmail drafting uses the same three, and the card says so plainly when
+they are missing rather than offering a button that cannot work.
 
-After deploying, approve a gig with a deadline — the Calendar event should appear
-within a few seconds. The 📅 icon appears on the Overview page next to synced gigs.
-
-## Notes
-
-- The refresh token never expires unless you revoke access or change your Google password.
-- Calendar sync degrades gracefully: if the secrets aren't set, approval still works,
-  it just skips the Calendar step.
-- To test locally: add secrets to a `.dev.vars` file (gitignored):
-  ```
-  GOOGLE_CLIENT_ID=...
-  GOOGLE_CLIENT_SECRET=...
-  GOOGLE_REFRESH_TOKEN=...
-  GOOGLE_CALENDAR_ID=primary
-  ```
+**The redirect URI does not change.** Both purposes come back to
+`/api/gmail/callback`, which is what is registered in the Google console, and
+`state` carries which grant is being made (`src/lib/googleOAuth.ts`). Adding a
+purpose therefore costs nothing anybody has to go and configure — which is the
+point of the whole exercise.

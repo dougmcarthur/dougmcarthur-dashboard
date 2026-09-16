@@ -413,6 +413,11 @@ export const googleGrants = sqliteTable('google_grants', {
   scopes: text('scopes').notNull(),
   grantedAt: text('granted_at').notNull(),
   lastUsedAt: text('last_used_at'),
+  /**
+   * For a `calendar` grant: the secondary calendar Scout created and is the
+   * only one it may touch. Null for every other purpose. See migration 0025.
+   */
+  calendarId: text('calendar_id'),
 })
 
 /* --------------------------------------------------------------------- */

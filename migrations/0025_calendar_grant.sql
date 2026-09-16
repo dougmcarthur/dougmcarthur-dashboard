@@ -1,0 +1,26 @@
+-- A connected calendar, so nothing has to be pasted at a terminal.
+--
+-- Calendar has been unreachable in production since it shipped: it wants
+-- GOOGLE_REFRESH_TOKEN and GOOGLE_CALENDAR_ID as Worker secrets, obtained
+-- through an OAuth dance at a command line, and nobody ever set them. Every
+-- booked gig has silently created no event.
+--
+-- `google_grants` already holds a Google authorisation the person made in
+-- their browser, keyed by purpose, so drafting and the read-only scan can be
+-- revoked independently (migration 0019). A calendar grant is one more
+-- purpose, which is why this migration is one nullable column rather than a
+-- table.
+--
+-- The column exists because the calendar scope this asks for is
+-- `calendar.app.created` — "make secondary Google calendars, and see, create,
+-- change, and delete events" — which can only touch a calendar the app itself
+-- made. That is a guarantee Google enforces rather than one this code
+-- promises, and it is strictly better than what the Gmail grant could get:
+-- Scout cannot read the artist's own calendar, and cannot touch an event it
+-- did not create, even if this code is wrong. The price is that Scout has to
+-- create that calendar and remember which one it is, and that id belongs to
+-- the grant — a new grant is a new calendar.
+--
+-- Additive, so the currently-deployed Worker reads the table unchanged across
+-- the migrate-then-deploy gap: it selects named columns and never SELECT *.
+ALTER TABLE google_grants ADD COLUMN calendar_id TEXT;

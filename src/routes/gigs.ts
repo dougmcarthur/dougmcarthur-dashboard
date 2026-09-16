@@ -257,7 +257,7 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
     ...(b as Partial<GigRow>),
     status: newStatus,
   }
-  Object.assign(updates, await syncGigCalendar(c.env, after))
+  Object.assign(updates, await syncGigCalendar(c.env, after, tenantOf(c)))
 
   await db.update(gigOpportunities).set(updates).where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
 
@@ -325,7 +325,7 @@ gigs.delete('/:id', async (c) => {
     .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
     .get()
 
-  if (row) await removeGigCalendar(c.env, row)
+  if (row) await removeGigCalendar(c.env, row, tenantOf(c))
 
   // Reminders reference gigs by (entity_type, entity_id) with no foreign key,
   // so deleting the gig alone leaves them behind pointing at nothing. That is

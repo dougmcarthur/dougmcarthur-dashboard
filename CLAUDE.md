@@ -737,6 +737,40 @@ differently per audience and reports what is stale or missing inside it. A file
 exported in March cannot tell you its photo credit went missing in April, which
 is the whole reason this is assembled on read.
 
+**The calendar is connected with a button, and Google enforces the limit.**
+Calendar wanted `GOOGLE_REFRESH_TOKEN` and `GOOGLE_CALENDAR_ID` as Worker
+secrets, got by hand at a terminal — and **they were never set in production**,
+so every booked gig silently created no event from the day the feature shipped.
+`/api/calendar/connect` is one press: consent in the browser, the token written
+to `google_grants` under the `calendar` purpose, no key to obtain and nothing
+to paste.
+
+The scope is `calendar.app.created`, and choosing it is the interesting part.
+It permits making *secondary* calendars and editing events on those — so Scout
+creates one called **Sun Dogs Music Scout** and can reach nothing else. It
+cannot read the artist's own calendar and cannot alter an event it did not
+create, **whatever this code does**. That is the exact inverse of the
+`gmail.compose` trade below, where Google offered nothing narrow enough and the
+guarantee had to be rebuilt by hand; here the structural version was available
+and is what `test/calendarGrant.test.ts` pins — it fails if the broad
+`calendar` or `calendar.events` scope appears anywhere in `src/`.
+
+Two consequences worth knowing. `GOOGLE_CALENDAR_ID` stops being configuration,
+because under that scope there is only one calendar Scout can reach and it made
+it — migration 0025 hangs the id off the grant, so a new grant is a new
+calendar. And **the redirect URI does not change**: it is registered in the
+Google console, so a second one would be a thing somebody has to configure,
+which is the cost the button exists to avoid. Both purposes return to
+`/api/gmail/callback` and `state` carries which grant is being completed
+(`src/lib/googleOAuth.ts`) — the path is named after the feature that
+registered it rather than what it now does, deliberately.
+
+The secrets path still works. `calendarTarget` in `src/lib/gigCalendar.ts`
+prefers a grant and falls back to it, the same "read both spellings" move
+`normaliseGigStatus` makes. A grant that exists but is refused writes nowhere
+rather than falling back — the artist connected a calendar, and writing to the
+owner's instead would be worse than writing nothing.
+
 **Gmail drafting is a grant the person makes, not a secret somebody pasted.**
 Every Google token before this one was obtained at a terminal and stored with
 `wrangler secret put`. That cannot work for a feature where the *user* decides

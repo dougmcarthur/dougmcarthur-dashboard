@@ -3,9 +3,10 @@ import { calendarConfigured } from '../lib/googleCalendar'
 import { gmailConfigured } from '../lib/gmail'
 import { mailerConfigured } from '../lib/mailer'
 import { readCredentialHealth, runCredentialChecks } from '../lib/credentialCheck'
-import type { Env } from '../types'
+import { readGrant } from '../lib/googleGrant'
+import { tenantOf, type AppEnv } from '../context'
 
-const health = new Hono<{ Bindings: Env }>()
+const health = new Hono<AppEnv>()
 
 /**
  * What is configured, and what is known about whether it works.
@@ -45,6 +46,12 @@ health.get('/', async (c) => {
     // wrangler.toml or it is not, so there is no list of missing keys.
     emailConfigured: mailerConfigured(c.env),
     credentials: await readCredentialHealth(c.env, new Date()),
+    // The calendar has two possible ways in and they answer differently. The
+    // secrets above are a deployment fact; this is the artist's own grant, and
+    // when it exists it is the one that gets used. Reported separately rather
+    // than folded together, because "you connected this" and "somebody set a
+    // secret on the server" are different claims and the card says which.
+    calendarGrant: await readGrant(c.env, tenantOf(c), 'calendar'),
   })
 })
 
