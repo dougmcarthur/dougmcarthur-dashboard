@@ -209,3 +209,49 @@ through a Gmail rule to a plus-addressed Cloudflare address and see whether it
 arrives — rather than another documentation search. Documentation cannot
 settle a question about somebody else's enforcement thresholds.
 
+### Phase 2a — the useful question is "reject, or deliver with a verdict?"
+
+Prices and tiers read 2026-09-16; all of them move, so re-read before
+committing money. Detail per service is in the researcher's notes.
+
+Phase 1 turned the comparison into a single question, and it sorts the field
+cleanly. **A service that rejects mail failing SPF or DMARC is hostile to
+forwarding; a service that delivers it with a verdict attached lets Scout
+decide.** Scout wants the second, because it has a stronger signal available
+than any of those checks — the envelope sender matched against an address
+verified once against the account — and it wants the verdicts as
+*corroboration* rather than as a gate somebody else operates.
+
+| Service | On a failed check | Inbound cost |
+| --- | --- | --- |
+| CloudMailin | Delivers, with a structured per-protocol verdict (`pass`/`fail`/`neutral`/`temperror`/`permerror`) | Free tier: 10,000/month, 512 KB per message, no card |
+| EmailConnect.eu | Delivers, with verdicts, threshold explicitly the caller's | Free tier: 100/month |
+| Mailgun | Delivers by default, verdicts in `X-Mailgun-*` headers — **but hard-reject spam filtering is opt-in, so the domain's setting has to be checked** | Free 100/day, 1 route; Basic $15/month |
+| SendGrid | Delivers; documentation says explicitly it does not reject | Essentials $19.95/month, no permanent free plan any more |
+| ImprovMX | Exposes `Authentication-Results`, but its own accept/reject policy is undocumented | Webhooks need Premium, $9/month |
+| Postmark | No documented reject policy; SpamAssassin score only, nothing on SPF/DKIM/DMARC | Inbound gated behind Pro, $16.50/month |
+| Mailparser | No authentication verdicts found at all | No free tier |
+| Resend | **Not found** | — |
+
+**CloudMailin is the candidate**, and it is not close: the free tier covers
+this volume many times over, and it is the clearest documented answer to the
+deciding question. EmailConnect.eu is the same design from a much smaller
+vendor, with a tighter free tier, and is worth knowing about only as a second
+source.
+
+Two entries that are warnings rather than options. **Resend could not be
+confirmed either way** — no statement found about whether it reports
+authentication results on inbound mail or silently drops failing messages —
+and an attractive free tier does not compensate for not knowing that. Its
+webhook is also metadata-only, with the body and attachments needing a second
+API call. **Mailparser** is a field-extraction product, not a relay; it would
+put the parsing somewhere Scout cannot test.
+
+**What this does to the comparison.** Cloudflare is free, is already in the
+stack, and needs no new vendor — but enforces on Scout's behalf with no
+documented override. CloudMailin is a new dependency and a webhook endpoint
+that must be authenticated, but hands over the decision. If phase 2b finds
+that Cloudflare honours ARC and a Gmail-forwarded message lands, Cloudflare
+wins on every axis. If it does not, this is the fallback, and the free tier
+means the fallback costs nothing but the integration.
+
