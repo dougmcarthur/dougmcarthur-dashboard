@@ -46,8 +46,8 @@ a research output.
 | # | Phase | Status |
 | --- | --- | --- |
 | 1 | Cloudflare inbound: Email Routing, the Worker email binding, per-address and catch-all, what forwarding does to SPF/DKIM/DMARC, limits, cost | **done** |
-| 2 | Third-party inbound services, and whether Cloudflare inbound honours ARC on a forward | **running** |
-| 3 | Google side: Gmail watch/push versus polling, per-artist OAuth scopes, and what setting up an auto-forward rule actually costs a person | pending |
+| 2 | Third-party inbound services, and whether Cloudflare inbound honours ARC on a forward | **done** |
+| 3 | Google side: Gmail watch/push versus polling, per-artist OAuth scopes, and what setting up an auto-forward rule actually costs a person | **running** |
 | 4 | The product pattern: how TripIt, Expensify and peers verify a forwarded message, and user-forwards versus Scout-collects | pending |
 | 5 | Pre-filled link support per form platform (the extension doc's check list, item 1) | pending |
 | 6 | Costs and store rules: Browser Rendering pricing, model-driven browser cost, Chrome Web Store policy, WXT and the ports (check list, items 2–4) | pending |
@@ -254,4 +254,89 @@ that must be authenticated, but hands over the decision. If phase 2b finds
 that Cloudflare honours ARC and a Gmail-forwarded message lands, Cloudflare
 wins on every axis. If it does not, this is the fallback, and the free tier
 means the fallback costs nothing but the integration.
+
+### Phase 2b — Cloudflare rejects forwarded mail, unpredictably, and the senders it rejects are this app's senders
+
+**Documented.** Email Routing requires inbound mail to pass SPF *or* DKIM
+*and* satisfy the sender domain's DMARC alignment. A message failing that is
+**rejected outright** — no quarantine, no deliver-with-a-verdict mode, no
+per-address exception in any documentation found. Enforced since 2025-07-03
+per the changelog (`/email-routing/postmaster/`).
+
+**The ARC gap is real, and it is on the wrong leg.** Cloudflare's own
+October 2023 blog post confirms it adds ARC seals and does SRS rewriting **when
+Cloudflare is itself the forwarding hop** — its outbound leg. Nothing
+documented says it *validates* an ARC chain arriving on mail that some earlier
+hop (Gmail) already forwarded. That is the direction this design needs, and it
+is a documentation gap rather than an inference.
+
+**User reports, which are the substance here.** Three Cloudflare Community
+threads describe exactly this topology — Gmail auto-forward into an Email
+Routing address — failing with "DMARC checks failed", rejected before the
+Worker runs:
+
+- **August 2026**, six weeks ago: mail from automated senders forwarded via
+  Gmail consistently rejected while other forwarded mail arrived. The user
+  asked for a per-address override; no such feature exists and the request went
+  unanswered.
+- **October 2025**: a setup that worked for a month then broke, with a
+  community reply attributing it to Cloudflare enforcing *strict* alignment
+  where the sender's own DMARC record asked for *relaxed*.
+- **July 2025**: mail that passed DKIM still rejected, because the sender's own
+  alignment was incomplete.
+
+No report was found of anyone forwarding from Gmail into Email Routing
+successfully and reliably.
+
+**The mechanism explains the inconsistency.** Gmail's auto-forward rewrites the
+envelope sender but leaves signed content alone, so DMARC can still pass *via
+DKIM alignment* — if the original sender DKIM-signs with a key aligned to its
+own `From` domain. SPF alignment always breaks on a forward. So the outcome is
+**per-sender**: well-configured senders survive, SPF-only and misaligned
+senders do not.
+
+**And that is the finding, because this repository already knows who its
+senders are.** The reply-matching work counted eight real organiser replies in
+this mailbox: exactly one came from the festival's own domain. The rest came
+from Wufoo, Jotform, a portal, a parent organisation and **two personal Gmail
+addresses**. That population — third-party form platforms and individuals on
+free mail — is precisely the population whose mail fails alignment when
+forwarded. The senders Scout most needs to receive are the senders Cloudflare
+is most likely to reject, and it will do it silently, before any code runs.
+
+An intermittent, silent, per-sender rejection is close to the worst failure
+shape available for this feature. A receipt that never arrives looks exactly
+like an application that was never acknowledged, and the whole point of the
+submission-evidence work is to tell those two apart.
+
+**Direct sends are fine.** A Wufoo or Jotform notification sent *directly* to a
+Scout address is a first hop from the platform's own authenticated
+infrastructure, and faces only the ordinary bar. Nothing suggests Cloudflare
+penalises automated senders as a category. This is reasoned rather than
+separately confirmed.
+
+### Section A has an answer
+
+**Two paths, split by how the mail gets there** — and the split falls out of
+the evidence rather than being a compromise:
+
+- **Mail sent directly to Scout** — an artist putting their Scout address into
+  a form's notification field, or as their reply-to — can go through
+  **Cloudflare Email Routing**, free, already in the stack, into the Worker's
+  `email()` handler, per-artist by plus-addressing.
+- **Forwarded mail** cannot go through Cloudflare. It needs a service that
+  delivers with a verdict: **CloudMailin**, on the free tier.
+
+Before building either, note what phase 1a raised: Email Routing needs
+Cloudflare's own nameservers and its own MX on the domain, and `send_email`
+already sends from `sundogsmusic.ca`. Whether Email Routing can coexist with
+that is a prerequisite, not a detail.
+
+**The live test still matters, and is now cheap and specific.** Not "does
+forwarding work" — the answer is "sometimes, per sender". Stand up the address
+and forward one message from each of the classes that actually appear in the
+mailbox: a personal Gmail address, a small organiser's own domain, and a
+Wufoo/Jotform notification, each both forwarded and sent directly. Read the
+`Authentication-Results` on what arrives and note what never does. A single
+synthetic message generalises to nothing.
 
