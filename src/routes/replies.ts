@@ -177,6 +177,20 @@ export async function runReplyScan(
       continue
     }
 
+    // Mail that says in its own headers it was not written by a person.
+    // Dropped before scoring rather than weighed, because the two signals
+    // behind this verdict are reliable by specification — a mailing list and
+    // an auto-responder both declare themselves, and an organiser's reply
+    // declares neither. See shared/bulkMail.ts.
+    //
+    // Deliberately before the resolution check above is not possible and
+    // deliberately after it is: a message somebody already decided about stays
+    // decided, whatever its headers say now.
+    if (message.automation.tier === 'automated') {
+      skipped++
+      continue
+    }
+
     const { candidates, ambiguous } = matchReply(message, gigs, bindings)
     const best = candidates[0]
     const classification = classifyReply(message.body)
@@ -207,6 +221,9 @@ export async function runReplyScan(
           gigName: cand.gigName,
           score: cand.score,
           confidence: matchConfidence(cand),
+          // Carried so the screen can say "confirmed" rather than re-deriving
+          // it from the signals and getting a different answer.
+          bound: cand.bound,
           signals: cand.signals,
         })),
       ),

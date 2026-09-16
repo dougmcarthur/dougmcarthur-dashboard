@@ -312,6 +312,70 @@ const POINTS = {
   relay: 12,
 } as const
 
+/**
+ * How much the evidence is actually worth, in a word.
+ *
+ * The queue showed a score and a run-on sentence of signal details, which
+ * meant a match resting on one common word looked exactly like a match resting
+ * on a confirmed thread. Both were grey captions. Somebody triaging cannot act
+ * on that, and the measured version of this problem is in
+ * `docs/reply-matching-precision.md`: a pizza receipt and a real organiser
+ * reply scored identically, and the screen gave no way to tell.
+ *
+ * Derived from the signals rather than from a second set of thresholds, so
+ * this cannot drift away from what the scoring actually did.
+ */
+export type MatchStrength = 'confirmed' | 'strong' | 'possible' | 'weak'
+
+export function matchStrength(candidate: Pick<ReplyCandidate, 'signals' | 'score' | 'bound'>): MatchStrength {
+  // A binding is not evidence weighed against other evidence — it is a thing
+  // somebody already confirmed.
+  if (candidate.bound) return 'confirmed'
+
+  // One signal, worth no more than a single ordinary word appearing somewhere
+  // in a body. This is the case that filled the queue.
+  const lone = candidate.signals.length === 1 ? candidate.signals[0] : null
+  if (lone && lone.points <= POINTS.name.distinctive.body) return 'weak'
+
+  if (candidate.score >= POINTS.name.full.subject || candidate.signals.length >= 2) return 'strong'
+  return 'possible'
+}
+
+export const STRENGTH_LABELS: Record<MatchStrength, string> = {
+  confirmed: 'Confirmed',
+  strong: 'Likely',
+  possible: 'Possible',
+  weak: 'Weak',
+}
+
+/**
+ * What to say beside the label, so the word is a claim somebody can check.
+ *
+ * `weak` says what the *only* evidence was, because that is the fact that
+ * makes it dismissible at a glance.
+ */
+export function strengthNote(
+  strength: MatchStrength,
+  candidate: Pick<ReplyCandidate, 'signals'>,
+): string {
+  switch (strength) {
+    case 'confirmed':
+      return 'You have already confirmed this sender or thread writes about this one.'
+    case 'strong':
+      return candidate.signals.length >= 2
+        ? 'More than one thing points at this application.'
+        : 'The application is named outright.'
+    case 'possible':
+      return 'Some evidence, but nothing decisive.'
+    case 'weak':
+      return `The only evidence is ${lowerFirst(candidate.signals[0]?.detail ?? 'a single weak signal.')}`
+  }
+}
+
+function lowerFirst(s: string): string {
+  return s.length ? s[0].toLowerCase() + s.slice(1) : s
+}
+
 /** Below this, a candidate is a coincidence rather than a lead. */
 export const MATCH_THRESHOLD = 26
 

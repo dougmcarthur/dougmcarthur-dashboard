@@ -143,6 +143,8 @@ export interface ReplyCandidateSummary {
   gigName: string
   score: number
   confidence: MatchConfidence
+  /** A learned binding hit, rather than evidence weighed against evidence. */
+  bound: boolean
   signals: MatchSignal[]
 }
 

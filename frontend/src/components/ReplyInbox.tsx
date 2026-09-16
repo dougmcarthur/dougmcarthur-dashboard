@@ -1,3 +1,4 @@
+import { matchStrength, strengthNote, STRENGTH_LABELS } from '../../../shared/replyMatch'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type GigReply } from '../api'
@@ -87,15 +88,46 @@ function Card({
         </p>
       )}
 
-      <div className="mt-2.5 text-xs">
+      <div className="mt-2.5 space-y-1 text-xs">
         {reply.matchAmbiguous ? (
           <p className="text-warn-fg">
             Two applications match this equally well — say which one.
           </p>
         ) : top ? (
-          <p className="text-muted">
-            {top.signals.map((s) => s.detail).join(' ')}
-          </p>
+          (() => {
+            // Why this is here rather than a grey caption: a match resting on
+            // one common word looked identical to one resting on a confirmed
+            // thread, so the queue could not be triaged at a glance. The label
+            // is derived from the same signals that produced the score.
+            const strength = matchStrength(top)
+            const tone =
+              strength === 'confirmed' || strength === 'strong'
+                ? 'text-success-fg'
+                : strength === 'weak'
+                  ? 'text-warn-fg'
+                  : 'text-muted'
+            return (
+              <>
+                <p className={tone}>
+                  <span className="font-medium">{STRENGTH_LABELS[strength]}</span>
+                  {' — '}
+                  {strengthNote(strength, top)}
+                </p>
+                {/*
+                  One line per signal rather than joined into a sentence, so
+                  two reasons read as two reasons.
+                */}
+                <ul className="space-y-0.5">
+                  {top.signals.map((sig) => (
+                    <li key={`${sig.id}-${sig.detail}`} className="flex gap-1.5 text-muted">
+                      <span aria-hidden>•</span>
+                      <span className="min-w-0">{sig.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )
+          })()
         ) : (
           <p className="text-muted">Nothing in the pipeline matched this one.</p>
         )}
