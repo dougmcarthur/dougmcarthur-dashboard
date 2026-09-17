@@ -1,4 +1,5 @@
 import type { Backlog } from '../api'
+import { CARD_CLASS } from './ui/Surface'
 
 /**
  * Block D — the rot detector.
@@ -30,7 +31,11 @@ export function OpenEndedRow({ backlog, onNav }: { backlog: Backlog; onNav: (pag
   return (
     <button
       onClick={() => onNav('review')}
-      className="w-full text-left bg-surface border border-line rounded-xl shadow-card px-4 py-3 hover:border-line-strong hover:bg-sunken transition-colors group"
+      // A card that is also a button. `Card` renders a div or a section, not
+      // an interactive element, so this keeps its own string rather than
+      // growing the shared one an `as="button"` nobody else wants.
+      className={`${CARD_CLASS} w-full text-left px-4 py-3 group
+                  hover:border-line-strong hover:bg-sunken transition-colors`}
     >
       <p className="text-sm text-ink">
         <span className="font-semibold tabular-nums">{openEnded}</span>{' '}

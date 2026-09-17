@@ -7,6 +7,7 @@ import type {
 import { api, type SessionState } from '../api'
 import { Button } from './ui/Button'
 import { FIELD } from './ui/Field'
+import { Card } from './ui/Surface'
 
 /**
  * The front door.
@@ -93,7 +94,7 @@ export function LoginScreen({ session, onSignedIn }: { session: SessionState; on
           </p>
         </div>
 
-        <div className="rounded-xl border border-line bg-surface shadow-card p-5 space-y-4">
+        <Card pad="md" className="space-y-4">
           {mode === 'signin' ? (
             <>
               <Button variant="primary" size="md" className="w-full py-2" disabled={busy} onClick={signIn}>
@@ -158,7 +159,7 @@ export function LoginScreen({ session, onSignedIn }: { session: SessionState; on
           {error && (
             <p className="text-xs text-danger-fg bg-danger-bg rounded-md px-3 py-2">{error}</p>
           )}
-        </div>
+        </Card>
 
         {/* The other path, always reachable and never the loud one. A device
             with no passkey needs the code route; a device with one should

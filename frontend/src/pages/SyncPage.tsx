@@ -9,6 +9,8 @@ import { FIELD, FILTER } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { DraftActions } from '../components/DraftActions'
 import { GmailDraftsPanel } from '../components/GmailDraftsPanel'
+import { Banner, Card, EmptyState } from '../components/ui/Surface'
+import { Caption, Label } from '../components/ui/Surface'
 
 const SYNC_STATUSES: SyncStatus[] = ['draft_ready', 'pitched', 'confirmed', 'declined', 'archived']
 
@@ -51,41 +53,41 @@ function CreateSyncForm({ onDone }: { onDone: () => void }) {
   })
 
   return (
-    <div className="bg-surface border border-line rounded-xl shadow-card p-5 space-y-4">
+    <Card pad="md" className="space-y-4">
       <h2 className="text-sm font-semibold text-ink">New Sync Target</h2>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Name *</label>
+          <Label>Name *</Label>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="Epitaph Records" className={FIELD} autoFocus />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Agency type</label>
+          <Label>Agency type</Label>
           <input value={draft.agencyType} onChange={(e) => set('agencyType', e.target.value)} placeholder="label, library, supervisor…" className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Contact email</label>
+          <Label>Contact email</Label>
           <input type="email" value={draft.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} placeholder="sync@label.com" className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Contact role</label>
+          <Label>Contact role</Label>
           <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} placeholder="A&R, Sync Supervisor…" className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Confirm via</label>
+          <Label>Confirm via</Label>
           <input value={draft.confirmationMethod} onChange={(e) => set('confirmationMethod', e.target.value)} placeholder="email, phone, portal…" className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Initial status</label>
+          <Label>Initial status</Label>
           <select value={draft.status} onChange={(e) => set('status', e.target.value as SyncStatus)} className={FIELD}>
             {SYNC_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">Notes</label>
+          <Label>Notes</Label>
           <textarea rows={2} value={draft.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Context about this target…" className={`${FIELD} resize-none`} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">Pitch draft</label>
+          <Label>Pitch draft</Label>
           <textarea rows={4} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} placeholder="Dear…" className={`${FIELD} resize-y`} />
         </div>
       </div>
@@ -98,7 +100,7 @@ function CreateSyncForm({ onDone }: { onDone: () => void }) {
           Cancel
         </Button>
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -130,31 +132,31 @@ function EditSyncPanel({
     <div className="space-y-4 max-w-2xl">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Name</label>
+          <Label>Name</Label>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Agency type</label>
+          <Label>Agency type</Label>
           <input value={draft.agencyType} onChange={(e) => set('agencyType', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Contact email</label>
+          <Label>Contact email</Label>
           <input type="email" value={draft.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Contact role</label>
+          <Label>Contact role</Label>
           <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} className={FIELD} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">Confirm via</label>
+          <Label>Confirm via</Label>
           <input value={draft.confirmationMethod} onChange={(e) => set('confirmationMethod', e.target.value)} className={FIELD} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">Notes</label>
+          <Label>Notes</Label>
           <textarea rows={3} value={draft.notes} onChange={(e) => set('notes', e.target.value)} className={`${FIELD} resize-none`} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">Pitch draft</label>
+          <Label>Pitch draft</Label>
           <textarea rows={6} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} className={`${FIELD} resize-y`} />
         </div>
       </div>
@@ -185,13 +187,13 @@ function SyncDetail({ target, onEdit }: { target: SyncTarget; onEdit: () => void
     <div className="space-y-4 max-w-2xl">
       {target.notes && (
         <div>
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Notes</p>
+          <Caption spaced>Notes</Caption>
           <p className="text-sm text-body leading-relaxed">{target.notes}</p>
         </div>
       )}
       {target.pitchDraft && (
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Pitch Draft</p>
+          <Caption spaced>Pitch Draft</Caption>
           <p className="text-sm text-body leading-relaxed whitespace-pre-wrap bg-surface rounded-md border border-line p-3">
             {target.pitchDraft}
           </p>
@@ -263,9 +265,9 @@ export function SyncPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
+      <Banner>
         Failed to load sync targets — {(error as Error).message}
-      </div>
+      </Banner>
     )
   }
 
@@ -311,7 +313,7 @@ export function SyncPage() {
       {isLoading ? (
         <SkeletonList rows={5} />
       ) : (
-        <div className="bg-surface border border-line rounded-xl shadow-card divide-y divide-line">
+        <Card pad="none" divided>
           {data.map((target) => {
             const isOpen = expanded.has(target.id)
             const isEditing = editingId === target.id
@@ -377,9 +379,9 @@ export function SyncPage() {
             )
           })}
           {data.length === 0 && (
-            <p className="px-4 py-12 text-center text-muted text-sm">No sync targets found.</p>
+            <EmptyState>No sync targets found.</EmptyState>
           )}
-        </div>
+        </Card>
       )}
 
       {!isLoading && <p className="text-xs text-muted">{data.length} targets</p>}

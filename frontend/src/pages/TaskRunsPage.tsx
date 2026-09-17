@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { SkeletonList } from '../components/Skeleton'
 import { FILTER } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
+import { Banner, Card, EmptyState } from '../components/ui/Surface'
 
 const PAGE_SIZE = 50
 
@@ -39,9 +40,9 @@ export function TaskRunsPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
+      <Banner>
         Failed to load task runs — {(error as Error).message}
-      </div>
+      </Banner>
     )
   }
 
@@ -89,7 +90,7 @@ export function TaskRunsPage() {
       {isLoading ? (
         <SkeletonList rows={8} />
       ) : (
-        <div className="bg-surface border border-line rounded-xl shadow-card divide-y divide-line">
+        <Card pad="none" divided>
           {runs.map((r) => (
             <div key={r.id} className="px-4 py-3 flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
@@ -125,11 +126,11 @@ export function TaskRunsPage() {
             </div>
           ))}
           {runs.length === 0 && (
-            <p className="px-4 py-12 text-center text-muted text-sm">
+            <EmptyState>
               {filtered ? 'No runs match these filters.' : 'No task runs recorded yet.'}
-            </p>
+            </EmptyState>
           )}
-        </div>
+        </Card>
       )}
 
       <div className="flex items-center justify-between">

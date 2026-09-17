@@ -215,3 +215,34 @@ describe('the row does not say the same thing twice', () => {
     expect(opens.length).toBeGreaterThanOrEqual(2)
   })
 })
+
+describe('a Connect button is a claim that connecting will work', () => {
+  const card = readFileSync('frontend/src/components/IntegrationsCard.tsx', 'utf8')
+
+  it('reads the deployment answer the grant has always returned', () => {
+    // `readGrant` has returned `configured` since the grant table existed and
+    // this card ignored it, so Connect was offered on a deployment whose
+    // consent route answers 503. Pressing it in production is how it was
+    // found — the same class of mistake as a button naming a status the PATCH
+    // route refuses.
+    expect(card).toContain('serverReady')
+    expect(card).toMatch(/offeringConnect\s*=\s*connectable && !connected && row\.serverReady/)
+  })
+
+  it('takes it from the grant on every grant row, including the calendar', () => {
+    // The calendar has a second way in — the older Worker secrets — so it has
+    // a branch of its own, and that branch hardcoded `serverReady: true`. It
+    // was then the one row still offering a Connect that could not complete.
+    expect(card).not.toMatch(/serverReady:\s*true,\s*\n\s*\},\s*\n\s*\]\s*\n\s*\}\s*\n\s*const cred/)
+    const hardcoded = [...card.matchAll(/serverReady:\s*true/g)].length
+    // Exactly one: the secret-and-binding rows, which have no consent to block.
+    expect(hardcoded).toBe(1)
+  })
+
+  it('names the missing variable rather than listing all three', () => {
+    // On a configuration screen the variable name is the actionable fact —
+    // the one place developer-speak stays. "Google client credentials or
+    // TOKEN_ENCRYPTION_KEY are not configured" made the reader check three.
+    expect(card).toContain('grantMissingSecrets')
+  })
+})

@@ -296,6 +296,11 @@ export interface TaskRunPage {
 }
 
 export interface HealthStatus {
+  /**
+   * The Worker secrets every browser-made grant needs before a consent can be
+   * started at all. Empty when connecting is possible.
+   */
+  grantMissingSecrets: string[]
   calendarConfigured: boolean
   calendarMissingSecrets: string[]
   gmailConfigured: boolean

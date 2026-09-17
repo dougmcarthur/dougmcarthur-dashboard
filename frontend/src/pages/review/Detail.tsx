@@ -8,6 +8,7 @@ import {
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../api'
 import type { ReviewItem } from '../../../../shared/reviewQueue'
 import { DecisionBar } from './DecisionBar'
+import { Card } from '../../components/ui/Surface'
 
 /**
  * Everything known about the selected item, on one surface.
@@ -164,7 +165,7 @@ export function Detail({
 
   return (
     // One card, one background. Every section below is a heading and a rule.
-    <div className="rounded-xl border border-line bg-surface shadow-card p-5 divide-y divide-transparent">
+    <Card pad="md" className="divide-y divide-transparent">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
@@ -357,6 +358,6 @@ export function Detail({
       )}
 
       {item.note && <RawNote note={item.note} />}
-    </div>
+    </Card>
   )
 }

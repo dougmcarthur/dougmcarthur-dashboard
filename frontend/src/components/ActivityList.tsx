@@ -4,6 +4,7 @@ import { Chevron } from './Chevron'
 import type { TaskRun } from '../api'
 import { shortDate } from '../format'
 import { taskLabel } from '../../../shared/taskLabels'
+import { Caption, Card } from './ui/Surface'
 
 /**
  * What the automation did, one line per run.
@@ -31,9 +32,9 @@ export function ActivityList({ runs, onNav }: { runs: TaskRun[]; onNav: (page: s
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xs font-semibold text-muted uppercase tracking-wider">
+        <Caption as="h2">
           Recent runs
-        </h2>
+        </Caption>
         <button
           onClick={() => onNav('runs')}
           className="text-xs text-muted hover:text-body transition-colors"
@@ -42,7 +43,7 @@ export function ActivityList({ runs, onNav }: { runs: TaskRun[]; onNav: (page: s
         </button>
       </div>
 
-      <div className="bg-surface border border-line rounded-xl shadow-card divide-y divide-line">
+      <Card pad="none" divided>
         {shown.map((run) => {
           const isOpen = expanded.has(run.id)
           const hasSummary = Boolean(run.summary)
@@ -78,7 +79,7 @@ export function ActivityList({ runs, onNav }: { runs: TaskRun[]; onNav: (page: s
             </div>
           )
         })}
-      </div>
+      </Card>
     </div>
   )
 }

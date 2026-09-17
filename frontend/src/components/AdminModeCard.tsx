@@ -4,6 +4,7 @@ import { api } from '../api'
 import { withConfirmation } from '../confirmIdentity'
 import { Button } from './ui/Button'
 import { Explainer } from './ui/Explainer'
+import { Card } from './ui/Surface'
 
 /**
  * The way in to the oversight surface, on the Settings screen.
@@ -44,7 +45,7 @@ export function AdminModeCard() {
   })
 
   return (
-    <div className="bg-surface border border-line rounded-xl shadow-card p-4 space-y-3">
+    <Card className="space-y-3">
       <Explainer title="Admin mode">
         Who is on the platform and what their accounts cost. It is a separate screen, not
         a bigger version of this one — while you are in it, your own gigs, replies and
@@ -59,6 +60,6 @@ export function AdminModeCard() {
       <p className="text-xs text-faint">
         Asks for your passkey, and lasts until you switch back.
       </p>
-    </div>
+    </Card>
   )
 }

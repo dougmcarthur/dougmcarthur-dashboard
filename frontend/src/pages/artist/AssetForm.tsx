@@ -4,6 +4,7 @@ import { ASSET_KINDS, ASSET_KIND_META, assetKindMeta } from '../../../../shared/
 import { QUESTION_KINDS } from '../../../../shared/questionKinds'
 import { FIELD } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
+import { Label } from '../../components/ui/Surface'
 
 /** Add or edit one entry. Same form either way — the fields do not differ. */
 export function AssetForm({
@@ -38,7 +39,7 @@ export function AssetForm({
     <div className="space-y-3 p-4 bg-sunken border border-line rounded-xl">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Kind</label>
+          <Label>Kind</Label>
           <select value={draft.kind} onChange={(e) => set('kind', e.target.value)} className={FIELD}>
             {ASSET_KINDS.map((k) => (
               <option key={k} value={k}>{ASSET_KIND_META[k].label}</option>
@@ -47,15 +48,15 @@ export function AssetForm({
           <p className="text-xs text-faint mt-1">{meta.meaning}</p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Label</label>
+          <Label>Label</Label>
           <input value={draft.label} onChange={(e) => set('label', e.target.value)} className={FIELD}
             placeholder={meta.isLink ? 'Live at the Park Theatre' : 'Long bio'} />
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">
+          <Label>
             {meta.isLink ? 'URL' : 'Text'}
-          </label>
+          </Label>
           {meta.isLink ? (
             <input type="url" value={draft.value} onChange={(e) => set('value', e.target.value)} className={FIELD} />
           ) : (
@@ -68,9 +69,9 @@ export function AssetForm({
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">
+          <Label>
             Answers the question <span className="text-faint font-normal">— what a form is asking when it asks for this</span>
-          </label>
+          </Label>
           <select value={draft.questionKind} onChange={(e) => set('questionKind', e.target.value)} className={FIELD}>
             <option value="">—</option>
             {QUESTION_KINDS.map((q) => (
@@ -82,11 +83,11 @@ export function AssetForm({
         {meta.needsCredit && (
           <>
             <div>
-              <label className="block text-xs font-medium text-muted mb-1">Photographer credit</label>
+              <Label>Photographer credit</Label>
               <input value={draft.credit} onChange={(e) => set('credit', e.target.value)} className={FIELD} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted mb-1">Usage rights</label>
+              <Label>Usage rights</Label>
               <input value={draft.usageRights} onChange={(e) => set('usageRights', e.target.value)} className={FIELD}
                 placeholder="Press use, credit required" />
             </div>
@@ -94,19 +95,19 @@ export function AssetForm({
         )}
 
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">
+          <Label>
             Review by <span className="text-faint font-normal">— blank for {meta.reviewMonths} months</span>
-          </label>
+          </Label>
           <input type="date" value={draft.reviewBy} onChange={(e) => set('reviewBy', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Where it came from</label>
+          <Label>Where it came from</Label>
           <input value={draft.source} onChange={(e) => set('source', e.target.value)} className={FIELD}
             placeholder="Drive, the 2026 EPK" />
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">Notes</label>
+          <Label>Notes</Label>
           <input value={draft.notes} onChange={(e) => set('notes', e.target.value)} className={FIELD} />
         </div>
       </div>

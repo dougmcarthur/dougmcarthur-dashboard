@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Weekday } from '../api'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from './ui/Explainer'
+import { Banner, Card } from './ui/Surface'
 
 const DAYS: Array<{ id: Weekday; label: string }> = [
   { id: 'mon', label: 'Mon' },
@@ -47,7 +48,7 @@ export function DigestSettingsCard() {
   const settings = d?.settings
 
   return (
-    <div className="rounded-xl border border-line bg-surface shadow-card p-4 space-y-3">
+    <Card className="space-y-3">
       <div className="flex items-start justify-between gap-4">
         <Explainer as="h2" title="Weekly digest">
           Only when something moved. Nothing is sent when there is nothing to say.
@@ -66,10 +67,10 @@ export function DigestSettingsCard() {
       </div>
 
       {d && !d.mailerConfigured && (
-        <p className="rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg">
+        <Banner tone="warn" size="sm">
           No email binding on this deploy — add <code>[[send_email]]</code> to wrangler.toml.
           Everything below still previews.
-        </p>
+        </Banner>
       )}
 
       {d?.schedule && (
@@ -206,6 +207,6 @@ export function DigestSettingsCard() {
           )}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

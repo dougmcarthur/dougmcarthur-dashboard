@@ -13,6 +13,7 @@ import { PasskeysCard } from '../components/PasskeysCard'
 import { AdminModeCard } from '../components/AdminModeCard'
 import { ProfileCard } from '../components/ProfileCard'
 import { useSession } from '../hooks/useSession'
+import { Label } from '../components/ui/Surface'
 
 
 // ── Reference doc editor ─────────────────────────────────────────────────────
@@ -165,9 +166,9 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
     <div className="border border-line-strong border-dashed rounded-lg p-4 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">
+          <Label>
             ID <span className="font-normal text-muted">(slug, e.g. bio, press-kit)</span>
-          </label>
+          </Label>
           <input
             value={id}
             onChange={(e) => setId(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
@@ -177,7 +178,7 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Title</label>
+          <Label>Title</Label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -187,7 +188,7 @@ function NewDocForm({ onCreated }: { onCreated: () => void }) {
         </div>
       </div>
       <div>
-        <label className="block text-xs font-medium text-muted mb-1">Content</label>
+        <Label>Content</Label>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}

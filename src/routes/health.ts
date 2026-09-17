@@ -37,7 +37,15 @@ health.get('/', async (c) => {
         (k) => !c.env[k],
       )
 
+  // What every browser-made grant needs before a consent can even be started.
+  // Reported so the screen can say the server side is not set up *before*
+  // somebody presses Connect and gets a 503 from the redirect — which is what
+  // it did, because the card had this field and never read it.
+  const grantMissing = (['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'TOKEN_ENCRYPTION_KEY'] as const)
+    .filter((k) => !c.env[k])
+
   return c.json({
+    grantMissingSecrets: grantMissing,
     calendarConfigured: cal,
     calendarMissingSecrets: calMissing,
     gmailConfigured: gmail,

@@ -6,6 +6,7 @@ import { Button } from './ui/Button'
 import { FIELD } from './ui/Field'
 import { shortDate } from '../format'
 import { Explainer } from './ui/Explainer'
+import { Card } from './ui/Surface'
 
 /**
  * Inviting an artist, on the oversight surface.
@@ -79,7 +80,7 @@ export function InvitesPanel() {
         </Explainer>
       </header>
 
-      <div className="rounded-xl border border-line bg-surface shadow-card p-4 space-y-3">
+      <Card className="space-y-3">
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="block">
             <span className="text-xs font-medium text-body">Their email</span>
@@ -118,7 +119,7 @@ export function InvitesPanel() {
         {error && <p className="text-sm text-danger-fg">{error}</p>}
 
         {link && <IssuedLink url={link.url} email={link.email} onDone={() => setLink(null)} />}
-      </div>
+      </Card>
 
       {invites.isLoading && <div className="h-16 bg-sunken rounded-xl animate-pulse" />}
 

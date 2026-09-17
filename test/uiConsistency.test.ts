@@ -523,3 +523,118 @@ describe('an explanation is offered, never imposed', () => {
     }
   })
 })
+
+describe('the shapes that were being spelled out by hand', () => {
+  const files = (function walk(dir: string): string[] {
+    return readdirSync(dir).flatMap((name) => {
+      const p = join(dir, name)
+      return statSync(p).isDirectory() ? walk(p) : p.endsWith('.tsx') ? [p] : []
+    })
+  })('frontend/src').filter((f) => !f.includes('/ui/'))
+
+  const sources = files.map((f) => [f, readFileSync(f, 'utf8')] as const)
+
+  it('never writes the form label string again', () => {
+    // Fifty-nine copies, the most repeated string in the app by a factor of
+    // eight. `Field` exported the input and left the thing above it to be
+    // typed out every time.
+    for (const [f, src] of sources) {
+      expect(src, f).not.toContain('block text-xs font-medium text-muted mb-1')
+    }
+  })
+
+  it('never hand-rolls the card shell again', () => {
+    // It had four spellings across roughly twenty uses, differing on padding,
+    // on whether rows were divided, and on clipping — which is how a card
+    // ends up looking subtly different on two screens for no reason.
+    for (const [f, src] of sources) {
+      expect(src.replace(/\s+/g, ' '), f).not.toMatch(
+        /bg-surface border border-line rounded-xl shadow-card|rounded-xl border border-line bg-surface shadow-card p-/,
+      )
+    }
+  })
+
+  it('keeps one letter-spacing for section captions', () => {
+    // `tracking-wide` and `tracking-wider` were both in use, ten against two.
+    // A quarter-pixel difference between two lists is drift, not a decision.
+    for (const [f, src] of sources) {
+      expect(src, f).not.toContain('uppercase tracking-wider')
+    }
+  })
+
+  it('does not draw a badge with nothing in it', () => {
+    // A reply the scan never classified carries an empty label, and the pill
+    // rendered anyway: eighteen pixels by six of border and background saying
+    // nothing. Found by probing for painted boxes with no text.
+    const inbox = readFileSync('frontend/src/components/ReplyInbox.tsx', 'utf8')
+    expect(inbox).toMatch(/\{reply\.classLabel \? \(/)
+  })
+})
+
+describe('density: a thing that is always the same is not information', () => {
+  const gigs = readFileSync('frontend/src/pages/GigsPage.tsx', 'utf8')
+  const review = readFileSync('frontend/src/pages/ReviewPage.tsx', 'utf8')
+  const assetRow = readFileSync('frontend/src/pages/artist/AssetRow.tsx', 'utf8')
+  const css = readFileSync('frontend/src/index.css', 'utf8')
+
+  it('asks the data before drawing the Gigs columns nothing fills', () => {
+    // `organizer` and `genreFitScore` are empty on all thirty-four production
+    // rows because nothing extracts them — two of eight columns holding an
+    // em-dash while `name` wrapped to three lines beside them. Asked rather
+    // than dropped, because both are editable by hand, so a hard removal
+    // would hide something somebody typed.
+    expect(gigs).toContain('const showOrganizer =')
+    expect(gigs).toContain('const showFit =')
+    expect(gigs).toMatch(/\.\.\.\(showOrganizer/)
+    expect(gigs).toMatch(/\.\.\.\(showFit/)
+  })
+
+  it('measures that against the whole result set, not the filtered view', () => {
+    // Otherwise changing a status filter makes columns appear and disappear
+    // underneath the cursor.
+    // The parameter's own type has parentheses in it, so match the tail.
+    expect(gigs).toContain('=> data.some(has)')
+  })
+
+  it('does not draw a destructive control on every Gigs row', () => {
+    // Thirty-four delete buttons on a screen you open to read. It lives in the
+    // expanded row now, beside Edit, which is where somebody who has decided
+    // to delete a gig already is.
+    expect(gigs).not.toContain('title="Delete"')
+    expect(readFileSync('frontend/src/pages/gigs/GigDetail.tsx', 'utf8')).toContain('onDelete')
+  })
+
+  it('hides a Review filter that would find nothing, but never the one in use', () => {
+    // `Contradictions 0` was a click that costs a redraw to tell you there is
+    // nothing there. The active chip and `Everything` always stay, or
+    // clearing a filter's last row would make the control you just pressed
+    // vanish and take the way back with it.
+    expect(review).toMatch(/counts\?\.\[f\.id\] \?\? 0\) > 0 \|\| filter === f\.id \|\| f\.id === 'all'/)
+  })
+
+  it('shows an asset review date only when the date is doing work', () => {
+    // `assetHealth` already sorts `fresh` from the three states that want
+    // something. This printed the date whatever it said, so a bio fine for
+    // another eighteen months carried a 2027 date at the weight of the bio.
+    expect(assetRow).toMatch(/asset\.reviewBy && asset\.health\.freshness !== 'fresh'/)
+  })
+
+  it('keeps row actions visible on a row that is asking for something', () => {
+    // The first version hid them unconditionally, which left the press photo
+    // with no photographer credit stating its problem and offering no way to
+    // fix it. Found by looking at the screen, not by the types.
+    expect(assetRow).toMatch(/const quiet =\s*asset\.health\.freshness === 'fresh' && !asset\.health\.problem/)
+    expect(assetRow).toMatch(/\$\{quiet \? 'row-actions' : ''\}/)
+  })
+
+  it('reveals row actions on hover and on focus, and never hides them on touch', () => {
+    // Gated on `(hover: hover)` rather than a Tailwind `hover:` variant: on a
+    // touch screen there is no hover and so no way to reveal them, and the
+    // default build would hide them on a phone with no way back.
+    expect(css).toContain('@media (hover: hover)')
+    expect(css).toMatch(/\.row-actions:focus-within/)
+    // `opacity`, so the buttons stay in the tab order for `:focus-within` to
+    // find. `display: none` would take them out of it.
+    expect(css).toMatch(/\.row-actions \{\s*opacity: 0;/)
+  })
+})

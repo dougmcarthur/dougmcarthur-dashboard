@@ -2,6 +2,7 @@ import type { DueReminder, TimingRow } from '../api'
 import { shortDate } from '../format'
 import { isGigTransitionAllowed } from '../../../shared/gigStatus'
 import { Button } from './ui/Button'
+import { Caption, Card } from './ui/Surface'
 
 /**
  * Block C — everything with a date attached to it, in one list.
@@ -102,11 +103,11 @@ export function TimingStrip({
 
   return (
     <div>
-      <h2 className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
+      <Caption as="h2" className="mb-3">
         Time-sensitive
-      </h2>
+      </Caption>
 
-      <div className="bg-surface border border-line rounded-xl shadow-card divide-y divide-line">
+      <Card pad="none" divided>
         {reminders.map((r) => {
           // Reminders carry a real scheduled date, so they get the same
           // countdown as everything else here rather than a bare date — one
@@ -159,7 +160,7 @@ export function TimingStrip({
             onClick={() => onNav(`review/${row.key}`)}
           />
         ))}
-      </div>
+      </Card>
     </div>
   )
 }

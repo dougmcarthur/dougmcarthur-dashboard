@@ -53,11 +53,28 @@ export const DEFAULTS: Appearance = {
   showHints: true,
 }
 
+/**
+ * The root font size, as a multiple of 16px. Every Tailwind size is in rem, so
+ * this scales the whole interface rather than only body copy.
+ *
+ * The steps used to be 0.9375 / 1 / 1.0625 / 1.125 — fifteen, sixteen,
+ * seventeen and eighteen pixels. Four options spanning three pixels, where
+ * choosing "Larger" moved prose from twelve pixels to thirteen and a half and
+ * somebody who needed it bigger had nowhere left to go. A control that cannot
+ * make a difference is worse than no control, because it answers the question
+ * and leaves the problem.
+ *
+ * The ladder is wider now and the top is genuinely large. `default` stays at
+ * exactly 1 — it means *untouched*, and the type ramp in tailwind.config.js is
+ * where the app's own sizes were raised, which is the right place for it: a
+ * default above 1 would override somebody who had already set a larger font
+ * size in their browser, which is the opposite of an accessibility win.
+ */
 export const TEXT_SCALE: Record<TextSize, number> = {
   compact: 0.9375,
   default: 1,
-  large: 1.0625,
-  xlarge: 1.125,
+  large: 1.125,
+  xlarge: 1.25,
 }
 
 /**

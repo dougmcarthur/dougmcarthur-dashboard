@@ -7,6 +7,7 @@ import { Disclosure } from '../components/ui/Disclosure'
 import { InvitesPanel } from '../components/InvitesPanel'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from '../components/ui/Explainer'
+import { Card } from '../components/ui/Surface'
 
 /**
  * The oversight surface: who is on the platform, and what their account costs.
@@ -83,7 +84,7 @@ export function AdminPage() {
 
 function ArtistRow({ artist }: { artist: AdminArtist }) {
   return (
-    <li className="rounded-xl border border-line bg-surface shadow-card p-4 space-y-3">
+    <Card as="li" className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-ink">
@@ -118,7 +119,7 @@ function ArtistRow({ artist }: { artist: AdminArtist }) {
       {/* The owner's own tenant is not removable here: deleting it would take
           the account holding this screen with it. The server refuses it too. */}
       {!artist.owner && <RemoveArtist artist={artist} />}
-    </li>
+    </Card>
   )
 }
 

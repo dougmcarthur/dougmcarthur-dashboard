@@ -7,6 +7,8 @@ import { shortDate } from '../format'
 import { Button } from './ui/Button'
 import { Select } from './ui/Field'
 import { ReplyDraftPanel } from './ReplyDraftPanel'
+import { Caption } from './ui/Surface'
+import { Explainer } from './ui/Explainer'
 
 /**
  * Phase 4 on screen: what arrived in the mail, and what the app thinks it
@@ -57,9 +59,17 @@ function Card({
   return (
     <div className="border border-line rounded-lg p-3 bg-surface">
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`text-xs px-2 py-0.5 rounded-md border bg-surface ${TONE[reply.classification] ?? TONE.unclear}`}>
-          {reply.classLabel}
-        </span>
+        {/*
+          Only when there is something to say. A reply the scan never
+          classified carries an empty label, and this drew the pill anyway —
+          eighteen pixels by six of border and background, meaning nothing, at
+          the top of the card. A badge with no text is not a quieter badge.
+        */}
+        {reply.classLabel ? (
+          <span className={`text-xs px-2 py-0.5 rounded-md border bg-surface ${TONE[reply.classification] ?? TONE.unclear}`}>
+            {reply.classLabel}
+          </span>
+        ) : null}
         {reply.classConfidence === 'low' && (
           <span className="text-xs text-faint">low confidence</span>
         )}
@@ -107,12 +117,31 @@ function Card({
                   ? 'text-warn-fg'
                   : 'text-muted'
             return (
-              <>
-                <p className={tone}>
-                  <span className="font-medium">{STRENGTH_LABELS[strength]}</span>
-                  {' — '}
-                  {strengthNote(strength, top)}
-                </p>
+              /*
+                The strength line always; the signals behind the info button.
+                The line already carries the deciding fact — "Weak — the only
+                evidence is 'Winnipeg' in the body" is enough to dismiss a
+                pizza receipt without reading further — and the bullets under
+                it repeated that in list form on every card, for the junk and
+                the real organiser reply alike.
+
+                `hideable={false}`: this is evidence about the row, not the app
+                explaining itself, so switching explanations off must not put
+                it out of reach.
+              */
+              <Explainer
+                as="div"
+                titleClassName=""
+                titleText="why this matched"
+                hideable={false}
+                title={
+                  <p className={tone}>
+                    <span className="font-medium">{STRENGTH_LABELS[strength]}</span>
+                    {' — '}
+                    {strengthNote(strength, top)}
+                  </p>
+                }
+              >
                 {/*
                   One line per signal rather than joined into a sentence, so
                   two reasons read as two reasons.
@@ -125,7 +154,7 @@ function Card({
                     </li>
                   ))}
                 </ul>
-              </>
+              </Explainer>
             )
           })()
         ) : (
@@ -223,9 +252,9 @@ export function ReplyInbox() {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wide">
+        <Caption>
           Replies {items.length > 0 && `· ${items.length}`}
-        </p>
+        </Caption>
         <Button variant="neutral" disabled={busy} onClick={() => scan.mutate()}>
           {scan.isPending ? 'Reading your mail…' : 'Check mail'}
         </Button>

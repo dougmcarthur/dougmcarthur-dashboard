@@ -8,6 +8,30 @@ export default {
   darkMode: ['class', '[data-theme="dark"]'],
   theme: {
     extend: {
+      /*
+       * The type ramp, moved up a step.
+       *
+       * This app uses `text-xs` as its body size — 297 uses against 139 of
+       * `text-sm` — so twelve pixels was not an exception for badges, it was
+       * the paragraph size, and the modal was the place that made it obvious.
+       *
+       * Changing 297 class strings would be the kind of sweep that typechecks,
+       * renders, and quietly breaks a dozen dense layouts. Redefining what the
+       * names mean moves everything at once, in proportion, with no JSX churn
+       * and nothing to get wrong one file at a time.
+       *
+       * Line heights are declared with each size because supplying a fontSize
+       * without one drops Tailwind's paired default and leaves prose set solid.
+       */
+      fontSize: {
+        xs: ['0.8125rem', { lineHeight: '1.125rem' }],   // 13px, was 12
+        sm: ['0.9375rem', { lineHeight: '1.375rem' }],   // 15px, was 14
+        base: ['1.0625rem', { lineHeight: '1.625rem' }], // 17px, was 16
+        lg: ['1.1875rem', { lineHeight: '1.75rem' }],    // 19px, was 18
+        xl: ['1.375rem', { lineHeight: '1.875rem' }],    // 22px, was 20
+        '2xl': ['1.625rem', { lineHeight: '2.125rem' }], // 26px, was 24
+        '3xl': ['2rem', { lineHeight: '2.375rem' }],     // 32px, was 30
+      },
       screens: {
         // Tailwind stops at 1536px. Displays do not.
         '3xl': '1920px',

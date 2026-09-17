@@ -5,6 +5,7 @@ import { StatusBadge } from './StatusBadge'
 import { PitchDiff } from './PitchDiff'
 import { Button } from './ui/Button'
 import { Explainer } from './ui/Explainer'
+import { Banner, Card } from './ui/Surface'
 
 type LearnChoice = 'keep' | 'learn'
 
@@ -189,7 +190,7 @@ export function ReconcilePanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="bg-surface border border-line rounded-xl shadow-card overflow-hidden">
+    <Card pad="none" clip>
       {/* Panel header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-line">
         <Explainer as="h2" title="Gmail Reconciliation">
@@ -221,7 +222,7 @@ export function ReconcilePanel({ onClose }: { onClose: () => void }) {
         )}
 
         {error && (
-          <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
+          <Banner>
             {error.includes('not configured') ? (
               <span>
                 Gmail is not connected yet, so there is no sent mail to reconcile against.
@@ -230,7 +231,7 @@ export function ReconcilePanel({ onClose }: { onClose: () => void }) {
             ) : (
               error
             )}
-          </div>
+          </Banner>
         )}
 
         {/* Results */}
@@ -302,6 +303,6 @@ export function ReconcilePanel({ onClose }: { onClose: () => void }) {
           </>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

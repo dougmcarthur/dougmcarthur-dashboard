@@ -9,6 +9,7 @@ import {
 } from '../../../shared/nudgeRouting'
 import { Select } from './ui/Field'
 import { Explainer } from './ui/Explainer'
+import { Banner, Card } from './ui/Surface'
 
 /**
  * What Scout puts where.
@@ -77,7 +78,7 @@ export function NudgeRoutingCard() {
   const missing = unreachable(p, connected)
 
   return (
-    <div className="rounded-xl border border-line bg-surface shadow-card p-4 space-y-3">
+    <Card className="space-y-3">
       <div className="border-b border-line pb-3">
         <Explainer as="h2" title="Where reminders go">
           A calendar entry means you have to be somewhere. A task means there is work to do. Scout
@@ -87,11 +88,11 @@ export function NudgeRoutingCard() {
       </div>
 
       {missing.length ? (
-        <p className="rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg">
+        <Banner tone="warn" size="sm">
           {missing.join(' and ')} {missing.length > 1 ? 'are' : 'is'} not connected, so anything sent
           there is written nowhere. Connect{' '}
           {missing.length > 1 ? 'them' : 'it'} above, or send those reminders somewhere else.
-        </p>
+        </Banner>
       ) : null}
 
       <div className="divide-y divide-line">
@@ -176,6 +177,6 @@ export function NudgeRoutingCard() {
           That could not be saved — {(patch.error as Error).message}
         </p>
       ) : null}
-    </div>
+    </Card>
   )
 }

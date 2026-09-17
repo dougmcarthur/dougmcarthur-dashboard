@@ -32,9 +32,19 @@ export function AssetRow({
   const fresh = FRESHNESS[asset.health.freshness]
   const question = asset.questionKind ? kindByKey(asset.questionKind) : undefined
   const length = asset.charCount ?? asset.value?.length ?? 0
+  /**
+   * Whether this row has nothing to report, and so can put its actions away.
+   *
+   * A row that *is* asking for something keeps them visible, because hiding
+   * them is how a screen ends up stating a problem and offering no way to fix
+   * it — which is exactly what the first version did to the press photo with
+   * no photographer credit: the credit is missing, the row said so, and the
+   * Edit button that fixes it was behind a hover.
+   */
+  const quiet = asset.health.freshness === 'fresh' && !asset.health.problem
 
   return (
-    <div className={`px-4 py-3 ${asset.archived ? 'opacity-50' : ''}`}>
+    <div className={`group px-4 py-3 ${asset.archived ? 'opacity-50' : ''}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">{asset.label}</p>
@@ -58,7 +68,15 @@ export function AssetRow({
               {fresh.text}
             </span>
           )}
-          {asset.reviewBy && (
+          {/*
+            Only where the date is doing work. `assetHealth` already sorts
+            `fresh` from `due_soon`, `overdue` and `unreviewed`, and this
+            printed the date whatever it said — so a bio that is fine for
+            another eighteen months carried a 2027 date at the same weight as
+            the bio itself, on every row. A row with nothing to report says
+            nothing, which is the honest rendering of nothing to report.
+          */}
+          {asset.reviewBy && asset.health.freshness !== 'fresh' && (
             <span className="text-xs text-faint tabular-nums">Review by {asset.reviewBy}</span>
           )}
         </div>
@@ -72,10 +90,14 @@ export function AssetRow({
             Answers: {question.label}
           </span>
         )}
+        {/*
+          Plain text rather than a fourth bordered pill. A pill carries the
+          weight of a status, and four of them per row is the density problem
+          — the count itself is a useful glance at whether a bio is a stub, so
+          it stays, at the weight of a footnote.
+        */}
         {!meta.isLink && length > 0 && (
-          <span className="px-2 py-0.5 rounded-md border border-line bg-surface text-muted tabular-nums">
-            {length} chars
-          </span>
+          <span className="text-muted tabular-nums">{length} chars</span>
         )}
         {asset.credit && (
           <span className="px-2 py-0.5 rounded-md border border-line bg-surface text-muted">© {asset.credit}</span>
@@ -89,10 +111,18 @@ export function AssetRow({
             Still good
           </Button>
         )}
-        <Button variant="quiet" size="sm" onClick={onEdit}>Edit</Button>
-        <Button variant="quiet" size="sm" disabled={busy} onClick={onArchive}>
-          {asset.archived ? 'Restore' : 'Archive'}
-        </Button>
+        {/*
+          Six buttons across three visible rows competed with the content
+          before anybody had decided anything. `Still good` is not in here: it
+          only renders on a row that is already asking for something, so it is
+          the row's point rather than its furniture.
+        */}
+        <span className={`${quiet ? 'row-actions' : ''} flex items-center gap-2`}>
+          <Button variant="quiet" size="sm" onClick={onEdit}>Edit</Button>
+          <Button variant="quiet" size="sm" disabled={busy} onClick={onArchive}>
+            {asset.archived ? 'Restore' : 'Archive'}
+          </Button>
+        </span>
       </div>
     </div>
   )

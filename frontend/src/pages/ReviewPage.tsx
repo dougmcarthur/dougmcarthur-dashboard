@@ -6,6 +6,7 @@ import type { ReviewFilter } from '../../../shared/reviewQueue'
 import { QueueRow } from './review/QueueRow'
 import { Detail } from './review/Detail'
 import { ReplyInbox } from '../components/ReplyInbox'
+import { Banner } from '../components/ui/Surface'
 
 /**
  * The filters, and why they are worded the way they are.
@@ -148,9 +149,9 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
 
   if (error) {
     return (
-      <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
+      <Banner>
         Failed to load the review queue — {(error as Error).message}
-      </div>
+      </Banner>
     )
   }
 
@@ -175,8 +176,23 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
       */}
       <ReplyInbox />
 
+      {/*
+        A filter that would find nothing is not offered.
+        `Contradictions 0` was a click that costs a screen redraw to tell you
+        there is nothing there, and nine chips is a row of them. The count was
+        already computed, so this hides the ones that cannot pay out — the
+        Artist page makes the same move by turning its tallies into filters
+        rather than decoration.
+
+        Two exceptions, and both are about not moving under the cursor. The
+        one you are *on* always stays, or choosing a filter and clearing its
+        last row would make the control you just pressed vanish. And
+        `Everything` always stays, because it is the way back.
+      */}
       <div className="flex flex-wrap gap-1.5">
-        {FILTERS.map((f) => {
+        {FILTERS.filter(
+          (f) => (counts?.[f.id] ?? 0) > 0 || filter === f.id || f.id === 'all',
+        ).map((f) => {
           const count = counts?.[f.id] ?? 0
           const active = filter === f.id
           return (

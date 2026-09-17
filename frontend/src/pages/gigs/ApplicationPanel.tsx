@@ -4,6 +4,7 @@ import { api, type Application, type PreparedField, type ChecklistItem } from '.
 import { kindByKey } from '../../../../shared/questionKinds'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea, Select } from '../../components/ui/Field'
+import { Caption } from '../../components/ui/Surface'
 
 /**
  * Phase 3 on screen: the questions this application asks, and what the artist
@@ -168,9 +169,9 @@ function Checklist({ items }: { items: ChecklistItem[] }) {
   if (items.length === 0) return null
   return (
     <div>
-      <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">
+      <Caption spaced>
         Materials to attach
-      </p>
+      </Caption>
       <ul className="space-y-1.5">
         {items.map((item) => (
           <li key={item.label} className="text-sm flex items-start gap-2">
@@ -233,7 +234,7 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wide">Application</p>
+        <Caption>Application</Caption>
         {fields.length > 0 && (
           <p className="text-xs text-muted">
             {readiness.checked} of {readiness.answered} answers read
@@ -307,9 +308,9 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
       {email && (
         <div className="border border-line rounded-lg p-3 bg-surface">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-muted uppercase tracking-wide">
+            <Caption>
               Draft email — submitted by mail
-            </p>
+            </Caption>
             <Copy text={`${email.subject}\n\n${email.body}`} label="Copy draft" />
           </div>
           <p className="text-sm font-medium text-ink mt-2">{email.subject}</p>
