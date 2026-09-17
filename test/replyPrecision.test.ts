@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { automationVerdict, isAutomated } from '../shared/bulkMail'
 import { gigTerms, planReplyScan } from '../src/lib/gmailReplies'
 import { matchStrength, strengthNote, type ReplyCandidate } from '../shared/replyMatch'
@@ -232,5 +233,47 @@ describe('an ask quoted back at you is not an ask', () => {
       ].join('\n'),
     )
     expect(reading.asks).toEqual([])
+  })
+})
+
+describe('what the scan is allowed to file', () => {
+  const route = readFileSync('src/routes/replies.ts', 'utf8')
+
+  it('files nothing for a message that matched no application', () => {
+    // The half the precision work missed, and the reason Review stayed full
+    // after it shipped. Rarity weighting stopped a pizza receipt producing a
+    // *candidate*; the row was written anyway — `best` undefined, score zero,
+    // signals empty — so the queue went on listing it under "Nothing in the
+    // pipeline matched this one". The scoring was fixed and the list was not.
+    expect(route).toContain('if (candidates.length === 0) {')
+    // And it stops there rather than falling through to the insert.
+    const branch = route.slice(route.indexOf('if (candidates.length === 0) {'))
+    expect(branch.slice(0, 400)).toContain('continue')
+  })
+
+  it('takes back a row an earlier scan filed that no longer matches', () => {
+    // Self-healing instead of a migration: the window is derived from the
+    // oldest submission, so the next sweep re-fetches that mail, re-scores it
+    // under the current rules and deletes what no longer matches. Compare
+    // wanted against present, like every other reconcile here.
+    const branch = route.slice(route.indexOf('if (candidates.length === 0) {'))
+    expect(branch.slice(0, 400)).toContain('db.delete(gigReplies)')
+  })
+
+  it('keeps an ambiguous match, which has candidates and no gig', () => {
+    // The condition is `candidates.length`, never `gigId`. An ambiguous match
+    // stores a null gig on purpose — naming one would invent the answer the
+    // matcher just said it lacked — and those rows are the whole reason the
+    // screen asks you to pick.
+    expect(route).not.toContain('if (!best)')
+    expect(route).not.toMatch(/if \(best\?\.\w+ == null\)/)
+    expect(route).toContain('gigId: ambiguous ? null : (best?.gigId ?? null)')
+  })
+
+  it('says how many it read and declined, not only how many it kept', () => {
+    // A sweep that reports "nothing new" and nothing else cannot be told from
+    // a sweep that is not running.
+    expect(route).toContain('unmatched')
+    expect(route).toContain('cleared')
   })
 })

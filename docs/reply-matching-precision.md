@@ -401,3 +401,40 @@ marker line is what ends the top post rather than the angle bracket.
 
 Matching still reads the whole body, deliberately and unchanged: the quoted
 receipt is often the only place the festival is named.
+
+### The scoring was fixed and the list was not
+
+Review stayed full after all six stages shipped, and the reason is worth
+recording because every measurement in this document was correct and the
+screen was unchanged.
+
+`runReplyScan` wrote a `gig_replies` row for **every message it fetched**,
+matched or not. With no candidate, `best` is undefined, so the row was stored
+with `gig_id` null, `match_score` 0 and `match_signals` `[]` — and
+`GET /api/replies` lists every unresolved row. So the rarity weighting did
+exactly what it was measured to do, the pizza receipt stopped producing a
+*candidate*, and the queue went on showing it under *"Nothing in the pipeline
+matched this one"*. A different caption on the same flood.
+
+The empty classification badge fixed during the UI pass was a symptom of this
+and was read as a rendering bug at the time.
+
+**A message with no candidate is no longer filed**, and a row an earlier scan
+filed that no longer matches is **deleted** rather than left. That makes the
+fix reach the mail already in the table instead of only new mail, and needs no
+migration: the sweep window is derived from the oldest submission, so the next
+scan re-fetches those messages, re-scores them under the current rules, and
+takes out what no longer matches. The same wanted-against-present shape as
+every other reconcile here.
+
+Nothing is lost by not storing them. The message stays in the mailbox, it is
+re-fetched on every scan while it is inside the window, and a gig added next
+week gives it a candidate it did not have today.
+
+The condition is `candidates.length === 0`, never `gigId == null`. An
+**ambiguous** match has candidates and stores a null gig deliberately, because
+naming one would invent the answer the matcher just said it lacked — and those
+rows are the whole reason the screen asks you to pick.
+
+The scan now also reports `unmatched` and `cleared`, because a sweep that says
+only "nothing new" cannot be told from a sweep that is not running.

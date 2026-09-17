@@ -147,7 +147,7 @@ export async function runReplyScan(
 
   const plan = planReplyScan({ gigs, bindings, today })
   if (plan.queries.length === 0) {
-    return { ...plan, found: 0, stored: 0, skipped: 0 }
+    return { ...plan, found: 0, stored: 0, skipped: 0, unmatched: 0, cleared: 0 }
   }
 
   const messages = await fetchReplies(env, plan)
@@ -168,6 +168,10 @@ export async function runReplyScan(
 
   let stored = 0
   let skipped = 0
+  // Fetched, read, and found to be about none of your applications.
+  let unmatched = 0
+  // Of those, the ones an earlier scan had filed and this one removed.
+  let cleared = 0
   const fresh: Array<{ subject: string | null; gigName: string | null; classification: string }> = []
 
   // Measured once for the whole scan rather than per message: the question is
@@ -213,6 +217,39 @@ export async function runReplyScan(
       bindings,
       rarity,
     )
+    // Nothing in the pipeline matched, so this is not a reply to an
+    // application and does not belong in a queue of them.
+    //
+    // This is the half the precision work missed. Weighing words by rarity
+    // stopped a pizza receipt producing a *candidate*, and the row was written
+    // anyway — `best` undefined, score zero, signals empty — so the Review
+    // page went on listing it under "Nothing in the pipeline matched this
+    // one". The scoring was fixed and the queue was not.
+    //
+    // A row that already exists is *deleted* rather than left, so the fix
+    // reaches the mail the old scan already filed instead of only new mail.
+    // That needs no migration and no backfill: the sweep window is derived
+    // from the oldest submission, so the next scan re-fetches those messages,
+    // re-scores them under the current rules and clears the ones that no
+    // longer match. Compare wanted against present, like every other
+    // reconcile here.
+    //
+    // Nothing is lost. The message stays in the mailbox, it is re-fetched on
+    // every scan while it is inside the window, and a gig added next week
+    // gives it a candidate it did not have today.
+    //
+    // `candidates.length` rather than `gigId`: an *ambiguous* match has
+    // candidates and deliberately stores a null gig, because naming one would
+    // invent the answer the matcher just said it lacked. Those stay.
+    if (candidates.length === 0) {
+      if (prior) {
+        await db.delete(gigReplies).where(scoped(gigReplies, tenant, eq(gigReplies.id, prior.id)))
+        cleared++
+      }
+      unmatched++
+      continue
+    }
+
     const best = candidates[0]
     const classification = classifyReply(message.body)
     // Read here, not on demand: this is the only moment the whole body
@@ -282,7 +319,11 @@ export async function runReplyScan(
     })
   }
 
-  return { ...plan, found: messages.length, stored, skipped }
+  if (cleared > 0) {
+    console.log(`cleared ${cleared} replies that no longer match anything`)
+  }
+
+  return { ...plan, found: messages.length, stored, skipped, unmatched, cleared }
 }
 
 /**
@@ -294,6 +335,10 @@ export type ReplyScanOutcome = ReturnType<typeof planReplyScan> & {
   found: number
   stored: number
   skipped: number
+  /** Read and found to be about none of your applications. */
+  unmatched: number
+  /** Of those, the ones an earlier scan had filed and this one removed. */
+  cleared: number
 }
 
 replies.post('/scan', async (c) => {

@@ -219,11 +219,22 @@ export function ReplyInbox() {
   const scan = useMutation({
     mutationFn: () => api.replies.scan(),
     onSuccess: (r) => {
-      setNote(
+      // What it read and what it declined, because a sweep that says only
+      // "nothing new" cannot be told from one that is not running. `cleared`
+      // is the interesting one the first time: mail an earlier scan filed
+      // that no longer matches anything has been taken back out.
+      const parts = [
         r.stored === 0
           ? `Nothing new. Looked back ${r.windowDays} days across ${r.gigCount} open applications.`
           : `${r.stored} new ${r.stored === 1 ? 'reply' : 'replies'}, looking back ${r.windowDays} days.`,
-      )
+      ]
+      if (r.unmatched > 0) {
+        parts.push(`${r.unmatched} ${r.unmatched === 1 ? 'message' : 'messages'} matched no application.`)
+      }
+      if (r.cleared > 0) {
+        parts.push(`Removed ${r.cleared} that no longer ${r.cleared === 1 ? 'does' : 'do'}.`)
+      }
+      setNote(parts.join(' '))
       refresh()
     },
     onError: (e) => setNote((e as Error).message),

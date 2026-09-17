@@ -216,6 +216,10 @@ export interface ReplyScanResult {
   found: number
   stored: number
   skipped: number
+  /** Read, and about none of your applications. */
+  unmatched: number
+  /** Of those, the ones an earlier scan had filed and this one removed. */
+  cleared: number
 }
 
 export interface ReconcileResult {
