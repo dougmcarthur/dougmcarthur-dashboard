@@ -29,11 +29,14 @@ export function GigDetail({
   gig,
   onEdit,
   onStatusChange,
+  onDelete,
   isPatching,
 }: {
   gig: GigOpportunity
   onEdit: () => void
   onStatusChange: (status: GigStatus) => void
+  /** Absent where a caller has nothing to delete with. */
+  onDelete?: () => void
   isPatching: boolean
 }) {
   const status = normaliseGigStatus(gig.status)
@@ -125,6 +128,23 @@ export function GigDetail({
         <Button variant="neutral" onClick={onEdit}>
           Edit details
         </Button>
+        {/*
+          Deleting lives here rather than on the table row, where it was drawn
+          once per row — thirty-four destructive controls on a screen you open
+          to read. Somebody who has decided to delete a gig has opened it, and
+          this is where they are. `ml-auto` puts it at the far end, away from
+          the two controls you press without thinking.
+        */}
+        {onDelete ? (
+          <Button
+            variant="quiet"
+            className="ml-auto text-faint hover:text-danger-fg"
+            disabled={isPatching}
+            onClick={onDelete}
+          >
+            Delete
+          </Button>
+        ) : null}
       </div>
 
       {/*

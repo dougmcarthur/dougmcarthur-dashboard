@@ -241,6 +241,30 @@
     margin-inline: auto;
   }
 
+  /*
+   * Row actions: present, but quiet until the row is hovered or something
+   * inside it has focus.
+   *
+   * Gated on `(hover: hover)` deliberately. On a touch screen there is no
+   * hover and therefore no way to reveal them, so the rule simply does not
+   * apply there and the buttons are always visible — which is why this is a
+   * media query rather than a Tailwind `hover:` variant, whose default build
+   * would hide them on a phone with no way back.
+   *
+   * `opacity` rather than `display` or `visibility`, so the buttons stay in
+   * the tab order and `:focus-within` can bring them back for a keyboard.
+   */
+  @media (hover: hover) {
+    .row-actions {
+      opacity: 0;
+      transition: opacity var(--motion-fast) ease;
+    }
+    .row-actions:focus-within,
+    .group:hover .row-actions {
+      opacity: 1;
+    }
+  }
+
   .skip-link {
     position: absolute;
     left: 0.75rem;

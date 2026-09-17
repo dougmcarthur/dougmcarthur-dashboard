@@ -56,15 +56,17 @@ pill in another. Give the reclaimed width to `NAME` and `DEADLINE`.
 columns are empty because of a schema decision, not a preference, and a
 control offering them would be a control that shows you nothing.
 
-**Second, smaller:** every row carries two status pills — the real `status`
-and the `submission_state` derived from the note — plus a `×`. Two pills reads
-as two facts of equal weight when one is the pipeline and the other is a
-parsed hint. Keep the pipeline status; move the submission state into the
-expanded row, where the note it came from already lives.
-
-**Third:** the `×` on every row is a destructive action drawn 34 times. It
+**Second:** the `×` on every row is a destructive action drawn 34 times. It
 belongs in the expanded row beside Edit, which is where somebody who has
 decided to delete a gig already is.
+
+> **Corrected while implementing.** This section originally claimed every row
+> carried two status pills, the second being `submission_state` parsed from
+> the note. Reading the code, the second pill is an *action button* — `Applied`
+> on a shortlisted row, `Will apply` / `Pass` on a discovered one. There is no
+> duplication. What is genuinely confusing is that `StatusBadge` renders
+> `shortlisted` as the words "Will apply" directly beside a button that says
+> "Applied", which is worth a look on its own and is not a density problem.
 
 ---
 
@@ -112,15 +114,30 @@ the same weight as the bio it describes.
 
 ---
 
-## 4. Overview: two panels that are one sentence each
+## 4. Overview: withdrawn
 
-The right column holds a callout — *7 opportunities have no deadline* — and a
-`Data health: 2 deadlines are not a date` line, in different treatments, both
-saying "something about your data is imperfect". Two boxes, two visual
-weights, one idea.
+The proposal here was to merge the *7 opportunities have no deadline* callout
+with the `Data health: 2 deadlines are not a date` line, on the grounds that
+both said "something about your data is imperfect" in two visual weights.
 
-**Proposal.** One data-health block, with the lines inside it. It is the same
-merge the Integrations card did to three cards that were three kinds of thing.
+**That was a misreading and the merge would have been wrong.** They are two
+different claims:
+
+- `OpenEndedRow` is about the **shape of the backlog** — work that is
+  available and that nothing is forcing. Not a fault.
+- `DataHealthRow` is about **data that is broken** — a status contradicting
+  its note, a deadline that failed to parse, a reminder pointing at a deleted
+  gig.
+
+Merging them would file "you have seven things with no urgency" under the same
+heading as "two deadlines are not dates", which is the opposite of the
+distinction this app keeps making everywhere else. Left alone.
+
+The one real observation: `DataHealthRow` renders as a bare line of text
+directly beneath a card, so the column carries two visual treatments. Its own
+doc comment says it should be deleted once the underlying issues are fixed —
+"a permanently clean health row is furniture" — so the right move is to fix
+the data rather than restyle the reporter. Nothing to do here.
 
 ---
 
@@ -150,7 +167,7 @@ stop.
 3. Artist row actions and review dates — needs a hover/focus pattern that also
    works on touch, so slightly more care.
 4. Review evidence behind the info button — reuses `Explainer`.
-5. Overview data-health merge — smallest gain, do last.
+5. ~~Overview data-health merge~~ — withdrawn; see above.
 
 Everything above is reversible and none of it removes a fact from the
 database. Where something is hidden, it is hidden **behind a state that says

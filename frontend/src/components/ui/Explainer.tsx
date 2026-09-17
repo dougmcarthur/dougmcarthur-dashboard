@@ -73,6 +73,17 @@ export interface ExplainerProps {
    * a four-word-wide ribbon.
    */
   aside?: ReactNode
+  /**
+   * Whether the appearance toggle may hide this one. Default true.
+   *
+   * False for content that is *data about the row* rather than teaching —
+   * the evidence behind a reply match, say. Somebody who switches
+   * explanations off is saying they know how the app works, not that they no
+   * longer want to see why a particular email was matched to a particular
+   * application. Hiding the second with the first would make a fact
+   * unreachable through a preference about hand-holding.
+   */
+  hideable?: boolean
 }
 
 export function Explainer({
@@ -83,13 +94,14 @@ export function Explainer({
   id,
   titleClassName = 'text-sm font-semibold text-ink',
   aside,
+  hideable = true,
 }: ExplainerProps) {
   const [open, setOpen] = useState(false)
   const panelId = useId()
   const { appearance } = useAppearance()
   // Read after the hooks above, never before: bailing out early would change
   // how many hooks this component calls between renders.
-  const offered = appearance.showHints && Boolean(children)
+  const offered = (appearance.showHints || !hideable) && Boolean(children)
 
   // Escape closes. Clicking elsewhere deliberately does *not*, and that is the
   // difference between this and a popover: a panel that floats over the page

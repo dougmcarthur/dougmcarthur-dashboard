@@ -102,6 +102,29 @@ export function GigsPage() {
 
   const isPatching = patchMutation.isPending
 
+  /**
+   * Whether any row in the table has ever filled this in.
+   *
+   * `organizer` and `genreFitScore` are empty on all thirty-four production
+   * rows, because nothing extracts them — CLAUDE.md records that no note
+   * carries either in a form anything can read. They were still two of eight
+   * columns, a quarter of the table's width holding an em-dash on every row,
+   * while `name` wrapped to three lines in what was left.
+   *
+   * Dropping them outright would be wrong: both are editable by hand in the
+   * create and edit forms, so they *can* hold a value and hiding one would
+   * hide something somebody typed. Asking the data instead is the same rule
+   * the rest of this pass follows — the column appears the moment one row has
+   * something to put in it, and goes when the last one is cleared.
+   *
+   * Measured against the whole result set rather than the filtered view, so
+   * that changing a status filter cannot make columns appear and disappear
+   * underneath the cursor.
+   */
+  const filled = (has: (row: (typeof data)[number]) => boolean) => data.some(has)
+  const showOrganizer = filled((r) => Boolean(r.organizer))
+  const showFit = filled((r) => r.genreFitScore != null)
+
   const columns = [
     col.accessor('name', {
       header: 'Name',
@@ -120,10 +143,14 @@ export function GigsPage() {
       header: 'Type',
       cell: (info) => <TypeChip type={info.getValue()} />,
     }),
-    col.accessor('organizer', {
-      header: 'Organizer',
-      cell: (info) => info.getValue() ?? <span className="text-faint">—</span>,
-    }),
+    ...(showOrganizer
+      ? [
+          col.accessor('organizer', {
+            header: 'Organizer',
+            cell: (info) => info.getValue() ?? <span className="text-faint">—</span>,
+          }),
+        ]
+      : []),
     col.accessor('deadline', {
       header: 'Deadline',
       cell: (info) => {
@@ -141,24 +168,30 @@ export function GigsPage() {
     }),
     col.accessor('feeAmount', {
       header: 'Fee',
+      // `paid` used to be a column of its own and is a word on this one now.
+      // It was filled on two rows of thirty-four, so it spent a column's width
+      // drawing an em-dash thirty-two times to say "Paid" twice — and the row
+      // whose fee is "Travel bursary available (amount unclear)" reads as one
+      // piece of prose rather than as prose in one cell and a pill in another.
       cell: (info) => {
         const amt = info.getValue()
         const row = info.row.original
+        const paid = row.paid ? <span className="text-success-fg"> · paid</span> : null
         if (amt == null && !row.fee) return <span className="text-faint">—</span>
-        if (amt != null) return <span>{row.feeCurrency ?? 'USD'} {amt.toLocaleString()}</span>
-        return <span className="text-muted text-xs">{row.fee}</span>
+        if (amt != null) {
+          return <span>{row.feeCurrency ?? 'USD'} {amt.toLocaleString()}{paid}</span>
+        }
+        return <span className="text-muted text-xs">{row.fee}{paid}</span>
       },
     }),
-    col.accessor('paid', {
-      header: 'Paid',
-      cell: (info) => info.getValue()
-        ? <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-success-bg text-success-fg">Paid</span>
-        : <span className="text-faint text-xs">—</span>,
-    }),
-    col.accessor('genreFitScore', {
-      header: 'Fit',
-      cell: (info) => <FitScore score={info.getValue() ?? null} />,
-    }),
+    ...(showFit
+      ? [
+          col.accessor('genreFitScore', {
+            header: 'Fit',
+            cell: (info) => <FitScore score={info.getValue() ?? null} />,
+          }),
+        ]
+      : []),
     col.accessor('status', {
       header: 'Status',
       cell: (info) => <StatusBadge status={info.getValue()} kind="gig" />,
@@ -188,12 +221,6 @@ export function GigsPage() {
                 Applied
               </Button>
             )}
-            <button disabled={deleteMutation.isPending}
-              onClick={() => { if (confirm(`Delete "${row.name}"?`)) deleteMutation.mutate(row.id) }}
-              className="w-6 h-6 flex items-center justify-center rounded text-faint hover:text-danger-fg hover:bg-danger-bg disabled:opacity-40 transition-colors"
-              title="Delete">
-              ×
-            </button>
           </div>
         )
       },
@@ -297,6 +324,11 @@ export function GigsPage() {
                             gig={row.original}
                             onEdit={() => setEditingId(row.original.id)}
                             onStatusChange={(status) => patchMutation.mutate({ id: row.original.id, body: { status } })}
+                            onDelete={() => {
+                              if (confirm(`Delete "${row.original.name}"?`)) {
+                                deleteMutation.mutate(row.original.id)
+                              }
+                            }}
                             isPatching={isPatching}
                           />
                         )}
