@@ -4,6 +4,7 @@ import {
   INTEGRATIONS,
   integrationSpec,
   isConnectable,
+  rowNeedsAttention,
   stateNote,
   type IntegrationSpec,
 } from '../shared/integrations'
@@ -157,5 +158,60 @@ describe('the sentence under the status pill', () => {
     for (const state of ['working', 'unverified', 'unreachable', 'declared'] as const) {
       expect(stateNote(grant, state, STATE_NOTES[state])).toBe(STATE_NOTES[state])
     }
+  })
+})
+
+describe('what counts as needing attention', () => {
+  it('does not call an unconnected grant a problem', () => {
+    // A Connect button is not a fault report. Counting these told a new
+    // account that several things were broken on the day it was set up
+    // correctly, which is how a summary line stops being read.
+    for (const spec of INTEGRATIONS.filter((s) => s.kind === 'grant')) {
+      expect(rowNeedsAttention(spec, 'unconfigured'), spec.id).toBe(false)
+    }
+  })
+
+  it('still calls a missing server credential a problem', () => {
+    // Same state, different meaning: nobody can press a button to fix this
+    // one, and something that was supposed to work is not working.
+    for (const spec of INTEGRATIONS.filter((s) => s.kind !== 'grant')) {
+      expect(rowNeedsAttention(spec, 'unconfigured'), spec.id).toBe(true)
+    }
+  })
+
+  it('raises a refused credential whatever kind of row it is on', () => {
+    // `rejected` means it was connected and has stopped, which is the state
+    // the whole probe exists to surface. A grant is not exempt from that.
+    for (const spec of INTEGRATIONS) {
+      expect(rowNeedsAttention(spec, 'rejected'), spec.id).toBe(true)
+    }
+  })
+
+  it('stays quiet about the states the shared rule is quiet about', () => {
+    for (const spec of INTEGRATIONS) {
+      for (const state of ['working', 'unverified', 'unreachable', 'declared'] as const) {
+        expect(rowNeedsAttention(spec, state), `${spec.id} ${state}`).toBe(false)
+      }
+    }
+  })
+})
+
+describe('the row does not say the same thing twice', () => {
+  const card = readFileSync('frontend/src/components/IntegrationsCard.tsx', 'utf8')
+
+  it('shows the status pill only when there is no Connect button', () => {
+    // "Not connected" beside a Connect button is the button's own message in
+    // two words and a colour. The button is the stronger signal because it is
+    // the thing you can act on, so the pill steps aside for it.
+    expect(card).toMatch(/offeringConnect\s*\?/)
+    expect(card).toContain('offeringConnect')
+  })
+
+  it('keeps a way into the detail when the pill is gone', () => {
+    // The pill used to be the only way in. "What can this reach, and what can
+    // it not" is most worth reading *before* connecting — exactly when there
+    // is now no pill — so the row's name opens it too.
+    const opens = card.match(/onClick=\{onOpen\}/g) ?? []
+    expect(opens.length).toBeGreaterThanOrEqual(2)
   })
 })

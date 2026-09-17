@@ -450,3 +450,76 @@ describe('screens name things, they do not print identifiers', () => {
     }
   })
 })
+
+describe('an explanation is offered, never imposed', () => {
+  const explainer = readFileSync('frontend/src/components/ui/Explainer.tsx', 'utf8')
+
+  it('opens on click and on nothing else', () => {
+    // A hover popover appears because a pointer crossed something on its way
+    // somewhere else, and then covers what the person was heading for.
+    // Opening an explanation has to be a thing somebody decided to do.
+    expect(explainer).not.toMatch(/onMouseEnter|onMouseOver|onPointerEnter/)
+    expect(explainer).not.toMatch(/group-hover:(block|flex|opacity-100)/)
+    expect(explainer).toContain('onClick')
+  })
+
+  it('closes on Escape, and deliberately not on a click elsewhere', () => {
+    // The difference between this and a popover. One that floats over the page
+    // has to get out of the way of the next click; one that expands in place
+    // obstructs nothing, so closing it would take something away for no
+    // reason. A click-away handler also closes the *previous* panel, so two
+    // could never be open — and comparing two settings is exactly when you
+    // want both. That was the shipped behaviour until a browser run caught it
+    // contradicting the comment above it.
+    expect(explainer).toContain("'Escape'")
+    expect(explainer).not.toContain('mousedown')
+  })
+
+  it('says whether it is open, so it is not a mystery to a screen reader', () => {
+    expect(explainer).toContain('aria-expanded')
+    expect(explainer).toContain('aria-controls')
+  })
+
+  it('is the only place an info affordance is drawn', () => {
+    // Fourteen button strings is how this repository learned the rule. One
+    // icon, imported — a second drawing of it is the same mistake in miniature.
+    const files = (function walk(dir: string): string[] {
+      return readdirSync(dir).flatMap((name) => {
+        const p = join(dir, name)
+        return statSync(p).isDirectory() ? walk(p) : p.endsWith('.tsx') ? [p] : []
+      })
+    })('frontend/src')
+
+    const drawing = files.filter(
+      (f) =>
+        !f.endsWith('Explainer.tsx') &&
+        /<svg[^>]*>[\s\S]{0,300}?<circle[\s\S]{0,300}?M8 7\.25/.test(readFileSync(f, 'utf8')),
+    )
+    expect(drawing, 'a second info icon was drawn instead of importing InfoGlyph').toEqual([])
+  })
+
+  it('can be switched off wholesale, and only hides explanations when it is', () => {
+    // Somebody who has read them should get the screen back. What goes is the
+    // offer, not the answer — and nothing that is a warning, a count or an
+    // error goes with it, because those are the app telling you something
+    // rather than teaching you something.
+    expect(explainer).toContain('showHints')
+    const appearance = readFileSync('frontend/src/appearance.ts', 'utf8')
+    expect(appearance).toContain('showHints: true')
+  })
+
+  it('leaves the settings cards with no explanatory paragraph of their own', () => {
+    // The conversion, pinned. A card that grows its prose back gets a wall of
+    // text on a screen the rest of which has none.
+    for (const file of [
+      'frontend/src/components/ProfileCard.tsx',
+      'frontend/src/components/PasskeysCard.tsx',
+      'frontend/src/components/AdminModeCard.tsx',
+      'frontend/src/components/DigestSettingsCard.tsx',
+      'frontend/src/components/NudgeRoutingCard.tsx',
+      'frontend/src/components/AppearanceSettings.tsx',
+    ]) {
+      expect(readFileSync(file, 'utf8'), file).toContain('Explainer')
+    }
+  })
+})

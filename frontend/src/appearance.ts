@@ -26,6 +26,17 @@ export interface Appearance {
   reduceMotion: boolean
   /** Underline links in body copy, not just on hover. */
   underlineLinks: boolean
+  /**
+   * Show the info buttons that hold each setting's explanation.
+   *
+   * On by default, because somebody opening a screen for the first time is
+   * exactly who the explanations are for. Off is for the person who has read
+   * them: the sentences are not gone, they are just not offered, and turning
+   * this back on restores every one of them. Nothing is hidden that is not
+   * *only* an explanation — a warning, a count and an error all stay put,
+   * because those are the app telling you something rather than teaching you.
+   */
+  showHints: boolean
 }
 
 export const DEFAULTS: Appearance = {
@@ -39,6 +50,7 @@ export const DEFAULTS: Appearance = {
   highContrast: false,
   reduceMotion: false,
   underlineLinks: false,
+  showHints: true,
 }
 
 export const TEXT_SCALE: Record<TextSize, number> = {

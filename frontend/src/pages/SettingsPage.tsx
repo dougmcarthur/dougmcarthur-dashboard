@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type ReferenceDoc } from '../api'
 import { IntegrationsCard } from '../components/IntegrationsCard'
 import { NudgeRoutingCard } from '../components/NudgeRoutingCard'
+import { Explainer } from '../components/ui/Explainer'
 import { AppearanceSettings } from '../components/AppearanceSettings'
 import { DigestSettingsCard } from '../components/DigestSettingsCard'
 import { FIELD } from '../components/ui/Field'
@@ -265,12 +266,9 @@ export function SettingsPage() {
       </div>
 
       <div className="space-y-3 max-w-4xl">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-ink">Reference Docs</h2>
-          <p className="text-xs text-muted">
-            Bio, press kit, pitch templates — text blocks the automation agent pulls from
-          </p>
-        </div>
+        <Explainer as="h2" title="Reference Docs">
+          Bio, press kit, pitch templates — text blocks the automation agent pulls from.
+        </Explainer>
 
         {isLoading ? (
           <div className="space-y-2 animate-pulse">

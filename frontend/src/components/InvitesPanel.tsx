@@ -5,6 +5,7 @@ import { withConfirmation } from '../confirmIdentity'
 import { Button } from './ui/Button'
 import { FIELD } from './ui/Field'
 import { shortDate } from '../format'
+import { Explainer } from './ui/Explainer'
 
 /**
  * Inviting an artist, on the oversight surface.
@@ -64,12 +65,18 @@ export function InvitesPanel() {
 
   return (
     <section className="space-y-4">
-      <header className="space-y-1">
-        <h2 className="text-sm font-semibold text-ink">Invitations</h2>
-        <p className="text-xs text-muted">
+      {/*
+        Only the header converts. The two paragraphs further down stay put: one
+        says the address cannot be changed once issued, which is an
+        irreversibility notice on the input it sits beside, and the other says
+        to copy the link and send it yourself, which is the next thing to do
+        rather than background. Neither is the app teaching you how it works.
+      */}
+      <header>
+        <Explainer as="h2" title="Invitations">
           An invitation creates an account when it is redeemed. It lasts thirty days, works
           once, and can be withdrawn until it is used.
-        </p>
+        </Explainer>
       </header>
 
       <div className="rounded-xl border border-line bg-surface shadow-card p-4 space-y-3">

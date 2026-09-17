@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Weekday } from '../api'
 import { relativeTime, shortDate } from '../format'
+import { Explainer } from './ui/Explainer'
 
 const DAYS: Array<{ id: Weekday; label: string }> = [
   { id: 'mon', label: 'Mon' },
@@ -48,12 +49,9 @@ export function DigestSettingsCard() {
   return (
     <div className="rounded-xl border border-line bg-surface shadow-card p-4 space-y-3">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-sm font-semibold text-ink">Weekly digest</h2>
-          <p className="text-xs text-muted mt-0.5">
-            Only when something moved. Nothing is sent when there is nothing to say.
-          </p>
-        </div>
+        <Explainer as="h2" title="Weekly digest">
+          Only when something moved. Nothing is sent when there is nothing to say.
+        </Explainer>
         <button
           onClick={() => settings && patch.mutate({ enabled: !settings.enabled })}
           disabled={!settings || patch.isPending}

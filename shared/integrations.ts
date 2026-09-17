@@ -15,6 +15,8 @@
  * words, or if a raw scope URL reaches a screen.
  */
 
+import { needsAttention, type CredentialState } from './credentialHealth'
+
 export type IntegrationId =
   | 'calendar'
   | 'calendar.primary'
@@ -180,6 +182,24 @@ const GRANT_NOTES: Partial<Record<string, string>> = {
 export function stateNote(spec: IntegrationSpec, state: string, fallback: string): string {
   if (spec.kind !== 'grant') return fallback
   return GRANT_NOTES[state] ?? fallback
+}
+
+/**
+ * Whether a row is actually *wrong*, as opposed to merely unconnected.
+ *
+ * `needsAttention` answers this for a credential, where `unconfigured` means a
+ * value the deployment needs is missing — a fault somebody has to go and fix.
+ * On a grant row it means nobody has pressed Connect yet, which is a choice
+ * not yet made and not a problem with anything. Counting those under "need
+ * attention" tells a new account that three things are broken on the day it
+ * is set up correctly, which is how a summary line stops being read.
+ *
+ * Same split `stateNote` makes, for the same reason: a grant and a secret are
+ * different kinds of thing wearing the same six states.
+ */
+export function rowNeedsAttention(spec: IntegrationSpec, state: string): boolean {
+  if (spec.kind === 'grant' && state === 'unconfigured') return false
+  return needsAttention(state as CredentialState)
 }
 
 export function integrationSpec(id: IntegrationId): IntegrationSpec {

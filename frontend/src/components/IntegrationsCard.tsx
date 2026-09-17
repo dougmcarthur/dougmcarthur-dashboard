@@ -4,6 +4,7 @@ import { api, type CalendarGrant, type CredentialHealth, type CredentialState } 
 import {
   INTEGRATIONS,
   isConnectable,
+  rowNeedsAttention,
   stateNote,
   type IntegrationId,
   type IntegrationSpec,
@@ -11,6 +12,8 @@ import {
 import { STATE_LABELS, STATE_NOTES, needsAttention } from '../../../shared/credentialHealth'
 import { Button } from './ui/Button'
 import { Modal } from './ui/Modal'
+import { Explainer, InfoGlyph } from './ui/Explainer'
+import { useAppearance } from '../hooks/useAppearance'
 
 /**
  * One list instead of a card each.
@@ -280,37 +283,72 @@ function DetailModal({ row, onClose }: { row: RowState | null; onClose: () => vo
 }
 
 function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
+  const { appearance } = useAppearance()
+  const showHints = appearance.showHints
   const connectHref = CONNECT_HREF[row.spec.id]
   const connectable = isConnectable(row.spec) && connectHref !== undefined
   const connected = row.grant?.connected ?? false
+  // A Connect button already says the thing is not connected, so the pill
+  // beside it repeated it in two words and a colour. The button is the
+  // stronger signal — it is the thing you can act on — so the pill goes and
+  // the button stands alone.
+  const offeringConnect = connectable && !connected
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-      <div className="min-w-0 flex-1">
+      {/*
+        The name is the way in to the detail now. It used to be the pill, which
+        worked until the pill stopped always being there — and "what can this
+        reach, and what can it not" is most worth reading *before* connecting,
+        which is exactly when there is no pill to click.
+
+        The one-line purpose that used to sit under the name is gone from the
+        row rather than tucked behind its own icon: the modal already opens
+        with that exact sentence as its subtitle, so a second disclosure on
+        one row would have led to the same words. It carries the same glyph as
+        every other explanation on this screen, because it is the same promise
+        — press this, read why — even though this one opens a panel with four
+        lists in it instead of a sentence.
+      */}
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group min-w-0 flex-1 flex items-center gap-1.5 text-left rounded-md
+                   focus:outline-none focus:ring-2 focus:ring-accent"
+        aria-label={`${row.spec.name} — what it can reach`}
+      >
         <h3 className="text-sm font-medium text-ink">{row.spec.name}</h3>
-        <p className="text-xs text-muted">{row.spec.purpose}</p>
-      </div>
+        {/*
+          Hidden with the rest when explanations are off. The name still opens
+          the detail — what goes is the glyph offering it, exactly as the other
+          rows lose their icon and keep their sentence behind it.
+        */}
+        {showHints ? (
+          <span className="shrink-0 text-faint transition-colors group-hover:text-body">
+            <InfoGlyph />
+          </span>
+        ) : null}
+      </button>
 
       <div className="flex shrink-0 items-center gap-2">
-        {connectable && !connected ? (
-          <Button variant="primary" className="whitespace-nowrap" onClick={() => { window.location.href = connectHref }}>
+        {offeringConnect ? (
+          <Button
+            variant="primary"
+            className="whitespace-nowrap"
+            onClick={() => { window.location.href = connectHref }}
+          >
             Connect
           </Button>
-        ) : null}
-        {/*
-          The status is the way in to the detail, for connectable rows and for
-          the two that are not: "what can this reach" is worth answering about
-          a server credential too, and a row you cannot click is a row that
-          looks broken.
-        */}
-        <button
-          type="button"
-          onClick={onOpen}
-          className="rounded-full transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent"
-          aria-label={`${row.spec.name} — connection details`}
-        >
-          <StatusPill state={row.state} />
-        </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpen}
+            className="rounded-full transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent"
+            aria-label={`${row.spec.name} — connection details`}
+          >
+            <StatusPill state={row.state} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -335,16 +373,25 @@ export function IntegrationsCard() {
   if (isLoading) return <div className="h-48 bg-sunken rounded-xl animate-pulse" />
 
   const rows = resolveRows(data)
-  const attention = rows.filter((r) => needsAttention(r.state)).length
+  // Not `needsAttention`: on a grant row, `unconfigured` means nobody has
+  // pressed Connect, which is a choice not yet made rather than a fault. See
+  // `rowNeedsAttention`.
+  const attention = rows.filter((r) => rowNeedsAttention(r.spec, r.state)).length
+  // Counted separately, because "nothing is broken" and "everything is
+  // connected" are different claims and the summary used to make the second
+  // when it could only support the first.
+  const unconnected = rows.filter((r) => r.state === 'unconfigured').length
 
   return (
     <div className="bg-surface border border-line rounded-xl shadow-card p-4">
       <div className="flex flex-col items-start gap-1.5 border-b border-line pb-3">
         <h2 className="text-sm font-semibold text-ink">Integrations</h2>
         <p className="text-xs text-muted">
-          {attention === 0
-            ? 'Everything Scout talks to is working.'
-            : `${attention} of ${rows.length} ${attention === 1 ? 'needs' : 'need'} attention.`}
+          {attention > 0
+            ? `${attention} of ${rows.length} ${attention === 1 ? 'needs' : 'need'} attention.`
+            : unconnected > 0
+              ? `${rows.length - unconnected} of ${rows.length} connected, and nothing is broken.`
+              : 'Everything Scout talks to is working.'}
         </p>
       </div>
 
@@ -355,17 +402,24 @@ export function IntegrationsCard() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
-        <Button
-          variant="neutral"
-          className="whitespace-nowrap"
-          onClick={() => check.mutate()}
-          disabled={check.isPending}
+        <Explainer
+          as="div"
+          titleClassName=""
+          titleText="checking connections"
+          title={
+            <Button
+              variant="neutral"
+              className="whitespace-nowrap"
+              onClick={() => check.mutate()}
+              disabled={check.isPending}
+            >
+              {check.isPending ? 'Checking…' : 'Check connections'}
+            </Button>
+          }
         >
-          {check.isPending ? 'Checking…' : 'Check connections'}
-        </Button>
-        <p className="min-w-0 flex-1 text-xs text-faint">
-          Asks Google whether each credential is still accepted. Runs once a day on its own.
-        </p>
+          Asks Google whether each credential is still accepted. Runs once a day on its own, which
+          is what makes a credential that quietly stopped working findable at all.
+        </Explainer>
       </div>
       {check.isError ? (
         <p className="pt-2 text-xs text-danger-fg">
