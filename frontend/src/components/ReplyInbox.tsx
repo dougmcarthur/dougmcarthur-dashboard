@@ -7,6 +7,7 @@ import { shortDate } from '../format'
 import { Button } from './ui/Button'
 import { Select } from './ui/Field'
 import { ReplyDraftPanel } from './ReplyDraftPanel'
+import { Caption } from './ui/Surface'
 
 /**
  * Phase 4 on screen: what arrived in the mail, and what the app thinks it
@@ -57,9 +58,17 @@ function Card({
   return (
     <div className="border border-line rounded-lg p-3 bg-surface">
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`text-xs px-2 py-0.5 rounded-md border bg-surface ${TONE[reply.classification] ?? TONE.unclear}`}>
-          {reply.classLabel}
-        </span>
+        {/*
+          Only when there is something to say. A reply the scan never
+          classified carries an empty label, and this drew the pill anyway —
+          eighteen pixels by six of border and background, meaning nothing, at
+          the top of the card. A badge with no text is not a quieter badge.
+        */}
+        {reply.classLabel ? (
+          <span className={`text-xs px-2 py-0.5 rounded-md border bg-surface ${TONE[reply.classification] ?? TONE.unclear}`}>
+            {reply.classLabel}
+          </span>
+        ) : null}
         {reply.classConfidence === 'low' && (
           <span className="text-xs text-faint">low confidence</span>
         )}
@@ -223,9 +232,9 @@ export function ReplyInbox() {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wide">
+        <Caption>
           Replies {items.length > 0 && `· ${items.length}`}
-        </p>
+        </Caption>
         <Button variant="neutral" disabled={busy} onClick={() => scan.mutate()}>
           {scan.isPending ? 'Reading your mail…' : 'Check mail'}
         </Button>

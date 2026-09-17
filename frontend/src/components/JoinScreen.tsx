@@ -3,6 +3,7 @@ import { startRegistration } from '@simplewebauthn/browser'
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser'
 import { api, type JoinCheck } from '../api'
 import { Button } from './ui/Button'
+import { Card } from './ui/Surface'
 
 /**
  * Redeeming an invitation.
@@ -83,7 +84,7 @@ export function JoinScreen({ token, onJoined }: { token: string; onJoined: () =>
           </p>
         </div>
 
-        <div className="rounded-xl border border-line bg-surface shadow-card p-5 space-y-4">
+        <Card pad="md" className="space-y-4">
           {check === null && !refusal && <div className="h-20 bg-sunken rounded-md animate-pulse" />}
 
           {refusal && (
@@ -129,7 +130,7 @@ export function JoinScreen({ token, onJoined }: { token: string; onJoined: () =>
           {error && (
             <p className="text-xs text-danger-fg bg-danger-bg rounded-md px-3 py-2">{error}</p>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   )

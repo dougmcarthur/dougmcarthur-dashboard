@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button'
 import { Select } from '../../components/ui/Field'
 import { ApplicationPanel } from './ApplicationPanel'
 import { CostPanel } from './CostPanel'
+import { Caption } from '../../components/ui/Surface'
 
 /**
  * The one-click moves worth having on the row itself, by the status you are on.
@@ -49,7 +50,7 @@ export function GigDetail({
     <div className="space-y-4 max-w-3xl">
       {(gig.fitRationale || gig.fitNotes) && (
         <div>
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Why it fits</p>
+          <Caption spaced>Why it fits</Caption>
           <p className="text-sm text-body leading-relaxed">{gig.fitRationale ?? gig.fitNotes}</p>
         </div>
       )}
@@ -62,7 +63,7 @@ export function GigDetail({
       */}
       {span && (
         <div>
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1">On stage</p>
+          <Caption className="mb-1">On stage</Caption>
           <p className="text-sm font-semibold text-ink">{span}</p>
           {status !== 'booked' && (
             <p className="text-xs text-faint mt-0.5">

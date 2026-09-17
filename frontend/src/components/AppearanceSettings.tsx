@@ -8,6 +8,7 @@ import {
 } from '../appearance'
 import { Button } from './ui/Button'
 import { Explainer } from './ui/Explainer'
+import { Card } from './ui/Surface'
 
 /**
  * The appearance panel.
@@ -112,9 +113,11 @@ export function AppearanceSettings() {
   const { appearance: a, set, reset, resolved } = useAppearance()
 
   return (
-    <section
+    <Card
+      as="section"
+      pad="none"
       aria-labelledby="appearance-heading"
-      className="rounded-xl border border-line bg-surface shadow-card p-5 sm:p-6"
+      className="p-5 sm:p-6"
     >
       <div className="flex items-start justify-between gap-4 mb-4">
         <Explainer as="h2" id="appearance-heading" title="Appearance">
@@ -280,6 +283,6 @@ export function AppearanceSettings() {
           </div>
         </div>
       </div>
-    </section>
+    </Card>
   )
 }

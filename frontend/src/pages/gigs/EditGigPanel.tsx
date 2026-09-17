@@ -6,6 +6,7 @@ import { SUBMISSION_METHODS } from './constants'
 import { performanceDateProblem } from '../../../../shared/performance'
 import { TRAVEL_BANDS, LODGING_TIERS } from '../../../../shared/gigCost'
 import { Explainer } from '../../components/ui/Explainer'
+import { CAPTION_CLASS, Label } from '../../components/ui/Surface'
 
 /** Editing an existing row in place, inside its expanded table row. */
 export function EditGigPanel({
@@ -89,27 +90,27 @@ export function EditGigPanel({
     <div className="space-y-4 max-w-3xl">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Name</label>
+          <Label>Name</Label>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Type</label>
+          <Label>Type</Label>
           <input value={draft.type} onChange={(e) => set('type', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Organizer</label>
+          <Label>Organizer</Label>
           <input value={draft.organizer} onChange={(e) => set('organizer', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Deadline</label>
+          <Label>Deadline</Label>
           <input type="date" value={draft.deadline} onChange={(e) => set('deadline', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Applications open</label>
+          <Label>Applications open</Label>
           <input type="date" value={draft.opensAt} onChange={(e) => set('opensAt', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Fee</label>
+          <Label>Fee</Label>
           <div className="flex gap-1.5">
             <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={`${FIELD} w-20 shrink-0`}>
               {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
@@ -118,29 +119,29 @@ export function EditGigPanel({
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Submit via</label>
+          <Label>Submit via</Label>
           <select value={draft.submissionMethod} onChange={(e) => set('submissionMethod', e.target.value)} className={FIELD}>
             <option value="">—</option>
             {SUBMISSION_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Audience size</label>
+          <Label>Audience size</Label>
           <input type="number" min="0" value={draft.audienceSize} onChange={(e) => set('audienceSize', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Fit score (1–5)</label>
+          <Label>Fit score (1–5)</Label>
           <select value={draft.genreFitScore} onChange={(e) => set('genreFitScore', e.target.value)} className={FIELD}>
             <option value="">—</option>
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">Why it fits</label>
+          <Label>Why it fits</Label>
           <textarea rows={3} value={draft.fitRationale} onChange={(e) => set('fitRationale', e.target.value)} className={`${FIELD} resize-none`} />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">URL</label>
+          <Label>URL</Label>
           <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} className={FIELD} />
         </div>
 
@@ -150,16 +151,16 @@ export function EditGigPanel({
           show, and they are the only ones the calendar writes as an event.
         */}
         <div className="col-span-2 pt-1">
-          <Explainer as="div" title="Performance dates" titleClassName="text-xs font-semibold text-muted uppercase tracking-wide">
+          <Explainer as="div" title="Performance dates" titleClassName={CAPTION_CLASS}>
             When you are on stage. Goes on your calendar once this is booked, and not before.
           </Explainer>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">First day</label>
+          <Label>First day</Label>
           <input type="date" value={draft.performanceStart} onChange={(e) => set('performanceStart', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Last day <span className="text-faint font-normal">— if it runs more than one</span></label>
+          <Label>Last day <span className="text-faint font-normal">— if it runs more than one</span></Label>
           <input type="date" value={draft.performanceEnd} onChange={(e) => set('performanceEnd', e.target.value)} className={FIELD} />
         </div>
         {dateProblem && (
@@ -179,14 +180,14 @@ export function EditGigPanel({
           </Explainer>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Where</label>
+          <Label>Where</Label>
           <input
             type="text" placeholder="Gimli, MB" value={draft.location}
             onChange={(e) => set('location', e.target.value)} className={FIELD}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Country</label>
+          <Label>Country</Label>
           <select value={draft.country} onChange={(e) => set('country', e.target.value)} className={FIELD}>
             <option value="">—</option>
             <option value="CA">Canada</option>
@@ -195,7 +196,7 @@ export function EditGigPanel({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Getting there</label>
+          <Label>Getting there</Label>
           <select value={draft.travelBand} onChange={(e) => set('travelBand', e.target.value)} className={FIELD}>
             <option value="">Guess from the location</option>
             {(Object.keys(TRAVEL_BANDS) as Array<keyof typeof TRAVEL_BANDS>).map((b) => (
@@ -206,16 +207,16 @@ export function EditGigPanel({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">
+          <Label>
             Nights away <span className="text-faint font-normal">— 0 if you sleep at home</span>
-          </label>
+          </Label>
           <input
             type="number" min={0} value={draft.nights}
             onChange={(e) => set('nights', e.target.value)} className={FIELD}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Room</label>
+          <Label>Room</Label>
           <select value={draft.lodgingTier} onChange={(e) => set('lodgingTier', e.target.value)} className={FIELD}>
             <option value="">Guess from the location</option>
             {(Object.keys(LODGING_TIERS) as Array<keyof typeof LODGING_TIERS>).map((t) => (
@@ -224,7 +225,7 @@ export function EditGigPanel({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Showcase or paid booking</label>
+          <Label>Showcase or paid booking</Label>
           <select
             value={draft.performanceKind}
             onChange={(e) => set('performanceKind', e.target.value)}
@@ -242,18 +243,18 @@ export function EditGigPanel({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">
+          <Label>
             Stipend <span className="text-faint font-normal">— CAD</span>
-          </label>
+          </Label>
           <input
             type="number" min={0} value={draft.stipendAmount}
             onChange={(e) => set('stipendAmount', e.target.value)} className={FIELD}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">
+          <Label>
             Guarantee <span className="text-faint font-normal">— CAD</span>
-          </label>
+          </Label>
           <input
             type="number" min={0} value={draft.guaranteeAmount}
             onChange={(e) => set('guaranteeAmount', e.target.value)} className={FIELD}

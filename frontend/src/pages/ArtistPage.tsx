@@ -13,6 +13,7 @@ import { AssetRow } from './artist/AssetRow'
 import { AssetForm } from './artist/AssetForm'
 import { SourcePanel } from './artist/SourcePanel'
 import { Explainer } from '../components/ui/Explainer'
+import { Caption, Card } from '../components/ui/Surface'
 
 const AUDIENCES: Array<{ id: EpkAudience; label: string; blurb: string }> = [
   { id: 'festival', label: 'Festival', blurb: 'Live video, stage plot, the practical facts.' },
@@ -173,11 +174,11 @@ export function ArtistPage() {
             </p>
           )}
           {grouped.map((group) => (
-            <section key={group.kind} className="bg-surface border border-line rounded-xl shadow-card overflow-hidden">
+            <Card as="section" key={group.kind} pad="none" clip>
               <header className="px-4 py-2.5 bg-sunken border-b border-line">
-                <h2 className="text-xs font-semibold text-muted uppercase tracking-wide">
+                <Caption as="h2">
                   {ASSET_KIND_META[group.kind].plural}
-                </h2>
+                </Caption>
               </header>
               <div className="divide-y divide-line">
                 {group.assets.map((a) =>
@@ -202,7 +203,7 @@ export function ArtistPage() {
                   ),
                 )}
               </div>
-            </section>
+            </Card>
           ))}
         </div>
       ) : (
@@ -217,9 +218,9 @@ export function ArtistPage() {
                 </div>
               )}
               {epk.data.sections.map((section) => (
-                <section key={section.kind} className="bg-surface border border-line rounded-xl shadow-card overflow-hidden">
+                <Card as="section" key={section.kind} pad="none" clip>
                   <header className="px-4 py-2.5 bg-sunken border-b border-line">
-                    <h2 className="text-xs font-semibold text-muted uppercase tracking-wide">{section.heading}</h2>
+                    <Caption as="h2">{section.heading}</Caption>
                   </header>
                   <div className="divide-y divide-line">
                     {section.assets.map((a) => (
@@ -233,7 +234,7 @@ export function ArtistPage() {
                       />
                     ))}
                   </div>
-                </section>
+                </Card>
               ))}
             </>
           )}

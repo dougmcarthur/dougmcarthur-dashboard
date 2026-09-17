@@ -6,6 +6,7 @@ import type { ReviewFilter } from '../../../shared/reviewQueue'
 import { QueueRow } from './review/QueueRow'
 import { Detail } from './review/Detail'
 import { ReplyInbox } from '../components/ReplyInbox'
+import { Banner } from '../components/ui/Surface'
 
 /**
  * The filters, and why they are worded the way they are.
@@ -148,9 +149,9 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
 
   if (error) {
     return (
-      <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
+      <Banner>
         Failed to load the review queue — {(error as Error).message}
-      </div>
+      </Banner>
     )
   }
 

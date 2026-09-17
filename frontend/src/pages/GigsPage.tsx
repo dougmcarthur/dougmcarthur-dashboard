@@ -20,6 +20,7 @@ import { Button } from '../components/ui/Button'
 import { CreateGigForm } from './gigs/CreateGigForm'
 import { EditGigPanel } from './gigs/EditGigPanel'
 import { GigDetail } from './gigs/GigDetail'
+import { Banner, CAPTION_CLASS, Card } from '../components/ui/Surface'
 
 // The pipeline order, from shared/gigStatus.ts, so the picker and the Worker
 // can never disagree about what a status is or what it means.
@@ -212,9 +213,9 @@ export function GigsPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
+      <Banner>
         Failed to load gigs — {(error as Error).message}
-      </div>
+      </Banner>
     )
   }
 
@@ -253,7 +254,7 @@ export function GigsPage() {
       {isLoading ? (
         <SkeletonTable rows={6} cols={8} />
       ) : (
-        <div className="bg-surface border border-line rounded-xl shadow-card overflow-hidden">
+        <Card pad="none" clip>
           <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-sunken border-b border-line">
@@ -261,7 +262,7 @@ export function GigsPage() {
                 <tr key={hg.id}>
                   {hg.headers.map((header) => (
                     <th key={header.id} onClick={header.column.getToggleSortingHandler()}
-                      className="px-4 py-2.5 text-left text-xs font-semibold text-muted uppercase tracking-wide select-none cursor-pointer whitespace-nowrap hover:text-body transition-colors">
+                      className={`px-4 py-2.5 text-left ${CAPTION_CLASS} select-none cursor-pointer whitespace-nowrap hover:text-body transition-colors`}>
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       <span className="ml-1 text-faint">
                         {header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : ''}
@@ -314,7 +315,7 @@ export function GigsPage() {
             </tbody>
           </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {!isLoading && (

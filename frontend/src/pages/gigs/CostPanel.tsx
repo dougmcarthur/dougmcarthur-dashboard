@@ -5,6 +5,7 @@ import {
   formatCostRange,
   type CostLine,
 } from '../../../../shared/gigCost'
+import { Caption } from '../../components/ui/Surface'
 
 /**
  * What the trip costs, assembled on read.
@@ -24,7 +25,7 @@ export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }
   if (estimate.lines.length === 0 && estimate.income.high === 0) {
     return (
       <div>
-        <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">What it costs</p>
+        <Caption spaced>What it costs</Caption>
         <p className="text-sm text-faint">
           Nothing to cost this on yet — add a location, a country and the nights away in Edit details.
         </p>
@@ -36,7 +37,7 @@ export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }
 
   return (
     <div>
-      <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">What it costs</p>
+      <Caption spaced>What it costs</Caption>
 
       <p className="text-lg font-semibold text-ink">
         {formatCostRange(estimate.net)}
@@ -101,7 +102,7 @@ export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }
 
       {estimate.unknowns.length > 0 && (
         <div className="mt-3">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1">Not counted</p>
+          <Caption className="mb-1">Not counted</Caption>
           <ul className="space-y-0.5">
             {estimate.unknowns.map((u) => (
               <li key={u} className="text-xs text-faint">

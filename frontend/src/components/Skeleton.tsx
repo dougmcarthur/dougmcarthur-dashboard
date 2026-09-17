@@ -1,6 +1,7 @@
+import { Card } from './ui/Surface'
 export function SkeletonTable({ rows = 5, cols = 5 }: { rows?: number; cols?: number }) {
   return (
-    <div className="bg-surface border border-line rounded-xl shadow-card overflow-hidden animate-pulse">
+    <Card pad="none" clip className="animate-pulse">
       <div className="border-b border-line px-4 py-2.5 bg-sunken flex gap-6">
         {Array.from({ length: cols }).map((_, i) => (
           <div key={i} className="h-3 bg-line rounded" style={{ width: `${60 + (i % 3) * 20}px` }} />
@@ -15,13 +16,13 @@ export function SkeletonTable({ rows = 5, cols = 5 }: { rows?: number; cols?: nu
           <div className="h-5 bg-sunken rounded-full w-20" />
         </div>
       ))}
-    </div>
+    </Card>
   )
 }
 
 export function SkeletonList({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="bg-surface border border-line rounded-xl shadow-card divide-y divide-line animate-pulse">
+    <Card pad="none" divided className="animate-pulse">
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="px-4 py-3 flex items-center justify-between">
           <div className="space-y-1.5">
@@ -31,6 +32,6 @@ export function SkeletonList({ rows = 4 }: { rows?: number }) {
           <div className="h-5 bg-sunken rounded-full w-20" />
         </div>
       ))}
-    </div>
+    </Card>
   )
 }

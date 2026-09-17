@@ -14,6 +14,7 @@ import { Button } from './ui/Button'
 import { Modal } from './ui/Modal'
 import { Explainer, InfoGlyph } from './ui/Explainer'
 import { useAppearance } from '../hooks/useAppearance'
+import { Banner, Card } from './ui/Surface'
 
 /**
  * One list instead of a card each.
@@ -266,17 +267,17 @@ function DetailModal({
           is a trade somebody may legitimately want to make, not a mistake.
         */}
         {!row.serverReady ? (
-          <p className="rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg">
+          <Banner tone="warn" size="sm">
             Connecting is not possible on this deployment yet
             {missing.length ? <> — {missing.join(' and ')} {missing.length > 1 ? 'are' : 'is'} not set on the server</> : null}. Nothing
             you can fix from here.
-          </p>
+          </Banner>
         ) : null}
 
         {spec.gated ? (
-          <p className="rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg">
+          <Banner tone="warn" size="sm">
             {spec.gated.reason}
-          </p>
+          </Banner>
         ) : null}
 
         <div className="space-y-1.5">
@@ -431,7 +432,7 @@ export function IntegrationsCard() {
   const blocked = data?.grantMissingSecrets ?? []
 
   return (
-    <div className="bg-surface border border-line rounded-xl shadow-card p-4">
+    <Card>
       <div className="flex flex-col items-start gap-1.5 border-b border-line pb-3">
         <h2 className="text-sm font-semibold text-ink">Integrations</h2>
         <p className="text-xs text-muted">
@@ -500,6 +501,6 @@ export function IntegrationsCard() {
         missing={data?.grantMissingSecrets ?? []}
         onClose={() => setOpenId(null)}
       />
-    </div>
+    </Card>
   )
 }

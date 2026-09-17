@@ -7,6 +7,7 @@ import { withConfirmation } from '../confirmIdentity'
 import { Button } from './ui/Button'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from './ui/Explainer'
+import { Card } from './ui/Surface'
 
 /**
  * What can sign in, and what it would cost to lose each one.
@@ -87,7 +88,7 @@ export function PasskeysCard() {
   const onlyOne = items.length === 1
 
   return (
-    <div className="rounded-xl border border-line bg-surface shadow-card p-4 space-y-3">
+    <Card className="space-y-3">
       <div className="flex items-start justify-between gap-4">
         <Explainer as="h2" title="Passkeys">
           What can sign in to this dashboard. Cloudflare Access and the emailed login code are
@@ -162,6 +163,6 @@ export function PasskeysCard() {
           </Button>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }

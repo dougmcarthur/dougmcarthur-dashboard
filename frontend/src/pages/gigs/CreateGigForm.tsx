@@ -5,6 +5,8 @@ import { GIG_STATUSES, GIG_STATUS_META } from '../../../../shared/gigStatus'
 import { FIELD } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
 import { SUBMISSION_METHODS } from './constants'
+import { Card } from '../../components/ui/Surface'
+import { Label } from '../../components/ui/Surface'
 
 /** The "+ New gig" form. Its own draft shape, kept local to it. */
 type GigDraft = {
@@ -60,32 +62,32 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
   })
 
   return (
-    <div className="bg-surface border border-line rounded-xl shadow-card p-5 space-y-4">
+    <Card pad="md" className="space-y-4">
       <h2 className="text-sm font-semibold text-ink">New Gig Opportunity</h2>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2 grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-muted mb-1">Name *</label>
+            <Label>Name *</Label>
             <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="SXSW 2027" className={FIELD} autoFocus />
           </div>
           <div>
-            <label className="block text-xs font-medium text-muted mb-1">Type *</label>
+            <Label>Type *</Label>
             <input value={draft.type} onChange={(e) => set('type', e.target.value)} placeholder="festival, showcase, venue…" className={FIELD} />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Organizer</label>
+          <Label>Organizer</Label>
           <input value={draft.organizer} onChange={(e) => set('organizer', e.target.value)} placeholder="SXSW LLC" className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Deadline</label>
+          <Label>Deadline</Label>
           <input type="date" value={draft.deadline} onChange={(e) => set('deadline', e.target.value)} className={FIELD} />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Fee amount</label>
+          <Label>Fee amount</Label>
           <div className="flex gap-1.5">
             <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={`${FIELD} w-20 shrink-0`}>
               {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
@@ -94,7 +96,7 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Submit via</label>
+          <Label>Submit via</Label>
           <select value={draft.submissionMethod} onChange={(e) => set('submissionMethod', e.target.value)} className={FIELD}>
             <option value="">—</option>
             {SUBMISSION_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -102,11 +104,11 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Audience size</label>
+          <Label>Audience size</Label>
           <input type="number" min="0" value={draft.audienceSize} onChange={(e) => set('audienceSize', e.target.value)} placeholder="500" className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Fit score (1–5)</label>
+          <Label>Fit score (1–5)</Label>
           <select value={draft.genreFitScore} onChange={(e) => set('genreFitScore', e.target.value)} className={FIELD}>
             <option value="">—</option>
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
@@ -114,16 +116,16 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-muted mb-1">Why it fits</label>
+          <Label>Why it fits</Label>
           <textarea rows={3} value={draft.fitRationale} onChange={(e) => set('fitRationale', e.target.value)} placeholder="Describe the fit…" className={`${FIELD} resize-none`} />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">URL</label>
+          <Label>URL</Label>
           <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} placeholder="https://…" className={FIELD} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Status</label>
+          <Label>Status</Label>
           <select value={draft.status} onChange={(e) => set('status', e.target.value as GigStatus)} className={FIELD}>
             {GIG_STATUSES.map((s) => (
               <option key={s} value={s} title={GIG_STATUS_META[s].meaning}>
@@ -151,6 +153,6 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
           Cancel
         </Button>
       </div>
-    </div>
+    </Card>
   )
 }

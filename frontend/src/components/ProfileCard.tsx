@@ -4,6 +4,7 @@ import { api } from '../api'
 import { FIELD } from './ui/Field'
 import { Button } from './ui/Button'
 import { Explainer } from './ui/Explainer'
+import { Card } from './ui/Surface'
 
 /**
  * The one field the oversight surface reads, filled in by the person it is
@@ -42,7 +43,7 @@ export function ProfileCard() {
   const dirty = name.trim() !== current
 
   return (
-    <div className="bg-surface border border-line rounded-xl shadow-card p-4 space-y-3">
+    <Card className="space-y-3">
       <Explainer title="Your name">
         What this account is called. It is not printed on anything you send — drafts and
         applications use the artist database — only on the account itself.
@@ -77,6 +78,6 @@ export function ProfileCard() {
           </span>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

@@ -174,8 +174,15 @@
 
 @layer base {
   html {
-    /* Every Tailwind size is in rem, so the whole interface scales from here. */
-    font-size: calc(16px * var(--ui-scale, 1));
+    /* Every Tailwind size is in rem, so the whole interface scales from here.
+
+       `100%` rather than `16px`, and that is an accessibility fix rather than
+       a tidy-up: a hardcoded pixel size overrides somebody who has set a
+       larger default font in their browser, which is the one preference a
+       person with low vision is most likely to have already set. A percentage
+       on the root resolves against that preference, so the setting below
+       scales *their* size rather than replacing it. */
+    font-size: calc(100% * var(--ui-scale, 1));
     -webkit-text-size-adjust: 100%;
   }
 

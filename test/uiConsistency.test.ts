@@ -523,3 +523,50 @@ describe('an explanation is offered, never imposed', () => {
     }
   })
 })
+
+describe('the shapes that were being spelled out by hand', () => {
+  const files = (function walk(dir: string): string[] {
+    return readdirSync(dir).flatMap((name) => {
+      const p = join(dir, name)
+      return statSync(p).isDirectory() ? walk(p) : p.endsWith('.tsx') ? [p] : []
+    })
+  })('frontend/src').filter((f) => !f.includes('/ui/'))
+
+  const sources = files.map((f) => [f, readFileSync(f, 'utf8')] as const)
+
+  it('never writes the form label string again', () => {
+    // Fifty-nine copies, the most repeated string in the app by a factor of
+    // eight. `Field` exported the input and left the thing above it to be
+    // typed out every time.
+    for (const [f, src] of sources) {
+      expect(src, f).not.toContain('block text-xs font-medium text-muted mb-1')
+    }
+  })
+
+  it('never hand-rolls the card shell again', () => {
+    // It had four spellings across roughly twenty uses, differing on padding,
+    // on whether rows were divided, and on clipping — which is how a card
+    // ends up looking subtly different on two screens for no reason.
+    for (const [f, src] of sources) {
+      expect(src.replace(/\s+/g, ' '), f).not.toMatch(
+        /bg-surface border border-line rounded-xl shadow-card|rounded-xl border border-line bg-surface shadow-card p-/,
+      )
+    }
+  })
+
+  it('keeps one letter-spacing for section captions', () => {
+    // `tracking-wide` and `tracking-wider` were both in use, ten against two.
+    // A quarter-pixel difference between two lists is drift, not a decision.
+    for (const [f, src] of sources) {
+      expect(src, f).not.toContain('uppercase tracking-wider')
+    }
+  })
+
+  it('does not draw a badge with nothing in it', () => {
+    // A reply the scan never classified carries an empty label, and the pill
+    // rendered anyway: eighteen pixels by six of border and background saying
+    // nothing. Found by probing for painted boxes with no text.
+    const inbox = readFileSync('frontend/src/components/ReplyInbox.tsx', 'utf8')
+    expect(inbox).toMatch(/\{reply\.classLabel \? \(/)
+  })
+})

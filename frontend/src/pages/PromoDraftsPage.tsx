@@ -6,6 +6,7 @@ import { Chevron } from '../components/Chevron'
 import { SkeletonList } from '../components/Skeleton'
 import { FILTER } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
+import { Banner, Card, EmptyState } from '../components/ui/Surface'
 
 /** "2026-09" is a key, not a label. */
 function monthLabel(m: string): string {
@@ -69,9 +70,9 @@ export function PromoDraftsPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
+      <Banner>
         Failed to load promo drafts — {(error as Error).message}
-      </div>
+      </Banner>
     )
   }
 
@@ -119,7 +120,7 @@ export function PromoDraftsPage() {
       {isLoading ? (
         <SkeletonList rows={4} />
       ) : (
-        <div className="bg-surface border border-line rounded-xl shadow-card divide-y divide-line">
+        <Card pad="none" divided>
           {visible.map((draft) => {
             const isOpen = expanded.has(draft.id)
             return (
@@ -173,11 +174,11 @@ export function PromoDraftsPage() {
             )
           })}
           {visible.length === 0 && (
-            <p className="px-4 py-12 text-center text-muted text-sm">
+            <EmptyState>
               {filtered ? 'No drafts match these filters.' : 'No promo drafts.'}
-            </p>
+            </EmptyState>
           )}
-        </div>
+        </Card>
       )}
 
       {!isLoading && (

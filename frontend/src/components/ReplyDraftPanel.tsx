@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../api'
 import { Button } from './ui/Button'
 import { DraftActions } from './DraftActions'
+import { Caption } from './ui/Surface'
 
 /**
  * The answer to an organiser's question, drafted from the artist database.
@@ -37,7 +38,7 @@ export function ReplyDraftPanel({ replyId }: { replyId: number }) {
   return (
     <div className="mt-2 rounded-md border border-line bg-raised px-3 py-2.5 space-y-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wide">Draft answer</p>
+        <Caption>Draft answer</Caption>
         <Button variant="quiet" onClick={() => setOpen(false)}>Close</Button>
       </div>
 
