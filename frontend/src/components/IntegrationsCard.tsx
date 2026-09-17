@@ -57,12 +57,26 @@ interface RowState {
   grant: CalendarGrant | null
   detail: string | null
   checkedAt: string | null
+  /**
+   * Whether this deployment could complete a consent at all.
+   *
+   * False means a Worker secret every grant needs is not set, which is a
+   * different thing from "nobody has connected this yet" and wants the
+   * opposite treatment: no Connect button, and it *does* count as needing
+   * attention, because nobody can fix it by pressing anything here.
+   *
+   * `readGrant` has returned this since the grant table existed and this card
+   * ignored it, so Connect was offered on a deployment that answers the
+   * consent route with a 503. Pressing it is how it was found.
+   */
+  serverReady: boolean
 }
 
 /** Everything the rows read, which is one query's worth. */
 type HealthLike =
   | {
       credentials?: CredentialHealth[]
+      grantMissingSecrets?: string[]
       calendarGrant?: CalendarGrant
       gmailGrant?: CalendarGrant
       tasksGrant?: CalendarGrant
@@ -94,6 +108,9 @@ function fromGrant(spec: IntegrationSpec, grant: CalendarGrant | undefined): Row
     grant: grant ?? null,
     detail: null,
     checkedAt: grant?.grantedAt ?? null,
+    // `configured` is the deployment's answer, identical on every grant row,
+    // and false only when a Worker secret is missing.
+    serverReady: grant?.configured ?? false,
   }
 }
 
@@ -130,6 +147,11 @@ function resolveRows(health: HealthLike): RowState[] {
           grant: null,
           detail: cred?.detail ?? null,
           checkedAt: cred?.checkedAt ?? null,
+          // From the grant, not `true`. This branch is still a grant row — it
+          // is only here because the calendar has a second way in, the older
+          // Worker secrets — and hardcoding it left Calendar as the one row
+          // still offering a Connect that cannot complete.
+          serverReady: health?.calendarGrant?.configured ?? false,
         },
       ]
     }
@@ -142,6 +164,9 @@ function resolveRows(health: HealthLike): RowState[] {
         grant: null,
         detail: cred?.detail ?? null,
         checkedAt: cred?.checkedAt ?? null,
+        // A secret and a binding are set on the server either way; there is no
+        // consent for a missing client credential to block.
+        serverReady: true,
       },
     ]
   })
@@ -177,7 +202,16 @@ const LEAVES_BEHIND: Partial<Record<IntegrationId, string>> = {
   'gmail.drafts': 'Drafts already written stay in your mailbox.',
 }
 
-function DetailModal({ row, onClose }: { row: RowState | null; onClose: () => void }) {
+function DetailModal({
+  row,
+  missing,
+  onClose,
+}: {
+  row: RowState | null
+  /** Worker secrets every grant needs, named because this is a config screen. */
+  missing: string[]
+  onClose: () => void
+}) {
   const queryClient = useQueryClient()
   const disconnect = useMutation({
     mutationFn: async (id: IntegrationId) => DISCONNECT[id]?.() ?? Promise.resolve({ ok: true }),
@@ -231,6 +265,14 @@ function DetailModal({ row, onClose }: { row: RowState | null; onClose: () => vo
           before the consent rather than after it. Warn rather than danger: it
           is a trade somebody may legitimately want to make, not a mistake.
         */}
+        {!row.serverReady ? (
+          <p className="rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg">
+            Connecting is not possible on this deployment yet
+            {missing.length ? <> — {missing.join(' and ')} {missing.length > 1 ? 'are' : 'is'} not set on the server</> : null}. Nothing
+            you can fix from here.
+          </p>
+        ) : null}
+
         {spec.gated ? (
           <p className="rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg">
             {spec.gated.reason}
@@ -292,7 +334,10 @@ function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
   // beside it repeated it in two words and a colour. The button is the
   // stronger signal — it is the thing you can act on — so the pill goes and
   // the button stands alone.
-  const offeringConnect = connectable && !connected
+  // Not offered when the server side is not set up. A button that answers with
+  // "Google client credentials are not configured" is worse than no button:
+  // there is nothing the person pressing it can do about it.
+  const offeringConnect = connectable && !connected && row.serverReady
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -376,11 +421,14 @@ export function IntegrationsCard() {
   // Not `needsAttention`: on a grant row, `unconfigured` means nobody has
   // pressed Connect, which is a choice not yet made rather than a fault. See
   // `rowNeedsAttention`.
-  const attention = rows.filter((r) => rowNeedsAttention(r.spec, r.state)).length
+  const attention = rows.filter(
+    (r) => !r.serverReady || rowNeedsAttention(r.spec, r.state),
+  ).length
   // Counted separately, because "nothing is broken" and "everything is
   // connected" are different claims and the summary used to make the second
   // when it could only support the first.
   const unconnected = rows.filter((r) => r.state === 'unconfigured').length
+  const blocked = data?.grantMissingSecrets ?? []
 
   return (
     <div className="bg-surface border border-line rounded-xl shadow-card p-4">
@@ -394,6 +442,26 @@ export function IntegrationsCard() {
               : 'Everything Scout talks to is working.'}
         </p>
       </div>
+
+      {/*
+        Said once at the top rather than three times down the list. One missing
+        Worker secret blocks every grant, so it is a fact about the deployment
+        and not about any row — and naming the variable is the actionable part.
+        This is the one place developer-speak stays, for exactly that reason.
+      */}
+      {blocked.length ? (
+        <p className="mt-3 rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg">
+          Connecting is switched off on this deployment:{' '}
+          {blocked.map((name, i) => (
+            <span key={name}>
+              {i > 0 ? (i === blocked.length - 1 ? ' and ' : ', ') : ''}
+              <code className="font-mono">{name}</code>
+            </span>
+          ))}{' '}
+          {blocked.length > 1 ? 'are' : 'is'} not set on the server. Everything already connected
+          keeps working.
+        </p>
+      ) : null}
 
       <div className="divide-y divide-line">
         {rows.map((row) => (
@@ -427,7 +495,11 @@ export function IntegrationsCard() {
         </p>
       ) : null}
 
-      <DetailModal row={rows.find((r) => r.spec.id === openId) ?? null} onClose={() => setOpenId(null)} />
+      <DetailModal
+        row={rows.find((r) => r.spec.id === openId) ?? null}
+        missing={data?.grantMissingSecrets ?? []}
+        onClose={() => setOpenId(null)}
+      />
     </div>
   )
 }
