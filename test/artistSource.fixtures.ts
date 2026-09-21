@@ -84,7 +84,7 @@ Doug McArthur is a Winnipeg-based singer-songwriter with a powerful, soulful voi
 
 ## Contact & Links
 
-Website: https://dougmcarthur.net | Bandcamp: https://dougmcarthurmusic.bandcamp.com | Email: dougmcarthur0@gmail.com | SOCAN registered: Yes
+Website: https://dougmcarthur.net | Bandcamp: https://dougmcarthurmusic.bandcamp.com | Email: doug@dougmcarthur.net | SOCAN registered: Yes
 
 ---
 
