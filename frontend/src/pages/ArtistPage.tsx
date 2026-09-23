@@ -143,18 +143,26 @@ export function ArtistPage() {
         </div>
       )}
 
-      <div className="flex gap-0.5 border-b border-line">
-        {(['library', ...AUDIENCES.map((a) => a.id)] as const).map((id) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`px-3.5 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              tab === id ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'
-            }`}
-          >
-            {id === 'library' ? 'Library' : `EPK — ${AUDIENCES.find((a) => a.id === id)!.label}`}
-          </button>
-        ))}
+      {/* One row that scrolls sideways on a phone, rather than tabs that wrap
+          into two rows or squeeze their labels onto two lines. The rule lives
+          on the inner strip, sized to the tabs but never narrower than the
+          page: an overflow container clips at its padding box, so the -mb-px
+          overlap between a tab's underline and the rule has to happen inside
+          it or it becomes a 1px vertical scroll. */}
+      <div className="overflow-x-auto">
+        <div className="flex gap-0.5 border-b border-line w-max min-w-full">
+          {(['library', ...AUDIENCES.map((a) => a.id)] as const).map((id) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                tab === id ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'
+              }`}
+            >
+              {id === 'library' ? 'Library' : `EPK — ${AUDIENCES.find((a) => a.id === id)!.label}`}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === 'library' ? (

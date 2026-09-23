@@ -59,9 +59,18 @@ function LeaveAdminMode() {
     },
   })
 
+  // "Leave" alone on a phone, where it sits right beside the sentence saying
+  // which mode you are in; the full label wherever there is room for it.
   return (
-    <Button variant="neutral" onClick={() => leave.mutate()} disabled={leave.isPending}>
-      {leave.isPending ? 'Leaving…' : 'Leave admin mode'}
+    <Button variant="neutral" size="sm" className="shrink-0 whitespace-nowrap" onClick={() => leave.mutate()} disabled={leave.isPending}>
+      {leave.isPending ? (
+        'Leaving…'
+      ) : (
+        <>
+          <span className="sm:hidden">Leave</span>
+          <span className="hidden sm:inline">Leave admin mode</span>
+        </>
+      )}
     </Button>
   )
 }
@@ -119,7 +128,13 @@ export function Layout({
 
       <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md border-b border-line">
         <div className="shell px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-4 h-14">
+          {/* Wraps, so admin mode can take a second row on a phone. The brand
+              cannot give up the room — the product is never named on "Scout"
+              alone — and squeezed into one row the admin sentence was 80px
+              wide and 170px tall, spilling out of the header both ways. In
+              artist mode everything fits and this stays one 56px row — at
+              320px with 3px to spare, which is why the gap is 3 and not 4. */}
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 min-h-14 py-2">
             <a
               href={admin ? '#admin' : '#overview'}
               className="font-semibold text-ink text-sm tracking-tight hover:text-body transition-colors shrink-0"
@@ -128,9 +143,12 @@ export function Layout({
             </a>
 
             {admin ? (
-              <p className="text-xs font-medium text-warn-fg bg-warn-bg rounded-full px-3 py-1">
-                Admin mode — you cannot see anyone&rsquo;s work, including your own
-              </p>
+              <div className="order-last basis-full md:order-none md:basis-auto flex items-center justify-between gap-3 min-w-0">
+                <p className="min-w-0 text-xs font-medium text-warn-fg bg-warn-bg rounded-lg md:rounded-full px-3 py-1">
+                  Admin mode — you cannot see anyone&rsquo;s work, including your own
+                </p>
+                <LeaveAdminMode />
+              </div>
             ) : (
             <nav aria-label="Primary" className="hidden md:flex gap-0.5">
               {NAV_LINKS.map((l) => (
@@ -147,7 +165,7 @@ export function Layout({
             )}
 
             <div className="flex items-center gap-1">
-              {admin ? <LeaveAdminMode /> : <NotificationBell onNav={onNav} />}
+              {admin ? null : <NotificationBell onNav={onNav} />}
 
               <button
                 type="button"

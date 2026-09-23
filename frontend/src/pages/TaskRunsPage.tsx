@@ -50,7 +50,7 @@ export function TaskRunsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-xl font-semibold text-ink">Task Run Log</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {facets.tasks.length > 1 && (
             <select
               value={task}
@@ -60,7 +60,7 @@ export function TaskRunsPage() {
             >
               <option value="">All tasks</option>
               {facets.tasks.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t} value={t}>{taskLabel(t)}</option>
               ))}
             </select>
           )}

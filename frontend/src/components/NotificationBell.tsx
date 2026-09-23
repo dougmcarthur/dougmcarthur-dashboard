@@ -428,8 +428,12 @@ export function NotificationBell({ onNav }: { onNav: (page: string) => void }) {
     onNav('runs')
   }
 
+  // Positioned only from `sm` up. Below that the panel anchors to the sticky
+  // header instead and spans it inside the page gutters: right-aligned to the
+  // bell, which sits 87px in from the edge, it ran 55px off the left of a
+  // 320px phone.
   return (
-    <div className="relative" ref={wrapRef}>
+    <div className="sm:relative" ref={wrapRef}>
       <button
         ref={btnRef}
         type="button"
@@ -456,7 +460,7 @@ export function NotificationBell({ onNav }: { onNav: (page: string) => void }) {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-full mt-2 w-[min(26rem,calc(100vw-2rem))] z-40
+          className="absolute inset-x-4 top-full mt-2 sm:left-auto sm:right-0 sm:w-[min(26rem,calc(100vw-2rem))] z-40
                      rounded-xl border border-line bg-surface shadow-pop overflow-hidden"
         >
           <div className="flex items-center justify-between gap-3 px-3.5 py-3 border-b border-line">
