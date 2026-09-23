@@ -737,3 +737,29 @@ describe('a control hidden until hover is shown on a touch screen', () => {
     expect(offenders).toEqual([])
   })
 })
+
+/**
+ * Choosing an item on a phone brings the item to you.
+ *
+ * Below `lg` the queue and the detail stack, and the queue is the whole list,
+ * so the detail sat a screen or more below the row you tapped. The tap
+ * changed something nobody could see and looked dead. `choose` scrolls the
+ * detail into view after it renders; a row wired straight to
+ * `setSelectedKey` would typecheck and quietly bring the dead tap back.
+ */
+describe('the review queue reveals what you chose', () => {
+  const src = readFileSync('frontend/src/pages/ReviewPage.tsx', 'utf8')
+
+  it('selects through choose, never by setting the key directly', () => {
+    expect(src).toMatch(/onSelect=\{\(\) => choose\(item\.key\)\}/)
+    expect(src).not.toMatch(/onSelect=\{\(\) => setSelectedKey/)
+  })
+
+  it('scrolls after the chosen item renders, not at the tap', () => {
+    // At the tap the page still held the previous detail, and a longer new
+    // one stopped short where the old page ended.
+    const choose = src.slice(src.indexOf('const choose'), src.indexOf('useEffect(', src.indexOf('const choose')))
+    expect(choose).toContain('pendingReveal.current = key')
+    expect(choose).not.toMatch(/setSelectedKey\(key\)[\s\S]*reveal\(/)
+  })
+})
