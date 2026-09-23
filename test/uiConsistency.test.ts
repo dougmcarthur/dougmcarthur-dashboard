@@ -679,3 +679,28 @@ describe('colour tokens take an opacity modifier', () => {
     expect(naked.map(([m]) => m)).toEqual([])
   })
 })
+
+/**
+ * A modal's backdrop dims the page; it does not replace it.
+ *
+ * Seeing where you were is what makes a dialog feel like a detour you can
+ * leave rather than a screen you have been moved to. The backdrop was a 90%
+ * canvas wash: near-opaque, and in the light theme it lightened the page to
+ * white instead of dimming it. `scrim` is dark in both themes, and the page
+ * behind stays recognisable through a light blur.
+ */
+describe('a modal backdrop leaves the page in view', () => {
+  const src = readFileSync('frontend/src/components/ui/Modal.tsx', 'utf8')
+  const backdrop = src.match(/className="(fixed inset-0[^"]*)"/)?.[1] ?? ''
+
+  it('tints with the scrim, translucently, never with a surface colour', () => {
+    const alpha = Number(backdrop.match(/\bbg-scrim\/(\d+)\b/)?.[1])
+    expect(alpha, backdrop).toBeGreaterThan(0)
+    expect(alpha, backdrop).toBeLessThanOrEqual(60)
+    expect(backdrop).not.toMatch(/\bbg-(canvas|surface|raised|sunken)\b/)
+  })
+
+  it('softens the page rather than hiding it', () => {
+    expect(backdrop).toMatch(/\bbackdrop-blur(-sm|-\[\dpx\])?\b/)
+  })
+})

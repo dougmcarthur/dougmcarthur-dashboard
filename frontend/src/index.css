@@ -93,6 +93,11 @@
   --c-cat-orange-bg: 29 31 27; --c-cat-orange-line: 40 43 38; --c-cat-orange-fg: 138 144 131;
   --c-cat-rose-bg: 29 31 27;   --c-cat-rose-line: 40 43 38;   --c-cat-rose-fg: 138 144 131;
 
+  /* What a modal lays over the page: a tint that dims it, never a wash that
+     hides it. Dark in both themes, so the page recedes rather than fading to
+     white. How strong it is belongs to the class's alpha, not to this value. */
+  --c-scrim: 0 0 0;
+
   --shadow-card: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5);
   --shadow-raised: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px -6px rgba(0,0,0,.7);
   --shadow-pop: 0 1px 0 rgba(255,255,255,.05) inset, 0 12px 34px -10px rgba(0,0,0,.82);
@@ -155,6 +160,8 @@
   --c-cat-teal-bg: 247 248 245;   --c-cat-teal-line: 223 226 219;   --c-cat-teal-fg: 95 102 89;
   --c-cat-orange-bg: 247 248 245; --c-cat-orange-line: 223 226 219; --c-cat-orange-fg: 95 102 89;
   --c-cat-rose-bg: 247 248 245;   --c-cat-rose-line: 223 226 219;   --c-cat-rose-fg: 95 102 89;
+
+  --c-scrim: 20 23 18;
 
   --shadow-card: 0 1px 2px rgba(20,23,18,.06);
   --shadow-raised: 0 2px 4px rgba(20,23,18,.06), 0 10px 26px -10px rgba(20,23,18,.16);

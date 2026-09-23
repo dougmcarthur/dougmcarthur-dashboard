@@ -58,7 +58,7 @@ silently inherits and looks *almost* right. That has cost real time. Check
 
 The complete set:
 
-- Surfaces: `canvas` `surface` `raised` `sunken`
+- Surfaces: `canvas` `surface` `raised` `sunken`, and `scrim` — only ever translucent, behind a modal
 - Lines: `line` `line-strong`
 - Text: `ink` (strongest) `body` `muted` `faint` — **there is no `subtle`**
 - Accent: `accent` `accent-hover` `accent-fg` `accent-soft`

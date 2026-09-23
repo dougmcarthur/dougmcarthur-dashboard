@@ -56,9 +56,13 @@ export function Modal({
 
   if (!open) return null
 
+  // The backdrop dims and softens the page; it does not hide it. Seeing where
+  // you were is what tells you the dialog is a detour you can leave, not a new
+  // screen you have been moved to. A near-opaque canvas wash did the opposite,
+  // and in the light theme it lightened the page rather than dimming it.
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-canvas/90 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim/40 backdrop-blur-sm p-4 sm:items-center"
       // A click on the backdrop closes; a click inside must not bubble out to
       // it, which is the other half people forget.
       onClick={onClose}
