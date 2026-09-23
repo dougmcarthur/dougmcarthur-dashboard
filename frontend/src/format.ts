@@ -21,6 +21,19 @@ export function shortDate(iso: string, now: Date = new Date()): string {
 }
 
 /**
+ * Today's date on the reader's own calendar, as YYYY-MM-DD.
+ *
+ * For handing to `daysUntil` and friends, which take `today` as an argument
+ * rather than reading the clock. Not `toISOString().slice(0, 10)`: that is
+ * the UTC date, which in Winnipeg turns into tomorrow at seven every evening
+ * and counts every deadline a day short until midnight.
+ */
+export function localToday(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}
+
+/**
  * How long ago, in the coarsest unit that is still true.
  *
  * Notifications are read at a glance, and "2h ago" answers the only question

@@ -61,7 +61,7 @@ export function StatusBadge({ status, kind }: { status: string; kind?: 'gig' }) 
     return (
       <span
         title={`${meta.meaning}${meta.decider === 'them' ? ' (their decision)' : ''}`}
-        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+        className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${
           STATUS_COLORS[key] ?? 'bg-sunken text-body'
         }`}
       >
@@ -72,7 +72,7 @@ export function StatusBadge({ status, kind }: { status: string; kind?: 'gig' }) 
 
   const color = STATUS_COLORS[status] ?? 'bg-sunken text-body'
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
       {status.replace(/_/g, ' ')}
     </span>
   )

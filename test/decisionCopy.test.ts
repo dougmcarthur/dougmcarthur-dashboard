@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildReviewQueue } from '../shared/reviewQueue'
-import { GIG_STATUS_BY_INTENT } from '../shared/decisionCopy'
-import { isGigTransitionAllowed, normaliseGigStatus } from '../shared/gigStatus'
+import { GIG_STATUS_BY_INTENT, inlineGigMoves } from '../shared/decisionCopy'
+import { GIG_STATUSES, isGigTransitionAllowed, normaliseGigStatus } from '../shared/gigStatus'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../shared/types'
 
 function gig(o: Partial<GigOpportunity> & { id: number; name: string }): GigOpportunity {
@@ -323,5 +323,44 @@ describe('decision copy — the visa lead time', () => {
   it('offers passing, not withdrawing, before anything has gone in', () => {
     const item = at({ country: 'US', performanceKind: 'paid', performanceStart: inDays(60) })
     expect(item.decision.actions.find((a) => a.tone === 'no')?.intent).toBe('pass')
+  })
+})
+
+describe('decision copy — the moves a table row offers inline', () => {
+  const inline = (status: string) =>
+    inlineGigMoves(status).map(({ to, tone }) => `${tone}:${to}`)
+
+  it('keeps the triage pair on a fresh row and one forward step after it', () => {
+    // The pair the Gigs table always had, now asked of the pipeline instead
+    // of written into the cell.
+    expect(inline('discovered')).toEqual(['go:shortlisted', 'no:passed'])
+    expect(inline('shortlisted')).toEqual(['go:submitted'])
+    expect(inline('preparing')).toEqual(['go:submitted'])
+    expect(inline('invited')).toEqual(['go:booked'])
+  })
+
+  it("never records the organiser's verdict from a table cell", () => {
+    // `submitted` offers acknowledged, info_requested, invited and declined —
+    // every one of them their move. A one-click "Declined" on a row you are
+    // scanning is how a rejection gets written down by reflex.
+    for (const s of ['submitted', 'acknowledged', 'info_requested']) expect(inline(s)).toEqual([])
+  })
+
+  it('offers nothing on a settled row', () => {
+    for (const s of ['passed', 'declined', 'expired', 'withdrawn', 'archived']) expect(inline(s)).toEqual([])
+  })
+
+  it('reads a legacy spelling as the status it maps to', () => {
+    expect(inline('pending_review')).toEqual(inline('discovered'))
+    expect(inline('approved')).toEqual(inline('shortlisted'))
+  })
+
+  it('never offers a move the pipeline would refuse, or one that writes nothing', () => {
+    for (const from of GIG_STATUSES) {
+      for (const { to } of inlineGigMoves(from)) {
+        expect(isGigTransitionAllowed(from, to), `${from} → ${to}`).toBe(true)
+        expect(to).not.toBe(from)
+      }
+    }
   })
 })

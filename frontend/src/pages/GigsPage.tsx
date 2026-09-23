@@ -11,7 +11,10 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { api, type GigOpportunity } from '../api'
-import { GIG_STATUSES, GIG_STATUS_META, normaliseGigStatus } from '../../../shared/gigStatus'
+import { GIG_STATUSES, GIG_STATUS_META, gigStatusMeta } from '../../../shared/gigStatus'
+import { GIG_MOVE_LABEL, inlineGigMoves } from '../../../shared/decisionCopy'
+import { parseDeadline } from '../../../shared/reviewParse'
+import { localToday, shortDate } from '../format'
 import { StatusBadge } from '../components/StatusBadge'
 import { Chevron } from '../components/Chevron'
 import { SkeletonTable } from '../components/Skeleton'
@@ -113,6 +116,10 @@ export function GigsPage() {
 
   const isPatching = patchMutation.isPending
 
+  // Read once per render and handed to every cell, so the whole table counts
+  // from the same day and no cell reads the clock for itself.
+  const today = localToday()
+
   /**
    * Whether any row in the table has ever filled this in.
    *
@@ -164,16 +171,40 @@ export function GigsPage() {
       : []),
     col.accessor('deadline', {
       header: 'Deadline',
+      // Most rows hold prose here, not a date — "None — rolling artist roster
+      // intake" — and a Date built from prose is Invalid Date, whose
+      // countdown is NaN and never urgent. `parseDeadline` goes through `splitDeadline`
+      // and counts against the `today` this render was handed.
       cell: (info) => {
-        const d = info.getValue()
-        if (!d) return <span className="text-faint">—</span>
-        const days = Math.round((new Date(d).getTime() - Date.now()) / 86400_000)
+        const row = info.row.original
+        const d = parseDeadline(info.getValue(), { note: row.deadlineNote, opensAt: row.opensAt, today })
+        // No closing date, but the window's opening is known — the fixture's
+        // "applications open in three weeks" row. An em-dash there reads as
+        // "nothing known", which is the one thing it is not.
+        if (!d.raw && !d.note) {
+          return d.opensAt
+            ? <span className="text-xs text-muted whitespace-nowrap">Opens {shortDate(d.opensAt)}</span>
+            : <span className="text-faint">—</span>
+        }
+        // Where a date was recovered from prose the prose stays beside it,
+        // exactly as the Review pane does: the recovery is a reading, and
+        // "Nov 20" alone claims a certainty the column does not have.
+        const prose = d.exact ? d.note : (d.raw ?? d.note)
+        if (!d.date) {
+          return <span className="max-w-56 text-xs text-muted line-clamp-2" title={prose ?? undefined}>{prose}</span>
+        }
+        const days = d.daysUntil ?? -1
         const urgent = days >= 0 && days <= 14
         return (
-          <span className={urgent ? 'text-cat-orange-fg font-medium' : 'text-body'}>
-            {d}
-            {urgent && days <= 7 && <span className="ml-1 text-xs text-cat-orange-fg">({days}d)</span>}
-          </span>
+          <div className="max-w-56">
+            <span className={`whitespace-nowrap ${urgent ? 'text-cat-orange-fg font-medium' : 'text-body'}`}>
+              {shortDate(d.date)}
+              {urgent && days <= 7 && (
+                <span className="ml-1 text-xs text-cat-orange-fg">({days === 0 ? 'today' : `${days}d`})</span>
+              )}
+            </span>
+            {prose && <span className="text-xs text-muted line-clamp-2" title={prose}>{prose}</span>}
+          </div>
         )
       },
     }),
@@ -210,28 +241,26 @@ export function GigsPage() {
     col.display({
       id: 'actions',
       header: '',
+      // Asked of the pipeline, never listed here. This cell used to hardcode
+      // Will apply / Pass on a discovered row and Applied on a shortlisted one
+      // — legal today, but a claim about legality nothing checked, and the
+      // Review bar's fixed four went wrong exactly that way. `inlineGigMoves`
+      // keeps the cell to the obvious next step; every other legal move is in
+      // the expanded row's picker.
       cell: (info) => {
         const row = info.row.original
+        // `whitespace-nowrap` because the header is empty and the column is
+        // the first squeezed: "Will apply" broke onto two lines, and its Pass
+        // stretched beside it to a 44px pill in a row of 26px ones.
         return (
-          <div className="flex gap-1 justify-end">
-            {normaliseGigStatus(row.status) === 'discovered' && (
-              <>
-                <Button variant="good" size="sm" disabled={isPatching}
-                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'shortlisted' } })}>
-                  Will apply
-                </Button>
-                <Button variant="danger" size="sm" disabled={isPatching}
-                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'passed' } })}>
-                  Pass
-                </Button>
-              </>
-            )}
-            {normaliseGigStatus(row.status) === 'shortlisted' && (
-              <Button variant="info" size="sm" disabled={isPatching}
-                onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'submitted' } })}>
-                Applied
+          <div className="flex gap-1 justify-end whitespace-nowrap">
+            {inlineGigMoves(row.status).map(({ to, tone }) => (
+              <Button key={to} variant={tone === 'go' ? 'good' : 'danger'} size="sm" disabled={isPatching}
+                title={gigStatusMeta(to).meaning}
+                onClick={() => patchMutation.mutate({ id: row.id, body: { status: to } })}>
+                {GIG_MOVE_LABEL[to] ?? gigStatusMeta(to).label}
               </Button>
-            )}
+            ))}
           </div>
         )
       },

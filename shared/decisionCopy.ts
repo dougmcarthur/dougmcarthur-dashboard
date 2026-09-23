@@ -18,6 +18,7 @@
 import type { ReviewItem, ReviewKind, FlagId } from './reviewQueue'
 import {
   type GigStatus,
+  GIG_STATUS_META,
   normaliseGigStatus,
   nextGigStatuses,
 } from './gigStatus'
@@ -175,6 +176,32 @@ const INTENT_BY_GIG_STATUS = {
 const LADDER: Record<'go' | 'no', GigStatus[]> = {
   go: ['booked', 'submitted', 'preparing', 'shortlisted'],
   no: ['expired', 'withdrawn', 'passed', 'archived'],
+}
+
+/**
+ * The moves worth a button inside a table row, in the order to render them.
+ *
+ * A cell is not a decision surface. The expanded row under it has a picker
+ * holding every move `nextGigStatuses` offers, so the cell carries only the
+ * step you would take without opening anything: the furthest-forward move
+ * that is yours to make, from the same ladder the cards fall back on — which
+ * is why an organiser's verdict (`acknowledged`, `invited`, `declined`) never
+ * gets one.
+ *
+ * The negative joins it only while the row is still in the collect phase.
+ * Passing on something freshly found is triage, the reason you scan the table
+ * at all; passing, withdrawing or letting the window close on something you
+ * already said yes to is a second thought, and belongs where the row's
+ * meaning is on screen rather than one mis-click from a Will apply.
+ */
+export function inlineGigMoves(status: string): Array<{ to: GigStatus; tone: 'go' | 'no' }> {
+  const moves = new Set<GigStatus>(nextGigStatuses(status))
+  const triage = GIG_STATUS_META[normaliseGigStatus(status)].phase === 'collect'
+  const tones: Array<'go' | 'no'> = triage ? ['go', 'no'] : ['go']
+  return tones.flatMap((tone) => {
+    const to = LADDER[tone].find((s) => moves.has(s))
+    return to ? [{ to, tone }] : []
+  })
 }
 
 export function gigMoveAction(to: GigStatus, tone: 'go' | 'no'): DecisionAction | null {
