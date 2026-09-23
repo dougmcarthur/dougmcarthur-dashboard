@@ -45,7 +45,10 @@ export function AssetRow({
 
   return (
     <div className={`group px-4 py-3 ${asset.archived ? 'opacity-50' : ''}`}>
-      <div className="flex items-start justify-between gap-4">
+      {/* Below sm the badges go under the text rather than beside it. Beside
+          it they took 111-146px of a 288px row and left the asset itself
+          92px, which is a dozen characters of a bio per line. */}
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">{asset.label}</p>
           {asset.value && (
@@ -62,7 +65,7 @@ export function AssetRow({
             <p className="text-xs text-danger-fg mt-1">{asset.health.problem}</p>
           )}
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:flex-col sm:flex-nowrap sm:items-end sm:gap-1 shrink-0">
           {fresh.text && (
             <span className={`text-xs px-2 py-0.5 rounded-md border bg-surface ${fresh.className}`}>
               {fresh.text}

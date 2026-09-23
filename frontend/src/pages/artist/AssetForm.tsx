@@ -37,7 +37,7 @@ export function AssetForm({
 
   return (
     <div className="space-y-3 p-4 bg-sunken border border-line rounded-xl">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label>Kind</Label>
           <select value={draft.kind} onChange={(e) => set('kind', e.target.value)} className={FIELD}>
@@ -53,7 +53,7 @@ export function AssetForm({
             placeholder={meta.isLink ? 'Live at the Park Theatre' : 'Long bio'} />
         </div>
 
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>
             {meta.isLink ? 'URL' : 'Text'}
           </Label>
@@ -68,7 +68,7 @@ export function AssetForm({
           )}
         </div>
 
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>
             Answers the question <span className="text-faint font-normal">— what a form is asking when it asks for this</span>
           </Label>
@@ -106,7 +106,7 @@ export function AssetForm({
             placeholder="Drive, the 2026 EPK" />
         </div>
 
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Notes</Label>
           <input value={draft.notes} onChange={(e) => set('notes', e.target.value)} className={FIELD} />
         </div>
