@@ -23,8 +23,8 @@
  * deadline_note IS NOT NULL`.
  */
 
-import { execFileSync } from 'node:child_process'
 import { splitDeadline } from '../shared/reviewParse'
+import { wrangler } from './lib/wrangler.mjs'
 
 const DB = 'dougmcarthur-music-hq'
 const remote = process.argv.includes('--remote')
@@ -41,12 +41,12 @@ interface GigRow {
 function d1<T>(sql: string, json: true): T[]
 function d1(sql: string, json?: false): void
 function d1<T>(sql: string, json = false): T[] | void {
-  const args = ['wrangler', 'd1', 'execute', DB, remote ? '--remote' : '--local', '--command', sql]
+  const args = ['d1', 'execute', DB, remote ? '--remote' : '--local', '--command', sql]
   if (json) args.push('--json')
-  // execFileSync, not execSync: these SQL strings carry apostrophes and em
-  // dashes straight out of the notes, and shell-quoting them by hand is how
-  // a backfill script corrupts the data it was written to clean up.
-  const out = execFileSync('npx', args, { encoding: 'utf8', stdio: json ? 'pipe' : 'inherit' })
+  // No shell in between: these SQL strings carry apostrophes and em dashes
+  // straight out of the notes, and shell-quoting them by hand is how a
+  // backfill script corrupts the data it was written to clean up.
+  const out = wrangler(args, { encoding: 'utf8', stdio: json ? 'pipe' : 'inherit' })
   if (!json) return
   const parsed = JSON.parse(out) as Array<{ results: T[] }>
   return parsed[0]?.results ?? []

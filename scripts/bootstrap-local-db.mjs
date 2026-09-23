@@ -21,8 +21,8 @@
  * nothing new to reconcile.
  */
 
-import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { wrangler as runWrangler } from './lib/wrangler.mjs'
 
 /** One source for the database name — it is already declared in wrangler.toml. */
 function databaseName() {
@@ -37,7 +37,7 @@ function databaseName() {
 function wrangler(args) {
   // stdout captured, stderr inherited: wrangler writes its banner and warnings
   // to stderr, and mixing those into the JSON is how the parse breaks.
-  return execFileSync('npx', ['wrangler', ...args], {
+  return runWrangler(args, {
     encoding: 'utf8',
     stdio: ['inherit', 'pipe', 'inherit'],
   })
