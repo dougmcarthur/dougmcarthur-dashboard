@@ -703,4 +703,19 @@ describe('a modal backdrop leaves the page in view', () => {
   it('softens the page rather than hiding it', () => {
     expect(backdrop).toMatch(/\bbackdrop-blur(-sm|-\[\dpx\])?\b/)
   })
+
+  it('never centres in a way that can push the top out of reach', () => {
+    // `items-center` on a scrolling backdrop puts an over-tall dialog's top
+    // above the scroll origin. On a phone held sideways that was the title
+    // and the Close button, at -40px, with no way to scroll up to them. The
+    // panel centres itself with an auto margin, which gives way instead.
+    expect(backdrop).not.toMatch(/\bitems-center\b/)
+    expect(src).toMatch(/className="[^"]*\bmy-auto\b[^"]*"/)
+  })
+
+  it('opens at the top rather than scrolled to fit', () => {
+    // Focusing a dialog taller than the screen scrolls it into view, which
+    // took the top margin away on a 320×640 phone.
+    expect(src).toContain('focus({ preventScroll: true })')
+  })
 })
