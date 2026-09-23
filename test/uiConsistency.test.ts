@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+// posix, so paths read `frontend/src/components/ui/…` on Windows too and the
+// `/ui/` exclusions below match there as well as in CI.
+import { join } from 'node:path/posix'
 
 /**
  * Source-level guards for mistakes that typecheck and render fine.
@@ -636,5 +638,44 @@ describe('density: a thing that is always the same is not information', () => {
     // `opacity`, so the buttons stay in the tab order for `:focus-within` to
     // find. `display: none` would take them out of it.
     expect(css).toMatch(/\.row-actions \{\s*opacity: 0;/)
+  })
+})
+
+/**
+ * Every colour token has to accept an opacity modifier.
+ *
+ * The tokens were `var(--c-warn-bg)`, a finished colour, and Tailwind cannot
+ * put an alpha on one — so for `bg-canvas/90` it emitted no rule at all. That
+ * typechecks, builds and renders: the modal backdrop was transparent, so page
+ * text showed straight through behind modal text, and the sticky header and
+ * every warning banner had no background. Eleven classes, none of them visible
+ * as a fault in the source.
+ *
+ * The fix is two halves that have to agree, so both are checked: the config
+ * wraps each variable as `rgb(var(--c-x) / <alpha-value>)`, and the stylesheet
+ * stores bare channels for that to wrap. A hex value on the CSS side makes
+ * `rgb(#0b0c0b / 0.9)`, which is invalid and every bit as silently transparent.
+ */
+describe('colour tokens take an opacity modifier', () => {
+  const css = readFileSync('frontend/src/index.css', 'utf8')
+
+  it('declares every colour in the Tailwind config with <alpha-value>', async () => {
+    const config = (await import('../tailwind.config.js')).default
+    const colors = config.theme.extend.colors as Record<string, string>
+    const bare = Object.entries(colors).filter(([, v]) => !v.includes('<alpha-value>'))
+    expect(bare.map(([k, v]) => `${k}: ${v}`)).toEqual([])
+    expect(Object.keys(colors).length).toBeGreaterThan(0)
+  })
+
+  it('stores every --c- colour as RGB channels, never a finished colour', () => {
+    const finished = [...css.matchAll(/(--c-[a-z-]+):\s*([^;]+);/g)]
+      .filter(([, , value]) => !/^\d{1,3} \d{1,3} \d{1,3}$/.test(value.trim()))
+      .map(([, name, value]) => `${name}: ${value}`)
+    expect(finished).toEqual([])
+  })
+
+  it('wraps a --c- variable in rgb() wherever it is read directly', () => {
+    const naked = [...css.matchAll(/(.{0,4})var\(--c-[a-z-]+\)/g)].filter(([, before]) => !before.endsWith('rgb('))
+    expect(naked.map(([m]) => m)).toEqual([])
   })
 })

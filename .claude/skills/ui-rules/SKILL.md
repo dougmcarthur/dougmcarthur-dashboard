@@ -71,6 +71,13 @@ The complete set:
 Every one is a CSS variable with a light and a dark value, so use the token and
 both themes follow. Never hardcode a hex.
 
+The variables hold bare RGB channels (`--c-canvas: 11 12 11`), which is what
+lets `bg-canvas/90` work. Until they did, Tailwind emitted *no rule* for any
+`/NN` class and the modal backdrop, the sticky header and the warn banner were
+all transparent. So in CSS, read a token as `rgb(var(--c-x))`, never
+`var(--c-x)`, and add a new one as channels in both themes — the guard checks
+the config and the stylesheet agree.
+
 **A hover must change something.** `hover:bg-X` on an element already painted
 `bg-X` renders as no hover at all, and eight buttons shipped that way. The
 tinted variants use the `-bg-hover` tokens, which is what makes them respond —
