@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildReviewQueue } from '../shared/reviewQueue'
-import { GIG_STATUS_BY_INTENT, inlineGigMoves } from '../shared/decisionCopy'
-import { GIG_STATUSES, isGigTransitionAllowed, normaliseGigStatus } from '../shared/gigStatus'
+import { GIG_MOVE_LABEL, GIG_STATUS_BY_INTENT, inlineGigMoves } from '../shared/decisionCopy'
+import { GIG_STATUSES, isGigTransitionAllowed, nextGigStatuses, normaliseGigStatus } from '../shared/gigStatus'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../shared/types'
 
 function gig(o: Partial<GigOpportunity> & { id: number; name: string }): GigOpportunity {
@@ -361,6 +361,23 @@ describe('decision copy — the moves a table row offers inline', () => {
         expect(isGigTransitionAllowed(from, to), `${from} → ${to}`).toBe(true)
         expect(to).not.toBe(from)
       }
+    }
+  })
+})
+
+describe('decision copy — every move has a button label', () => {
+  it('names each status a move can reach as a move, never as a state', () => {
+    // The fallback to `GIG_STATUS_META[s].label` renders a state — "Declined"
+    // — on a button, where it is ambiguous whose decision is being written
+    // down. Every reachable status carries a move label so it is never used.
+    const reachable = new Set(GIG_STATUSES.flatMap((s) => nextGigStatuses(s)))
+    const unnamed = [...reachable].filter((s) => !GIG_MOVE_LABEL[s])
+    expect(unnamed).toEqual([])
+  })
+
+  it("names the organiser as the one who moved", () => {
+    for (const s of ['acknowledged', 'info_requested', 'invited', 'declined'] as const) {
+      expect(GIG_MOVE_LABEL[s]).toMatch(/^They /)
     }
   })
 })

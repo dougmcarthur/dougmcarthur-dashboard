@@ -4,6 +4,7 @@ import {
   nextGigStatuses,
   gigStatusMeta,
 } from '../../../../shared/gigStatus'
+import { GIG_MOVE_LABEL } from '../../../../shared/decisionCopy'
 import { formatPerformanceSpan } from '../../../../shared/performance'
 import { Button } from '../../components/ui/Button'
 import { Select } from '../../components/ui/Field'
@@ -31,6 +32,7 @@ export function GigDetail({
   onStatusChange,
   onDelete,
   isPatching,
+  today,
 }: {
   gig: GigOpportunity
   onEdit: () => void
@@ -38,6 +40,8 @@ export function GigDetail({
   /** Absent where a caller has nothing to delete with. */
   onDelete?: () => void
   isPatching: boolean
+  /** The reader's local date, from the page — see `localToday`. */
+  today: string
 }) {
   const status = normaliseGigStatus(gig.status)
   const meta = gigStatusMeta(status)
@@ -99,9 +103,16 @@ export function GigDetail({
       </div>
 
       <div className="flex gap-2 flex-wrap items-center pt-1">
+        {/*
+          Named for the move, not the state it lands in: this button read
+          "Submitted" on a row the table beside it offered as "Applied", and
+          "Invited" on a row where you are recording that *they* moved. The
+          picker next to it keeps state names, because those are destinations.
+        */}
         {quick.map((s) => (
-          <Button key={s} variant="info" disabled={isPatching} onClick={() => onStatusChange(s)}>
-            {gigStatusMeta(s).label}
+          <Button key={s} variant="info" title={gigStatusMeta(s).meaning} disabled={isPatching}
+            onClick={() => onStatusChange(s)}>
+            {GIG_MOVE_LABEL[s] ?? gigStatusMeta(s).label}
           </Button>
         ))}
         {moves.length > 0 && (
@@ -148,11 +159,13 @@ export function GigDetail({
       </div>
 
       {/*
-        The clock is read once, here, and handed down — `visaLead` takes the
-        date as an argument for the same reason the queue does.
+        The page reads the clock once and hands the date down — `visaLead`
+        takes it as an argument for the same reason the queue does. It used to
+        be read here as the UTC date, which from 7pm in Winnipeg is tomorrow,
+        so the visa lead time came up a day short every evening.
       */}
       <div className="border-t border-line pt-4">
-        <CostPanel gig={gig} today={new Date().toISOString().slice(0, 10)} />
+        <CostPanel gig={gig} today={today} />
       </div>
 
       {applying && (

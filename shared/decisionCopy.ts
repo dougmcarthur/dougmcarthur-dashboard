@@ -139,13 +139,23 @@ export const GIG_STATUS_BY_INTENT: Record<DecisionIntent, GigStatus> = {
  *
  * Not `GIG_STATUS_META[s].label`, which names the *state* a row lands in.
  * "Archived" is where you end up; "Archive" is what you are about to do, and a
- * button has to say the second one. Exported because the Review pane builds
- * its bar from the same moves.
+ * button has to say the second one. Exported because the Review pane, the
+ * Gigs table and the row under it build their buttons from the same moves.
+ *
+ * The organiser's four name who moved. A button reading "Declined" leaves open
+ * whether you are declining or recording that they did — the ambiguity the
+ * status rename existed to remove — and a button is where it would cost most,
+ * because it writes. Every status a move can reach has an entry, and
+ * decisionCopy.test.ts fails if one goes missing.
  */
 export const GIG_MOVE_LABEL: Partial<Record<GigStatus, string>> = {
   shortlisted: 'Will apply',
   preparing: 'Start preparing',
   submitted: 'Applied',
+  acknowledged: 'They confirmed receipt',
+  info_requested: 'They asked for more',
+  invited: 'They invited you',
+  declined: 'They declined',
   booked: 'Confirm the booking',
   passed: 'Pass',
   expired: 'Window closed',
