@@ -65,8 +65,8 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
     <Card pad="md" className="space-y-4">
       <h2 className="text-sm font-semibold text-ink">New Gig Opportunity</h2>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="col-span-2 grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label>Name *</Label>
             <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="SXSW 2027" className={FIELD} autoFocus />
@@ -89,10 +89,15 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
         <div>
           <Label>Fee amount</Label>
           <div className="flex gap-1.5">
-            <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={`${FIELD} w-20 shrink-0`}>
-              {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
-            </select>
-            <input type="number" min="0" value={draft.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} placeholder="0" className={FIELD} />
+            {/* Width on a wrapper, never `${FIELD} w-20`: see EditGigPanel. */}
+            <div className="w-20 shrink-0">
+              <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={FIELD}>
+                {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            {/* min-w-0, as in EditGigPanel: the input's default width is
+                otherwise its floor beside the fixed-width currency. */}
+            <input type="number" min="0" value={draft.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} placeholder="0" className={`${FIELD} min-w-0`} />
           </div>
         </div>
         <div>
@@ -115,7 +120,7 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
           </select>
         </div>
 
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Why it fits</Label>
           <textarea rows={3} value={draft.fitRationale} onChange={(e) => set('fitRationale', e.target.value)} placeholder="Describe the fit…" className={`${FIELD} resize-none`} />
         </div>
