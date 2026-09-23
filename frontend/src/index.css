@@ -33,58 +33,65 @@
  * icon and a label carry the distinction instead.
  *
  * Dark is the default. Light is the alternate, reached by choosing it.
+ *
+ * Each colour is stored as bare RGB channels — `11 12 11`, not `#0b0c0b` — so
+ * Tailwind can put an alpha after it. A token that resolves to a finished
+ * colour cannot take an opacity modifier, and Tailwind's answer to
+ * `bg-canvas/90` is to emit no rule at all: the modal backdrop, the sticky
+ * header and every warning banner rendered with no background for as long as
+ * the tokens were hex. Reading one directly therefore means `rgb(var(--c-x))`.
  */
 :root {
   color-scheme: dark;
 
-  --c-canvas: #0b0c0b;
-  --c-surface: #141613;
-  --c-raised: #1d1f1b;
-  --c-sunken: #0f110e;
-  --c-line: #282b26;
-  --c-line-strong: #3a4038;
+  --c-canvas: 11 12 11;
+  --c-surface: 20 22 19;
+  --c-raised: 29 31 27;
+  --c-sunken: 15 17 14;
+  --c-line: 40 43 38;
+  --c-line-strong: 58 64 56;
 
-  --c-ink: #edefea;
-  --c-body: #b3b8ae;
-  --c-muted: #8a9083;
-  --c-faint: #6b7167;
+  --c-ink: 237 239 234;
+  --c-body: 179 184 174;
+  --c-muted: 138 144 131;
+  --c-faint: 107 113 103;
 
-  --c-accent: #8fc98a;
-  --c-accent-hover: #a6d7a0;
-  --c-accent-fg: #0d1a0c;
-  --c-accent-soft: #18251a;
+  --c-accent: 143 201 138;
+  --c-accent-hover: 166 215 160;
+  --c-accent-fg: 13 26 12;
+  --c-accent-soft: 24 37 26;
 
   /* clay */
-  --c-danger-bg: #241715;
-  --c-danger-bg-hover: #30201c;
-  --c-danger-line: #4a2c23;
-  --c-danger-fg: #d99a86;
-  --c-danger-solid: #b4573f;
+  --c-danger-bg: 36 23 21;
+  --c-danger-bg-hover: 48 32 28;
+  --c-danger-line: 74 44 35;
+  --c-danger-fg: 217 154 134;
+  --c-danger-solid: 180 87 63;
 
   /* green */
-  --c-success-bg: #15221a;
-  --c-success-bg-hover: #1d2f23;
-  --c-success-line: #2b4430;
-  --c-success-fg: #8fc98a;
-  --c-success-solid: #4f9a54;
+  --c-success-bg: 21 34 26;
+  --c-success-bg-hover: 29 47 35;
+  --c-success-line: 43 68 48;
+  --c-success-fg: 143 201 138;
+  --c-success-solid: 79 154 84;
 
   /* warn is clay: two hues, not three */
-  --c-warn-bg: #241715;
-  --c-warn-line: #4a2c23;
-  --c-warn-fg: #d99a86;
+  --c-warn-bg: 36 23 21;
+  --c-warn-line: 74 44 35;
+  --c-warn-fg: 217 154 134;
 
   /* info is not a hue — links take the green, surfaces stay neutral */
-  --c-info-bg: #1d1f1b;
-  --c-info-bg-hover: #252822;
-  --c-info-line: #282b26;
-  --c-info-fg: #8fc98a;
+  --c-info-bg: 29 31 27;
+  --c-info-bg-hover: 37 40 34;
+  --c-info-line: 40 43 38;
+  --c-info-fg: 143 201 138;
 
   /* Categorical tints are gone. A kind is named, not coloured. */
-  --c-cat-violet-bg: #1d1f1b; --c-cat-violet-line: #282b26; --c-cat-violet-fg: #8a9083;
-  --c-cat-sky-bg: #1d1f1b;    --c-cat-sky-line: #282b26;    --c-cat-sky-fg: #8a9083;
-  --c-cat-teal-bg: #1d1f1b;   --c-cat-teal-line: #282b26;   --c-cat-teal-fg: #8a9083;
-  --c-cat-orange-bg: #1d1f1b; --c-cat-orange-line: #282b26; --c-cat-orange-fg: #8a9083;
-  --c-cat-rose-bg: #1d1f1b;   --c-cat-rose-line: #282b26;   --c-cat-rose-fg: #8a9083;
+  --c-cat-violet-bg: 29 31 27; --c-cat-violet-line: 40 43 38; --c-cat-violet-fg: 138 144 131;
+  --c-cat-sky-bg: 29 31 27;    --c-cat-sky-line: 40 43 38;    --c-cat-sky-fg: 138 144 131;
+  --c-cat-teal-bg: 29 31 27;   --c-cat-teal-line: 40 43 38;   --c-cat-teal-fg: 138 144 131;
+  --c-cat-orange-bg: 29 31 27; --c-cat-orange-line: 40 43 38; --c-cat-orange-fg: 138 144 131;
+  --c-cat-rose-bg: 29 31 27;   --c-cat-rose-line: 40 43 38;   --c-cat-rose-fg: 138 144 131;
 
   --shadow-card: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5);
   --shadow-raised: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px -6px rgba(0,0,0,.7);
@@ -103,51 +110,51 @@
 [data-theme='light'] {
   color-scheme: light;
 
-  --c-canvas: #f3f4f1;
-  --c-surface: #ffffff;
-  --c-raised: #f7f8f5;
-  --c-sunken: #eef0eb;
-  --c-line: #dfe2db;
-  --c-line-strong: #c2c8bd;
+  --c-canvas: 243 244 241;
+  --c-surface: 255 255 255;
+  --c-raised: 247 248 245;
+  --c-sunken: 238 240 235;
+  --c-line: 223 226 219;
+  --c-line-strong: 194 200 189;
 
-  --c-ink: #141712;
-  --c-body: #454a41;
-  --c-muted: #5f6659;
-  --c-faint: #7d8477;
+  --c-ink: 20 23 18;
+  --c-body: 69 74 65;
+  --c-muted: 95 102 89;
+  --c-faint: 125 132 119;
 
   /* The lightness relationship inverts: green is the dark one on a light
      ground, which is what keeps it apart from the clay for a CVD reader. */
-  --c-accent: #35703d;
-  --c-accent-hover: #2a5c31;
-  --c-accent-fg: #ffffff;
-  --c-accent-soft: #eaf2ea;
+  --c-accent: 53 112 61;
+  --c-accent-hover: 42 92 49;
+  --c-accent-fg: 255 255 255;
+  --c-accent-soft: 234 242 234;
 
-  --c-danger-bg: #fdf3f0;
-  --c-danger-bg-hover: #f8e4dd;
-  --c-danger-line: #ecc9bc;
-  --c-danger-fg: #a4432f;
-  --c-danger-solid: #a4432f;
+  --c-danger-bg: 253 243 240;
+  --c-danger-bg-hover: 248 228 221;
+  --c-danger-line: 236 201 188;
+  --c-danger-fg: 164 67 47;
+  --c-danger-solid: 164 67 47;
 
-  --c-success-bg: #eef5ee;
-  --c-success-bg-hover: #e0ece0;
-  --c-success-line: #c5dcc5;
-  --c-success-fg: #2c6134;
-  --c-success-solid: #35703d;
+  --c-success-bg: 238 245 238;
+  --c-success-bg-hover: 224 236 224;
+  --c-success-line: 197 220 197;
+  --c-success-fg: 44 97 52;
+  --c-success-solid: 53 112 61;
 
-  --c-warn-bg: #fdf3f0;
-  --c-warn-line: #ecc9bc;
-  --c-warn-fg: #a4432f;
+  --c-warn-bg: 253 243 240;
+  --c-warn-line: 236 201 188;
+  --c-warn-fg: 164 67 47;
 
-  --c-info-bg: #f7f8f5;
-  --c-info-bg-hover: #eceee7;
-  --c-info-line: #dfe2db;
-  --c-info-fg: #35703d;
+  --c-info-bg: 247 248 245;
+  --c-info-bg-hover: 236 238 231;
+  --c-info-line: 223 226 219;
+  --c-info-fg: 53 112 61;
 
-  --c-cat-violet-bg: #f7f8f5; --c-cat-violet-line: #dfe2db; --c-cat-violet-fg: #5f6659;
-  --c-cat-sky-bg: #f7f8f5;    --c-cat-sky-line: #dfe2db;    --c-cat-sky-fg: #5f6659;
-  --c-cat-teal-bg: #f7f8f5;   --c-cat-teal-line: #dfe2db;   --c-cat-teal-fg: #5f6659;
-  --c-cat-orange-bg: #f7f8f5; --c-cat-orange-line: #dfe2db; --c-cat-orange-fg: #5f6659;
-  --c-cat-rose-bg: #f7f8f5;   --c-cat-rose-line: #dfe2db;   --c-cat-rose-fg: #5f6659;
+  --c-cat-violet-bg: 247 248 245; --c-cat-violet-line: 223 226 219; --c-cat-violet-fg: 95 102 89;
+  --c-cat-sky-bg: 247 248 245;    --c-cat-sky-line: 223 226 219;    --c-cat-sky-fg: 95 102 89;
+  --c-cat-teal-bg: 247 248 245;   --c-cat-teal-line: 223 226 219;   --c-cat-teal-fg: 95 102 89;
+  --c-cat-orange-bg: 247 248 245; --c-cat-orange-line: 223 226 219; --c-cat-orange-fg: 95 102 89;
+  --c-cat-rose-bg: 247 248 245;   --c-cat-rose-line: 223 226 219;   --c-cat-rose-fg: 95 102 89;
 
   --shadow-card: 0 1px 2px rgba(20,23,18,.06);
   --shadow-raised: 0 2px 4px rgba(20,23,18,.06), 0 10px 26px -10px rgba(20,23,18,.16);
@@ -157,19 +164,19 @@
 
 /* Raises borders and pulls tertiary text toward primary. */
 [data-contrast='high'] {
-  --c-line: #4a5347;
-  --c-line-strong: #6b7567;
-  --c-body: #dfe4da;
-  --c-muted: #c8cfc3;
-  --c-faint: #aab2a4;
+  --c-line: 74 83 71;
+  --c-line-strong: 107 117 103;
+  --c-body: 223 228 218;
+  --c-muted: 200 207 195;
+  --c-faint: 170 178 164;
 }
 
 [data-theme='light'][data-contrast='high'] {
-  --c-line: #9aa394;
-  --c-line-strong: #6b7567;
-  --c-body: #1b1f18;
-  --c-muted: #2b3128;
-  --c-faint: #3d4439;
+  --c-line: 154 163 148;
+  --c-line-strong: 107 117 103;
+  --c-body: 27 31 24;
+  --c-muted: 43 49 40;
+  --c-faint: 61 68 57;
 }
 
 @layer base {
@@ -193,8 +200,8 @@
   }
 
   body {
-    background-color: var(--c-canvas);
-    color: var(--c-body);
+    background-color: rgb(var(--c-canvas));
+    color: rgb(var(--c-body));
     font-family: var(--font-ui);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -203,26 +210,26 @@
   /* A visible, consistent focus ring is the cheapest accessibility win there
      is, and the browser default disappears against dark surfaces. */
   :focus-visible {
-    outline: 2px solid var(--c-info-fg);
+    outline: 2px solid rgb(var(--c-info-fg));
     outline-offset: 2px;
     border-radius: 3px;
   }
 
   ::selection {
-    background: var(--c-accent-soft);
-    color: var(--c-ink);
+    background: rgb(var(--c-accent-soft));
+    color: rgb(var(--c-ink));
   }
 
   /* Firefox and WebKit scrollbars follow the theme rather than staying light. */
   * {
-    scrollbar-color: var(--c-line-strong) transparent;
+    scrollbar-color: rgb(var(--c-line-strong)) transparent;
   }
   ::-webkit-scrollbar {
     width: 11px;
     height: 11px;
   }
   ::-webkit-scrollbar-thumb {
-    background-color: var(--c-line-strong);
+    background-color: rgb(var(--c-line-strong));
     border-radius: 999px;
     border: 3px solid transparent;
     background-clip: content-box;
@@ -272,8 +279,8 @@
     z-index: 60;
     padding: 0.5rem 0.875rem;
     border-radius: 0.375rem;
-    background: var(--c-accent);
-    color: var(--c-accent-fg);
+    background: rgb(var(--c-accent));
+    color: rgb(var(--c-accent-fg));
     font-size: 0.8125rem;
     font-weight: 600;
     transition: top var(--motion-fast) ease;
