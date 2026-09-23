@@ -275,9 +275,9 @@ export function SyncPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-ink">Sync Targets</h1>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER}>
             <option value="">All statuses</option>
             {SYNC_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
@@ -321,10 +321,12 @@ export function SyncPage() {
               <div key={target.id}>
                 <div
                   onClick={() => toggleExpand(target.id)}
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isOpen ? 'bg-cat-violet-bg/40' : 'hover:bg-sunken'}`}
+                  className={`flex flex-wrap items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isOpen ? 'bg-cat-violet-bg/40' : 'hover:bg-sunken'}`}
                 >
                   <Chevron open={isOpen} />
-                  <div className="min-w-0 flex-1">
+                  {/* basis-40, so the actions drop to their own line only when a
+                      name would get less than 10rem, not whenever it is long. */}
+                  <div className="min-w-0 flex-1 basis-40">
                     <p className="text-sm font-medium text-ink truncate">{target.name}</p>
                     <div className="flex gap-2 mt-0.5 flex-wrap">
                       {target.agencyType && <span className="text-xs text-muted capitalize">{target.agencyType}</span>}
@@ -332,7 +334,7 @@ export function SyncPage() {
                       {target.contactRole && <span className="text-xs text-muted">· {target.contactRole}</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 ml-auto">
                     <StatusBadge status={target.status} />
                     {target.status === 'draft_ready' && (
                       <Button variant="info" size="sm" disabled={isPatching}

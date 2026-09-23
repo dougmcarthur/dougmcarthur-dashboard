@@ -163,9 +163,9 @@ function Card({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mt-2.5">
-        <label className="flex items-center gap-1.5 text-xs text-muted">
+        <label className="flex min-w-0 max-w-full items-center gap-1.5 text-xs text-muted">
           About
-          <Select filter value={chosen} disabled={busy} onChange={(e) => setChosen(e.target.value === '' ? '' : Number(e.target.value))}>
+          <Select filter className="min-w-0 max-w-full" value={chosen} disabled={busy} onChange={(e) => setChosen(e.target.value === '' ? '' : Number(e.target.value))}>
             <option value="">— pick an application —</option>
             {gigs.map((g) => (
               <option key={g.id} value={g.id}>
