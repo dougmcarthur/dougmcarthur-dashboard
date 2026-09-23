@@ -580,7 +580,7 @@ this code does.
 
 Mail goes out from `sundogsmusic.ca`, which is onboarded to Email Service —
 the digest from `digest@`, passkey setup codes from `login@`. The allowlist
-holds one address, `dougmcarthur0@gmail.com`, which receives both. Onboarding
+holds one address, `doug@dougmcarthur.net`, which receives both. Onboarding
 means the platform would deliver to anybody, so the list is the whole reason
 this Worker does not.
 

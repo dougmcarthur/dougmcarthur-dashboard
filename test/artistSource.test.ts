@@ -79,7 +79,7 @@ describe('a labelled URL is a link', () => {
 
   it('takes an email as a fact and not as a link', () => {
     const email = extractAssets(profile).proposals.find((p) => p.questionKind === 'email')
-    expect(email?.value).toBe('dougmcarthur0@gmail.com')
+    expect(email?.value).toBe('doug@dougmcarthur.net')
     expect(email?.kind).toBe('fact')
   })
 
