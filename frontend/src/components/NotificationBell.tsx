@@ -353,14 +353,16 @@ function Row({
         </span>
       </span>
 
-      {/* Revealed on hover, but always reachable by keyboard. */}
+      {/* Revealed on hover, reachable by keyboard, and always shown on a
+          touch screen. `row-actions` gates the hiding on `(hover: hover)`;
+          the Tailwind `opacity-0 group-hover:` it replaces hid the button on
+          every phone, where there is no hover to reveal it. */}
       <button
         type="button"
         onClick={() => onDismiss(note.key)}
         aria-label={`Dismiss: ${note.title}`}
-        className="absolute top-2 right-2 grid place-items-center h-6 w-6 rounded-md text-faint
-                   opacity-0 group-hover:opacity-100 focus-visible:opacity-100
-                   hover:text-ink hover:bg-sunken transition-opacity"
+        className="row-actions absolute top-2 right-2 grid place-items-center h-6 w-6 rounded-md text-faint
+                   hover:text-ink hover:bg-sunken"
       >
         <Icon name="x" className="h-3 w-3" />
       </button>
@@ -460,16 +462,21 @@ export function NotificationBell({ onNav }: { onNav: (page: string) => void }) {
         <div
           role="dialog"
           aria-label="Notifications"
+          // A column capped at the screen below the header, with the list the
+          // part that gives way. It hangs off a sticky header, so whatever
+          // runs past the bottom of the screen cannot be scrolled to: on a
+          // phone held sideways the History footer ended below the glass.
           className="absolute inset-x-4 top-full mt-2 sm:left-auto sm:right-0 sm:w-[min(26rem,calc(100vw-2rem))] z-40
+                     flex flex-col max-h-[calc(100dvh-5rem)]
                      rounded-xl border border-line bg-surface shadow-pop overflow-hidden"
         >
-          <div className="flex items-center justify-between gap-3 px-3.5 py-3 border-b border-line">
+          <div className="shrink-0 flex items-center justify-between gap-3 px-3.5 py-3 border-b border-line">
             <h2 className="text-sm font-bold text-ink">Notifications</h2>
             <button
               type="button"
               disabled={unread === 0 || markRead.isPending}
               onClick={() => markRead.mutate({ all: true })}
-              className="text-xs font-semibold text-info-fg disabled:text-faint transition-colors"
+              className="-my-1 py-1 text-xs font-semibold text-info-fg disabled:text-faint transition-colors"
             >
               Mark all read
             </button>
@@ -479,7 +486,7 @@ export function NotificationBell({ onNav }: { onNav: (page: string) => void }) {
             <FilterBar items={items} filters={filters} onChange={setFilters} />
           )}
 
-          <ul className="max-h-[min(30rem,55vh)] overflow-y-auto" aria-live="polite">
+          <ul className="min-h-0 max-h-[min(30rem,55vh)] overflow-y-auto" aria-live="polite">
             {visible.map((n) => (
               <Row key={n.key} note={n} onOpen={openItem} onDismiss={(k) => dismiss.mutate(k)} />
             ))}
@@ -510,7 +517,7 @@ export function NotificationBell({ onNav }: { onNav: (page: string) => void }) {
             <button
               type="button"
               onClick={goHistory}
-              className="w-full px-3.5 py-2.5 border-t border-line text-xs font-semibold
+              className="shrink-0 w-full px-3.5 py-2.5 border-t border-line text-xs font-semibold
                          text-info-fg hover:bg-sunken transition-colors"
             >
               {filters.unreadOnly || filters.tier || filters.kind

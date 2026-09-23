@@ -719,3 +719,21 @@ describe('a modal backdrop leaves the page in view', () => {
     expect(src).toContain('focus({ preventScroll: true })')
   })
 })
+
+/**
+ * Nothing is hidden behind a hover a phone cannot make.
+ *
+ * The notification dismiss button was `opacity-0 group-hover:opacity-100`, so
+ * on every touch screen it was invisible: the only way to dismiss a
+ * notification on a phone was to tap an empty-looking corner. `row-actions`
+ * in index.css does the same job gated on `(hover: hover)`, which is the
+ * whole reason it is a media query rather than a Tailwind variant.
+ */
+describe('a control hidden until hover is shown on a touch screen', () => {
+  it('reveals on hover through row-actions, never through a hover variant', () => {
+    const offenders = FILES.filter((f) =>
+      /\b(group-)?hover:opacity-100\b/.test(withoutComments(readFileSync(f, 'utf8'))),
+    )
+    expect(offenders).toEqual([])
+  })
+})
