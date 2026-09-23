@@ -763,3 +763,23 @@ describe('the review queue reveals what you chose', () => {
     expect(choose).not.toMatch(/setSelectedKey\(key\)[\s\S]*reveal\(/)
   })
 })
+
+/**
+ * FIELD fills its container; a width beside it is a second answer that loses.
+ *
+ * `${FIELD} w-20` put two widths on one element, and Tailwind emits `w-full`
+ * after `w-20`, so the fee's currency select filled its whole column. It
+ * could not shrink, and pushed the amount box outside the column — at every
+ * width, desktop included, in both gig forms. A fixed width goes on a wrapper
+ * and the field fills that.
+ */
+describe('a FIELD is sized by its container', () => {
+  it('never adds a width utility to FIELD, which already says w-full', () => {
+    const offenders = FILES.flatMap((f) =>
+      [...withoutComments(readFileSync(f, 'utf8')).matchAll(/\$\{FIELD\}[^`]*?(?<![\w-])w-[\w[\]().-]+/g)].map(
+        (m) => `${f}: ${m[0]}`,
+      ),
+    )
+    expect(offenders).toEqual([])
+  })
+})

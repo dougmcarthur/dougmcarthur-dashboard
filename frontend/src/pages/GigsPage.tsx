@@ -27,6 +27,17 @@ import { Banner, CAPTION_CLASS, Card } from '../components/ui/Surface'
 
 const col = createColumnHelper<GigOpportunity>()
 
+/**
+ * The name column, pinned to the left edge below `md` while the rest of the
+ * table scrolls under it. The rule on its right edge is a shadow rather than a
+ * border so it does not change the column's width.
+ */
+const PINNED_CELL = 'max-md:sticky max-md:left-0 max-md:z-10 max-md:shadow-[1px_0_0_rgb(var(--c-line))]'
+
+/** An expanded row's `bg-info-bg/40`, laid over the pinned cell's opaque surface. */
+const PINNED_TINT =
+  'max-md:[background-image:linear-gradient(rgb(var(--c-info-bg)/0.4),rgb(var(--c-info-bg)/0.4))]'
+
 const TYPE_COLORS: Record<string, string> = {
   festival: 'bg-cat-violet-bg text-cat-violet-fg',
   showcase: 'bg-cat-sky-bg text-cat-sky-fg',
@@ -282,14 +293,25 @@ export function GigsPage() {
         <SkeletonTable rows={6} cols={8} />
       ) : (
         <Card pad="none" clip>
-          <div className="overflow-x-auto">
+          {/*
+            On a phone this table is twice the width of the screen, and it stays
+            a table — scrolling sideways — with two things pinned so it reads:
+            the name, so a status three columns over still says whose it is,
+            and the expanded detail, which was the table's full width and ran
+            every line of prose 390px off the glass. `container-type` is what
+            lets the detail size itself to the visible width as `100cqw`
+            without restating the page gutters at each breakpoint.
+          */}
+          <div className="overflow-x-auto [container-type:inline-size]">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-sunken border-b border-line">
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id}>
-                  {hg.headers.map((header) => (
+                  {hg.headers.map((header, i) => (
                     <th key={header.id} onClick={header.column.getToggleSortingHandler()}
-                      className={`px-4 py-2.5 text-left ${CAPTION_CLASS} select-none cursor-pointer whitespace-nowrap hover:text-body transition-colors`}>
+                      className={`px-4 py-2.5 text-left ${CAPTION_CLASS} select-none cursor-pointer whitespace-nowrap hover:text-body transition-colors ${
+                        i === 0 ? PINNED_CELL + ' max-md:bg-sunken' : ''
+                      }`}>
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       <span className="ml-1 text-faint">
                         {header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : ''}
@@ -303,15 +325,23 @@ export function GigsPage() {
               {table.getRowModel().rows.map((row) => (
                 <Fragment key={row.id}>
                   <tr className={`transition-colors ${expanded.has(row.original.id) ? 'bg-info-bg/40' : 'hover:bg-sunken'}`}>
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-3 text-body">
+                    {row.getVisibleCells().map((cell, i) => (
+                      <td key={cell.id} className={`px-4 py-3 text-body ${
+                        // Pinned, so it needs a background of its own or the
+                        // columns scroll through it; an expanded row's tint
+                        // is laid over it as a gradient to match the row.
+                        i === 0
+                          ? `${PINNED_CELL} max-md:bg-surface ${expanded.has(row.original.id) ? PINNED_TINT : ''}`
+                          : ''
+                      }`}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
                   </tr>
                   {expanded.has(row.original.id) && (
                     <tr>
-                      <td colSpan={columns.length} className="px-6 pb-5 pt-3 bg-info-bg/40 border-b border-info-line">
+                      <td colSpan={columns.length} className="p-0 bg-info-bg/40 border-b border-info-line">
+                        <div className="px-6 pb-5 pt-3 max-md:px-4 max-md:sticky max-md:left-0 max-md:w-[100cqw]">
                         {editingId === row.original.id ? (
                           <EditGigPanel
                             gig={row.original}
@@ -332,6 +362,7 @@ export function GigsPage() {
                             isPatching={isPatching}
                           />
                         )}
+                        </div>
                       </td>
                     </tr>
                   )}

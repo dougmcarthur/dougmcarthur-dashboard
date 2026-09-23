@@ -88,7 +88,7 @@ export function EditGigPanel({
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label>Name</Label>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={FIELD} />
@@ -112,10 +112,17 @@ export function EditGigPanel({
         <div>
           <Label>Fee</Label>
           <div className="flex gap-1.5">
-            <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={`${FIELD} w-20 shrink-0`}>
-              {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
-            </select>
-            <input type="number" min="0" value={draft.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} className={FIELD} />
+            {/* The width is on a wrapper because FIELD already says w-full, and
+                `${FIELD} w-20` let w-full win: the select filled the column,
+                could not shrink, and pushed the amount outside it. */}
+            <div className="w-20 shrink-0">
+              <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={FIELD}>
+                {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            {/* min-w-0: an input's default width is its floor as a flex item,
+                which ran this past a 149px column on a phone. */}
+            <input type="number" min="0" value={draft.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} className={`${FIELD} min-w-0`} />
           </div>
         </div>
         <div>
@@ -136,11 +143,11 @@ export function EditGigPanel({
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Why it fits</Label>
           <textarea rows={3} value={draft.fitRationale} onChange={(e) => set('fitRationale', e.target.value)} className={`${FIELD} resize-none`} />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>URL</Label>
           <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} className={FIELD} />
         </div>
@@ -150,7 +157,7 @@ export function EditGigPanel({
           form that mean a stage. The deadline above is a chore; these are the
           show, and they are the only ones the calendar writes as an event.
         */}
-        <div className="col-span-2 pt-1">
+        <div className="sm:col-span-2 pt-1">
           <Explainer as="div" title="Performance dates" titleClassName={CAPTION_CLASS}>
             When you are on stage. Goes on your calendar once this is booked, and not before.
           </Explainer>
@@ -164,7 +171,7 @@ export function EditGigPanel({
           <input type="date" value={draft.performanceEnd} onChange={(e) => set('performanceEnd', e.target.value)} className={FIELD} />
         </div>
         {dateProblem && (
-          <p className="col-span-2 text-xs text-danger-fg">{dateProblem}</p>
+          <p className="sm:col-span-2 text-xs text-danger-fg">{dateProblem}</p>
         )}
 
         {/*
@@ -173,7 +180,7 @@ export function EditGigPanel({
           than defaulting it, so a half-filled section produces a partial
           estimate with its gaps on screen instead of a confident wrong number.
         */}
-        <div className="col-span-2 pt-1">
+        <div className="sm:col-span-2 pt-1">
           <Explainer as="div" title="The trip" titleClassName="text-xs font-semibold text-muted uppercase tracking-wide">
             What it costs to get there. Every field is optional. Leave a band empty and it is
             guessed from the location, and labelled as guessed.
