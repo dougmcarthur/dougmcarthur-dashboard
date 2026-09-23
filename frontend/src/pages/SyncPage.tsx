@@ -55,7 +55,7 @@ function CreateSyncForm({ onDone }: { onDone: () => void }) {
   return (
     <Card pad="md" className="space-y-4">
       <h2 className="text-sm font-semibold text-ink">New Sync Target</h2>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label>Name *</Label>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="Epitaph Records" className={FIELD} autoFocus />
@@ -82,11 +82,11 @@ function CreateSyncForm({ onDone }: { onDone: () => void }) {
             {SYNC_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Notes</Label>
           <textarea rows={2} value={draft.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Context about this target…" className={`${FIELD} resize-none`} />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Pitch draft</Label>
           <textarea rows={4} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} placeholder="Dear…" className={`${FIELD} resize-y`} />
         </div>
@@ -130,7 +130,7 @@ function EditSyncPanel({
 
   return (
     <div className="space-y-4 max-w-2xl">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label>Name</Label>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={FIELD} />
@@ -147,15 +147,15 @@ function EditSyncPanel({
           <Label>Contact role</Label>
           <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} className={FIELD} />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Confirm via</Label>
           <input value={draft.confirmationMethod} onChange={(e) => set('confirmationMethod', e.target.value)} className={FIELD} />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Notes</Label>
           <textarea rows={3} value={draft.notes} onChange={(e) => set('notes', e.target.value)} className={`${FIELD} resize-none`} />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Pitch draft</Label>
           <textarea rows={6} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} className={`${FIELD} resize-y`} />
         </div>
@@ -364,7 +364,7 @@ export function SyncPage() {
                 </div>
 
                 {isOpen && (
-                  <div className="px-6 pb-5 pt-3 bg-cat-violet-bg/40 border-t border-cat-violet-line">
+                  <div className="px-4 sm:px-6 pb-5 pt-3 bg-cat-violet-bg/40 border-t border-cat-violet-line">
                     {isEditing ? (
                       <EditSyncPanel
                         target={target}
