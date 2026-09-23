@@ -98,6 +98,37 @@ describe('gig transitions are asked for, not listed', () => {
   it('the timing strip asks whether a move is legal rather than listing it', () => {
     expect(read('frontend/src/components/TimingStrip.tsx')).toContain('isGigTransitionAllowed')
   })
+
+  it('the gigs table writes no gig status it chose itself', () => {
+    const src = read('frontend/src/pages/GigsPage.tsx')
+    // Missed when Review and Overview were fixed: the actions cell carried
+    // `body: { status: 'shortlisted' }` and two siblings, gated on
+    // `normaliseGigStatus(row.status) === 'discovered'`. All three happened
+    // to be legal, which is why nobody noticed — a claim about the pipeline
+    // that nothing checks is right only until the pipeline changes.
+    expect(src).not.toMatch(/status:\s*['"`]/)
+    expect(src).not.toMatch(/===\s*['"`](?:discovered|shortlisted|preparing|submitted|invited)['"`]/)
+    expect(src).toContain('inlineGigMoves')
+  })
+})
+
+/**
+ * A deadline is counted through the parser, against a date the screen was
+ * handed.
+ *
+ * Most gig rows hold prose in `deadline`, and `new Date(prose)` is Invalid
+ * Date: its countdown is NaN, never urgent and never an error, so the table
+ * silently stopped warning about anything written as a sentence. And a cell
+ * that reads `Date.now()` is logic reading the clock, which is how a queue
+ * fixture passed one day and failed in CI the next.
+ */
+describe('the gigs table reads deadlines through the parser', () => {
+  const src = readFileSync('frontend/src/pages/GigsPage.tsx', 'utf8')
+
+  it('never turns the column into a Date itself', () => {
+    expect(src).not.toMatch(/new Date\(|Date\.now\(\)/)
+    expect(src).toContain('parseDeadline(')
+  })
 })
 
 /**
