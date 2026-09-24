@@ -107,6 +107,24 @@ and so on) may keep public member directories too; none has been checked. Each
 would be its own parser plus a `profileUrl` pattern — add one when a tester has
 a profile there, not before.
 
+**The rest of manitobamusic.com, and where each part fits.** Surveyed
+2026-09-24; all server-rendered and readable without a login.
+
+| Page | What it is | Where it fits in Scout |
+| --- | --- | --- |
+| `/deadlines` | Curated deadlines, updated Fridays: showcases, calls, youth programmes, grants, competitions | **Done** — the gig research agent's first source (`scripts/agents/prompts/gig-festival-scan.md`) |
+| `/industry` | Directory by category, including *Festivals, Talent Buyers, Promoters* and venues | Gig research: a list of every Manitoba festival and buyer to check for open calls, and booking contacts for venues |
+| `/livemusic` | Every show in the province, with venue, time and full bill | Gig research: which venues book artists like this one, and who they share bills with — leads, not rows |
+| `/songoftheweek`, the Spotify playlists | Promotion slots for members, booked by email, filling months ahead | The promo agent: a standing reminder to request a slot around a release |
+| `/member-news` | Members' own news, submitted to Manitoba Music | The promo agent: a news item to draft when there is a release or a show |
+| `/funding`, `/market-access`, `/export-development` | Funding programmes and Manitoba Music's own travel fund | Already reached through `/deadlines`; the Market Access Fund is the one to connect to a booked out-of-province show |
+| `/workshops` | Professional development sessions | Low priority; not a gig |
+
+`/livemusic` and the profile's own event list also suggest one more link for
+the Shows panel: a show marked "not on Manitoba Music" could send a member
+straight to where they add an event, once that page's address is known —
+it sits behind the member login, so it has not been checked.
+
 **Not built: re-reading on a schedule.** The profile is read when the artist
 opens the panel. A weekly re-read would compare against the library and raise
 a bell condition — "your Manitoba Music profile has 3 things Scout does not"
