@@ -43,7 +43,7 @@ type Read =
   | { ok: false; verdict: 'rejected' | 'unreachable'; error: string }
 
 /** Fetch and parse. Never throws: every failure is a sentence for the screen. */
-async function readProfile(input: string): Promise<Read> {
+export async function readProfile(input: string): Promise<Read> {
   const target = profileUrl(input)
   if ('error' in target) return { ok: false, verdict: 'rejected', error: target.error }
   try {
@@ -58,11 +58,22 @@ async function readProfile(input: string): Promise<Read> {
     if (!res.ok) {
       return { ok: false, verdict: 'unreachable', error: `Manitoba Music answered ${res.status}. Try again in a while.` }
     }
-    const profile = parseProfile(await res.text())
+    const html = await res.text()
+    const profile = parseProfile(html)
     if (!profile) {
       // A redesign, a login page or an unpublished profile all land here, and
       // none of them is "your profile is empty".
-      return { ok: false, verdict: 'rejected', error: 'That page did not read as a Manitoba Music profile.' }
+      // Named by its title, because "did not read" alone cannot tell a
+      // redesign from a bot check, and the two want different fixes. Rated
+      // unreachable rather than rejected: the address was already accepted,
+      // and a page that reads as a profile one minute and not the next is a
+      // fact about that minute.
+      const title = (html.match(/<title>([^<]{1,120})/)?.[1] ?? '').trim()
+      return {
+        ok: false,
+        verdict: 'unreachable',
+        error: `That page did not read as a Manitoba Music profile${title ? ` (Manitoba Music sent a page titled "${title}")` : ''}.`,
+      }
     }
     return { ok: true, url: target.url, slug: target.slug, profile }
   } catch (err) {

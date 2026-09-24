@@ -83,7 +83,16 @@ export interface MmProfile {
   videos: Array<{ title: string; youtubeId: string }>
   releases: Array<{ title: string; released: string | null; url: string }>
   photos: string[]
-  shows: Array<{ date: string; title: string; url: string | null }>
+  shows: Array<{
+    date: string
+    /** `HH:MM`, 24-hour, or null. */
+    time: string | null
+    title: string
+    venue: string | null
+    /** "Winnipeg, MB" */
+    location: string | null
+    url: string | null
+  }>
   news: Array<{ date: string | null; title: string; url: string }>
 }
 
@@ -119,6 +128,12 @@ function https(url: string): string | null {
   const s = decode(url.trim())
   const abs = s.startsWith('/') ? `https://${MM_HOST}${s}` : s
   return /^https:\/\//i.test(abs) ? abs : null
+}
+
+function to24(h: string, m: string, ampm: string): string {
+  let hour = Number(h) % 12
+  if (ampm.toUpperCase() === 'PM') hour += 12
+  return `${String(hour).padStart(2, '0')}:${m}`
 }
 
 /** "instagram.com" → "Instagram"; the artist's own domain → "Website". */
@@ -225,7 +240,19 @@ export function parseProfile(html: string): MmProfile | null {
       const date = m[1].match(/<time class="event-item-date" datetime="(\d{4}-\d{2}-\d{2})/)
       const title = m[1].match(/<h3 class="event-item-title">([\s\S]*?)<\/h3>/)
       const href = m[1].match(/<h3 class="event-item-title">[\s\S]*?href="([^"]+)"/)
-      if (date && title) shows.push({ date: date[1], title: text(title[1]), url: href ? https(href[1]) : null })
+      const venue = m[1].match(/<a class="venue-name"[^>]*>([\s\S]*?)<\/a>/)
+      const region = m[1].match(/<span class="venue-region">([\s\S]*?)<\/span>/)
+      const time = m[1].match(/<span class="event-item-time">\s*(\d{1,2}):(\d{2})\s*([AP]M)/i)
+      if (date && title) {
+        shows.push({
+          date: date[1],
+          time: time ? to24(time[1], time[2], time[3]) : null,
+          title: text(title[1]),
+          venue: venue ? text(venue[1]) || null : null,
+          location: region ? text(region[1]) || null : null,
+          url: href ? https(href[1]) : null,
+        })
+      }
     }
   }
 

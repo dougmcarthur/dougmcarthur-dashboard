@@ -78,7 +78,13 @@ describe('reading a profile', () => {
       'Electronic Press Kit PDF - 2024',
     ])
     expect(p.photos).toHaveLength(3)
-    expect(p.shows[0]).toMatchObject({ date: '2026-10-06', title: 'Songwriter Showcase 5' })
+    expect(p.shows[0]).toMatchObject({
+      date: '2026-10-06',
+      time: '19:00',
+      title: 'Songwriter Showcase 5',
+      venue: 'The Handsome Daughter',
+      location: 'Winnipeg, MB',
+    })
     expect(p.news.length).toBeGreaterThan(0)
   })
 

@@ -37,7 +37,6 @@ import {
   errorNote,
   eventsUrl,
   parseEvents,
-  splitShows,
   verdictFor,
   type ProbeVerdict,
   type Show,
@@ -56,7 +55,7 @@ function todayFrom(c: Context<AppEnv>): string {
 
 type Row = typeof artistConnectors.$inferSelect
 
-async function loadRow(env: Env, tenant: TenantId, kind: string = KIND): Promise<Row | undefined> {
+export async function loadRow(env: Env, tenant: TenantId, kind: string = KIND): Promise<Row | undefined> {
   return getDb(env.DB)
     .select()
     .from(artistConnectors)
@@ -74,7 +73,7 @@ interface Fetched {
  * One request to Bandsintown. Never throws: a network failure is an
  * `unreachable` verdict, which is information, not an exception.
  */
-async function fetchWindow(account: string, key: string, window: ShowWindow, today: string): Promise<Fetched> {
+export async function fetchWindow(account: string, key: string, window: ShowWindow, today: string): Promise<Fetched> {
   try {
     const res = await fetch(eventsUrl(account, key, window, today), {
       headers: { Accept: 'application/json' },
@@ -92,7 +91,7 @@ async function fetchWindow(account: string, key: string, window: ShowWindow, tod
   }
 }
 
-async function recordProbe(env: Env, tenant: TenantId, probe: Fetched) {
+export async function recordProbe(env: Env, tenant: TenantId, probe: Fetched) {
   const now = new Date().toISOString()
   await getDb(env.DB)
     .update(artistConnectors)
@@ -179,41 +178,6 @@ connectors.delete('/bandsintown', async (c) => {
     .delete(artistConnectors)
     .where(scoped(artistConnectors, tenantOf(c), eq(artistConnectors.kind, KIND)))
   return c.json({ ok: true })
-})
-
-/**
- * The shows, upcoming and from the last year.
- *
- * Read on request rather than copied into D1: Bandsintown is where the artist
- * edits them, and a copy is a second place for a date to go stale. The two
- * requests run together; if either is refused the verdict is recorded, so the
- * Settings card and this screen agree about the key.
- */
-connectors.get('/bandsintown/shows', async (c) => {
-  const tenant = tenantOf(c)
-  const row = await loadRow(c.env, tenant)
-  if (!row?.secret) return c.json({ connected: false, upcoming: [], past: [] })
-
-  const today = todayFrom(c)
-  const key = await decryptToken(c.env, row.secret)
-  const [ahead, behind] = await Promise.all([
-    fetchWindow(row.account, key, 'upcoming', today),
-    fetchWindow(row.account, key, 'past', today),
-  ])
-
-  const worst = [ahead, behind].find((p) => p.verdict === 'rejected') ?? [ahead, behind].find((p) => p.verdict === 'unreachable')
-  if (worst || row.status !== 'working') await recordProbe(c.env, tenant, worst ?? ahead)
-
-  const { upcoming } = splitShows(ahead.shows, today)
-  const { past } = splitShows(behind.shows, today)
-  return c.json({
-    connected: true,
-    account: row.account,
-    status: worst?.verdict ?? 'working',
-    statusNote: worst?.note ?? null,
-    upcoming,
-    past,
-  })
 })
 
 export default connectors
