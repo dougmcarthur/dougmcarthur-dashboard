@@ -272,7 +272,7 @@ So, without exception:
 |---|---|---|
 | A | Status vocabulary, migration, calendar reframe | **Done.** The app was actively misleading until this landed |
 | B | Performance dates; `booked` writes a real calendar event | **Done.** Completes the calendar story |
-| C | Artist database + EPK assembly | **Done** apart from sourcing. Everything in phases 3–5 draws on it |
+| C | Artist database + EPK assembly | **Done**, sourcing included (`shared/artistSource.ts`); Drive, the website and press photos are still by hand |
 | D | Phase 3: form pre-fill, draft emails, materials checklist | **Done.** Migration 0011, `shared/application.ts`, and the panel on the gig row. See [application-prep-plan.md](./application-prep-plan.md) |
 | E | Phase 4: Gmail follow-up classification | **Done.** Migrations 0012 and 0015, `shared/replyMatch.ts`, `replyClassify.ts` and `replyDraft.ts`, swept on the cron. See [reply-matching-plan.md](./reply-matching-plan.md) |
 | F | Cost model + swing-weight elicitation + scoring | **Half built.** The cost side is in — migration 0013, `shared/gigCost.ts`. The scoring side waits on the elicitation |
@@ -363,11 +363,13 @@ website are still unread, and the press photos — the assets with the most
 expensive failure mode, since a photo with no credit is broken the day it is
 added — are not in any document and have to be entered by hand.
 
-**The notes backfill.** `shared/reviewParse.ts` is a stopgap that re-derives
-structured facts out of prose on every read, because migration 0001's columns
-were never backfilled. It is the oldest debt in the repo and the one with a
-written plan already — see [notes-field-audit.md](./notes-field-audit.md). The
-parser should be deleted, not extended.
+**The notes backfill. Done, and the parser stays.** `shared/noteColumns.ts`
+extracts six columns on insert and on a rewritten note, `POST
+/api/backfill/notes` filled the older rows, and the stored column wins over the
+prose on every screen. The plan to delete `shared/reviewParse.ts` afterwards
+was not reachable: the research agents write prose from outside this repo, so
+extraction has to keep happening — only its timing moved, from every read to
+each write. See [notes-field-audit.md](./notes-field-audit.md).
 
 ### Salvaged from the abandoned prototype
 
