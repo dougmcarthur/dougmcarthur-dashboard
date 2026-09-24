@@ -26,6 +26,7 @@ import agentTokens from './routes/agentTokens'
 import admin from './routes/admin'
 import profile from './routes/profile'
 import connectors from './routes/connectors'
+import manitobaMusic from './routes/manitobaMusic'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
 import { isDigestDue } from '../shared/digestSchedule'
 import { sendMail, mailerConfigured } from './lib/mailer'
@@ -182,6 +183,7 @@ app.route('/api/auth', auth)
 app.route('/api/gmail', gmailDrafts)
 app.route('/api/agent-tokens', agentTokens)
 app.route('/api/profile', profile)
+app.route('/api/connectors/manitoba-music', manitobaMusic)
 app.route('/api/connectors', connectors)
 // The oversight surface. See ADMIN_API_PREFIX above for what the middleware
 // does with it, in both directions.

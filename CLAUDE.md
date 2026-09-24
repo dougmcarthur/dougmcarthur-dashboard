@@ -851,6 +851,19 @@ many artists wants their partner programme first. See
 `docs/artist-profile-plan.md`, which also holds the storage and social-scan
 research.
 
+**A Manitoba Music profile is read from the address the artist gives, never
+found by name.** Most of the next testers are Winnipeg artists with a member
+profile, which carries a bio, links, videos, releases, downloads and photos in
+the same server-rendered markup on every page. `profileUrl` in
+`shared/manitobaMusic.ts` accepts `/profiles/view,<n>/<slug>` and nothing else,
+and connecting shows the name and photo on that page — "Is this you?" — before
+saving, because a search by name files a stranger's bio the day there are two
+of you. The import is the reference-document shape: preview, then write, all
+never reviewed, a proposal dropped when its source *or* its value is already
+on file. Contact details are never copied. Its photos refuse a foreign
+`Referer`, so an EPK that displays one needs its own copy. See
+`docs/artist-profile-plan.md`.
+
 **Gmail drafting is a grant the person makes, not a secret somebody pasted.**
 Every Google token before this one was obtained at a terminal and stored with
 `wrangler secret put`. That cannot work for a feature where the *user* decides

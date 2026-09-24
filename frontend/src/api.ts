@@ -510,7 +510,31 @@ export interface ConnectorSummary {
 export interface ConnectorList {
   canStore: boolean
   bandsintown: ConnectorSummary | null
+  /** `account` is the profile address; `statusNote` the name read off it. */
+  manitobaMusic: ConnectorSummary | null
 }
+
+/** What a Manitoba Music profile says about who it belongs to. */
+export interface MmIdentity {
+  url: string
+  name: string
+  photo: string | null
+  genres: string[]
+  counts: { bio: number; links: number; videos: number; releases: number; files: number; photos: number }
+}
+
+export type MmImportPlan =
+  | { connected: false }
+  | { connected: true; error: string }
+  | {
+      connected: true
+      name: string
+      url: string
+      proposals: AssetProposal[]
+      skipped: Array<{ heading: string; reason: string }>
+      existing: number
+      wouldAdd: number
+    }
 
 /** One show from Bandsintown. See shared/bandsintown.ts. */
 export interface BandsintownShow {
@@ -756,6 +780,23 @@ export const api = {
       }),
     removeBandsintown: () => apiFetch<{ ok: boolean }>('/connectors/bandsintown', { method: 'DELETE' }),
     shows: () => apiFetch<ShowsResponse>(`/connectors/bandsintown/shows?today=${localToday()}`),
+    checkManitobaMusic: (url: string) =>
+      apiFetch<MmIdentity>('/connectors/manitoba-music/check', { method: 'POST', body: JSON.stringify({ url }) }),
+    saveManitobaMusic: (url: string) =>
+      apiFetch<{ manitobaMusic: ConnectorSummary }>('/connectors/manitoba-music', {
+        method: 'PUT',
+        body: JSON.stringify({ url }),
+      }),
+    removeManitobaMusic: () => apiFetch<{ ok: boolean }>('/connectors/manitoba-music', { method: 'DELETE' }),
+  },
+  /**
+   * Filling the library from a Manitoba Music profile. Preview, then apply —
+   * the reference documents' shape, and the guard in uiConsistency holds it.
+   */
+  manitobaMusic: {
+    preview: () => apiFetch<MmImportPlan>('/connectors/manitoba-music/import'),
+    apply: () =>
+      apiFetch<{ added: number; existing: number }>('/connectors/manitoba-music/import', { method: 'POST' }),
   },
   /**
    * The research agents' credentials. Issuing and revoking both come back

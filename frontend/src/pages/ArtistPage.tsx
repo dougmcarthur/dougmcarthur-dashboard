@@ -13,6 +13,7 @@ import { AssetRow } from './artist/AssetRow'
 import { AssetForm } from './artist/AssetForm'
 import { ShowsPanel } from './artist/ShowsPanel'
 import { SourcePanel } from './artist/SourcePanel'
+import { ManitobaMusicPanel } from './artist/ManitobaMusicPanel'
 import { Explainer } from '../components/ui/Explainer'
 import { Caption, Card } from '../components/ui/Surface'
 
@@ -169,6 +170,7 @@ export function ArtistPage() {
       {tab === 'library' ? (
         <div className="space-y-4">
           <SourcePanel onDone={invalidate} />
+          <ManitobaMusicPanel onDone={invalidate} />
           {adding && (
             <AssetForm
               onSave={(body) => create.mutate(body)}

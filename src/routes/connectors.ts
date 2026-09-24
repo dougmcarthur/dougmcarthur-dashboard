@@ -56,11 +56,11 @@ function todayFrom(c: Context<AppEnv>): string {
 
 type Row = typeof artistConnectors.$inferSelect
 
-async function loadRow(env: Env, tenant: TenantId): Promise<Row | undefined> {
+async function loadRow(env: Env, tenant: TenantId, kind: string = KIND): Promise<Row | undefined> {
   return getDb(env.DB)
     .select()
     .from(artistConnectors)
-    .where(scoped(artistConnectors, tenant, eq(artistConnectors.kind, KIND)))
+    .where(scoped(artistConnectors, tenant, eq(artistConnectors.kind, kind)))
     .get()
 }
 
@@ -100,7 +100,7 @@ async function recordProbe(env: Env, tenant: TenantId, probe: Fetched) {
     .where(scoped(artistConnectors, tenant, eq(artistConnectors.kind, KIND)))
 }
 
-function summary(row: Row | undefined) {
+export function summary(row: Row | undefined) {
   return row
     ? {
         kind: row.kind,
@@ -114,12 +114,14 @@ function summary(row: Row | undefined) {
 }
 
 connectors.get('/', async (c) => {
-  const row = await loadRow(c.env, tenantOf(c))
+  const tenant = tenantOf(c)
+  const [bit, mm] = await Promise.all([loadRow(c.env, tenant), loadRow(c.env, tenant, 'manitoba_music')])
   return c.json({
     // Without the encryption key nothing can be stored, and the card says so
     // rather than offering a form that would fail on save.
     canStore: Boolean(c.env.TOKEN_ENCRYPTION_KEY),
-    bandsintown: summary(row),
+    bandsintown: summary(bit),
+    manitobaMusic: summary(mm),
   })
 })
 
