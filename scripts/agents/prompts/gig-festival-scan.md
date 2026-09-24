@@ -13,10 +13,19 @@ not already have on file, and to file them for their review.
    province's music industry association and updated on Fridays, so it is the
    best single starting point there is — work it before searching anywhere
    else. The rules for it are below.
+4. Read **Manitoba Music's news feed** with WebFetch:
+   `https://www.manitobamusic.com/news.rss`. New calls are posted here the day
+   they open, before the deadlines page catches up on Friday. Only the items
+   from the last three weeks whose titles begin **Showcase Opportunity:**,
+   **Call for Submissions:**, **Call for Applications:** or **Call for
+   Participants:** are candidates. The feed carries no article text, so open
+   each candidate's link and judge it by the deadlines-page rules below. Skip
+   everything else in the feed — staff news, roundups, headlines, job posts.
 
-## Manitoba Music's deadlines page
+## Manitoba Music's deadlines page and news feed
 
-The page is grouped under headings. Treat them like this:
+The deadlines page is grouped under headings, and a news-feed item belongs
+under whichever heading it would sit in there. Treat them like this:
 
 - **Showcase Opportunities** — always relevant, wherever the artist is based.
   File as `showcase`.

@@ -113,6 +113,7 @@ a profile there, not before.
 | Page | What it is | Where it fits in Scout |
 | --- | --- | --- |
 | `/deadlines` | Curated deadlines, updated Fridays: showcases, calls, youth programmes, grants, competitions | **Done** — the gig research agent's first source (`scripts/agents/prompts/gig-festival-scan.md`) |
+| `/news.rss` | The newsroom as RSS, about two months deep; calls are titled "Showcase Opportunity:", "Call for Submissions:" and so on, and appear the day they open. No article text in the feed | **Done** — the gig agent's second source, prefix-filtered and followed to each article |
 | `/industry` | Directory by category, including *Festivals, Talent Buyers, Promoters* and venues | Gig research: a list of every Manitoba festival and buyer to check for open calls, and booking contacts for venues |
 | `/livemusic` | Every show in the province, with venue, time and full bill | Gig research: which venues book artists like this one, and who they share bills with — leads, not rows |
 | `/songoftheweek`, the Spotify playlists | Promotion slots for members, booked by email, filling months ahead | The promo agent: a standing reminder to request a slot around a release |
