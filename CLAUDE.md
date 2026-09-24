@@ -946,6 +946,16 @@ good way to be blacklisted. The output is text to copy. `ApplicationPanel` has
 Copy and *This one is right*, no Send, and `test/uiConsistency.test.ts` fails if
 a button appears claiming otherwise. See `docs/application-prep-plan.md`.
 
+**A Google Form can open pre-filled, and only with what you have read.**
+`shared/formPrefill.ts` builds `viewform?usp=pp_url&entry.<id>=…` from the ids
+the form reader already keeps. A `suggested` answer stays out — typing it into
+the form would erase the unread state at the moment it matters — and so does a
+choice the form does not offer, because Google drops it silently and the box
+arrives empty. Everything left out is named with a reason. The budget is 6,000
+encoded characters, under the common 8 KB request-line limit since Google does
+not publish its own. Other platforms need builder-side field names and
+Airtable renders in JavaScript, so this is Google Forms only.
+
 **A suggestion is not an answer.** `answer_state` is a column apart from
 `answer` for the same reason `unreviewed` is a state apart from `overdue`: "the
 app proposed this" and "you read it and said yes" are different claims, and an
