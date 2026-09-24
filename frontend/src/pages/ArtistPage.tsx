@@ -11,6 +11,7 @@ import { Button } from '../components/ui/Button'
 import { FILTER } from '../components/ui/Field'
 import { AssetRow } from './artist/AssetRow'
 import { AssetForm } from './artist/AssetForm'
+import { ShowsPanel } from './artist/ShowsPanel'
 import { SourcePanel } from './artist/SourcePanel'
 import { Explainer } from '../components/ui/Explainer'
 import { Caption, Card } from '../components/ui/Surface'
@@ -246,6 +247,8 @@ export function ArtistPage() {
               ))}
             </>
           )}
+          {/* Programmers and press want dates; a music supervisor does not. */}
+          {tab !== 'sync' && <ShowsPanel />}
         </div>
       )}
     </div>

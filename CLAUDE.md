@@ -224,7 +224,7 @@ tenant-scoped, and none of them ask. Admin mode is the next thing that will
 (`docs/multi-tenant-plan.md`); the client tries first and re-asserts only on
 refusal, so a burst of removals costs one touch, and retries exactly once.
 
-**A request resolves to an artist before any route runs.** Fifteen tables
+**A request resolves to an artist before any route runs.** Sixteen tables
 hold rows that belong to one person, and `src/db/scope.ts` is the only way to
 reach them: `scoped(table, tenant, ...rest)` builds the `WHERE`, `withTenant`
 builds the values, and `TenantId` is a **branded** type with one constructor,
@@ -240,7 +240,7 @@ and `TenantId` is not nullable — so an admin-mode request reaching for
 `gig_opportunities` fails to compile rather than returning a stranger's rows.
 
 **A missing filter is a test failure, not a leak.**
-`test/tenantScope.test.ts` reads the source and fails when one of the fifteen
+`test/tenantScope.test.ts` reads the source and fails when one of the sixteen
 is named in a query that does not pass through `scoped` or `withTenant`. It
 has to be source-level: an unscoped query typechecks, runs, and returns the
 right rows for as long as there is one artist — it starts being wrong on the
@@ -367,10 +367,10 @@ vocabulary, or links to a route that surface cannot reach.
 the `usage_daily` rollup — the counts are written by the cron running *as the
 tenant*, which emits a number, and the owner reads the number. The one write
 that crosses the line is removing an artist: a tenant-scoped delete across the
-fifteen, previewed first as a **count per table**, which names no column and
+sixteen, previewed first as a **count per table**, which names no column and
 returns no row. The owner's own tenant is refused, because deleting it takes
 the account holding the surface with it. `test/adminMode.test.ts` fails if the
-admin router names one of the fifteen, or uses `asTenantId` more than the
+admin router names one of the sixteen, or uses `asTenantId` more than the
 once that removal needs.
 
 **Three of the rollup's seven counters have no writer, and the API says so.**
@@ -833,6 +833,23 @@ prefers a grant and falls back to it, the same "read both spellings" move
 `normaliseGigStatus` makes. A grant that exists but is refused writes nowhere
 rather than falling back — the artist connected a calendar, and writing to the
 owner's instead would be worse than writing nothing.
+
+**Bandsintown is read with the artist's own key, and the key never reaches a
+page.** Bandsintown issues one API key per artist, so a deployment-wide key
+would be one artist's key used for another; `artist_connectors` (migration
+0027, the sixteenth scoped table) holds each tenant's, AES-GCM encrypted like a
+Google refresh token. Saving probes first and a key Bandsintown refuses is not
+stored; a timeout still saves, because it is not a verdict. Shows are read on
+request rather than copied into D1, since Bandsintown is where the artist edits
+them. **Bandsintown echoes the caller's `app_id` into every event and ticket
+link it returns**, so `shared/bandsintown.ts` strips it from each URL before a
+show leaves the Worker — `test/bandsintown.test.ts` pins that with the real
+shape. `today` comes from the browser, because a show tonight in Winnipeg is
+upcoming until midnight there, not UTC. Their terms allow artists and their
+teams to display events "on their website or app"; a platform doing it for
+many artists wants their partner programme first. See
+`docs/artist-profile-plan.md`, which also holds the storage and social-scan
+research.
 
 **Gmail drafting is a grant the person makes, not a secret somebody pasted.**
 Every Google token before this one was obtained at a terminal and stored with

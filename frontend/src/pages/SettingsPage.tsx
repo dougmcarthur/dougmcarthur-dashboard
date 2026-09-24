@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type ReferenceDoc } from '../api'
 import { IntegrationsCard } from '../components/IntegrationsCard'
+import { BandsintownCard } from '../components/BandsintownCard'
 import { NudgeRoutingCard } from '../components/NudgeRoutingCard'
 import { Explainer } from '../components/ui/Explainer'
 import { AppearanceSettings } from '../components/AppearanceSettings'
@@ -257,6 +258,7 @@ export function SettingsPage() {
         </div>
         <div className="space-y-8 min-w-0">
           <IntegrationsCard />
+          <BandsintownCard />
           {/* Directly under Integrations: the two are one decision read top to
               bottom — what is connected, then what each connection is for. */}
           <NudgeRoutingCard />
