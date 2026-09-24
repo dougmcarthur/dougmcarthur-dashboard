@@ -6,7 +6,8 @@ import { SOURCE_LABELS } from '../../../../shared/showMerge'
 /**
  * Shows on the EPK: one list from every place they are posted.
  *
- * Bandsintown, the Manitoba Music profile and gigs booked in Scout, merged by
+ * Bandsintown, the Manitoba Music profile and calendar, and gigs booked in
+ * Scout, merged by
  * `shared/showMerge.ts` so the same night appears once. Each row says where it
  * is listed, and an upcoming show missing from a connected listing says so —
  * artists post dates inconsistently, and "not on Bandsintown" is also "not on
@@ -87,7 +88,7 @@ export function ShowsPanel() {
       <header className="px-4 py-2.5 bg-sunken border-b border-line flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <Caption as="h2">Shows</Caption>
         <span className="text-xs text-muted">
-          From {[...data.connected.map((s) => SOURCE_LABELS[s]), 'gigs booked in Scout'].join(', ')}
+          From {[...data.sources.map((s) => SOURCE_LABELS[s.source]), 'gigs booked in Scout'].join(', ')}
         </span>
       </header>
       {failing.length > 0 && (

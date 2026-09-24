@@ -113,8 +113,9 @@ a profile there, not before.
 | Page | What it is | Where it fits in Scout |
 | --- | --- | --- |
 | `/deadlines` | Curated deadlines, updated Fridays: showcases, calls, youth programmes, grants, competitions | **Done** — the gig research agent's first source (`scripts/agents/prompts/gig-festival-scan.md`) |
+| `/news.rss` | The newsroom as RSS, about two months deep; calls are titled "Showcase Opportunity:", "Call for Submissions:" and so on, and appear the day they open. No article text in the feed | **Done** — the gig agent's second source, prefix-filtered and followed to each article |
 | `/industry` | Directory by category, including *Festivals, Talent Buyers, Promoters* and venues | Gig research: a list of every Manitoba festival and buyer to check for open calls, and booking contacts for venues |
-| `/livemusic` | Every show in the province, with venue, time and full bill | Gig research: which venues book artists like this one, and who they share bills with — leads, not rows |
+| `/livemusic` | Every show in the province, with venue, time and full bill; `livemusic.rss` takes `keyword:`, `genre:<id>`, `category:<id>` and `from:` filters (CakePHP named parameters, which the site's own search form redirects to) | **Done, twice** — `keyword:<artist name>` is a fourth show source (`shared/mmCalendar.ts`), keeping only events whose line-up names the artist exactly; `genre:<id>` feeds the gig agent's *Venues booking similar acts* report section |
 | `/songoftheweek`, the Spotify playlists | Promotion slots for members, booked by email, filling months ahead | The promo agent: a standing reminder to request a slot around a release |
 | `/member-news` | Members' own news, submitted to Manitoba Music | The promo agent: a news item to draft when there is a release or a show |
 | `/funding`, `/market-access`, `/export-development` | Funding programmes and Manitoba Music's own travel fund | Already reached through `/deadlines`; the Market Access Fund is the one to connect to a booked out-of-province show |

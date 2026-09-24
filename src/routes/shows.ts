@@ -1,9 +1,10 @@
 /**
  * Every show the artist has, from every place it is listed, as one list.
  *
- * Three sources, read together on request: Bandsintown (upcoming and the last
+ * Four sources, read together on request: Bandsintown (upcoming and the last
  * year), the Manitoba Music profile's Shows (upcoming only — its iCal feed is
- * broken, every event dated 1969), and gigs booked in Scout with a
+ * broken, every event dated 1969), the province's live calendar searched for
+ * the artist's name (`shared/mmCalendar.ts`), and gigs booked in Scout with a
  * performance date. `shared/showMerge.ts` folds the same night from several
  * sources into one row and says which listings an upcoming show is missing
  * from.
@@ -27,6 +28,7 @@ import { fetchWindow, loadRow, recordProbe } from './connectors'
 import { readProfile } from './manitobaMusic'
 import { normaliseGigStatus } from '../../shared/gigStatus'
 import { mergeShows, type ShowSource, type SourceShow } from '../../shared/showMerge'
+import { calendarFeedUrl, eventsFor, parseCalendarFeed } from '../../shared/mmCalendar'
 
 const shows = new Hono<AppEnv>()
 
@@ -101,6 +103,41 @@ shows.get('/', async (c) => {
         location: s.location,
         url: s.url,
       })
+    }
+    // After the profile's own rows, so an event on both is labelled as the
+    // profile listing it — the one the artist keeps.
+    await calendar(read.profile.name)
+  }
+
+  /**
+   * Shows on the province's calendar that bill the artist by the name on
+   * their profile — the name they confirmed was theirs. Upcoming only; a
+   * failure is reported and costs only this source.
+   */
+  const calendar = async (name: string) => {
+    try {
+      const res = await fetch(calendarFeedUrl(name), {
+        headers: { 'User-Agent': 'SunDogsMusicScout/1.0 (+https://scout.sundogsmusic.ca)', Accept: 'application/rss+xml' },
+        signal: AbortSignal.timeout(10000),
+      })
+      if (!res.ok) {
+        states.push({ source: 'manitoba_calendar', status: 'unreachable', note: `The calendar answered ${res.status}.` })
+        return
+      }
+      states.push({ source: 'manitoba_calendar', status: 'working', note: null })
+      for (const e of eventsFor(parseCalendarFeed(await res.text()), name)) {
+        collected.push({
+          source: 'manitoba_calendar',
+          date: e.date!,
+          time: e.time,
+          title: e.event ?? e.lineup.join(', '),
+          venue: e.venue,
+          location: e.city,
+          url: e.url,
+        })
+      }
+    } catch (err) {
+      states.push({ source: 'manitoba_calendar', status: 'unreachable', note: err instanceof Error ? err.message : 'No answer.' })
     }
   }
 
