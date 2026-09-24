@@ -28,7 +28,7 @@
  * Pure: no clock, no network. `today` is an argument.
  */
 
-export type ShowSource = 'scout' | 'bandsintown' | 'manitoba_music'
+export type ShowSource = 'scout' | 'bandsintown' | 'manitoba_music' | 'manitoba_calendar'
 
 /** The listings an artist publishes to; Scout's own gigs are not one. */
 export const LISTING_SOURCES: ShowSource[] = ['bandsintown', 'manitoba_music']
@@ -36,7 +36,11 @@ export const LISTING_SOURCES: ShowSource[] = ['bandsintown', 'manitoba_music']
 export const SOURCE_LABELS: Record<ShowSource, string> = {
   scout: 'Booked in Scout',
   bandsintown: 'Bandsintown',
-  manitoba_music: 'Manitoba Music',
+  manitoba_music: 'Manitoba Music profile',
+  // Found on the province's calendar by name: a venue or promoter posted it,
+  // whether or not the artist linked it to their profile. It is not a
+  // listing the artist keeps, so a show is never "missing" from it.
+  manitoba_calendar: 'Manitoba Music calendar',
 }
 
 export interface SourceShow {
@@ -113,7 +117,7 @@ function realVenue(s: SourceShow): string | null {
  * short and typed by a person), then Bandsintown's, which often carries the
  * whole bill in the title.
  */
-const TITLE_ORDER: ShowSource[] = ['scout', 'manitoba_music', 'bandsintown']
+const TITLE_ORDER: ShowSource[] = ['scout', 'manitoba_music', 'manitoba_calendar', 'bandsintown']
 
 export function mergeShows(
   shows: SourceShow[],
@@ -134,6 +138,8 @@ export function mergeShows(
       // Never fold two rows from the same source together: a source listing
       // two shows on one day means two shows.
       if (g.some((x) => x.source === s.source)) return false
+      // One event page, reached through two feeds, is one show.
+      if (s.url && g.some((x) => x.url === s.url)) return true
       if (g.some((x) => sharesWord(words(x), mine))) return true
       const city = cityOf(s.location)
       return Boolean(city) && alone(s) && g.every((x) => alone(x) && cityOf(x.location) === city)
@@ -148,7 +154,7 @@ export function mergeShows(
     const bySource = (order: ShowSource[]) =>
       [...g].sort((a, b) => order.indexOf(a.source) - order.indexOf(b.source))
     const titled = bySource(TITLE_ORDER)
-    const venueFirst = bySource(['manitoba_music', 'bandsintown', 'scout'])
+    const venueFirst = bySource(['manitoba_music', 'manitoba_calendar', 'bandsintown', 'scout'])
     const ticket = g.find((s) => s.hasTickets && s.url)
     const sources = [...new Set(g.map((s) => s.source))]
     const upcoming = g[0].date >= options.today
@@ -162,7 +168,10 @@ export function mergeShows(
       ticketUrl: ticket?.url ?? null,
       withArtists: [...new Set(g.flatMap((s) => s.withArtists ?? []))],
       sources,
-      links: g.filter((s) => s.url).map((s) => ({ source: s.source, url: s.url! })),
+      links: g
+        .filter((s) => s.url)
+        .filter((s, i, all) => all.findIndex((x) => x.url === s.url) === i)
+        .map((s) => ({ source: s.source, url: s.url! })),
       gigId: g.find((s) => s.gigId != null)?.gigId ?? null,
       missingFrom: upcoming ? listings.filter((l) => !sources.includes(l)) : [],
     }

@@ -21,6 +21,8 @@ not already have on file, and to file them for their review.
    Participants:** are candidates. The feed carries no article text, so open
    each candidate's link and judge it by the deadlines-page rules below. Skip
    everything else in the feed — staff news, roundups, headlines, job posts.
+5. **Only if the reference documents say the artist is based in Manitoba**,
+   read who is booking artists like them — see *Venue leads* below.
 
 ## Manitoba Music's deadlines page and news feed
 
@@ -63,6 +65,31 @@ Three rules specific to this page:
   page's wording in `deadlineNote`, and never again while it is on file. It
   matters when a booked show or a showcase needs travel, which is the artist's
   call to connect.
+
+## Venue leads
+
+Manitoba Music's live calendar lists every show in the province, and its feed
+can be filtered by genre: `https://www.manitobamusic.com/livemusic/genre:<id>.rss`.
+Open `https://www.manitobamusic.com/livemusic` once to read the genre list —
+each is an `<option>` in the Genre filter, with its number as the value — and
+pick the two or three that match the genres in the reference documents. Read
+each genre's feed.
+
+What you are looking for is **venues and promoters that book acts like this
+one**, and who shares their bills. It is a lead, not an opportunity: a venue
+that booked three singer-songwriters this month has not asked for
+applications. So:
+
+- **Do not file a venue as a gig** because it appears in the calendar. File
+  one only when you find it actually taking bookings or submissions — a
+  booking page, an open call, a stated contact for booking — the same bar as
+  everything else.
+- **Do put the leads in your final report**, under a heading *Venues booking
+  similar acts*: the venue, how many matching shows it has listed, one or two
+  of the acts, and the promoter when the listing names one. The artist reads
+  that and decides whom to approach.
+- Skip venues already in `list_existing_gigs`, and skip the artist's own
+  shows.
 
 ## What to look for
 

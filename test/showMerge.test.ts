@@ -121,3 +121,26 @@ it('reads distinctive words without accents, punctuation or filler', () => {
   expect([...distinctive('Festival du Voyageur — Live at the Fort Gibraltar')]).toEqual(['festival', 'voyageur', 'fort', 'gibraltar'])
   expect([...distinctive('Showcase 5')]).toEqual(['showcase', '5'])
 })
+
+describe('the Manitoba Music calendar', () => {
+  const CAL: SourceShow = {
+    source: 'manitoba_calendar',
+    date: '2026-10-06',
+    time: null,
+    title: 'Songwriter Showcase 5',
+    venue: 'The Handsome Daughter',
+    location: 'Winnipeg',
+    url: MM.url,
+  }
+
+  it('folds into the profile listing of the same event page, with one link', () => {
+    const [row] = mergeShows([BIT, MM, CAL], opts).upcoming
+    expect(row.sources.sort()).toEqual(['bandsintown', 'manitoba_calendar', 'manitoba_music'])
+    expect(row.links.map((l) => l.url)).toEqual([BIT.url, MM.url])
+  })
+
+  it('says a show a venue posted is missing from the artist’s own listings, never from the calendar', () => {
+    const [row] = mergeShows([CAL], opts).upcoming
+    expect(row.missingFrom).toEqual(['bandsintown', 'manitoba_music'])
+  })
+})
