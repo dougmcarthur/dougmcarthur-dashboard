@@ -335,8 +335,8 @@ race rather than an ending.
 tenant — the same "read both spellings" move `normaliseGigStatus` makes,
 because withdrawing it in this deploy would 401 every agent until three GitHub
 secrets were rotated. It goes when `.github/workflows/agents.yml` holds a row
-instead. **There is no Settings UI for these yet**; the screen is step 3's
-work and the routes are usable without one.
+instead. **Settings → Agent tokens** issues and revokes them; the token is
+shown once and held only in the card's state, never the query cache.
 
 **Admin mode is a different surface, not a bigger one.** The owner has two
 jobs and one account; `auth_sessions.mode` (migration 0023) says which surface

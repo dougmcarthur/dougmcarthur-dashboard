@@ -490,6 +490,22 @@ export interface TenantHealth {
   unscoped: number
 }
 
+/** A research agent's credential, as Settings sees it. Never the token. */
+export interface AgentTokenSummary {
+  id: string
+  label: string
+  createdAt: string
+  lastUsedAt: string | null
+  revokedAt: string | null
+}
+
+/** The one moment an agent token exists outside the agent's configuration. */
+export interface IssuedAgentToken {
+  id: string
+  label: string
+  token: string
+}
+
 /** An invitation, as the oversight surface sees it. Never the token. */
 export interface InviteSummary {
   id: string
@@ -674,6 +690,22 @@ export const api = {
       apiFetch<IssuedInvite>('/admin/invites', { method: 'POST', body: JSON.stringify(body) }),
     revokeInvite: (id: string) =>
       apiFetch<{ id: string; revoked: boolean }>(`/admin/invites/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
+  },
+  /**
+   * The research agents' credentials. Issuing and revoking both come back
+   * asking for the passkey, so callers go through `withConfirmation`.
+   */
+  agentTokens: {
+    list: () => apiFetch<{ items: AgentTokenSummary[] }>('/agent-tokens'),
+    issue: (label: string) =>
+      apiFetch<IssuedAgentToken>('/agent-tokens', {
+        method: 'POST',
+        body: JSON.stringify({ label }),
+      }),
+    revoke: (id: string) =>
+      apiFetch<{ id: string; revoked: boolean }>(`/agent-tokens/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }),
   },
