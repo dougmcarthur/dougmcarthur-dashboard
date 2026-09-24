@@ -41,6 +41,7 @@ export type {
 } from '../../shared/artistAssets'
 
 import type { ArtistAsset, AssetHealth, Epk, EpkAudience } from '../../shared/artistAssets'
+import type { MergedShow, ShowSource } from '../../shared/showMerge'
 
 /** An asset with the freshness the server worked out, which the UI never recomputes. */
 export type ArtistAssetWithHealth = ArtistAsset & { health: AssetHealth }
@@ -536,28 +537,16 @@ export type MmImportPlan =
       wouldAdd: number
     }
 
-/** One show from Bandsintown. See shared/bandsintown.ts. */
-export interface BandsintownShow {
-  id: string
-  date: string
-  time: string | null
-  venue: string
-  location: string
-  country: string | null
-  withArtists: string[]
-  url: string | null
-  hasTickets: boolean
-  free: boolean
-  title: string | null
-}
+/** One show, merged across every source. See shared/showMerge.ts. */
+export type { MergedShow, ShowSource }
 
 export interface ShowsResponse {
-  connected: boolean
-  account?: string
-  status?: string
-  statusNote?: string | null
-  upcoming: BandsintownShow[]
-  past: BandsintownShow[]
+  /** Listings that are connected, whether or not they answered. */
+  connected: Array<ShowSource>
+  /** How each connected listing answered this time. */
+  sources: Array<{ source: ShowSource; status: string; note: string | null }>
+  upcoming: Array<MergedShow>
+  past: Array<MergedShow>
 }
 
 /** A research agent's credential, as Settings sees it. Never the token. */
@@ -779,7 +768,6 @@ export const api = {
         method: 'POST',
       }),
     removeBandsintown: () => apiFetch<{ ok: boolean }>('/connectors/bandsintown', { method: 'DELETE' }),
-    shows: () => apiFetch<ShowsResponse>(`/connectors/bandsintown/shows?today=${localToday()}`),
     checkManitobaMusic: (url: string) =>
       apiFetch<MmIdentity>('/connectors/manitoba-music/check', { method: 'POST', body: JSON.stringify({ url }) }),
     saveManitobaMusic: (url: string) =>
@@ -814,6 +802,8 @@ export const api = {
         method: 'DELETE',
       }),
   },
+  /** Every show from every source, merged. `today` is the viewer's own date. */
+  shows: () => apiFetch<ShowsResponse>(`/shows?today=${localToday()}`),
   /** What to call this artist. One field, set by them, read by oversight. */
   profile: {
     read: () => apiFetch<{ displayName: string | null }>('/profile'),

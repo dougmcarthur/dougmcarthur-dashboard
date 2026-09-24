@@ -1,37 +1,63 @@
 import { useQuery } from '@tanstack/react-query'
-import { api, type BandsintownShow } from '../../api'
+import { api, type MergedShow } from '../../api'
 import { Card, Caption } from '../../components/ui/Surface'
+import { SOURCE_LABELS } from '../../../../shared/showMerge'
 
 /**
- * Shows on the EPK, read from Bandsintown.
+ * Shows on the EPK: one list from every place they are posted.
  *
- * Read on every view rather than stored, because Bandsintown is where the
- * artist edits them (`src/routes/connectors.ts`). Upcoming first, then what
- * was played in the last year — the "recent notable performances" a form asks
- * for. When nothing is connected the panel says where to connect it rather
- * than drawing an empty Shows section that reads as "no shows".
+ * Bandsintown, the Manitoba Music profile and gigs booked in Scout, merged by
+ * `shared/showMerge.ts` so the same night appears once. Each row says where it
+ * is listed, and an upcoming show missing from a connected listing says so —
+ * artists post dates inconsistently, and "not on Bandsintown" is also "not on
+ * Spotify or Instagram", which Bandsintown feeds.
+ *
+ * Read on every view rather than stored: the listings are where the artist
+ * edits them. A source that did not answer is named above the list, because
+ * a short list that looks complete is how a show goes missing.
  */
 
 const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-function ShowRow({ show }: { show: BandsintownShow }) {
+function ShowRow({ show }: { show: MergedShow }) {
   const [, m, d] = show.date.split('-')
+  const where = [show.venue, show.location].filter(Boolean).join(' · ')
   return (
-    <li className="flex items-center gap-3 px-4 py-2.5">
+    <li className="flex items-start gap-3 px-4 py-2.5">
       <div className="w-11 shrink-0 text-center rounded-md bg-sunken py-1">
         <div className="text-[11px] font-semibold text-accent uppercase">{MONTH[Number(m) - 1]}</div>
         <div className="text-base font-semibold text-ink leading-tight">{Number(d)}</div>
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm text-ink truncate">{show.title || show.venue}</p>
-        <p className="text-xs text-muted truncate">
-          {[show.title && show.title !== show.venue ? show.venue : null, show.location].filter(Boolean).join(' · ')}
-          {show.withArtists.length > 0 && ` · with ${show.withArtists.join(', ')}`}
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <p className="text-sm text-ink truncate">{show.title || show.venue || 'Show'}</p>
+        {where && <p className="text-xs text-muted truncate">{where}</p>}
+        <p className="text-xs text-faint">
+          {show.links.length > 0
+            ? show.links.map((l, i) => (
+                <span key={l.source}>
+                  {i > 0 && ' · '}
+                  <a href={l.url} target="_blank" rel="noreferrer" className="underline hover:text-ink">
+                    {SOURCE_LABELS[l.source]}
+                  </a>
+                </span>
+              ))
+            : null}
+          {show.sources.includes('scout') && (
+            <span>
+              {show.links.length > 0 && ' · '}
+              {SOURCE_LABELS.scout}
+            </span>
+          )}
         </p>
+        {show.missingFrom.length > 0 && (
+          <p className="text-xs text-warn-fg">
+            Not on {show.missingFrom.map((s) => SOURCE_LABELS[s]).join(' or ')} yet
+          </p>
+        )}
       </div>
-      {show.url && (
-        <a href={show.url} target="_blank" rel="noreferrer" className="text-xs text-info-fg underline shrink-0">
-          {show.hasTickets ? (show.free ? 'Free' : 'Tickets') : 'Details'}
+      {show.ticketUrl && (
+        <a href={show.ticketUrl} target="_blank" rel="noreferrer" className="text-xs text-info-fg underline shrink-0">
+          Tickets
         </a>
       )}
     </li>
@@ -39,39 +65,49 @@ function ShowRow({ show }: { show: BandsintownShow }) {
 }
 
 export function ShowsPanel() {
-  const { data, isLoading } = useQuery({ queryKey: ['shows'], queryFn: api.connectors.shows })
+  const { data, isLoading } = useQuery({ queryKey: ['shows'], queryFn: api.shows })
 
-  if (isLoading) return <p className="text-sm text-muted">Reading shows from Bandsintown…</p>
+  if (isLoading) return <p className="text-sm text-muted">Gathering your shows…</p>
   if (!data) return null
 
-  if (!data.connected) {
+  const failing = data.sources.filter((s) => s.status !== 'working')
+  const empty = data.upcoming.length === 0 && data.past.length === 0
+
+  if (data.connected.length === 0 && empty) {
     return (
       <p className="text-sm text-muted">
-        Shows come from Bandsintown. Connect it under Settings and your dates appear here.
+        Shows come from Bandsintown and your Manitoba Music profile. Connect either under Settings
+        and your dates appear here, together with any gig you have marked booked.
       </p>
     )
   }
 
   return (
     <Card as="section" pad="none" clip>
-      <header className="px-4 py-2.5 bg-sunken border-b border-line flex items-center justify-between gap-3">
+      <header className="px-4 py-2.5 bg-sunken border-b border-line flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <Caption as="h2">Shows</Caption>
-        <span className="text-xs text-muted">From Bandsintown · {data.account}</span>
+        <span className="text-xs text-muted">
+          From {[...data.connected.map((s) => SOURCE_LABELS[s]), 'gigs booked in Scout'].join(', ')}
+        </span>
       </header>
-      {data.status && data.status !== 'working' && (
-        <p className="px-4 py-2 text-xs text-warn-fg border-b border-line">
-          {data.status === 'rejected'
-            ? `Bandsintown refused the key${data.statusNote ? `: ${data.statusNote}` : ''}. Check it under Settings.`
-            : 'Bandsintown did not answer just now, so this may be incomplete.'}
-        </p>
+      {failing.length > 0 && (
+        <ul className="px-4 py-2 text-xs text-warn-fg border-b border-line space-y-0.5">
+          {failing.map((f) => (
+            <li key={f.source}>
+              {f.status === 'rejected'
+                ? `${SOURCE_LABELS[f.source]} refused${f.note ? `: ${f.note}` : ''}. Check it under Settings.`
+                : `${SOURCE_LABELS[f.source]} did not answer just now, so this list may be missing its dates.`}
+            </li>
+          ))}
+        </ul>
       )}
-      {data.upcoming.length === 0 && data.past.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-muted">Bandsintown lists no shows in the last year or ahead.</p>
+      {empty ? (
+        <p className="px-4 py-3 text-sm text-muted">No shows in the last year or ahead, anywhere Scout can see.</p>
       ) : (
         <>
           {data.upcoming.length > 0 && (
             <ul className="divide-y divide-line">
-              {data.upcoming.map((s) => <ShowRow key={s.id} show={s} />)}
+              {data.upcoming.map((s) => <ShowRow key={s.key} show={s} />)}
             </ul>
           )}
           {data.past.length > 0 && (
@@ -80,7 +116,7 @@ export function ShowsPanel() {
                 {data.past.length} played in the last year
               </summary>
               <ul className="divide-y divide-line">
-                {data.past.map((s) => <ShowRow key={s.id} show={s} />)}
+                {data.past.map((s) => <ShowRow key={s.key} show={s} />)}
               </ul>
             </details>
           )}

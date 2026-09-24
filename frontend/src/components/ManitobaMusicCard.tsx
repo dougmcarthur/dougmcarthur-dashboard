@@ -44,6 +44,7 @@ export function ManitobaMusicCard() {
       setEditing(false)
       qc.invalidateQueries({ queryKey: ['connectors'] })
       qc.invalidateQueries({ queryKey: ['mm-import'] })
+      qc.invalidateQueries({ queryKey: ['shows'] })
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Could not connect'),
   })
@@ -53,6 +54,7 @@ export function ManitobaMusicCard() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['connectors'] })
       qc.invalidateQueries({ queryKey: ['mm-import'] })
+      qc.invalidateQueries({ queryKey: ['shows'] })
     },
   })
 
