@@ -511,8 +511,9 @@ a bad trade, and it is the central finding of this research.
 **Reply matching is the real customer for inbound mail, and it has no free
 path** — but it also has no users. The owner's own reply scan already works,
 on `gmail.readonly` against his own mailbox. Every artist who would need
-another route is hypothetical: tenants, invitations and oversight are all
-unmerged, and production is still running the Worker from migration 0009. This
+another route is hypothetical. (This said tenants and invitations were
+unmerged; they shipped on 2026-09-11, which makes an invited artist possible
+rather than present.) This
 repository has a settled habit about exactly this — per-artist digests and
 mailbox grants "are real work with schema behind them, and are not pretended to
 exist". Inbound mail belongs in the same sentence.
