@@ -95,6 +95,15 @@ state. Only from `shortlisted`, and only when the read produced fields — a for
 nobody could open has not been started, and a submitted application does not go
 backwards because you re-read the form to check what you sent.
 
+## Opening a Google Form pre-filled
+
+Copy per field is still the way in everywhere, and on a Google Form there is
+also a link that opens it with every answer you have read already typed in
+(`shared/formPrefill.ts`). Suggestions stay out, choices must be ones the form
+offers, over-long answers stay out, and whatever is left out is named with a
+reason. It opens the form and stops; the form's own button is still yours to
+press. The answers travel in the address, and the panel says so.
+
 ## What this left open, and where it went
 
 - **Sourcing the artist database.** Built: `shared/artistSource.ts` fills

@@ -7,6 +7,10 @@
 > the only route that works on a phone. Airtable is the same mechanism. Every
 > other platform needs field names from the form's builder, so the rest of the
 > plan does not follow from that first step being easy.
+>
+> **Pre-filled links for Google Forms: built, 2026-09-24.** `shared/formPrefill.ts`
+> and a button on the application panel. Airtable was left out: its forms are
+> drawn by JavaScript, so the reader never gets the labels Airtable keys by.
 
 
 Phase 3 reads a form and stages an answer per field. It stops there, because
