@@ -465,6 +465,33 @@ export const googleGrants = sqliteTable('google_grants', {
   tasksListId: text('tasks_list_id'),
 })
 
+/**
+ * Outside services that already know something about the artist, read with
+ * the artist's own credential. See migration 0027 and `shared/bandsintown.ts`.
+ *
+ * The sixteenth scoped table. One row per tenant per `kind`; the unique index
+ * is in the migration, and writes are delete-then-insert like `storeGrant`, so
+ * no statement names a conflict target.
+ */
+export const artistConnectors = sqliteTable('artist_connectors', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  /** Which artist's row this is. See src/db/scope.ts. */
+  tenantId: text('tenant_id'),
+  /** `bandsintown` today. */
+  kind: text('kind').notNull(),
+  /** What the service calls the artist — a Bandsintown artist name or id. */
+  account: text('account').notNull(),
+  /** AES-GCM, like a Google refresh token. Never returned by any route. */
+  secret: text('secret'),
+  /** The last probe: unverified | working | rejected | unreachable. */
+  status: text('status').notNull().default('unverified'),
+  /** The service's own words for the last outcome, trimmed. */
+  statusNote: text('status_note'),
+  checkedAt: text('checked_at'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
 /* --------------------------------------------------------------------- */
 /* Accounts. See migration 0021 and docs/multi-tenant-plan.md.            */
 /* --------------------------------------------------------------------- */

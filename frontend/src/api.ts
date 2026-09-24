@@ -404,6 +404,12 @@ export const UNAUTHENTICATED_EVENT = 'mhq:unauthenticated'
  */
 export class ElevationRequired extends Error {}
 
+/** The viewer's own date, `YYYY-MM-DD`, for routes that ask what "today" is. */
+function localToday(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -488,6 +494,70 @@ export interface RemovalResult {
 export interface TenantHealth {
   tables: Array<{ table: string; unscoped: number }>
   unscoped: number
+}
+
+/** A connector, as Settings sees it. Never the key. */
+export interface ConnectorSummary {
+  kind: string
+  account: string
+  hasKey: boolean
+  /** unverified | working | rejected | unreachable */
+  status: string
+  statusNote: string | null
+  checkedAt: string | null
+}
+
+export interface ConnectorList {
+  canStore: boolean
+  bandsintown: ConnectorSummary | null
+  /** `account` is the profile address; `statusNote` the name read off it. */
+  manitobaMusic: ConnectorSummary | null
+}
+
+/** What a Manitoba Music profile says about who it belongs to. */
+export interface MmIdentity {
+  url: string
+  name: string
+  photo: string | null
+  genres: string[]
+  counts: { bio: number; links: number; videos: number; releases: number; files: number; photos: number }
+}
+
+export type MmImportPlan =
+  | { connected: false }
+  | { connected: true; error: string }
+  | {
+      connected: true
+      name: string
+      url: string
+      proposals: AssetProposal[]
+      skipped: Array<{ heading: string; reason: string }>
+      existing: number
+      wouldAdd: number
+    }
+
+/** One show from Bandsintown. See shared/bandsintown.ts. */
+export interface BandsintownShow {
+  id: string
+  date: string
+  time: string | null
+  venue: string
+  location: string
+  country: string | null
+  withArtists: string[]
+  url: string | null
+  hasTickets: boolean
+  free: boolean
+  title: string | null
+}
+
+export interface ShowsResponse {
+  connected: boolean
+  account?: string
+  status?: string
+  statusNote?: string | null
+  upcoming: BandsintownShow[]
+  past: BandsintownShow[]
 }
 
 /** A research agent's credential, as Settings sees it. Never the token. */
@@ -692,6 +762,41 @@ export const api = {
       apiFetch<{ id: string; revoked: boolean }>(`/admin/invites/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }),
+  },
+  /**
+   * Outside services read with the artist's own credential. `today` is the
+   * viewer's local date, so a show tonight is still upcoming tonight.
+   */
+  connectors: {
+    list: () => apiFetch<ConnectorList>('/connectors'),
+    saveBandsintown: (body: { account: string; apiKey: string }) =>
+      apiFetch<{ bandsintown: ConnectorSummary; upcoming: number }>(
+        `/connectors/bandsintown?today=${localToday()}`,
+        { method: 'PUT', body: JSON.stringify(body) },
+      ),
+    checkBandsintown: () =>
+      apiFetch<{ bandsintown: ConnectorSummary }>(`/connectors/bandsintown/check?today=${localToday()}`, {
+        method: 'POST',
+      }),
+    removeBandsintown: () => apiFetch<{ ok: boolean }>('/connectors/bandsintown', { method: 'DELETE' }),
+    shows: () => apiFetch<ShowsResponse>(`/connectors/bandsintown/shows?today=${localToday()}`),
+    checkManitobaMusic: (url: string) =>
+      apiFetch<MmIdentity>('/connectors/manitoba-music/check', { method: 'POST', body: JSON.stringify({ url }) }),
+    saveManitobaMusic: (url: string) =>
+      apiFetch<{ manitobaMusic: ConnectorSummary }>('/connectors/manitoba-music', {
+        method: 'PUT',
+        body: JSON.stringify({ url }),
+      }),
+    removeManitobaMusic: () => apiFetch<{ ok: boolean }>('/connectors/manitoba-music', { method: 'DELETE' }),
+  },
+  /**
+   * Filling the library from a Manitoba Music profile. Preview, then apply —
+   * the reference documents' shape, and the guard in uiConsistency holds it.
+   */
+  manitobaMusic: {
+    preview: () => apiFetch<MmImportPlan>('/connectors/manitoba-music/import'),
+    apply: () =>
+      apiFetch<{ added: number; existing: number }>('/connectors/manitoba-music/import', { method: 'POST' }),
   },
   /**
    * The research agents' credentials. Issuing and revoking both come back
