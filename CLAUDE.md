@@ -992,6 +992,32 @@ organising previews first; sharing is one permission on the folder that every
 file inherits; nothing is deleted. The picker needs `GOOGLE_PICKER_API_KEY` and
 `GOOGLE_CLOUD_PROJECT_NUMBER`, which are vars in `wrangler.toml`.
 
+**Google is one connection, stored as several grants.** "Connect Google
+account" on Settings is one consent for Calendar, Tasks, Gmail drafts and
+Drive (`BUNDLE_PURPOSES`, `GET /api/google/connect`, finished by
+`completeBundle`), because most people keep all four under one account.
+Google shows them as separate checkboxes and any can be unticked, so each is
+checked and stored as its own `google_grants` row sharing one refresh token —
+which is why nothing that *uses* a grant changed. An unticked service is
+skipped, never stored broken; one that fails to set up (no Calendar API on the
+Cloud project, say) does not sink the rest; and a service already on a
+*different* account stays there, because that is the edge case the screen
+allows: each service's own consent sits behind "Use a different Google account
+for one service". `prompt=consent select_account` makes Google ask which
+account rather than take the browser's default. Reconnecting the same account
+reuses the calendar, list and folder it made rather than making a second.
+Disconnecting an account revokes its token at Google, so it leaves the
+account's third-party-access page too; the per-service disconnects do not,
+since one token backs several services. `calendar.primary` stays out of the
+bundle — it is the broad opt-in with its own warning.
+
+**The callback's outcome reaches the screen now.** It always redirected to
+`#settings?calendar=failed` and nothing read it, so a connect that Google said
+yes to and Scout failed to finish looked exactly like one never tried — which
+is how a calendar was "connected" with no row stored. `connectNotice` in
+`shared/integrations.ts` turns every outcome into a sentence, and a partial one
+names each service it could not connect and why.
+
 **Gmail drafting is a grant the person makes, not a secret somebody pasted.**
 Every Google token before this one was obtained at a terminal and stored with
 `wrangler secret put`. That cannot work for a feature where the *user* decides

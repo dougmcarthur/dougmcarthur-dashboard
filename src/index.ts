@@ -30,6 +30,7 @@ import manitobaMusic from './routes/manitobaMusic'
 import associationsRoute from './routes/associations'
 import showsRoute from './routes/shows'
 import driveRoute from './routes/drive'
+import googleAccounts from './routes/googleAccounts'
 import { epk as epkRoute, publicEpk } from './routes/epk'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
 import { isDigestDue } from '../shared/digestSchedule'
@@ -197,6 +198,7 @@ app.route('/api/connectors', connectors)
 app.route('/api/shows', showsRoute)
 app.route('/api/epk', epkRoute)
 app.route('/api/drive', driveRoute)
+app.route('/api/google', googleAccounts)
 app.route('/api/public', publicEpk)
 // The oversight surface. See ADMIN_API_PREFIX above for what the middleware
 // does with it, in both directions.

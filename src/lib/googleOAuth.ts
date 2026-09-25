@@ -22,9 +22,17 @@ import {
   GRANT_PURPOSES,
   grantConfigured,
   redirectUri,
+  bundleScopes,
   requestedScopes,
   type GrantPurpose,
 } from './googleGrant'
+
+/**
+ * What a consent is for: one service, or `google` — every service in
+ * `BUNDLE_PURPOSES` in one pass, which is what the Connect button on Settings
+ * starts.
+ */
+export type ConsentTarget = GrantPurpose | 'google'
 import type { Env } from '../types'
 
 /** Ten minutes is longer than a consent screen takes and shorter than a day. */
@@ -51,11 +59,11 @@ export function readStateCookie(header: string | null | undefined): string | nul
  * callback has no other way to know whether the code it was handed is a
  * calendar consent or a drafting one.
  */
-export function packState(nonce: string, purpose: GrantPurpose): string {
+export function packState(nonce: string, purpose: ConsentTarget): string {
   return `${nonce}.${purpose}`
 }
 
-export function unpackState(state: string | null): { nonce: string; purpose: GrantPurpose } | null {
+export function unpackState(state: string | null): { nonce: string; purpose: ConsentTarget } | null {
   if (!state) return null
   const dot = state.indexOf('.')
   if (dot < 1) return null
@@ -65,8 +73,8 @@ export function unpackState(state: string | null): { nonce: string; purpose: Gra
   // googleGrant.ts cannot silently fail to survive the round trip — and a
   // near-miss like `calendar.primary.extra` is refused rather than read as the
   // narrow calendar grant, which would complete a consent for the wrong one.
-  if (!(GRANT_PURPOSES as string[]).includes(purpose)) return null
-  return { nonce, purpose: purpose as GrantPurpose }
+  if (purpose !== 'google' && !(GRANT_PURPOSES as string[]).includes(purpose)) return null
+  return { nonce, purpose: purpose as ConsentTarget }
 }
 
 /**
@@ -77,15 +85,20 @@ export function unpackState(state: string | null): { nonce: string; purpose: Gra
  * omits them appears to work and then stops an hour later — the failure being
  * a silent one is exactly why they are not left to default.
  */
-export function beginConsent(c: Context<AppEnv>, purpose: GrantPurpose): Response {
+export function beginConsent(c: Context<AppEnv>, purpose: ConsentTarget): Response {
   const nonce = randomToken(16)
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
   url.searchParams.set('client_id', c.env.GOOGLE_CLIENT_ID ?? '')
   url.searchParams.set('redirect_uri', redirectUri(c.env))
   url.searchParams.set('response_type', 'code')
-  url.searchParams.set('scope', requestedScopes(purpose))
+  url.searchParams.set('scope', purpose === 'google' ? bundleScopes() : requestedScopes(purpose))
   url.searchParams.set('access_type', 'offline')
-  url.searchParams.set('prompt', 'consent')
+  // `select_account` as well as `consent`: somebody signed in to two Google
+  // accounts gets asked which one, rather than Google quietly picking the
+  // browser's default — which is how a calendar ends up in the wrong account.
+  url.searchParams.set('prompt', 'consent select_account')
+  // Explicit, so an older OAuth client shows the per-service checkboxes too.
+  url.searchParams.set('enable_granular_consent', 'true')
   url.searchParams.set('state', packState(nonce, purpose))
 
   c.header('Set-Cookie', stateCookie(nonce, STATE_TTL_SECONDS))
@@ -97,8 +110,8 @@ export function consentAvailable(env: Env): boolean {
 }
 
 export type CallbackCheck =
-  | { ok: true; code: string; purpose: GrantPurpose }
-  | { ok: false; reason: string; purpose: GrantPurpose | null }
+  | { ok: true; code: string; purpose: ConsentTarget }
+  | { ok: false; reason: string; purpose: ConsentTarget | null }
 
 /**
  * Validate what came back.
@@ -124,8 +137,18 @@ export function checkCallback(c: Context<AppEnv>): CallbackCheck {
 }
 
 /** Where the browser lands afterwards, with a word about how it went. */
-export function settingsRedirect(env: Env, purpose: GrantPurpose | null, outcome: string): string {
+export function settingsRedirect(
+  env: Env,
+  purpose: ConsentTarget | null,
+  outcome: string,
+  detail: Record<string, string[]> = {},
+): string {
   const origin = (env.DASHBOARD_URL ?? '').replace(/\/$/, '')
+  if (purpose === 'google') {
+    const query = new URLSearchParams({ google: outcome })
+    for (const [key, values] of Object.entries(detail)) if (values.length) query.set(key, values.join(','))
+    return `${origin}/#settings?${query.toString()}`
+  }
   // Drive's card lives with the EPK on the Artist page, so that is where the
   // artist comes back to.
   if (purpose === 'drive') return `${origin}/#artist/drive?drive=${encodeURIComponent(outcome)}`

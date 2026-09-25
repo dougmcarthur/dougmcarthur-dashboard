@@ -70,6 +70,9 @@ health.get('/', async (c) => {
     // appears at all — a Connect button that cannot complete is worse than no
     // row, because the failure happens on Google's side of the redirect.
     primaryCalendarGrant: await readGrant(c.env, tenantOf(c), 'calendar.primary'),
+    // Drive's card lives on the Artist page; Settings lists it with the other
+    // Google services so one account can be seen covering all of them.
+    driveGrant: await readGrant(c.env, tenantOf(c), 'drive'),
     primaryCalendarOffered: primaryCalendarOffered(c.env),
   })
 })

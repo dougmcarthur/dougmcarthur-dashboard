@@ -148,7 +148,7 @@ export function Banner({
   className = '',
 }: {
   children: ReactNode
-  tone?: 'danger' | 'warn' | 'info'
+  tone?: 'danger' | 'warn' | 'info' | 'success'
   /** `sm` is the inline px-3 py-2 spelling; `md` the px-4 py-3 block. */
   size?: 'sm' | 'md'
   className?: string
@@ -157,6 +157,7 @@ export function Banner({
     danger: 'bg-danger-bg border-danger-line text-danger-fg',
     warn: 'bg-warn-bg/60 border-warn-line text-warn-fg',
     info: 'bg-info-bg border-info-line text-info-fg',
+    success: 'bg-success-bg border-success-line text-success-fg',
   }
   const SIZE = { sm: 'px-3 py-2 rounded-md text-xs', md: 'px-4 py-3 rounded-lg text-sm' }
   return <p className={`border ${TONE[tone]} ${SIZE[size]} ${className}`}>{children}</p>

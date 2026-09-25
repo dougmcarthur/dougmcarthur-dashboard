@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, type CalendarGrant, type CredentialHealth, type CredentialState } from '../api'
+import { api, type CalendarGrant, type CredentialHealth, type CredentialState, type GoogleAccount } from '../api'
 import {
+  GOOGLE_PURPOSE_OF,
+  connectNotice,
+  listServices,
+  type ConnectNotice,
   INTEGRATIONS,
   isConnectable,
   rowNeedsAttention,
@@ -26,15 +30,17 @@ import { Banner, Card } from './ui/Surface'
  * until they need it moves behind the status.
  */
 
-function StatusPill({ state }: { state: CredentialState }) {
+function StatusPill({ state, calm = false }: { state: CredentialState; calm?: boolean }) {
+  // `calm` is a grant nobody has connected yet: a choice not yet made, which
+  // the warn tone made look like six faults on the day the account is new.
   const tone =
     state === 'working'
       ? 'bg-success-bg text-success-fg'
-      : needsAttention(state)
+      : needsAttention(state) && !calm
         ? 'bg-warn-bg text-warn-fg'
         : 'bg-sunken text-muted'
   const dot =
-    state === 'working' ? 'bg-success-solid' : needsAttention(state) ? 'bg-warn-fg' : 'bg-muted'
+    state === 'working' ? 'bg-success-solid' : needsAttention(state) && !calm ? 'bg-warn-fg' : 'bg-muted'
 
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${tone}`}>
@@ -82,6 +88,7 @@ type HealthLike =
       gmailGrant?: CalendarGrant
       tasksGrant?: CalendarGrant
       primaryCalendarGrant?: CalendarGrant
+      driveGrant?: CalendarGrant
       primaryCalendarOffered?: boolean
     }
   | undefined
@@ -99,6 +106,7 @@ const GRANT_ROWS: Partial<Record<IntegrationId, (h: HealthLike) => CalendarGrant
   'gmail.drafts': (h) => h?.gmailGrant,
   tasks: (h) => h?.tasksGrant,
   'calendar.primary': (h) => h?.primaryCalendarGrant,
+  drive: (h) => h?.driveGrant,
 }
 
 /** A grant is working when it exists and Google gave it the scope asked for. */
@@ -185,6 +193,7 @@ const CONNECT_HREF: Partial<Record<IntegrationId, string>> = {
   'calendar.primary': api.calendar.primaryConnectUrl,
   tasks: api.tasks.connectUrl,
   'gmail.drafts': api.gmail.connectHref,
+  drive: api.drive.connectHref,
 }
 
 const DISCONNECT: Partial<Record<IntegrationId, () => Promise<{ ok: boolean }>>> = {
@@ -192,6 +201,7 @@ const DISCONNECT: Partial<Record<IntegrationId, () => Promise<{ ok: boolean }>>>
   'calendar.primary': () => api.calendar.disconnectPrimary(),
   tasks: () => api.tasks.disconnect(),
   'gmail.drafts': () => api.gmail.disconnect(),
+  drive: () => api.drive.disconnect(),
 }
 
 /** What each grant leaves behind when it is disconnected. */
@@ -201,7 +211,16 @@ const LEAVES_BEHIND: Partial<Record<IntegrationId, string>> = {
     'Entries Scout already wrote stay in your calendar. Removing them would mean reaching into a calendar you have just said Scout may not touch.',
   tasks: 'The list and everything on it stay in your account.',
   'gmail.drafts': 'Drafts already written stay in your mailbox.',
+  drive: 'The folder and everything in it stay in your Drive.',
 }
+
+/**
+ * Rows that one press of "Connect Google account" covers. They get no Connect
+ * button of their own: four buttons that each open the same Google screen was
+ * the thing this replaced. Their own consent is still offered — at the bottom,
+ * for the person who keeps mail on one account and a calendar on another.
+ */
+const IN_BUNDLE = new Set<IntegrationId>(['calendar', 'tasks', 'gmail.drafts', 'drive'])
 
 function DetailModal({
   row,
@@ -218,6 +237,7 @@ function DetailModal({
     mutationFn: async (id: IntegrationId) => DISCONNECT[id]?.() ?? Promise.resolve({ ok: true }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['google', 'accounts'] })
       onClose()
     },
   })
@@ -338,7 +358,7 @@ function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
   // Not offered when the server side is not set up. A button that answers with
   // "Google client credentials are not configured" is worse than no button:
   // there is nothing the person pressing it can do about it.
-  const offeringConnect = connectable && !connected && row.serverReady
+  const offeringConnect = connectable && !connected && row.serverReady && !IN_BUNDLE.has(row.spec.id)
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -376,7 +396,17 @@ function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
         ) : null}
       </button>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
+        {/*
+          Which account, on the row itself. With one Google account this
+          repeats what the account panel above says; with two it is the only
+          place that says which one a service writes to.
+        */}
+        {connected && row.grant?.accountEmail ? (
+          <span className="hidden sm:inline min-w-0 truncate text-xs text-muted" title={row.grant.accountEmail}>
+            {row.grant.accountEmail}
+          </span>
+        ) : null}
         {offeringConnect ? (
           <Button
             variant="primary"
@@ -392,7 +422,7 @@ function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
             className="rounded-full transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent"
             aria-label={`${row.spec.name} — connection details`}
           >
-            <StatusPill state={row.state} />
+            <StatusPill state={row.state} calm={!rowNeedsAttention(row.spec, row.state)} />
           </button>
         )}
       </div>
@@ -400,8 +430,183 @@ function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
   )
 }
 
+
+/** The first letter, as an avatar. Google's own photo would need a scope. */
+function Initial({ email }: { email: string | null }) {
+  return (
+    <span
+      aria-hidden
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-ink"
+    >
+      {(email ?? '?').slice(0, 1).toUpperCase()}
+    </span>
+  )
+}
+
+/**
+ * Google, as the accounts a person connected.
+ *
+ * One primary button when nothing is connected, because most people keep
+ * calendar, mail and files under one account and should not have to press
+ * Connect four times to find that out. Once something is connected the
+ * button goes and the account takes its place — who it is and what it
+ * covers, which is what a connected-accounts screen is for — with Disconnect
+ * beside it and, if Google's screen left anything unticked, a quiet way to
+ * add it.
+ */
+function GoogleAccounts({ serverReady }: { serverReady: boolean }) {
+  const queryClient = useQueryClient()
+  const { data } = useQuery({ queryKey: ['google', 'accounts'], queryFn: api.google.accounts })
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const disconnect = useMutation({
+    mutationFn: (email: string | null) => api.google.disconnect(email),
+    onSuccess: () => {
+      setConfirming(null)
+      queryClient.invalidateQueries({ queryKey: ['google', 'accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
+    },
+  })
+
+  if (!data) return null
+  const bundle = data.bundle
+  const covered = new Set(data.accounts.flatMap((a) => a.purposes))
+  const missing = bundle.filter((p) => !covered.has(p))
+  const connect = () => {
+    window.location.href = api.google.connectHref
+  }
+
+  if (data.accounts.length === 0) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-4">
+        <div className="min-w-0 flex-1 space-y-1">
+          <h3 className="text-sm font-medium text-ink">Google account</h3>
+          <p className="text-xs text-muted">
+            One connection for {listServices(bundle)}. Google lists each on its own screen, and you
+            can untick any you do not want.
+          </p>
+        </div>
+        {serverReady ? (
+          <Button variant="primary" className="whitespace-nowrap" onClick={connect}>
+            Connect Google account
+          </Button>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3 border-b border-line py-4">
+      {data.accounts.map((account: GoogleAccount) => {
+        const key = account.email ?? ''
+        return (
+          <div key={key} className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <Initial email={account.email} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-ink">{account.email ?? 'Google account'}</p>
+                <p className="text-xs text-muted">
+                  Connected for {listServices(account.purposes)}
+                  {account.connectedAt ? ` · since ${onDate(account.connectedAt)}` : ''}
+                </p>
+              </div>
+            </div>
+            {confirming === key ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-body">
+                  Disconnect from {listServices(account.purposes)}?
+                </span>
+                <Button variant="danger" size="sm" onClick={() => disconnect.mutate(account.email)} disabled={disconnect.isPending}>
+                  {disconnect.isPending ? 'Disconnecting…' : 'Disconnect'}
+                </Button>
+                <Button variant="quiet" size="sm" onClick={() => setConfirming(null)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button variant="quiet" size="sm" onClick={() => setConfirming(key)}>
+                Disconnect
+              </Button>
+            )}
+          </div>
+        )
+      })}
+      {confirming !== null ? (
+        <p className="text-xs text-faint">
+          The calendar, task list, Drive folder and drafts Scout made stay in the account.
+          Google also stops listing Scout under the account’s third-party access.
+        </p>
+      ) : null}
+      {missing.length && serverReady ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted">Not connected: {listServices(missing)}.</p>
+          <Button variant="neutral" size="sm" onClick={connect}>
+            Add {missing.length === 1 ? 'it' : 'them'}
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * The edge case, kept quiet: a different Google account for one service.
+ * Each link is that service's own consent, and Google asks which account.
+ * Connecting one here replaces whatever account that service had — and a later
+ * "Connect Google account" leaves it where it is.
+ */
+function OtherAccounts({ rows }: { rows: RowState[] }) {
+  const offered = rows.filter((r) => IN_BUNDLE.has(r.spec.id) && CONNECT_HREF[r.spec.id] && r.serverReady)
+  if (!offered.length) return null
+  return (
+    <details className="group pt-3">
+      <summary className="cursor-pointer text-xs text-muted hover:text-ink">
+        Use a different Google account for one service
+      </summary>
+      <div className="mt-2 space-y-2">
+        <p className="text-xs text-faint">
+          For keeping, say, your calendar on one account and your mail on another. Google asks which
+          account to use; the service switches to it and everything else stays as it is.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {offered.map((r) => (
+            <Button
+              key={r.spec.id}
+              variant="neutral"
+              size="sm"
+              onClick={() => {
+                window.location.href = CONNECT_HREF[r.spec.id] as string
+              }}
+            >
+              {r.spec.name}
+            </Button>
+          ))}
+        </div>
+      </div>
+    </details>
+  )
+}
+
+/**
+ * How the last trip to Google went, read once from the address it came back
+ * to and then cleared, so a reload does not announce it twice.
+ */
+function useConnectNotice(): [ConnectNotice | null, () => void] {
+  const [notice, setNotice] = useState<ConnectNotice | null>(null)
+  useEffect(() => {
+    const hash = window.location.hash
+    const at = hash.indexOf('?')
+    if (at < 0) return
+    const found = connectNotice(new URLSearchParams(hash.slice(at + 1)))
+    if (!found) return
+    setNotice(found)
+    window.history.replaceState(null, '', `${window.location.pathname}${hash.slice(0, at)}`)
+  }, [])
+  return [notice, () => setNotice(null)]
+}
+
 export function IntegrationsCard() {
   const [openId, setOpenId] = useState<IntegrationId | null>(null)
+  const [notice, dismissNotice] = useConnectNotice()
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({ queryKey: ['health'], queryFn: api.health, staleTime: 60_000 })
@@ -464,13 +669,32 @@ export function IntegrationsCard() {
         </p>
       ) : null}
 
+      {notice ? (
+        <div className="mt-3 space-y-1">
+          <Banner tone={notice.tone} size="sm">
+            {notice.lines.map((line, i) => (
+              <span key={line} className={i === 0 ? 'block font-medium' : 'mt-1 block'}>
+                {line}
+              </span>
+            ))}
+          </Banner>
+          <button type="button" className="text-xs text-muted hover:text-ink" onClick={dismissNotice}>
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+
+      <GoogleAccounts serverReady={blocked.length === 0} />
+
       <div className="divide-y divide-line">
         {rows.map((row) => (
           <Row key={row.spec.id} row={row} onOpen={() => setOpenId(row.spec.id)} />
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
+      <OtherAccounts rows={rows} />
+
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
         <Explainer
           as="div"
           titleClassName=""
