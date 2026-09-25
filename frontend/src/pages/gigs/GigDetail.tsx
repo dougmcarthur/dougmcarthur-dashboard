@@ -1,29 +1,12 @@
 import { type GigOpportunity, type GigStatus } from '../../api'
-import {
-  normaliseGigStatus,
-  nextGigStatuses,
-  gigStatusMeta,
-} from '../../../../shared/gigStatus'
-import { GIG_MOVE_LABEL } from '../../../../shared/decisionCopy'
+import { normaliseGigStatus } from '../../../../shared/gigStatus'
+import { gigFlag, gigMoves, gigStage } from '../../../../shared/gigStage'
 import { formatPerformanceSpan } from '../../../../shared/performance'
 import { Button } from '../../components/ui/Button'
 import { Select } from '../../components/ui/Field'
 import { ApplicationPanel } from './ApplicationPanel'
 import { CostPanel } from './CostPanel'
 import { Caption } from '../../components/ui/Surface'
-
-/**
- * The one-click moves worth having on the row itself, by the status you are on.
- * Everything else in `nextGigStatuses` is still reachable from the picker
- * beside them — this is only about which two are worth a button.
- */
-const QUICK: Partial<Record<GigStatus, GigStatus[]>> = {
-  shortlisted: ['submitted'],
-  preparing: ['submitted'],
-  submitted: ['acknowledged'],
-  acknowledged: ['invited'],
-  invited: ['booked'],
-}
 
 /** The read-only expansion under a table row. */
 export function GigDetail({
@@ -44,14 +27,22 @@ export function GigDetail({
   today: string
 }) {
   const status = normaliseGigStatus(gig.status)
-  const meta = gigStatusMeta(status)
-  const moves = nextGigStatuses(status)
-  const quick = (QUICK[status] ?? []).filter((s) => moves.includes(s))
+  // Every move the pipeline offers, in the stage language. The forward one
+  // gets a button; the rest are in the picker, because an Applied gig has
+  // five and a row of five buttons reads as five things you ought to do.
+  const moves = gigMoves(status, gig.type)
+  const quick = moves.filter((m) => m.tone === 'go').slice(0, 1)
+  const others = moves.filter((m) => !quick.includes(m))
   const span = formatPerformanceSpan(gig.performanceStart, gig.performanceEnd)
   // Phase 3's workspace, and only where phase 3 is the question. A discovered
   // gig has not been decided on and a declined one cannot be applied to, so
   // offering either a form reader is offering work that cannot land.
-  const applying = status === 'shortlisted' || meta.phase === 'apply'
+  const stage = gigStage(status)
+  const applying = stage === 'in_progress'
+  // Asked of the stage and its flag: an Applied gig is their move unless they
+  // asked for something or made an offer, and then it is yours again.
+  const whoseMove =
+    stage === 'closed' ? null : stage === 'applied' && !gigFlag(status) ? 'Their move' : 'Your move'
 
   return (
     <div className="space-y-4 max-w-3xl">
@@ -74,16 +65,16 @@ export function GigDetail({
           <p className="text-sm font-semibold text-ink">{span}</p>
           {status !== 'booked' && (
             <p className="text-xs text-faint mt-0.5">
-              Pencilled in. Nothing reaches your calendar until this is booked.
+              Pencilled in. Nothing reaches your calendar until it is accepted.
             </p>
           )}
         </div>
       )}
 
       <div className="flex flex-wrap gap-2 text-xs">
-        <span className="bg-surface px-2.5 py-1 rounded-md border border-line text-body" title={meta.meaning}>
-          {meta.decider === 'them' ? 'Their move' : meta.decider === 'you' ? 'Your move' : 'No decision yet'}
-        </span>
+        {whoseMove && (
+          <span className="bg-surface px-2.5 py-1 rounded-md border border-line text-body">{whoseMove}</span>
+        )}
         {gig.submissionMethod && (
           <span className="bg-surface px-2.5 py-1 rounded-md border border-line text-body">Submit via {gig.submissionMethod}</span>
         )}
@@ -103,19 +94,12 @@ export function GigDetail({
       </div>
 
       <div className="flex gap-2 flex-wrap items-center pt-1">
-        {/*
-          Named for the move, not the state it lands in: this button read
-          "Submitted" on a row the table beside it offered as "Applied", and
-          "Invited" on a row where you are recording that *they* moved. The
-          picker next to it keeps state names, because those are destinations.
-        */}
-        {quick.map((s) => (
-          <Button key={s} variant="info" title={gigStatusMeta(s).meaning} disabled={isPatching}
-            onClick={() => onStatusChange(s)}>
-            {GIG_MOVE_LABEL[s] ?? gigStatusMeta(s).label}
+        {quick.map((m) => (
+          <Button key={m.to} variant="info" title={m.meaning} disabled={isPatching} onClick={() => onStatusChange(m.to)}>
+            {m.label}
           </Button>
         ))}
-        {moves.length > 0 && (
+        {others.length > 0 && (
           <label className="flex items-center gap-1.5 text-xs text-muted">
             Move to
             <Select
@@ -128,9 +112,9 @@ export function GigDetail({
               onChange={(e) => e.target.value && onStatusChange(e.target.value as GigStatus)}
             >
               <option value="">—</option>
-              {moves.map((s) => (
-                <option key={s} value={s} title={gigStatusMeta(s).meaning}>
-                  {gigStatusMeta(s).label}
+              {others.map((m) => (
+                <option key={m.to} value={m.to} title={m.meaning}>
+                  {m.label}
                 </option>
               ))}
             </Select>

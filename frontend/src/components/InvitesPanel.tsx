@@ -16,13 +16,12 @@ import { Card } from './ui/Surface'
  * rather than access to one — and it is stored hashed. Losing it means
  * withdrawing the invitation and issuing another, which is the correct cost.
  *
- * It is handed over rather than emailed, and that is a real limitation rather
- * than a preference: the `send_email` binding sends through an allowlist of
- * one address, the owner's, which is a genuine security property — the Worker
- * cannot mail anywhere else even if the code is wrong. The sending domain is
- * onboarded, so the allowlist is the whole gate now; widening it is the
- * invitation-mail work, not a setting.
- * The screen says so rather than offering a button that would throw.
+ * Scout can email it too, and does by default when a mail binding exists. The
+ * binding no longer carries a one-address allowlist; the Worker refuses any
+ * address that is not on an account or a live invitation instead, so the
+ * address typed here is mailable for exactly as long as this invitation is.
+ * The link is still shown once either way, because copying it is the fallback
+ * that always works — and a send that failed must not cost the invitation.
  */
 export function InvitesPanel() {
   const qc = useQueryClient()
@@ -31,19 +30,30 @@ export function InvitesPanel() {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [link, setLink] = useState<{ url: string; email: string } | null>(null)
+  const [mailIt, setMailIt] = useState(true)
+  const [link, setLink] = useState<{ url: string; email: string; mailed: boolean; mailError: string | null } | null>(null)
+  const canMail = invites.data?.canMail ?? false
 
   const issue = useMutation({
     mutationFn: () =>
       withConfirmation(() =>
-        api.admin.invite({ email: email.trim(), displayName: name.trim() || undefined }),
+        api.admin.invite({
+          email: email.trim(),
+          displayName: name.trim() || undefined,
+          send: canMail && mailIt,
+        }),
       ),
     onSuccess: (issued) => {
       setError(null)
       // Built here rather than by the server: the origin the owner is looking
       // at is the origin the invitee has to land on, and a base URL configured
       // somewhere else is one more thing that can be wrong.
-      setLink({ url: `${window.location.origin}/#join/${issued.token}`, email: email.trim() })
+      setLink({
+        url: `${window.location.origin}/#join/${issued.token}`,
+        email: email.trim(),
+        mailed: issued.mailed,
+        mailError: issued.mailError,
+      })
       setEmail('')
       setName('')
       qc.invalidateQueries({ queryKey: ['admin', 'invites'] })
@@ -108,6 +118,13 @@ export function InvitesPanel() {
           the account&rsquo;s recovery address.
         </p>
 
+        {canMail && (
+          <label className="flex items-center gap-2 text-sm text-body">
+            <input type="checkbox" checked={mailIt} onChange={(e) => setMailIt(e.target.checked)} className="rounded border-line-strong" />
+            Email the link to them as well
+          </label>
+        )}
+
         <Button
           variant="primary"
           onClick={() => issue.mutate()}
@@ -118,7 +135,15 @@ export function InvitesPanel() {
 
         {error && <p className="text-sm text-danger-fg">{error}</p>}
 
-        {link && <IssuedLink url={link.url} email={link.email} onDone={() => setLink(null)} />}
+        {link && (
+          <IssuedLink
+            url={link.url}
+            email={link.email}
+            mailed={link.mailed}
+            mailError={link.mailError}
+            onDone={() => setLink(null)}
+          />
+        )}
       </Card>
 
       {invites.isLoading && <div className="h-16 bg-sunken rounded-xl animate-pulse" />}
@@ -160,12 +185,26 @@ export function InvitesPanel() {
  * credential is a credential in a draft folder. Copy is also the fallback that
  * always works, which is the rule `DraftActions` already follows.
  */
-function IssuedLink({ url, email, onDone }: { url: string; email: string; onDone: () => void }) {
+function IssuedLink({
+  url,
+  email,
+  mailed,
+  mailError,
+  onDone,
+}: {
+  url: string
+  email: string
+  mailed: boolean
+  mailError: string | null
+  onDone: () => void
+}) {
   const [copied, setCopied] = useState(false)
 
   return (
     <div className="rounded-lg border border-warn-fg/30 bg-warn-bg px-3 py-3 space-y-2">
-      <p className="text-sm font-medium text-ink">Send this to {email}</p>
+      <p className="text-sm font-medium text-ink">
+        {mailed ? `Emailed to ${email}` : `Send this to ${email}`}
+      </p>
       <p className="text-xs text-body">
         This is the only time it is shown. It is stored hashed, so nothing here can print it
         again — if it is lost, withdraw the invitation and issue another.
@@ -189,10 +228,12 @@ function IssuedLink({ url, email, onDone }: { url: string; email: string; onDone
           Done
         </Button>
       </div>
-      <p className="text-xs text-muted">
-        Scout cannot email this yet: its mail binding sends only to the owner&rsquo;s own
-        address, so copy the link and send it yourself.
-      </p>
+      {mailError && (
+        <p className="text-xs text-danger-fg">
+          The email did not go out ({mailError}). The invitation still works — copy the link and
+          send it yourself.
+        </p>
+      )}
     </div>
   )
 }

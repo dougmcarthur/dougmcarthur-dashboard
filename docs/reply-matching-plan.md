@@ -157,11 +157,11 @@ auto-transition tells you that you were rejected when you were not.
 Re-scanning is safe by the same logic: a message you have already resolved is
 left exactly as you left it.
 
-## Not built
+## What this left open, and how each was closed
 
-- **Drafting the answer.** `info_requested` is recognised but the reply is
-  yours to write; §5 of the pipeline plan wants a draft, and that needs the
-  question parsed rather than merely detected.
-- **A scheduled scan.** It runs when you press *Check mail*. The hourly cron
-  already exists and could call it, which is a small change and a large
-  behavioural one — it wants to be a decision, not a side effect.
+- **Drafting the answer. Built.** `recogniseAsks` reads what was asked for
+  while the body is in hand (migration 0015), and `shared/replyDraft.ts`
+  composes the reply from the artist database on read. Copy, no Send.
+- **A scheduled scan. Built, as a decision.** The cron sweeps the mailbox at 7,
+  12 and 18 local (`REPLY_SCAN_HOURS`). It is safe because a reply you have
+  resolved is never re-proposed, and it still writes no status.

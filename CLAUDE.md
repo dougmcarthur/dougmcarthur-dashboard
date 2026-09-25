@@ -224,7 +224,7 @@ tenant-scoped, and none of them ask. Admin mode is the next thing that will
 (`docs/multi-tenant-plan.md`); the client tries first and re-asserts only on
 refusal, so a burst of removals costs one touch, and retries exactly once.
 
-**A request resolves to an artist before any route runs.** Fifteen tables
+**A request resolves to an artist before any route runs.** Sixteen tables
 hold rows that belong to one person, and `src/db/scope.ts` is the only way to
 reach them: `scoped(table, tenant, ...rest)` builds the `WHERE`, `withTenant`
 builds the values, and `TenantId` is a **branded** type with one constructor,
@@ -240,7 +240,7 @@ and `TenantId` is not nullable — so an admin-mode request reaching for
 `gig_opportunities` fails to compile rather than returning a stranger's rows.
 
 **A missing filter is a test failure, not a leak.**
-`test/tenantScope.test.ts` reads the source and fails when one of the fifteen
+`test/tenantScope.test.ts` reads the source and fails when one of the sixteen
 is named in a query that does not pass through `scoped` or `withTenant`. It
 has to be source-level: an unscoped query typechecks, runs, and returns the
 right rows for as long as there is one artist — it starts being wrong on the
@@ -335,8 +335,8 @@ race rather than an ending.
 tenant — the same "read both spellings" move `normaliseGigStatus` makes,
 because withdrawing it in this deploy would 401 every agent until three GitHub
 secrets were rotated. It goes when `.github/workflows/agents.yml` holds a row
-instead. **There is no Settings UI for these yet**; the screen is step 3's
-work and the routes are usable without one.
+instead. **Settings → Agent tokens** issues and revokes them; the token is
+shown once and held only in the card's state, never the query cache.
 
 **Admin mode is a different surface, not a bigger one.** The owner has two
 jobs and one account; `auth_sessions.mode` (migration 0023) says which surface
@@ -367,10 +367,10 @@ vocabulary, or links to a route that surface cannot reach.
 the `usage_daily` rollup — the counts are written by the cron running *as the
 tenant*, which emits a number, and the owner reads the number. The one write
 that crosses the line is removing an artist: a tenant-scoped delete across the
-fifteen, previewed first as a **count per table**, which names no column and
+sixteen, previewed first as a **count per table**, which names no column and
 returns no row. The owner's own tenant is refused, because deleting it takes
 the account holding the surface with it. `test/adminMode.test.ts` fails if the
-admin router names one of the fifteen, or uses `asTenantId` more than the
+admin router names one of the sixteen, or uses `asTenantId` more than the
 once that removal needs.
 
 **Three of the rollup's seven counters have no writer, and the API says so.**
@@ -410,18 +410,36 @@ other. The owner keeps the original string, since their authenticators already
 hold credentials under it and switching would leave a duplicate keychain entry
 for nothing; everybody else is keyed by their account id.
 
-**Scout cannot mail an invitation yet, and says so.** The `send_email` binding
-sends through an allowlist of one address, the owner's — a real security
-property, not a limitation: the Worker cannot mail anywhere else even if the
-code is wrong. The platform gate was a **domain**, not a plan, and it is open:
-`sundogsmusic.ca` was onboarded to Email Service on 2026-09-14 and both
-senders (`login@`, `digest@`) moved to it. What remains is the allowlist,
-which is now the only boundary — widening it is the invitation-mail work, and
-it has to come with something that refuses an address not on an invite or an
-account. Until then the owner copies the link. The same work blocks per-artist
-recovery: the emailed setup code goes to the configured address and enrols the
-*owner's* account, which is safe — only the owner can read that inbox — but is
-not recovery for anybody else.
+**Scout mails invitations and per-artist setup codes, and the boundary moved
+into the code to do it.** The `send_email` binding used to carry an allowlist
+of one address, the owner's, which meant the Worker could not mail anywhere
+else even if the code was wrong. That had to go for anybody else to get mail,
+so `sendMail` in `src/lib/mailer.ts` is the boundary now: every send names an
+**audience**, and `shared/recipients.ts` refuses an address that audience has
+no record of — the digest reaches only the owner's addresses, a setup code
+only an address already on an account, an invitation only the address a live
+invitation was issued to. That is weaker in exactly one way, and worth saying:
+a bug there widens it, where a bug could not widen the allowlist. So it is one
+function with one caller, and `test/recipients.test.ts` fails if anything but
+the mailer touches `env.EMAIL` or if the check stops running before the send.
+The binding still enforces the *sender* (`allowed_sender_addresses`).
+
+The digest audience is deliberately narrower than "on file": an artist's
+address is on an account, and still not somewhere the owner's digest may go.
+`PATCH /api/digest/settings` and `POST /api/digest/send` are owner-only for
+the same reason — with the allowlist gone, an artist able to set the recipient
+could have had the owner's digest mailed to themselves.
+
+**Recovery is per account, and the typed address is a lookup key.** The
+sign-in screen asks for the account's email; `recoveryAccount` in
+`src/lib/auth.ts` matches it against `AUTH_EMAIL` (the owner) or `users.email`
+(fixed by the invitation), and the code goes to the address *on file*. The
+answer is the same sentence whether or not anything matched, the cooldown is
+applied silently rather than as a 429, and the work runs after the response so
+the timing matches too. Codes are one live per account rather than one per
+deployment, so one artist asking cannot cancel another's, and the address is
+sent again with the code at `register/*` so the check lands on that account's
+attempt counter.
 
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a
@@ -442,10 +460,27 @@ relying-party ID, which is baked into every credential at registration and
 checked on every assertion — so changing the hostname invalidates every passkey
 already enrolled. It is read from the var rather than from the request because
 a request header is written by whoever is asking; the request URL is only
-consulted when nothing is configured, which in practice means `wrangler dev`.
-`relyingParty` in `shared/auth.ts` is where that decision lives, and local
-development is deliberately two origins, because Vite serves the browser on
-5173 and proxies to wrangler on 8787.
+consulted when nothing is configured, or when what is configured is itself
+`localhost`. `relyingParty` in `shared/auth.ts` is where that decision lives,
+and local development is deliberately two origins, because Vite serves the
+browser on 5173 and proxies to wrangler on 8787.
+
+**Run the Worker locally with `npm run dev:api`, never bare `wrangler dev`.**
+`wrangler dev` reads `[vars]`, so it serves with the production
+`DASHBOARD_URL` — the relying party becomes `scout.sundogsmusic.ca`, and "Add a
+passkey" at `localhost:8787` fails with *The RP ID "scout.sundogsmusic.ca" is
+invalid for this domain*. It used to say "nothing configured in practice means
+`wrangler dev`" here, which was never true while the var sat in `[vars]`.
+`dev:api` passes `--var DASHBOARD_URL:http://localhost:8787`, which outranks
+`[vars]`; a local value hands the decision back to the request host, so
+`127.0.0.1` works as well. It is a script argument rather than a `.dev.vars`
+line because `.dev.vars` is gitignored and copied by hand, so a clean checkout
+would still be broken. `test/auth.test.ts` fails if the script loses it.
+
+The local database scripts run wrangler through `scripts/lib/wrangler.mjs` —
+wrangler's own bin under `process.execPath` — rather than `npx`: on Windows npx
+is `npx.cmd`, which `execFileSync` cannot find, and `shell: true` would let
+cmd.exe re-split the SQL and paths the scripts pass.
 
 **The read path is three unbounded scans, and they are indexed now.**
 `composeFeed` and `buildReviewQueue` both open by reading every gig, every
@@ -664,10 +699,37 @@ condition lasts a day; dismissing an event is permanent. See
 
 **The pipeline is a shape, not a free-for-all.** `nextGigStatuses` in
 `shared/gigStatus.ts` says which moves a status offers, and the PATCH route
-refuses anything else, whoever is calling it. The entry
-worth knowing: **there is no route from `invited` to `declined`.** Declining is
-their verb; turning down an invitation is `withdrawn`. One mis-click should not
-be able to record that you were rejected from a festival that wanted you.
+refuses anything else, whoever is calling it. Declining is always their verb;
+turning an offer down yourself is `withdrawn`. `invited → declined` used to be
+refused outright and is allowed now, because an offer is not a booking and
+terms can fall through on their side — the only button that writes it says
+**Offer fell through**, which nobody clicks by reflex.
+
+**Screens show four stages; storage still holds fourteen statuses.** The work
+has three phases and an end — **New** (apply or pass), **In progress** (you
+said yes; only confirming it went out moves it), **Applied** (waiting; only a
+settled answer ends it) and **Closed** with an outcome: Accepted, Not
+selected, Passed, Missed or Withdrawn. `shared/gigStage.ts` is that view, and
+every screen reads it: the badge, the filter (`GET /api/gigs?stage=`), the
+row's buttons, the Review bar, the reply inbox and the new-gig form.
+`gigMoves` is `nextGigStatuses` in the stage language and never wider.
+
+What used to be a status and is now smaller: `preparing` is In progress with
+a draft; `acknowledged` is a receipt, offered only as **Answered** to clear a
+question; `info_requested` and `invited` are **flags** on Applied — *they need
+more* and *offer — contract pending*. **Accepted means the terms are settled**:
+a signed contract for a festival or showcase, a written confirmation for a
+grant or award (`settledByAward` reads the free-text type). An invitation is
+exciting and is not a booking, so it stays Applied and nothing reaches the
+calendar until it is Accepted. `archived` rows show as Closed with no outcome,
+because archiving never recorded why.
+
+**Storage has not moved, on purpose** — that is step 1 of the two-deploy
+rename. The agents POST the old vocabulary, the queue, reply matcher and
+nudges read it, and `normaliseGigStatus` now also accepts `new`,
+`in_progress` and `applied` on write. Migrating the column to stages plus an
+outcome and flags is step 2, a later change. `test/gigStage.test.ts` fails if
+a screen imports `GIG_STATUSES`, `GIG_STATUS_META` or `gigStatusMeta` again.
 
 **A screen never offers a move the pipeline refuses.** The PATCH route
 validates against `nextGigStatuses`, so a button naming a status is a claim
@@ -834,6 +896,89 @@ prefers a grant and falls back to it, the same "read both spellings" move
 rather than falling back — the artist connected a calendar, and writing to the
 owner's instead would be worse than writing nothing.
 
+**Bandsintown is read with the artist's own key, and the key never reaches a
+page.** Bandsintown issues one API key per artist, so a deployment-wide key
+would be one artist's key used for another; `artist_connectors` (migration
+0027, the sixteenth scoped table) holds each tenant's, AES-GCM encrypted like a
+Google refresh token. Saving probes first and a key Bandsintown refuses is not
+stored; a timeout still saves, because it is not a verdict. Shows are read on
+request rather than copied into D1, since Bandsintown is where the artist edits
+them. **Bandsintown echoes the caller's `app_id` into every event and ticket
+link it returns**, so `shared/bandsintown.ts` strips it from each URL before a
+show leaves the Worker — `test/bandsintown.test.ts` pins that with the real
+shape. `today` comes from the browser, because a show tonight in Winnipeg is
+upcoming until midnight there, not UTC. Their terms allow artists and their
+teams to display events "on their website or app"; a platform doing it for
+many artists wants their partner programme first. See
+`docs/artist-profile-plan.md`, which also holds the storage and social-scan
+research.
+
+**A Manitoba Music profile is read from the address the artist gives, never
+found by name.** Most of the next testers are Winnipeg artists with a member
+profile, which carries a bio, links, videos, releases, downloads and photos in
+the same server-rendered markup on every page. `profileUrl` in
+`shared/manitobaMusic.ts` accepts `/profiles/view,<n>/<slug>` and the short
+`manitobamusic.com/<slug>` form members put in their link lists (not a site
+section), and nothing else; a short link already in the library is offered on
+the Settings card without pasting,
+and connecting shows the name and photo on that page — "Is this you?" — before
+saving, because a search by name files a stranger's bio the day there are two
+of you. The import is the reference-document shape: preview, then write, all
+never reviewed, a proposal dropped when its source *or* its value is already
+on file. Contact details are never copied. Its photos refuse a foreign
+`Referer`, so an EPK that displays one needs its own copy. See
+`docs/artist-profile-plan.md`.
+
+**Every provincial association is a source, read the same way.**
+`shared/musicAssociations.ts` lists the ten worth reading — what each site
+offers was fetched, not assumed from Manitoba's. Seven have public member
+profiles on four different platforms; Music BC's are behind a login and
+MusicNL's and Music Yukon's are drawn in the browser, and the card says so
+rather than failing. Music NWT is left out because its site was carrying
+injected spam, and ADISQ has no artist profiles. Manitoba Music keeps its own
+parser and its `manitoba_music` row; every other site goes through
+`shared/associationProfile.ts`, which reads **by subtraction**: it fetches the
+association's homepage beside the profile and drops every link, paragraph and
+share image the two share. That removes the association's own Instagram and
+Facebook — which a naive read files as the artist's — without knowing one
+class name, so a redesign does not break it. A paragraph with an email or
+phone number in it is never taken. One connector row per association
+(`association:<id>`), because an artist who moved provinces can belong to two.
+The gig agent reads each province's calls and feeds, and
+`test/musicAssociations.test.ts` fails if the registry names a source the
+prompt does not.
+
+**A share link publishes only what the artist has claimed.** The EPK
+profile page (`#epk/<token>`, token in the fragment, POSTed to
+`/api/public/epk` — the second entry in `PUBLIC_API_PREFIXES`) renders
+`shared/publicEpk.ts`: reviewed assets only, no uncredited photo, and facts
+and documents only from an allow-list, so a phone number or a W-8BEN never
+reaches a stranger because nobody classified it. `epk_shares` (migration
+0028) is a credential like `agent_tokens`: hashed, shown once, resolved in
+`src/lib/actor.ts`, not a domain table, deleted by tenant removal by name.
+`test/epkShare.test.ts` pins where the token travels and that the public route
+strips `withheld`.
+
+**The page never renders a library value raw.** Those values were written for
+forms: "Artist Name" is three lines of markdown, "Genre" a paragraph plus an
+FFO list plus influences, the quote carries its source on a dash line. The
+first version printed them verbatim and shipped a heading reading "Doug" under
+four lines of uppercase. `shared/epkProfile.ts` splits each along the seams the
+documents use and nothing cleverer; one-liners are a tagline, not a bio; a
+link whose label says *private* is withheld, a sync pitch page only shows on
+the sync version, and anything sourced from the writing style guide stays off
+— it describes how to write, not the artist.
+
+**The Drive folder is `drive.file`, and Google enforces the limit.** Scout
+reaches the folder it made on connect and files the artist picked in Google's
+picker — nothing else in their Drive, whatever this code does;
+`test/calendarGrant.test.ts` fails if a broad Drive scope appears in `src/`.
+Picking a *folder* grants the folder, not its contents, so the picker tells the
+artist to select the files inside. Picked files are copied, never moved;
+organising previews first; sharing is one permission on the folder that every
+file inherits; nothing is deleted. The picker needs `GOOGLE_PICKER_API_KEY` and
+`GOOGLE_CLOUD_PROJECT_NUMBER`, which are vars in `wrangler.toml`.
+
 **Gmail drafting is a grant the person makes, not a secret somebody pasted.**
 Every Google token before this one was obtained at a terminal and stored with
 `wrangler secret put`. That cannot work for a feature where the *user* decides
@@ -945,6 +1090,16 @@ be attached — and then stops, because an application filed by automation is a
 good way to be blacklisted. The output is text to copy. `ApplicationPanel` has
 Copy and *This one is right*, no Send, and `test/uiConsistency.test.ts` fails if
 a button appears claiming otherwise. See `docs/application-prep-plan.md`.
+
+**A Google Form can open pre-filled, and only with what you have read.**
+`shared/formPrefill.ts` builds `viewform?usp=pp_url&entry.<id>=…` from the ids
+the form reader already keeps. A `suggested` answer stays out — typing it into
+the form would erase the unread state at the moment it matters — and so does a
+choice the form does not offer, because Google drops it silently and the box
+arrives empty. Everything left out is named with a reason. The budget is 6,000
+encoded characters, under the common 8 KB request-line limit since Google does
+not publish its own. Other platforms need builder-side field names and
+Airtable renders in JavaScript, so this is Google Forms only.
 
 **A suggestion is not an answer.** `answer_state` is a column apart from
 `answer` for the same reason `unreviewed` is a state apart from `overdue`: "the

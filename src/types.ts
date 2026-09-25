@@ -19,8 +19,8 @@ export type Env = {
   // invalidates every passkey already enrolled.
   DASHBOARD_URL?: string
   /**
-   * Where a passkey setup code is emailed. The `send_email` allowlist in
-   * wrangler.toml is the real boundary; this only chooses among it.
+   * The owner's recovery address. A setup code goes here when this is the
+   * address typed on the sign-in screen; `sendMail` still checks it.
    */
   AUTH_EMAIL?: string
   AUTH_EMAIL_SENDER?: string
@@ -35,6 +35,15 @@ export type Env = {
    * that fails. See `primaryCalendarOffered` in src/lib/googleGrant.ts.
    */
   PRIMARY_CALENDAR_OPT_IN?: string
+  /**
+   * Google Picker, for adding files to the artist's Drive folder: a browser
+   * API key restricted to the Picker API and this site, and the Cloud
+   * project number as the picker's app id. Both are public by nature — the
+   * picker runs in the page — so they are vars rather than secrets. Unset
+   * means the Drive card offers no picker and says why.
+   */
+  GOOGLE_PICKER_API_KEY?: string
+  GOOGLE_CLOUD_PROJECT_NUMBER?: string
   /**
    * The mailing address every email's footer prints, beside the house mark.
    * Deployment configuration rather than a setting, like the recovery address:

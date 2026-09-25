@@ -83,14 +83,15 @@ default branch, and migration 0022 applied, because that is where
 `agent_tokens` lives.
 
 1. **Issue a token** for the routines, separate from `API_TOKEN` so either can
-   be revoked without touching the other:
+   be revoked without touching the other: **Settings → Agent tokens**, name it
+   *Research routines*, and confirm with your passkey. Or, from a terminal:
 
    ```bash
    npx tsx scripts/issue-agent-token.ts "Research routines" --apply
    ```
 
-   It prints the token once, on its own line. Put it in 1Password; nothing can
-   show it again.
+   Either way it is shown once. Put it in 1Password; nothing can show it
+   again.
 
 2. **Create a cloud environment** at [claude.ai/code](https://claude.ai/code)
    called *Scout agents*, with **Full** network access, no environment
@@ -139,6 +140,8 @@ default branch, and migration 0022 applied, because that is where
    History is the proof.
 
 ## Revoking
+
+**Settings → Agent tokens → Revoke**, or:
 
 ```bash
 npx tsx scripts/issue-agent-token.ts --revoke <id> --apply

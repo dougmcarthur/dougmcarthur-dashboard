@@ -30,7 +30,7 @@
 
 import { eq, getTableName } from 'drizzle-orm'
 import { getDb } from '../db'
-import { agentTokens, authSessions, passkeyCredentials, tenants, usageDaily, users } from '../db/schema'
+import { agentTokens, authSessions, epkShares, passkeyCredentials, tenants, usageDaily, users } from '../db/schema'
 import { DOMAIN_TABLES, scoped, type TenantId } from '../db/scope'
 import { countRows } from './usage'
 import type { Env } from '../types'
@@ -102,6 +102,7 @@ export async function removeTenant(env: Env, tenant: TenantId): Promise<RemovalR
   }
 
   await db.delete(agentTokens).where(eq(agentTokens.tenantId, tenant))
+  await db.delete(epkShares).where(eq(epkShares.tenantId, tenant))
   await db.delete(usageDaily).where(eq(usageDaily.tenantId, tenant))
   await db.delete(users).where(eq(users.tenantId, tenant))
   await db.delete(tenants).where(eq(tenants.id, tenant))

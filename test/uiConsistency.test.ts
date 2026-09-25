@@ -50,7 +50,7 @@ describe('form controls come from one place', () => {
   it('has no per-page copy of the input class string', () => {
     const copies = FILES.filter(
       (f) =>
-        !f.includes('/ui/') &&
+        !/[\\/]ui[\\/]/.test(f) &&
         /border border-line-strong rounded-md[^'"]*focus:ring-accent/.test(readFileSync(f, 'utf8')),
     )
     expect(copies).toEqual([])
@@ -83,7 +83,7 @@ describe('gig transitions are asked for, not listed', () => {
     // was no way to record a booking at all. Nothing typechecked wrong and
     // nothing rendered wrong — you found out by clicking.
     expect(src).not.toMatch(/onGig\(\{\s*status:\s*['"`]/)
-    expect(src).toContain('nextGigStatuses')
+    expect(src).toContain('gigMoves')
   })
 
   it('the overview deck resolves gig intents through the shared table', () => {
@@ -115,8 +115,10 @@ describe('gig transitions are asked for, not listed', () => {
     const src = read('frontend/src/pages/gigs/GigDetail.tsx')
     // Its quick buttons read `gigStatusMeta(s).label`: "Submitted" beside a
     // table that said "Applied" for the same click, and "Invited" where you
-    // are recording that the organiser moved.
-    expect(src).toContain('GIG_MOVE_LABEL[s]')
+    // are recording that the organiser moved. `gigMoves` names each move in
+    // the stage language, including who moved.
+    expect(src).toContain('gigMoves(')
+    expect(src).not.toMatch(/gigStatusMeta\([^)]*\)\.label/)
   })
 })
 
@@ -301,6 +303,8 @@ describe('a panel that writes in bulk previews first', () => {
     'frontend/src/pages/artist/SourcePanel.tsx',
     'frontend/src/components/NotesBackfillCard.tsx',
     'frontend/src/components/GmailDraftsPanel.tsx',
+    'frontend/src/pages/artist/AssociationPanel.tsx',
+    'frontend/src/pages/artist/DriveTab.tsx',
   ]
 
   it('uses the shared shell rather than a third hand-rolled one', () => {
@@ -314,8 +318,9 @@ describe('a panel that writes in bulk previews first', () => {
     // first is one you find out about afterwards.
     for (const file of BULK) {
       const src = readFileSync(file, 'utf8')
-      const preview = src.search(/\.(?:preview|sourcePreview)\(\)/)
-      const write = src.search(/\.(?:apply|source)\(\)/)
+      // With or without an argument: a panel per association passes its id.
+      const preview = src.search(/\.(?:preview|sourcePreview)\([\w.]*\)/)
+      const write = src.search(/\.(?:apply|source)\([\w.]*\)/)
       expect(preview, file).toBeGreaterThan(-1)
       expect(write, file).toBeGreaterThan(-1)
       expect(preview, file).toBeLessThan(write)
@@ -590,7 +595,9 @@ describe('the shapes that were being spelled out by hand', () => {
       const p = join(dir, name)
       return statSync(p).isDirectory() ? walk(p) : p.endsWith('.tsx') ? [p] : []
     })
-  })('frontend/src').filter((f) => !f.includes('/ui/'))
+  // Either separator: `join` writes backslashes on Windows, where a '/ui/'
+  // test exempted nothing and failed on the shared components themselves.
+  })('frontend/src').filter((f) => !/[\\/]ui[\\/]/.test(f))
 
   const sources = files.map((f) => [f, readFileSync(f, 'utf8')] as const)
 

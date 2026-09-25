@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import {
   ELEVATION_TTL_MINUTES,
@@ -63,6 +64,19 @@ describe('relyingParty', () => {
 
   it('is null when neither is usable', () => {
     expect(relyingParty({ dashboardUrl: 'not a url', requestUrl: 'also not a url' })).toBeNull()
+  })
+
+  it('is local under `npm run dev:api`, whatever [vars] says', () => {
+    // `wrangler dev` reads [vars], which carries the production DASHBOARD_URL,
+    // so without an override the local relying party is the real hostname and
+    // no passkey can be added on localhost. The script's --var is the override.
+    const script: string = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+      .scripts['dev:api']
+    const override = script.match(/--var[ =]DASHBOARD_URL:(\S+)/)?.[1]
+    expect(override, 'dev:api must pass --var DASHBOARD_URL:<a localhost URL>').toBeDefined()
+
+    const party = relyingParty({ dashboardUrl: override, requestUrl: 'http://localhost:8787/api/auth/session' })
+    expect(party?.rpId).toBe('localhost')
   })
 })
 

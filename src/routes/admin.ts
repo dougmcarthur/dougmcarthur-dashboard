@@ -33,6 +33,8 @@ import { adminOf, type AdminEnv } from '../context'
 import { elevationState } from '../../shared/auth'
 import { previewRemoval, removeTenant } from '../lib/tenantRemoval'
 import { issueInvite, listInvites, revokeInvite } from '../lib/invites'
+import { mailerConfigured, sendMail, senderIdentity } from '../lib/mailer'
+import { inviteEmail } from '../lib/authMail'
 import { readTenantHealth } from '../lib/tenantHealth'
 import { MEASURED_FIELDS } from '../lib/usage'
 
@@ -187,19 +189,15 @@ admin.get('/invites', async (c) => {
       revokedAt: row.revokedAt,
     })),
     /**
-     * Why the link is handed over rather than emailed.
+     * Whether Scout can email an invitation itself.
      *
-     * The `send_email` binding sends through an explicit allowlist in
-     * wrangler.toml — one entry, the owner's — which is a real security
-     * property rather than a limitation: the Worker cannot mail anywhere else
-     * even if the code is wrong. It stops working the moment somebody else
-     * needs mail. `sundogsmusic.ca` is onboarded to Email Service, so the
-     * platform would deliver anywhere; the allowlist is the whole gate.
-     *
-     * Reported rather than assumed, so the screen says what it can actually do
-     * instead of offering a button that would throw.
+     * The binding no longer carries a one-address allowlist; `sendMail` refuses
+     * any address that is not on an account or a live invitation instead (see
+     * shared/recipients.ts), so an invitation's own address is mailable for
+     * exactly as long as the invitation is. Reported rather than assumed, so a
+     * deployment with no binding shows Copy alone instead of a box that throws.
      */
-    canMail: false,
+    canMail: mailerConfigured(c.env),
   })
 })
 
@@ -221,6 +219,8 @@ admin.post(
     z.object({
       email: z.string().trim().email(),
       displayName: z.string().trim().max(80).optional(),
+      /** Email the link as well as showing it. The link is shown either way. */
+      send: z.boolean().optional(),
     }),
   ),
   async (c) => {
@@ -239,10 +239,40 @@ admin.post(
       issuedBy: actor.userId,
     })
 
+    // Mailed to the address fixed above and nowhere else — `sendMail` checks it
+    // against the live invitations, which this one now is. A failed send does
+    // not undo the invitation: the link is still returned, and copying it is
+    // the fallback that always works.
+    let mailed = false
+    let mailError: string | null = null
+    if (body.send && mailerConfigured(c.env)) {
+      const base = (c.env.DASHBOARD_URL ?? new URL(c.req.url).origin).replace(/\/$/, '')
+      const mail = inviteEmail({
+        url: `${base}/#join/${issued.token}`,
+        name: body.displayName || null,
+        expiresOn: new Date(issued.expiresAt).toLocaleDateString('en-CA', {
+          dateStyle: 'long',
+          timeZone: 'UTC',
+        }),
+        identity: senderIdentity(c.env),
+      })
+      try {
+        await sendMail(c.env, {
+          to: body.email,
+          audience: 'invite',
+          from: c.env.AUTH_EMAIL_SENDER ?? 'login@sundogsmusic.ca',
+          ...mail,
+        })
+        mailed = true
+      } catch (err) {
+        mailError = err instanceof Error ? err.message : 'the email could not be sent'
+      }
+    }
+
     // The one and only time the token exists outside the invitee's browser.
     // Losing it means revoking and reissuing, which is the correct cost for a
     // credential — the same bargain an agent token makes.
-    return c.json({ id: issued.id, token: issued.token, expiresAt: issued.expiresAt }, 201)
+    return c.json({ id: issued.id, token: issued.token, expiresAt: issued.expiresAt, mailed, mailError }, 201)
   },
 )
 

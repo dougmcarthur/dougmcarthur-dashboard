@@ -12,7 +12,9 @@ owns rows — exists underneath them.
 **Steps 1 to 4 are done** (migrations 0021–0023; invites needed none, because
 their table arrived with 0021), and step 5 is half done (0024). What is left is
 the `NOT NULL` pass on the fourteen domain tables, which is deferred with three
-stated conditions, and two things gated on mail. Each step's section below
+stated conditions. The two things that were gated on the mail allowlist —
+mailing invitations and per-artist recovery — are done. The release
+carrying all of it shipped on 2026-09-11 (run 61). Each step's section below
 carries a note on what it actually did and where the plan turned out to be
 wrong, which is worth more than a plan that reads as though it was right — and
 step 5's note is the one to read first, because what it found applies to every
@@ -501,6 +503,16 @@ it has to refuse to mail an address that is not on an invite or an account,
 because "send a code to this address" pointed at an arbitrary inbox is the
 account-takeover vector the recovery rule exists to prevent.
 
+**Built 2026-09-25.** The destination allowlist is gone from `wrangler.toml`,
+and the binding keeps `allowed_sender_addresses`, the half Cloudflare can
+still enforce. `sendMail` takes an audience — `owner`, `account` or `invite` —
+and `shared/recipients.ts` decides from a fresh read of `users`, `invites` and
+`AUTH_EMAIL` whether the address is on that audience's list. Invitations are
+emailed from the issue call (the token exists only then), and a failed send
+still returns the link. Recovery takes the account's address as a lookup key,
+answers identically whether or not it matched, and keeps one live code per
+account.
+
 ### The notification is the bell that already exists
 
 Redemption writes a `notification_events` row, which the owner's feed shows
@@ -528,7 +540,9 @@ rule that took `gig-festival-scan` off the screen.
    defaults stay until step 5, because dropping them here would leave the
    pre-scoping Worker writing NULLs across the migrate-then-deploy gap.
    Outstanding from this step: per-artist digest and mailbox configuration,
-   and retiring `API_TOKEN` once the agents hold rows.
+   and retiring `API_TOKEN` once the agents hold rows. Tokens are issued and
+   revoked from **Settings → Agent tokens**, so that last one waits only on
+   moving the routines and `.github/workflows/agents.yml` onto an issued token.
 3. Admin mode, reusing the elevation already built, then the `/admin` routes
    and screen. **Done — migration 0023 plus the oversight deploy.** The
    guarantee turned out to be a type rather than a rule; see below. Outstanding
@@ -536,8 +550,10 @@ rule that took `gig-festival-scan` off the screen.
    the invite list on the screen waits on step 4.
 4. Invite issue / redeem, with the redemption event. **Done — no migration
    needed, since `invites` arrived with 0021.** Outstanding: mailing the
-   invitation, and per-artist recovery, both gated on onboarding
-   `sundogsmusic.ca` to Email Service.
+   invitation, and per-artist recovery. **Both done** (2026-09-25): the
+   destination allowlist is gone and `sendMail` refuses any address that is
+   not on an account or a live invitation instead — see "Mail to an invited
+   artist" below.
 5. `tenant_id` to `NOT NULL` on the fourteen domain tables — and on `users`
    too, since every account owns a tenant now, including the owner's.
    **Half done — migration 0024.** `users` is `NOT NULL`. The fourteen are
@@ -547,10 +563,15 @@ rule that took `gig-festival-scan` off the screen.
 ### What step 5 found, and why it stopped halfway
 
 The plan's last step assumed each step reached production before the next was
-written. **It did not.** The deployed Worker is from migration 0009 —
-passkeys, the research agents in CI, Gmail drafting, tenants, the oversight
-surface and invitations are all unmerged, and they land in one CI run. That is
-one fact, and it changes three things.
+written. **It did not.** When this was written the deployed Worker was from
+migration 0009 — passkeys, the research agents in CI, Gmail drafting, tenants,
+the oversight surface and invitations were all unmerged, and they landed in one
+CI run (run 61, 2026-09-11). That is one fact, and it changed three things.
+
+*Since then:* the release is live, so of 0024's three conditions the first is
+met. The other two — production's schema compared against what the migrations
+produce, and no row with a NULL tenant (`GET /api/admin/health`) — are still
+unchecked, and the `NOT NULL` pass waits on them.
 
 **It found a real bug in 0022.** That migration widens
 `notification_marks`'s primary key from `dedupe_key` to

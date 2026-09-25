@@ -85,18 +85,33 @@ export const TASKS_SCOPE = 'https://www.googleapis.com/auth/tasks'
 export const CALENDAR_OWNED_SCOPE = 'https://www.googleapis.com/auth/calendar.events.owned'
 
 /**
+ * Drive, for the folder of assets juries and organisers ask for.
+ *
+ * `drive.file` is the narrow one and the only one this app asks for: Scout
+ * can reach files it created, and files the artist picked for it in Google's
+ * picker, and nothing else in their Drive — **whatever this code does**, the
+ * same structural guarantee `calendar.app.created` gives. It is
+ * non-sensitive, so it needs no Google verification. The cost is that picking
+ * an existing *folder* grants that folder and not its contents; the artist
+ * selects the files inside instead. `test/calendarGrant.test.ts` fails if the
+ * broad `drive` or `drive.readonly` scope appears anywhere in `src/`.
+ */
+export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
+
+/**
  * Grants are keyed by purpose so revoking one does not revoke the others —
  * disconnecting drafting must not blind the reply matcher, neither should
  * touch the calendar, and giving up the primary-calendar grant must leave the
  * Scout calendar working rather than disconnecting everything.
  */
-export type GrantPurpose = 'gmail.compose' | 'calendar' | 'calendar.primary' | 'tasks'
+export type GrantPurpose = 'gmail.compose' | 'calendar' | 'calendar.primary' | 'tasks' | 'drive'
 
 export const GRANT_PURPOSES: GrantPurpose[] = [
   'gmail.compose',
   'calendar',
   'calendar.primary',
   'tasks',
+  'drive',
 ]
 
 /** The purpose `gmailDrafts.ts` has always meant, named so its callers read. */
@@ -107,6 +122,7 @@ const SCOPE_FOR: Record<GrantPurpose, string> = {
   calendar: CALENDAR_APP_SCOPE,
   'calendar.primary': CALENDAR_OWNED_SCOPE,
   tasks: TASKS_SCOPE,
+  drive: DRIVE_FILE_SCOPE,
 }
 
 /**
@@ -202,6 +218,8 @@ export interface GrantStatus {
   calendarId: string | null
   /** The list Scout made, on a `tasks` grant. Null on every other. */
   tasksListId: string | null
+  /** The folder Scout made, on a `drive` grant. Null on every other. */
+  driveFolderId: string | null
   /** Whether the deployment is even able to offer this. */
   configured: boolean
 }
@@ -230,7 +248,7 @@ export async function readGrant(
   if (!row) {
     return {
       connected: false, accountEmail: null, grantedAt: null, lastUsedAt: null,
-      canDraft: false, calendarId: null, tasksListId: null, configured,
+      canDraft: false, calendarId: null, tasksListId: null, driveFolderId: null, configured,
     }
   }
   return {
@@ -244,6 +262,7 @@ export async function readGrant(
     canDraft: row.scopes.includes(SCOPE_FOR[purpose]),
     calendarId: row.calendarId ?? null,
     tasksListId: row.tasksListId ?? null,
+    driveFolderId: row.driveFolderId ?? null,
     configured,
   }
 }
@@ -277,6 +296,8 @@ export async function storeGrant(
     calendarId?: string | null
     /** Only a tasks grant carries one: the list Scout made. */
     tasksListId?: string | null
+    /** Only a drive grant carries one: the folder Scout made. */
+    driveFolderId?: string | null
   },
 ): Promise<void> {
   const purpose = input.purpose ?? GRANT_PURPOSE
@@ -292,6 +313,7 @@ export async function storeGrant(
     lastUsedAt: null,
     calendarId: input.calendarId ?? null,
     tasksListId: input.tasksListId ?? null,
+    driveFolderId: input.driveFolderId ?? null,
   }))
 }
 

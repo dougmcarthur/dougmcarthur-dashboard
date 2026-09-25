@@ -25,6 +25,12 @@ import gmailDrafts from './routes/gmailDrafts'
 import agentTokens from './routes/agentTokens'
 import admin from './routes/admin'
 import profile from './routes/profile'
+import connectors from './routes/connectors'
+import manitobaMusic from './routes/manitobaMusic'
+import associationsRoute from './routes/associations'
+import showsRoute from './routes/shows'
+import driveRoute from './routes/drive'
+import { epk as epkRoute, publicEpk } from './routes/epk'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
 import { isDigestDue } from '../shared/digestSchedule'
 import { sendMail, mailerConfigured } from './lib/mailer'
@@ -90,6 +96,9 @@ app.use('/api/*', (c, next) => {
 const PUBLIC_API_PREFIXES = [
   // The ceremonies themselves. Signing in cannot require being signed in.
   '/api/auth/',
+  // A shared EPK, read by whoever holds its link. The link's token, in the
+  // request body, is the credential; see src/routes/epk.ts.
+  '/api/public/',
 ]
 
 /**
@@ -181,6 +190,13 @@ app.route('/api/auth', auth)
 app.route('/api/gmail', gmailDrafts)
 app.route('/api/agent-tokens', agentTokens)
 app.route('/api/profile', profile)
+app.route('/api/connectors/manitoba-music', manitobaMusic)
+app.route('/api/connectors/associations', associationsRoute)
+app.route('/api/connectors', connectors)
+app.route('/api/shows', showsRoute)
+app.route('/api/epk', epkRoute)
+app.route('/api/drive', driveRoute)
+app.route('/api/public', publicEpk)
 // The oversight surface. See ADMIN_API_PREFIX above for what the middleware
 // does with it, in both directions.
 app.route('/api/admin', admin)
@@ -260,6 +276,7 @@ async function runDigest(env: Env, tenant: TenantId): Promise<void> {
   try {
     await sendMail(env, {
       to: settings.recipient,
+      audience: 'owner',
       from: settings.sender,
       subject,
       text,

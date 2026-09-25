@@ -23,6 +23,12 @@ import { Card } from './ui/Surface'
  * device would otherwise be a locked door with the key inside it. So there
  * are two paths and they are not equals — one is how you sign in, the other
  * is how you get a way to sign in.
+ *
+ * The address box is a **lookup key, not a destination**. The code goes to
+ * the address already on file for the account it matches, and the screen says
+ * the same thing whether or not anything matched — so typing somebody else's
+ * address mails them, not you, and tells you nothing about whether they have
+ * an account.
  */
 type Mode = 'signin' | 'setup'
 
@@ -33,7 +39,8 @@ export function LoginScreen({ session, onSignedIn }: { session: SessionState; on
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [code, setCode] = useState('')
-  const [sentTo, setSentTo] = useState<string | null>(null)
+  const [email, setEmail] = useState('')
+  const [sent, setSent] = useState<string | null>(null)
 
   async function run(work: () => Promise<void>) {
     setBusy(true)
@@ -62,18 +69,19 @@ export function LoginScreen({ session, onSignedIn }: { session: SessionState; on
 
   const sendCode = () =>
     run(async () => {
-      const result = await api.auth.requestCode()
-      setSentTo(result.to)
+      const result = await api.auth.requestCode({ email: email.trim() })
+      setSent(result.message)
     })
 
   const addPasskey = () =>
     run(async () => {
       const trimmed = code.trim()
-      const { ceremony, options } = await api.auth.registerOptions({ code: trimmed })
+      const address = email.trim()
+      const { ceremony, options } = await api.auth.registerOptions({ code: trimmed, email: address })
       const response = await startRegistration({
         optionsJSON: options as unknown as PublicKeyCredentialCreationOptionsJSON,
       })
-      await api.auth.registerVerify({ ceremony, response, code: trimmed })
+      await api.auth.registerVerify({ ceremony, response, code: trimmed, email: address })
       onSignedIn()
     })
 
@@ -108,20 +116,28 @@ export function LoginScreen({ session, onSignedIn }: { session: SessionState; on
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
+                <label className="block text-xs font-medium text-body" htmlFor="setup-email">
+                  Your account&rsquo;s email
+                </label>
+                <input
+                  id="setup-email"
+                  className={FIELD}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
                 <Button
-                  variant={sentTo ? 'quiet' : 'primary'}
+                  variant={sent ? 'quiet' : 'primary'}
                   size="md"
                   className="w-full py-2"
-                  disabled={busy || !session.recoveryAvailable}
+                  disabled={busy || !session.recoveryAvailable || !email.includes('@')}
                   onClick={sendCode}
                 >
-                  {sentTo ? 'Send another code' : 'Email me a setup code'}
+                  {sent ? 'Send another code' : 'Email me a setup code'}
                 </Button>
-                {sentTo && (
-                  <p className="text-xs text-muted">
-                    Sent to <span className="text-body">{sentTo}</span>. It is good for 15 minutes.
-                  </p>
-                )}
+                {sent && <p className="text-xs text-muted">{sent}</p>}
                 {!session.recoveryAvailable && (
                   <p className="text-xs text-warn-fg">
                     No email binding is configured, so a setup code cannot be sent.
@@ -147,7 +163,7 @@ export function LoginScreen({ session, onSignedIn }: { session: SessionState; on
                   variant="primary"
                   size="md"
                   className="w-full py-2"
-                  disabled={busy || code.trim().length !== 6}
+                  disabled={busy || code.trim().length !== 6 || !email.includes('@')}
                   onClick={addPasskey}
                 >
                   {busy ? 'Waiting for your device…' : 'Add a passkey'}

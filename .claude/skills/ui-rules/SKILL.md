@@ -148,8 +148,12 @@ So for anything structural, run the app with real density and look:
 
 ```bash
 npm run db:seed:local -- --apply   # shapes, not data; prints a setup code
-npm run build:ui && npx wrangler dev --port 8787
+npm run build:ui && npm run dev:api   # Worker + built UI on :8787
 ```
+
+Use `npm run dev:api`, not bare `npx wrangler dev`: the script overrides
+`DASHBOARD_URL` to `localhost`, and without that the passkey relying party is
+the production hostname and "Add a passkey" fails on `localhost`.
 
 Sign in with the setup code the seed prints. The fixture deliberately contains a
 prose deadline, an application silent past `NO_REPLY_DAYS`, `info_requested`

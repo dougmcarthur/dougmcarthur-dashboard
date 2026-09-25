@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, reminders } from '../db/schema'
 import { scoped, withTenant } from '../db/scope'
@@ -16,6 +16,7 @@ import {
   hasBeenSubmitted,
 } from '../../shared/gigStatus'
 import { performanceDateProblem } from '../../shared/performance'
+import { gigStageLabel, isGigStage, statusesInStage } from '../../shared/gigStage'
 import { splitDeadline } from '../../shared/reviewParse'
 import { gigNoteColumns } from '../../shared/noteColumns'
 
@@ -66,11 +67,19 @@ const GigPatchSchema = GigInsertSchema.partial()
 gigs.get('/', async (c) => {
   const db = getDb(c.env.DB)
   const status = c.req.query('status')
+  const stage = c.req.query('stage')
   const paid = c.req.query('paid')
   const type = c.req.query('type')
 
   const conditions = []
   if (status) conditions.push(eq(gigOpportunities.status, status))
+  // What the screens filter by. A stage the route does not know is refused
+  // rather than ignored — a filter that quietly shows everything is how you
+  // conclude nothing is in it.
+  if (stage !== undefined) {
+    if (!isGigStage(stage)) return c.json({ error: `unknown stage: ${stage}` }, 400)
+    conditions.push(inArray(gigOpportunities.status, statusesInStage(stage)))
+  }
   if (paid !== undefined) conditions.push(eq(gigOpportunities.paid, paid === 'true' ? 1 : 0))
   if (type) conditions.push(eq(gigOpportunities.type, type))
 
@@ -218,8 +227,8 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
     return c.json(
       {
         error:
-          `A gig that is ${gigStatusMeta(before.status).label.toLowerCase()} ` +
-          `cannot move straight to ${gigStatusMeta(newStatus).label.toLowerCase()}.`,
+          `A gig that is ${gigStageLabel(before.status).label.toLowerCase()} ` +
+          `cannot move straight to ${gigStageLabel(newStatus).label.toLowerCase()}.`,
       },
       400,
     )

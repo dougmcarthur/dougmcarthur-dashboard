@@ -31,20 +31,23 @@ binding = "ASSETS"
 [triggers]
 crons = ["0 * * * *"]
 
-# Cloudflare Email Service. The allowlist is the security boundary: the Worker
-# can send to these addresses and nowhere else, whatever the code says.
+# Cloudflare Email Service, sending from sundogsmusic.ca (onboarded 2026-09-14).
 #
-# Mail is sent from sundogsmusic.ca, onboarded to Email Service on 2026-09-14.
-# Onboarding is what lets a Worker mail an arbitrary recipient, so from that
-# day this list — not the domain — is the only thing keeping Scout to one
-# inbox. It holds the one address both the digest and the passkey setup code
-# go to. Widening it is how invitation mail would start, and is a decision
-# about the recovery rule rather than a config tweak: see
-# docs/multi-tenant-plan.md, "Mail to an invited artist".
+# There is no destination allowlist any more. It held one address, the
+# owner's, and was the boundary while this was one person's app; invitations
+# and per-artist recovery need mail to reach other people. The boundary is now
+# `sendMail` in src/lib/mailer.ts, which refuses any address that is not on an
+# account or a live invitation (shared/recipients.ts) — weaker in that a bug
+# there could widen it, which is why it is one function called from one place
+# and pinned by test/recipients.test.ts.
+#
+# The *sender* is still enforced here: these are the only From addresses the
+# binding will accept, whatever the code or the digest settings say.
 [[send_email]]
 name = "EMAIL"
-allowed_destination_addresses = [
-  "doug@dougmcarthur.net",
+allowed_sender_addresses = [
+  "login@sundogsmusic.ca",
+  "digest@sundogsmusic.ca",
 ]
 
 [vars]
@@ -55,8 +58,9 @@ allowed_destination_addresses = [
 # every passkey already enrolled. See docs/passkey-login.md.
 DASHBOARD_URL = "https://scout.sundogsmusic.ca"
 
-# Where a passkey setup code is sent. Must be on the [[send_email]] allowlist
-# above — that binding is the boundary, not this var.
+# The owner's recovery address: where a setup code goes when the owner's
+# address is the one typed on the sign-in screen. Invited artists recover to
+# the address their invitation was issued to.
 AUTH_EMAIL = "doug@dougmcarthur.net"
 AUTH_EMAIL_SENDER = "login@sundogsmusic.ca"
 
@@ -67,6 +71,19 @@ MAIL_POSTAL_ADDRESS = "55 Tunis Bay, Winnipeg, MB R3T 2X2"
 # Where a reply lands. login@ and digest@ have no mailbox behind them, so
 # unset means a reply bounces rather than reaching anybody.
 # MAIL_REPLY_TO = ""
+
+# Google Picker, for adding files to an artist's EPK folder in their Drive.
+# Both are public by nature — the picker runs in the page — so they are vars.
+# Unset, the Drive tab connects and lists the folder but offers no picker, and
+# says so. Setup, all in the same Google Cloud project as GOOGLE_CLIENT_ID:
+#   1. APIs & Services → enable "Google Drive API" and "Google Picker API".
+#   2. OAuth consent screen → add the scope .../auth/drive.file (non-sensitive,
+#      no verification needed).
+#   3. Credentials → Create API key; restrict it to the Picker API and to the
+#      website https://scout.sundogsmusic.ca/*.
+#   4. The project NUMBER (not the id) is on the project's dashboard.
+# GOOGLE_PICKER_API_KEY = ""
+# GOOGLE_CLOUD_PROJECT_NUMBER = ""
 
 # API_TOKEN is a secret, not a var: `wrangler secret put API_TOKEN`. It is the
 # research agents' credential, and it is the thing to set BEFORE switching

@@ -1,3 +1,4 @@
+import { gigMoves } from '../shared/gigStage'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   normaliseGigStatus,
@@ -428,10 +429,15 @@ describe('the moves the pipeline offers', () => {
    * mis-click record that you were rejected from a festival that wanted you —
    * and a settled row is not something you go back and re-read.
    */
-  it('cannot get from invited to declined', () => {
-    expect(nextGigStatuses('invited')).not.toContain('declined')
+  it('lets an offer fall through on their side, and names it that way', () => {
+    // This was refused so a mis-click could not record a rejection from a
+    // festival that wanted you. It is allowed now because an offer is not a
+    // booking — terms can fail — and the only button that writes it says
+    // "Offer fell through" rather than "Declined".
+    expect(isGigTransitionAllowed('invited', 'declined')).toBe(true)
     expect(nextGigStatuses('invited')).toContain('withdrawn')
-    expect(isGigTransitionAllowed('invited', 'declined')).toBe(false)
+    const move = gigMoves('invited').find((m) => m.to === 'declined')
+    expect(move?.label).toBe('Offer fell through')
   })
 
   it('lets you change your mind before anything is sent, and calls it passing', () => {

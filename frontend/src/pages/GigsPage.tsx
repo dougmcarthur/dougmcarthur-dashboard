@@ -11,8 +11,8 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { api, type GigOpportunity } from '../api'
-import { GIG_STATUSES, GIG_STATUS_META, gigStatusMeta } from '../../../shared/gigStatus'
-import { GIG_MOVE_LABEL, inlineGigMoves } from '../../../shared/decisionCopy'
+import { GIG_STAGES, GIG_STAGE_META, type GigStage } from '../../../shared/gigStage'
+import { inlineGigMoves } from '../../../shared/decisionCopy'
 import { parseDeadline } from '../../../shared/reviewParse'
 import { localToday, shortDate } from '../format'
 import { StatusBadge } from '../components/StatusBadge'
@@ -79,12 +79,14 @@ export function GigsPage() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [statusFilter, setStatusFilter] = useState('')
+  // Four stages, not fourteen statuses: see shared/gigStage.ts. The route
+  // maps a stage to the stored statuses in it.
+  const [stageFilter, setStageFilter] = useState<GigStage | ''>('')
   const [showCreate, setShowCreate] = useState(false)
 
   const { data = [], isLoading, error } = useQuery({
-    queryKey: ['gigs', statusFilter],
-    queryFn: () => api.gigs.list(statusFilter ? { status: statusFilter } : undefined),
+    queryKey: ['gigs', stageFilter],
+    queryFn: () => api.gigs.list(stageFilter ? { stage: stageFilter } : undefined),
   })
 
   const patchMutation = useMutation({
@@ -236,7 +238,7 @@ export function GigsPage() {
       : []),
     col.accessor('status', {
       header: 'Status',
-      cell: (info) => <StatusBadge status={info.getValue()} kind="gig" />,
+      cell: (info) => <StatusBadge status={info.getValue()} kind="gig" gigType={info.row.original.type} />,
     }),
     col.display({
       id: 'actions',
@@ -254,11 +256,11 @@ export function GigsPage() {
         // stretched beside it to a 44px pill in a row of 26px ones.
         return (
           <div className="flex gap-1 justify-end whitespace-nowrap">
-            {inlineGigMoves(row.status).map(({ to, tone }) => (
+            {inlineGigMoves(row.status, row.type).map(({ to, tone, label, meaning }) => (
               <Button key={to} variant={tone === 'go' ? 'good' : 'danger'} size="sm" disabled={isPatching}
-                title={gigStatusMeta(to).meaning}
+                title={meaning}
                 onClick={() => patchMutation.mutate({ id: row.id, body: { status: to } })}>
-                {GIG_MOVE_LABEL[to] ?? gigStatusMeta(to).label}
+                {label}
               </Button>
             ))}
           </div>
@@ -291,11 +293,11 @@ export function GigsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-ink">Gig Opportunities</h1>
         <div className="flex flex-wrap gap-2 items-center">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER}>
-            <option value="">All statuses</option>
-            {GIG_STATUSES.map((s) => (
-              <option key={s} value={s} title={GIG_STATUS_META[s].meaning}>
-                {GIG_STATUS_META[s].label}
+          <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as GigStage | '')} className={FILTER}>
+            <option value="">All stages</option>
+            {GIG_STAGES.map((s) => (
+              <option key={s} value={s} title={GIG_STAGE_META[s].meaning}>
+                {GIG_STAGE_META[s].label}
               </option>
             ))}
           </select>

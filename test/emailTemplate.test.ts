@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { setupCodeEmail } from '../src/lib/authMail'
+import { inviteEmail, setupCodeEmail } from '../src/lib/authMail'
 import { renderDigestEmail } from '../src/lib/digestMail'
 import { NO_UNSUBSCRIBE, PRODUCT_NAME, type RenderedEmail } from '../src/lib/emailTemplate'
 import type { Digest } from '../shared/digest'
@@ -32,9 +32,14 @@ const setup = () => setupCodeEmail({ code: CODE, ttlMinutes: 15, identity: IDENT
 const weekly = () =>
   renderDigestEmail(digest, { base: BASE, schedule: { day: 'mon', hour: 8, timezone: 'America/Winnipeg' }, identity: IDENTITY })
 
+const INVITE_URL = `${BASE}/#join/tok_secret_value`
+const invite = () =>
+  inviteEmail({ url: INVITE_URL, name: 'Jo', expiresOn: 'October 25, 2026', identity: IDENTITY })
+
 const ALL: Array<[string, () => RenderedEmail]> = [
   ['setup code', setup],
   ['weekly digest', weekly],
+  ['invitation', invite],
 ]
 
 /** Comments hold the Outlook-only ghost table, which the markup rules exempt. */
@@ -160,6 +165,25 @@ describe('the setup code email tells the truth about the code', () => {
 
   it('says what happened if you did not ask', () => {
     expect(setup().text).toMatch(/Didn't ask for this\? Somebody pressed "Email me a setup code"/)
+  })
+})
+
+describe('the invitation link stays off a locked screen', () => {
+  it('is not in the subject or the preheader', () => {
+    const { subject, html } = invite()
+    expect(subject).not.toContain('tok_secret_value')
+    expect(preheaderOf(html)).not.toContain('tok_secret_value')
+  })
+
+  it('keeps the token in the fragment, never the path', () => {
+    const { html, text } = invite()
+    expect(html).toContain('/#join/tok_secret_value')
+    expect(text).toContain('/#join/tok_secret_value')
+    expect(`${html}${text}`).not.toMatch(/[^#]\/join\/tok/)
+  })
+
+  it('says whoever opens it can create the account', () => {
+    expect(invite().text).toMatch(/whoever opens the link/i)
   })
 })
 
