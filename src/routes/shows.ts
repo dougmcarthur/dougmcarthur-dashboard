@@ -21,7 +21,8 @@ import { Hono } from 'hono'
 import { and, gte, isNotNull } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities } from '../db/schema'
-import { scoped } from '../db/scope'
+import { scoped, type TenantId } from '../db/scope'
+import type { Env } from '../types'
 import { tenantOf, type AppEnv } from '../context'
 import { decryptToken } from '../lib/googleGrant'
 import { fetchWindow, loadRow, recordProbe } from './connectors'
@@ -47,11 +48,12 @@ interface SourceState {
   note: string | null
 }
 
-shows.get('/', async (c) => {
-  const env = c.env
-  const tenant = tenantOf(c)
-  const q = c.req.query('today') ?? ''
-  const today = ISO_DATE.test(q) ? q : new Date().toISOString().slice(0, 10)
+/**
+ * Every source, read and merged, for one tenant. A function rather than only
+ * a route because the public EPK needs the same list — the shows a programmer
+ * sees are the ones the artist sees.
+ */
+export async function collectShows(env: Env, tenant: TenantId, today: string) {
 
   const [bitRow, mmRow] = await Promise.all([loadRow(env, tenant), loadRow(env, tenant, 'manitoba_music')])
   const connected: ShowSource[] = []
@@ -170,7 +172,13 @@ shows.get('/', async (c) => {
 
   await Promise.all([bandsintown(), manitobaMusic(), booked()])
   const { upcoming, past } = mergeShows(collected, { today, connected })
-  return c.json({ connected, sources: states, upcoming, past })
+  return { connected, sources: states, upcoming, past }
+}
+
+shows.get('/', async (c) => {
+  const q = c.req.query('today') ?? ''
+  const today = ISO_DATE.test(q) ? q : new Date().toISOString().slice(0, 10)
+  return c.json(await collectShows(c.env, tenantOf(c), today))
 })
 
 export default shows

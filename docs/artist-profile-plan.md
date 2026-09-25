@@ -41,6 +41,42 @@ A public share link is new: today the EPK is only visible signed in. It wants
 an unguessable token in the URL fragment (the invitation rule) and a
 revocation, and it serves only what the chosen cut contains.
 
+## 1a. Built: the profile page and its share links (2026-09-25)
+
+The Artist page's **Profile page** tab is the EPK as a page, built screen-first
+from the mockups — live video leads, music, a bio with a length switch and
+Copy, merged shows, credited photos, a "For programmers" block — and a print
+stylesheet so the browser's Save as PDF gives a file for the forms that ask
+for an upload. **Share links** open it for anyone holding one:
+`#epk/<token>`, token in the fragment and sent in a POST body (the invitation's
+arrangement), stored hashed, shown once, one per recipient so each shows when
+it was last opened and can be withdrawn alone.
+
+What a link shows is `shared/publicEpk.ts`'s decision: only assets the artist
+has **reviewed**, never a photo without a credit, and only facts and documents
+on an allow-list — genre, hometown, line-up, set length, streaming numbers;
+stage plot, rider, input list, press kit. Contact details, fees and paperwork
+never. The preview lists everything held back and why.
+
+## 1b. Built: the Drive folder (2026-09-25)
+
+The **Drive folder** tab: connecting Drive (`drive.file` only) makes
+"<Artist> – EPK" with Photos, Audio, Video, Tech, Press and Other subfolders in
+the artist's own Drive. Google's picker adds files — uploads land in the
+folder; files picked from elsewhere are **copied** in, never moved. *Tidy the
+folder* previews every rename and move (`shared/driveOrganise.ts`:
+`DougMcArthur_Photo_01.jpg`, `DougMcArthur_StagePlot.pdf`) before applying.
+*Share with a link* sets one "anyone with the link can view" permission on the
+folder, which every file inherits, after saying what that means; then the
+folder link and each file's direct-download link have Copy buttons. Nothing is
+ever deleted, and disconnecting leaves the folder where it is.
+
+Needs, in the Google Cloud project: the Drive and Picker APIs enabled, the
+`drive.file` scope on the consent screen, and `GOOGLE_PICKER_API_KEY` /
+`GOOGLE_CLOUD_PROJECT_NUMBER` in `wrangler.toml` (instructions there). Not yet
+built: dropping the EPK PDF into the folder automatically — for now it is Save
+as PDF from the profile page, then Add files.
+
 ## 2. Where files live
 
 **Recommendation: Cloudflare R2 for files Scout serves, with Google Drive as an
