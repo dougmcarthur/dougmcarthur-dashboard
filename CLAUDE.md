@@ -931,6 +931,17 @@ The gig agent reads each province's calls and feeds, and
 `test/musicAssociations.test.ts` fails if the registry names a source the
 prompt does not.
 
+**Connected profiles are re-read every morning, and the re-read only
+talks.** `scanProfiles` runs on the daily housekeeping tick, per tenant, one
+profile after another (small sites, no bursts). It writes nothing to the
+library: new items ring the bell as an `automation` event pointing at the
+import panel, which still previews. `shared/profileScan.ts` keeps it quiet —
+the first read after connecting sets a baseline and says nothing, an item is
+announced once ever (`artist_connectors.seen_sources`, migration 0029, is
+everything announced, not what is pending, so an unimported item is not
+re-announced each morning), and anything already on file never counts.
+*Check for changes now* on the Settings card is the same call.
+
 **A share link publishes only what the artist has claimed.** The EPK
 profile page (`#epk/<token>`, token in the fragment, POSTed to
 `/api/public/epk` — the second entry in `PUBLIC_API_PREFIXES`) renders

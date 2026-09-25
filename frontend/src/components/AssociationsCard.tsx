@@ -58,6 +58,14 @@ export function AssociationsCard() {
 
   const remove = useMutation({ mutationFn: (id: string) => api.associations.remove(id), onSuccess: refresh })
 
+  const scan = useMutation({
+    mutationFn: api.associations.scan,
+    onSuccess: () => {
+      refresh()
+      qc.invalidateQueries({ queryKey: ['notifications'] })
+    },
+  })
+
   const connected = list.data?.connected ?? []
   const offer = list.data?.fromLibrary[0] ?? null
   const directory = list.data?.directory ?? []
@@ -118,9 +126,29 @@ export function AssociationsCard() {
       )}
 
       {connected.length > 0 && !adding && !found && (
-        <Button variant="quiet" size="sm" onClick={() => setAdding(true)}>
-          Add another association
-        </Button>
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted">
+            Scout re-reads {connected.length === 1 ? 'this profile' : 'these profiles'} every morning and tells you
+            when something new appears on {connected.length === 1 ? 'it' : 'them'}.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="neutral" size="sm" disabled={scan.isPending} onClick={() => scan.mutate()}>
+              {scan.isPending ? 'Reading…' : 'Check for changes now'}
+            </Button>
+            <Button variant="quiet" size="sm" onClick={() => setAdding(true)}>
+              Add another association
+            </Button>
+          </div>
+          {scan.data && (
+            <p className="text-xs text-body">
+              {scan.data.announced > 0
+                ? `${scan.data.announced} new — see the bell.`
+                : scan.data.read > 0
+                  ? 'Nothing new since the last read.'
+                  : 'Could not read the profile just now; the reason is shown above.'}
+            </p>
+          )}
+        </div>
       )}
 
       {showForm && !found && (
