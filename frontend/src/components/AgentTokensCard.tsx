@@ -6,7 +6,7 @@ import { Button } from './ui/Button'
 import { FIELD } from './ui/Field'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from './ui/Explainer'
-import { Card } from './ui/Surface'
+import { Banner, Card } from './ui/Surface'
 
 /**
  * The research agents' credentials, one row per token.
@@ -73,32 +73,40 @@ export function AgentTokensCard() {
         edit or delete anything. Issuing or revoking one asks for a passkey first.
       </Explainer>
 
-      <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (label.trim()) issue.mutate()
-        }}
-      >
-        <label className="block flex-1 min-w-[12rem]">
-          <span className="text-xs font-medium text-body">What will use it</span>
-          <input
-            className={FIELD}
-            value={label}
-            maxLength={80}
-            placeholder="Research routines"
-            onChange={(e) => setLabel(e.target.value)}
-          />
-        </label>
-        <Button
-          type="submit"
-          variant="primary"
-          className="shrink-0 whitespace-nowrap"
-          disabled={issue.isPending || !label.trim()}
+      {/*
+        Gone while a token is on screen. Issuing another replaced it, and a
+        token is shown once — so a second issue before the first was copied
+        lost it for good, with nothing to say so. "Done" is the only way back
+        to the form, and the panel says what Done costs.
+      */}
+      {!issued && (
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (label.trim()) issue.mutate()
+          }}
         >
-          {issue.isPending ? 'Confirming…' : 'Issue a token'}
-        </Button>
-      </form>
+          <label className="block flex-1 min-w-[12rem]">
+            <span className="text-xs font-medium text-body">What will use it</span>
+            <input
+              className={FIELD}
+              value={label}
+              maxLength={80}
+              placeholder="Research routines"
+              onChange={(e) => setLabel(e.target.value)}
+            />
+          </label>
+          <Button
+            type="submit"
+            variant="primary"
+            className="shrink-0 whitespace-nowrap"
+            disabled={issue.isPending || !label.trim()}
+          >
+            {issue.isPending ? 'Confirming…' : 'Issue a token'}
+          </Button>
+        </form>
+      )}
 
       {error && <p className="text-xs text-danger-fg bg-danger-bg rounded-md px-3 py-2">{error}</p>}
 
@@ -106,6 +114,20 @@ export function AgentTokensCard() {
 
       {tokens.isLoading ? (
         <div className="h-16 bg-sunken rounded-lg animate-pulse" />
+      ) : tokens.isError && !tokens.data ? (
+        // Never "None issued" on a failed read: an empty list because the
+        // request failed looked exactly like having no tokens, which is how
+        // you conclude the agents are unconfigured when they are fine. A list
+        // already loaded stays on screen if a later refetch fails — it was
+        // true when it arrived, which "nothing" never was.
+        <div className="flex items-center gap-2">
+          <Banner size="sm" className="flex-1">
+            Could not load the tokens, so this cannot say whether any exist.
+          </Banner>
+          <Button variant="quiet" size="sm" onClick={() => tokens.refetch()}>
+            Try again
+          </Button>
+        </div>
       ) : live.length === 0 ? (
         <p className="text-sm text-muted">
           None issued. Agents still using the deployment&rsquo;s shared token keep working, but

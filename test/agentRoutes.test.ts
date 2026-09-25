@@ -191,4 +191,17 @@ describe('the agent token card', () => {
   it('keeps the issued token out of the query cache', () => {
     expect(card).not.toMatch(/setQueryData/)
   })
+
+  it('says a failed read failed, before it can say there are none', () => {
+    // An empty list because the request failed rendered "None issued".
+    const failed = card.indexOf('tokens.isError')
+    const none = card.indexOf('None issued')
+    expect(failed, 'the card never checks whether the list loaded').toBeGreaterThan(-1)
+    expect(failed).toBeLessThan(none)
+  })
+
+  it('cannot issue a second token over one still on screen', () => {
+    // It is shown once, so replacing it before it was copied lost it for good.
+    expect(card).toMatch(/\{!issued && \(\s*<form/)
+  })
 })
