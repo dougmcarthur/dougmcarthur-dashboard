@@ -220,6 +220,10 @@ step 2 leaves you locked out of a dashboard nobody can reach.
   `DASHBOARD_URL` no longer matching the host you are on. The relying-party ID
   is checked on every assertion; a passkey enrolled under a different hostname
   can never be used under this one.
+- **Locally: *The RP ID "scout.sundogsmusic.ca" is invalid for this domain*.**
+  The Worker was started with bare `wrangler dev`, which serves the production
+  `DASHBOARD_URL` from `[vars]`. Use `npm run dev:api`, which overrides it to
+  localhost.
 - **Nothing works and no code can be sent.** Deleting every row from
   `passkey_credentials` returns the app to its first-run state, from which the
   emailed code is the way in. That is a `wrangler d1 execute --remote` against
