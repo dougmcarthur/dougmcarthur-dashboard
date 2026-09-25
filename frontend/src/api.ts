@@ -869,6 +869,8 @@ export const api = {
     save: (url: string) =>
       apiFetch<{ association: AssociationSummary }>('/connectors/associations', { method: 'PUT', body: JSON.stringify({ url }) }),
     remove: (id: string) => apiFetch<{ ok: boolean }>(`/connectors/associations/${id}`, { method: 'DELETE' }),
+    /** Re-read every connected profile now; new items ring the bell, nothing is written to the library. */
+    scan: () => apiFetch<{ read: number; announced: number }>('/connectors/associations/scan', { method: 'POST' }),
     preview: (id: string) => apiFetch<AssociationImportPlan>(`/connectors/associations/${id}/import`),
     apply: (id: string) =>
       apiFetch<{ added: number; existing: number }>(`/connectors/associations/${id}/import`, { method: 'POST' }),

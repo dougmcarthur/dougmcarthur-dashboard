@@ -27,7 +27,7 @@ import admin from './routes/admin'
 import profile from './routes/profile'
 import connectors from './routes/connectors'
 import manitobaMusic from './routes/manitobaMusic'
-import associationsRoute from './routes/associations'
+import associationsRoute, { scanProfiles } from './routes/associations'
 import showsRoute from './routes/shows'
 import driveRoute from './routes/drive'
 import { epk as epkRoute, publicEpk } from './routes/epk'
@@ -393,6 +393,20 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
       await reconcileGigNudges(env, tenant, today)
     } catch (err) {
       console.error('nudge reconcile failed:', err)
+    }
+  }
+
+  // Re-read every connected music association profile, and ring the bell for
+  // anything that has appeared since the last read. Per tenant, because the
+  // profiles are each artist's own; one artist after another, because these
+  // are small sites and the cron should not arrive at them in a burst. See
+  // shared/profileScan.ts.
+  for (const tenant of tenants) {
+    try {
+      const { read, announced } = await scanProfiles(env, tenant)
+      if (announced) console.log(`profile scan: ${read} read, ${announced} new items for ${tenant}`)
+    } catch (err) {
+      console.error('profile scan failed:', err)
     }
   }
 }

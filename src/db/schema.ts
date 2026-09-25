@@ -492,6 +492,8 @@ export const artistConnectors = sqliteTable('artist_connectors', {
   status: text('status').notNull().default('unverified'),
   /** The service's own words for the last outcome, trimmed. */
   statusNote: text('status_note'),
+  /** What the daily profile re-read has announced. See shared/profileScan.ts. */
+  seenSources: text('seen_sources'),
   checkedAt: text('checked_at'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),

@@ -35,6 +35,8 @@ import {
 } from '../../shared/musicAssociations'
 import { parseAssociationProfile } from '../../shared/associationProfile'
 import { readProfile as readManitoba } from './manitobaMusic'
+import { recordEvent } from '../lib/notificationEvents'
+import { scanOutcome, scanTitle } from '../../shared/profileScan'
 
 const associations = new Hono<AppEnv>()
 
@@ -240,6 +242,8 @@ associations.put('/', zValidator('json', UrlSchema), async (c) => {
       status: 'working',
       statusNote: read.profile.name,
       checkedAt: now,
+      // No baseline yet: the first daily re-read records one and says nothing.
+      seenSources: null,
       createdAt: now,
       updatedAt: now,
     }),
@@ -304,6 +308,56 @@ async function propose(env: Env, tenant: TenantId, id: string) {
     wouldAdd: fresh.length,
   }
 }
+
+/**
+ * The daily re-read: every connected profile, for one artist, announcing only
+ * what has appeared since the last read. It writes nothing to the library —
+ * the announcement points at the import panel, which previews as it always
+ * has. See `shared/profileScan.ts` for why the first read is silent.
+ *
+ * One profile at a time, because these are small sites run by small
+ * associations and a burst of parallel requests from a cron is the wrong way
+ * to read them. A profile that fails to read has its status recorded by
+ * `propose` and is skipped; Settings shows the failure, and one bad morning
+ * is not worth a bell.
+ */
+export async function scanProfiles(env: Env, tenant: TenantId): Promise<{ read: number; announced: number }> {
+  const rows = await loadRows(env, tenant)
+  let read = 0
+  let announced = 0
+  for (const row of rows) {
+    const id = idForKind(row.kind)
+    const association = id ? associationById(id) : null
+    if (!id || !association) continue
+    const plan = await propose(env, tenant, id)
+    if (!plan.connected || 'error' in plan) continue
+    read++
+
+    const outcome = scanOutcome(plan.proposals, row.seenSources)
+    await getDb(env.DB)
+      .update(artistConnectors)
+      .set({ seenSources: JSON.stringify(outcome.seen) })
+      .where(scoped(artistConnectors, tenant, eq(artistConnectors.kind, row.kind)))
+    if (outcome.fresh.length === 0) continue
+
+    announced += outcome.fresh.length
+    await recordEvent(env, tenant, {
+      kind: 'automation',
+      tier: 'info',
+      title: scanTitle(association.name, outcome.fresh),
+      body: 'Read them into your library from the Artist page — nothing is added until you do.',
+      href: '#artist/library',
+      action: 'Review',
+      // The same items are never announced twice anyway; this only stops a
+      // retried tick writing the row a second time.
+      dedupeKey: `profile-scan:${id}:${outcome.fresh.map((f) => f.source).sort().join('|').slice(0, 400)}`,
+    })
+  }
+  return { read, announced }
+}
+
+/** The same re-read on a button. Writes nothing to the library either. */
+associations.post('/scan', async (c) => c.json(await scanProfiles(c.env, tenantOf(c))))
 
 associations.get('/:id/import', async (c) => c.json(await propose(c.env, tenantOf(c), c.req.param('id'))))
 
