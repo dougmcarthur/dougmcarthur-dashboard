@@ -855,7 +855,10 @@ research.
 found by name.** Most of the next testers are Winnipeg artists with a member
 profile, which carries a bio, links, videos, releases, downloads and photos in
 the same server-rendered markup on every page. `profileUrl` in
-`shared/manitobaMusic.ts` accepts `/profiles/view,<n>/<slug>` and nothing else,
+`shared/manitobaMusic.ts` accepts `/profiles/view,<n>/<slug>` and the short
+`manitobamusic.com/<slug>` form members put in their link lists (not a site
+section), and nothing else; a short link already in the library is offered on
+the Settings card without pasting,
 and connecting shows the name and photo on that page — "Is this you?" — before
 saving, because a search by name files a stranger's bio the day there are two
 of you. The import is the reference-document shape: preview, then write, all

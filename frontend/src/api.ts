@@ -515,6 +515,8 @@ export interface ConnectorList {
   bandsintown: ConnectorSummary | null
   /** `account` is the profile address; `statusNote` the name read off it. */
   manitobaMusic: ConnectorSummary | null
+  /** A Manitoba Music profile address from the artist's own library, offered until one is connected. */
+  manitobaMusicFromLibrary: string | null
 }
 
 /** What a Manitoba Music profile says about who it belongs to. */

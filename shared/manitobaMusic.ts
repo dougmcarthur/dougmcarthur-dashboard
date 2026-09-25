@@ -45,6 +45,13 @@ export const MM_HOST = 'www.manitobamusic.com'
  * other pages, because reading one of those as a profile would file a news
  * article as a bio.
  */
+/** Top-level pages of the site, which the short profile form must not be mistaken for. */
+const SITE_SECTIONS = new Set([
+  'deadlines', 'news', 'livemusic', 'profiles', 'events', 'jobs', 'classifieds', 'resources', 'members',
+  'membership', 'about', 'contact', 'search', 'login', 'logout', 'register', 'programs', 'services',
+  'education', 'directory', 'calendar', 'opportunities', 'support', 'donate', 'store', 'uploads', 'account',
+])
+
 export function profileUrl(input: string): { url: string; slug: string } | { error: string } {
   const raw = input.trim()
   if (!raw) return { error: 'Paste the address of your Manitoba Music profile.' }
@@ -59,6 +66,14 @@ export function profileUrl(input: string): { url: string; slug: string } | { err
     return { error: 'That is not a Manitoba Music address.' }
   }
   const m = u.pathname.match(/^\/profiles\/view,(\d+)\/([a-z0-9_-]+?)(?:\.(?:rss|ics))?\/?$/i)
+  // The short form, manitobamusic.com/<name>, serves the same profile and is
+  // the one members put in their bios and link lists. It maps onto the long
+  // form the site itself links to; a section of the site is not a name.
+  const vanity = u.pathname.match(/^\/([a-z0-9_-]{2,60})\/?$/i)
+  if (!m && vanity && !SITE_SECTIONS.has(vanity[1].toLowerCase())) {
+    const slug = vanity[1].toLowerCase()
+    return { url: `https://${MM_HOST}/profiles/view,499/${slug}`, slug }
+  }
   if (!m) {
     return {
       error: 'That is a Manitoba Music page, but not a profile. Open your profile and copy the address from there — it has /profiles/view in it.',

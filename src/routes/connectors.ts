@@ -28,11 +28,12 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { getDb } from '../db'
-import { artistConnectors } from '../db/schema'
+import { artistAssets, artistConnectors } from '../db/schema'
 import { scoped, withTenant, type TenantId } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
 import type { Env } from '../types'
 import { decryptToken, encryptToken } from '../lib/googleGrant'
+import { profileUrl } from '../../shared/manitobaMusic'
 import {
   errorNote,
   eventsUrl,
@@ -114,8 +115,24 @@ export function summary(row: Row | undefined) {
 
 connectors.get('/', async (c) => {
   const tenant = tenantOf(c)
-  const [bit, mm] = await Promise.all([loadRow(c.env, tenant), loadRow(c.env, tenant, 'manitoba_music')])
+  const [bit, mm, links] = await Promise.all([
+    loadRow(c.env, tenant),
+    loadRow(c.env, tenant, 'manitoba_music'),
+    getDb(c.env.DB)
+      .select({ value: artistAssets.value })
+      .from(artistAssets)
+      .where(scoped(artistAssets, tenant, eq(artistAssets.kind, 'link'), eq(artistAssets.archived, 0))),
+  ])
+  // A profile address the artist already put in their own library is one
+  // they gave, so the card offers it — still behind "Is this you?", never
+  // connected on its own.
+  const fromLibrary = mm
+    ? null
+    : links
+        .map((l) => profileUrl(l.value ?? ''))
+        .find((r): r is { url: string; slug: string } => 'url' in r)?.url ?? null
   return c.json({
+    manitobaMusicFromLibrary: fromLibrary,
     // Without the encryption key nothing can be stored, and the card says so
     // rather than offering a form that would fail on save.
     canStore: Boolean(c.env.TOKEN_ENCRYPTION_KEY),

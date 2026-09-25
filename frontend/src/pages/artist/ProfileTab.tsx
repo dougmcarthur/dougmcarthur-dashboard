@@ -152,9 +152,15 @@ function ShareLinks({ audience }: { audience: EpkAudience }) {
  * What the page is missing, in the order a programmer would notice. Only the
  * artist sees this; the page itself never apologises for an empty section.
  */
-function pageGaps(epk: PublicEpk, audience: EpkAudience): string[] {
+function pageGaps(epk: PublicEpk, audience: EpkAudience, mmWaiting: boolean): string[] {
   const out: string[] = []
-  if (epk.photos.length === 0) out.push('A press photo with the photographer credited — the page opens on it.')
+  if (epk.photos.length === 0) {
+    out.push(
+      mmWaiting
+        ? 'A press photo with the photographer credited — the page opens on it. Your Manitoba Music profile has photos: connect it in Settings, read it into your library, then add each photographer.'
+        : 'A press photo with the photographer credited — the page opens on it.',
+    )
+  }
   if (audience !== 'sync' && epk.videos.length === 0) out.push('A live video — the first thing a programmer watches.')
   if (audience === 'sync' && epk.audio.length === 0) out.push('Recordings — a supervisor listens before reading anything.')
   if (epk.bios.length === 0) out.push('A bio you have marked right.')
@@ -165,7 +171,8 @@ export function ProfileTab() {
   const [audience, setAudience] = useState<EpkAudience>('festival')
   const preview = useQuery({ queryKey: ['epk-preview', audience], queryFn: () => api.epk.preview(audience) })
   const withheld = preview.data?.epk.withheld ?? []
-  const gaps = preview.data ? pageGaps(preview.data.epk, audience) : []
+  const connectors = useQuery({ queryKey: ['connectors'], queryFn: api.connectors.list })
+  const gaps = preview.data ? pageGaps(preview.data.epk, audience, Boolean(connectors.data?.manitobaMusicFromLibrary)) : []
 
   return (
     <div className="space-y-4">

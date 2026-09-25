@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type MmIdentity } from '../api'
 import { Button } from './ui/Button'
@@ -25,7 +25,7 @@ export function ManitobaMusicCard() {
   const [editing, setEditing] = useState(false)
 
   const check = useMutation({
-    mutationFn: () => api.connectors.checkManitobaMusic(url.trim()),
+    mutationFn: (address: string) => api.connectors.checkManitobaMusic(address.trim()),
     onSuccess: (identity) => {
       setError(null)
       setFound(identity)
@@ -59,6 +59,18 @@ export function ManitobaMusicCard() {
   })
 
   const current = list.data?.manitobaMusic ?? null
+  const fromLibrary = list.data?.manitobaMusicFromLibrary ?? null
+
+  // The address is already in the library: read it and ask "Is this you?"
+  // straight away rather than asking the artist to paste it a second time.
+  // Reading writes nothing; connecting still needs the yes.
+  const [offered, setOffered] = useState(false)
+  useEffect(() => {
+    if (!fromLibrary || current || offered) return
+    setOffered(true)
+    setUrl(fromLibrary)
+    check.mutate(fromLibrary)
+  }, [fromLibrary, current, offered, check])
   const showForm = editing || (!current && !list.isLoading)
 
   return (
@@ -109,7 +121,7 @@ export function ManitobaMusicCard() {
           className="space-y-2"
           onSubmit={(e) => {
             e.preventDefault()
-            if (url.trim()) check.mutate()
+            if (url.trim()) check.mutate(url)
           }}
         >
           <label className="block">
@@ -119,13 +131,12 @@ export function ManitobaMusicCard() {
               value={url}
               inputMode="url"
               autoComplete="off"
-              placeholder="https://www.manitobamusic.com/profiles/view,499/yourname"
+              placeholder="https://www.manitobamusic.com/yourname"
               onChange={(e) => setUrl(e.target.value)}
             />
           </label>
           <p className="text-xs text-muted">
-            Open your profile on manitobamusic.com and copy the address from the browser — it has
-            /profiles/view in it.
+            Open your profile on manitobamusic.com and copy the address from the browser.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button type="submit" variant="primary" disabled={check.isPending || !url.trim()}>
@@ -143,6 +154,7 @@ export function ManitobaMusicCard() {
       {found && (
         <div className="rounded-lg border border-line bg-sunken p-3 space-y-3">
           <p className="text-sm font-medium text-ink">Is this you?</p>
+          {url === fromLibrary && <p className="text-xs text-muted">Found in your library’s links.</p>}
           <div className="flex gap-3 items-start">
             {found.photo && (
               <img
