@@ -83,7 +83,7 @@ describe('gig transitions are asked for, not listed', () => {
     // was no way to record a booking at all. Nothing typechecked wrong and
     // nothing rendered wrong — you found out by clicking.
     expect(src).not.toMatch(/onGig\(\{\s*status:\s*['"`]/)
-    expect(src).toContain('nextGigStatuses')
+    expect(src).toContain('gigMoves')
   })
 
   it('the overview deck resolves gig intents through the shared table', () => {

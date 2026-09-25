@@ -21,6 +21,7 @@
  */
 
 import { normaliseGigStatus, isGigSettled, hasBeenSubmitted, awaitsYourReply } from './gigStatus'
+import { gigStageLabel } from './gigStage'
 import type { GigOpportunity, SyncTarget, PromoDraft } from './types'
 import { decisionFor, type Decision } from './decisionCopy'
 import { visaLead } from './gigCost'
@@ -288,7 +289,7 @@ function flagsFor(
     const invited = normaliseGigStatus(status) === 'invited'
     flags.push({
       id: 'reply_due',
-      label: invited ? 'They invited you — reply' : 'They asked a question',
+      label: invited ? 'Offer — contract pending' : 'They need more',
       severity: invited ? 'warn' : 'danger',
       kind: 'warning',
     })
@@ -297,7 +298,7 @@ function flagsFor(
   if (claimsDone && parsed.submissionState === 'not_submitted') {
     flags.push({
       id: 'conflict',
-      label: `Status says "${status.replace(/_/g, ' ')}", note says not submitted`,
+      label: `Status says "${(kind === 'gig' ? gigStageLabel(status).label : status.replace(/_/g, ' ')).toLowerCase()}", note says not submitted`,
       severity: 'danger',
       kind: 'warning',
     })

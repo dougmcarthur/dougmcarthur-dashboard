@@ -18,10 +18,10 @@
 import type { ReviewItem, ReviewKind, FlagId } from './reviewQueue'
 import {
   type GigStatus,
-  GIG_STATUS_META,
   normaliseGigStatus,
   nextGigStatuses,
 } from './gigStatus'
+import { gigMoves, gigStage, gigStageLabel, settledByAward } from './gigStage'
 
 /** Everything the copy needs — an item before its own sentence is attached. */
 export type DecisionInput = Omit<ReviewItem, 'decision'>
@@ -41,6 +41,8 @@ export type DecisionIntent =
   | 'withdraw'
   | 'book'
   | 'prepare'
+  // Clears "they need more": you sent what they asked for.
+  | 'answered'
 
 export interface DecisionAction {
   label: string
@@ -132,6 +134,7 @@ export const GIG_STATUS_BY_INTENT: Record<DecisionIntent, GigStatus> = {
   withdraw: 'withdrawn',
   book: 'booked',
   prepare: 'preparing',
+  answered: 'acknowledged',
 }
 
 /**
@@ -143,12 +146,12 @@ export const GIG_STATUS_BY_INTENT: Record<DecisionIntent, GigStatus> = {
  * its bar from the same moves.
  */
 export const GIG_MOVE_LABEL: Partial<Record<GigStatus, string>> = {
-  shortlisted: 'Will apply',
+  shortlisted: 'Apply',
   preparing: 'Start preparing',
-  submitted: 'Applied',
-  booked: 'Confirm the booking',
+  submitted: 'Mark as submitted',
+  booked: 'Contract signed',
   passed: 'Pass',
-  expired: 'Window closed',
+  expired: 'Missed the deadline',
   withdrawn: 'Withdraw',
   archived: 'Archive',
 }
@@ -174,7 +177,9 @@ const INTENT_BY_GIG_STATUS = {
  * reflex on the Overview page.
  */
 const LADDER: Record<'go' | 'no', GigStatus[]> = {
-  go: ['booked', 'submitted', 'preparing', 'shortlisted'],
+  // `preparing` is gone from here: it is In progress, the same stage as
+  // `shortlisted`, so a button into it moved nothing you could see.
+  go: ['booked', 'submitted', 'shortlisted'],
   no: ['expired', 'withdrawn', 'passed', 'archived'],
 }
 
@@ -194,13 +199,16 @@ const LADDER: Record<'go' | 'no', GigStatus[]> = {
  * already said yes to is a second thought, and belongs where the row's
  * meaning is on screen rather than one mis-click from a Will apply.
  */
-export function inlineGigMoves(status: string): Array<{ to: GigStatus; tone: 'go' | 'no' }> {
-  const moves = new Set<GigStatus>(nextGigStatuses(status))
-  const triage = GIG_STATUS_META[normaliseGigStatus(status)].phase === 'collect'
+export function inlineGigMoves(
+  status: string,
+  type?: string | null,
+): Array<{ to: GigStatus; tone: 'go' | 'no'; label: string; meaning: string }> {
+  const moves = gigMoves(status, type)
+  const triage = gigStage(status) === 'new'
   const tones: Array<'go' | 'no'> = triage ? ['go', 'no'] : ['go']
   return tones.flatMap((tone) => {
-    const to = LADDER[tone].find((s) => moves.has(s))
-    return to ? [{ to, tone }] : []
+    const move = moves.find((m) => m.tone === tone)
+    return move ? [{ to: move.to, tone, label: move.label, meaning: move.meaning }] : []
   })
 }
 
@@ -267,7 +275,6 @@ const GIG_ACTIONS: Record<string, DecisionAction[]> = {
   ],
   spend: [
     { label: 'Approve the spend', intent: 'approve', tone: 'go' },
-    { label: 'Approve the spend', intent: 'prepare', tone: 'go' },
     { label: 'Pass', intent: 'pass', tone: 'no' },
   ],
   // "Keep for next cycle" used to sit here as `approve`, which on an
@@ -275,11 +282,11 @@ const GIG_ACTIONS: Record<string, DecisionAction[]> = {
   // written and the same card came straight back. `expire` is the move the
   // pipeline actually offers, and it is what happened.
   close_out: [
-    { label: 'Applied', intent: 'confirm_sent', tone: 'go' },
-    { label: 'Window closed', intent: 'expire', tone: 'no' },
+    { label: 'Mark as submitted', intent: 'confirm_sent', tone: 'go' },
+    { label: 'Missed the deadline', intent: 'expire', tone: 'no' },
   ],
   invitation: [
-    { label: 'Confirm the booking', intent: 'book', tone: 'go' },
+    { label: 'Contract signed', intent: 'book', tone: 'go' },
     { label: 'Withdraw', intent: 'withdraw', tone: 'no' },
   ],
   // One action, and it is the negative one. There is no status that means
@@ -293,13 +300,11 @@ const GIG_ACTIONS: Record<string, DecisionAction[]> = {
   // `declined` would say they turned you down.
   visa: [
     { label: 'Apply anyway', intent: 'approve', tone: 'go' },
-    { label: 'Apply anyway', intent: 'prepare', tone: 'go' },
     { label: 'Withdraw', intent: 'withdraw', tone: 'no' },
     { label: 'Pass', intent: 'pass', tone: 'no' },
   ],
   go_no: [
-    { label: 'Will apply', intent: 'approve', tone: 'go' },
-    { label: 'Start preparing', intent: 'prepare', tone: 'go' },
+    { label: 'Apply', intent: 'approve', tone: 'go' },
     { label: 'Pass', intent: 'pass', tone: 'no' },
   ],
 }
@@ -372,7 +377,7 @@ export function decisionFor(item: DecisionInput): Decision {
       // thing here that is true.
       return {
         rationale:
-          `Marked ${status.replace(/_/g, ' ')} in the tracker, but the note says it was never ` +
+          `Marked ${gigStageLabel(status).label.toLowerCase()} in the tracker, but the note says it was never ` +
           `actually sent.${extra} One of the two is wrong, and fixing it is an edit rather ` +
           `than a decision — open it and correct whichever side is.`,
         actions: [],
@@ -405,24 +410,30 @@ export function decisionFor(item: DecisionInput): Decision {
 
     case 'reply_due': {
       if (normaliseGigStatus(status) === 'invited') {
+        const award = item.source.kind === 'gig' && settledByAward(item.source.row.type)
         return {
-          rationale:
-            'They want you. Nothing is booked until the agreement is signed, so this is the ' +
-            'confirmation — and turning it down is you withdrawing, not them declining.',
-          actions: gigActions(kind, status, GIG_ACTIONS.invitation),
+          rationale: award
+            ? 'They made an offer. It is not accepted until the award is confirmed in writing, ' +
+              'so confirm it here once it is — and turning it down is you withdrawing, not them declining.'
+            : 'They made an offer. It is not accepted until the contract is signed, so record it ' +
+              'here once it is — and turning it down is you withdrawing, not them declining.',
+          actions: gigActions(
+            kind,
+            status,
+            award
+              ? GIG_ACTIONS.invitation.map((a) => (a.intent === 'book' ? { ...a, label: 'Award confirmed' } : a))
+              : GIG_ACTIONS.invitation,
+          ),
         }
       }
-      // No buttons. The answer to a question is an email, and there is no
-      // status that means "replied" — recording what came back is the next
-      // decision, not this one. This is the state the plan called out as the
-      // one that stalls if nobody notices, so the card exists to make it
-      // impossible not to.
+      // One button, and it is not the answer. The answer is an email; the
+      // button records that you sent it, which clears the flag and puts the
+      // gig back to waiting. Nothing else moves the stage — it stays Applied.
       return {
         rationale:
-          'They asked a question, and nothing moves until you answer it. Answering is a ' +
-          'reply in your mail, not a button here — open it, send the answer, then record ' +
-          'whatever comes back.',
-        actions: [],
+          'They asked for something, and nothing moves until you answer. Send the answer ' +
+          'from your mail, then mark it answered here.',
+        actions: kind === 'gig' ? [{ label: 'Answered', intent: 'answered', tone: 'go' }] : [],
       }
     }
 
@@ -452,6 +463,15 @@ export function decisionFor(item: DecisionInput): Decision {
 
     case 'paid': {
       const cost = fee.amount != null ? `${fee.currency} ${fee.amount.toLocaleString()}` : 'money'
+      // Once it is In progress the spend is already approved — saying yes was
+      // saying yes to the fee — so the card stops asking and names when the
+      // money actually goes: at submission.
+      if (kind === 'gig' && gigStage(status) === 'in_progress') {
+        return {
+          rationale: `Costs ${cost} to enter, paid when it is submitted. You already said yes to applying.`,
+          actions: gigActions(kind, status, GIG_ACTIONS.spend),
+        }
+      }
       return {
         rationale:
           `Costs ${cost} to enter, so nobody can submit it without your say-so. ` +

@@ -682,10 +682,37 @@ condition lasts a day; dismissing an event is permanent. See
 
 **The pipeline is a shape, not a free-for-all.** `nextGigStatuses` in
 `shared/gigStatus.ts` says which moves a status offers, and the PATCH route
-refuses anything else, whoever is calling it. The entry
-worth knowing: **there is no route from `invited` to `declined`.** Declining is
-their verb; turning down an invitation is `withdrawn`. One mis-click should not
-be able to record that you were rejected from a festival that wanted you.
+refuses anything else, whoever is calling it. Declining is always their verb;
+turning an offer down yourself is `withdrawn`. `invited → declined` used to be
+refused outright and is allowed now, because an offer is not a booking and
+terms can fall through on their side — the only button that writes it says
+**Offer fell through**, which nobody clicks by reflex.
+
+**Screens show four stages; storage still holds fourteen statuses.** The work
+has three phases and an end — **New** (apply or pass), **In progress** (you
+said yes; only confirming it went out moves it), **Applied** (waiting; only a
+settled answer ends it) and **Closed** with an outcome: Accepted, Not
+selected, Passed, Missed or Withdrawn. `shared/gigStage.ts` is that view, and
+every screen reads it: the badge, the filter (`GET /api/gigs?stage=`), the
+row's buttons, the Review bar, the reply inbox and the new-gig form.
+`gigMoves` is `nextGigStatuses` in the stage language and never wider.
+
+What used to be a status and is now smaller: `preparing` is In progress with
+a draft; `acknowledged` is a receipt, offered only as **Answered** to clear a
+question; `info_requested` and `invited` are **flags** on Applied — *they need
+more* and *offer — contract pending*. **Accepted means the terms are settled**:
+a signed contract for a festival or showcase, a written confirmation for a
+grant or award (`settledByAward` reads the free-text type). An invitation is
+exciting and is not a booking, so it stays Applied and nothing reaches the
+calendar until it is Accepted. `archived` rows show as Closed with no outcome,
+because archiving never recorded why.
+
+**Storage has not moved, on purpose** — that is step 1 of the two-deploy
+rename. The agents POST the old vocabulary, the queue, reply matcher and
+nudges read it, and `normaliseGigStatus` now also accepts `new`,
+`in_progress` and `applied` on write. Migrating the column to stages plus an
+outcome and flags is step 2, a later change. `test/gigStage.test.ts` fails if
+a screen imports `GIG_STATUSES`, `GIG_STATUS_META` or `gigStatusMeta` again.
 
 **A screen never offers a move the pipeline refuses.** The PATCH route
 validates against `nextGigStatuses`, so a button naming a status is a claim
