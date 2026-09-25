@@ -231,3 +231,27 @@ unless specifically approved". An artist showing their own dates in their own
 EPK through Scout reads as within that; a platform doing it for many artists
 is the case their partner programme (`API@bandsintown.com`) exists for, and a
 partner key would also remove the step above entirely.
+
+
+## Provincial music associations (built)
+
+Manitoba Music's reader generalised to every province. What each site offers,
+as fetched in September 2026:
+
+| Association | Profiles | Platform | Sources for the gig agent |
+|---|---|---|---|
+| Manitoba Music | `/profiles/view,499/<name>`, `/<name>` | Catalyst (CakePHP) | deadlines page, news.rss, livemusic feeds |
+| SaskMusic | `/directory/search-directory/view,listing/<id>/` | CakePHP family | Sound Opportunities; refuses plain requests from some networks |
+| Alberta Music | `/directory-profile/<slug>/` | WordPress behind a SiteGround bot check | none readable; the Worker's own fetch did get through |
+| Music BC | behind member login | WordPress | `/feed/`, export opportunities |
+| MusicOntario | `/membership/directory/view,profile/<id>/<slug>` — name, category, city only | CakePHP (CIMA) | news, events |
+| Music NB | `/en/directory/<slug>` — bio, genres, links | Drupal 11 | blog |
+| Music Nova Scotia | `/artist/<slug>/` — mostly name and contact | WordPress | `/feed/`, events |
+| Music PEI | one directory page, no profiles | WordPress | opportunities page, `/feed/`, iCal |
+| MusicNL | directory drawn in the browser | WordPress | member opportunities, `/feed/` |
+| Music Yukon | member list drawn in the browser | WordPress | `/feed/` |
+| Music NWT | left out — injected spam links on the homepage | WordPress | — |
+
+Profiles other than Manitoba's are read by subtracting the association's
+homepage from the profile page (`shared/associationProfile.ts`), so the
+association's own social links never land in an artist's library.

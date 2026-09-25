@@ -27,6 +27,7 @@ import admin from './routes/admin'
 import profile from './routes/profile'
 import connectors from './routes/connectors'
 import manitobaMusic from './routes/manitobaMusic'
+import associationsRoute from './routes/associations'
 import showsRoute from './routes/shows'
 import driveRoute from './routes/drive'
 import { epk as epkRoute, publicEpk } from './routes/epk'
@@ -190,6 +191,7 @@ app.route('/api/gmail', gmailDrafts)
 app.route('/api/agent-tokens', agentTokens)
 app.route('/api/profile', profile)
 app.route('/api/connectors/manitoba-music', manitobaMusic)
+app.route('/api/connectors/associations', associationsRoute)
 app.route('/api/connectors', connectors)
 app.route('/api/shows', showsRoute)
 app.route('/api/epk', epkRoute)

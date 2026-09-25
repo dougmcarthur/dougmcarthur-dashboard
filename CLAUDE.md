@@ -867,6 +867,25 @@ on file. Contact details are never copied. Its photos refuse a foreign
 `Referer`, so an EPK that displays one needs its own copy. See
 `docs/artist-profile-plan.md`.
 
+**Every provincial association is a source, read the same way.**
+`shared/musicAssociations.ts` lists the ten worth reading — what each site
+offers was fetched, not assumed from Manitoba's. Seven have public member
+profiles on four different platforms; Music BC's are behind a login and
+MusicNL's and Music Yukon's are drawn in the browser, and the card says so
+rather than failing. Music NWT is left out because its site was carrying
+injected spam, and ADISQ has no artist profiles. Manitoba Music keeps its own
+parser and its `manitoba_music` row; every other site goes through
+`shared/associationProfile.ts`, which reads **by subtraction**: it fetches the
+association's homepage beside the profile and drops every link, paragraph and
+share image the two share. That removes the association's own Instagram and
+Facebook — which a naive read files as the artist's — without knowing one
+class name, so a redesign does not break it. A paragraph with an email or
+phone number in it is never taken. One connector row per association
+(`association:<id>`), because an artist who moved provinces can belong to two.
+The gig agent reads each province's calls and feeds, and
+`test/musicAssociations.test.ts` fails if the registry names a source the
+prompt does not.
+
 **A share link publishes only what the artist has claimed.** The EPK
 profile page (`#epk/<token>`, token in the fragment, POSTed to
 `/api/public/epk` — the second entry in `PUBLIC_API_PREFIXES`) renders
