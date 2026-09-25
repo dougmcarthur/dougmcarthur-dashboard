@@ -95,6 +95,24 @@ describe('gig transitions are asked for, not listed', () => {
     expect(src).not.toMatch(/gig:\s*\{/)
   })
 
+  it('the overview deck draws each action with the icon the invariants check', () => {
+    const src = withoutComments(read('frontend/src/components/DecisionDeck.tsx'))
+    // `decisionCopy.test.ts` fails when a card carries two actions with one
+    // icon, but it can only ask `actionGlyph`. An icon chosen in the JSX
+    // instead — `a.tone === 'go' ? 'check' : 'x'` was how it read when a
+    // promo card shipped with two identical checks — is one that test cannot see.
+    expect(src).toContain('<ActionIcon name={actionGlyph(a)} />')
+    expect(src).not.toMatch(/<ActionIcon name=\{(?!actionGlyph\(a\)\})/)
+  })
+
+  it('the review action bar takes promo moves from the shared table', () => {
+    const src = withoutComments(read('frontend/src/pages/review/DecisionBar.tsx'))
+    // A fixed Approve + Mark published pair offered Approve on copy that was
+    // already published — the same pair the deck drew as two checks.
+    expect(src).toContain('promoMoves(')
+    expect(src).not.toMatch(/onPromo\(\{\s*status:\s*['"`]/)
+  })
+
   it('the timing strip asks whether a move is legal rather than listing it', () => {
     expect(read('frontend/src/components/TimingStrip.tsx')).toContain('isGigTransitionAllowed')
   })

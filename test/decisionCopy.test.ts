@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildReviewQueue, isNew } from '../shared/reviewQueue'
-import { GIG_STATUS_BY_INTENT, inlineGigMoves } from '../shared/decisionCopy'
+import { GIG_STATUS_BY_INTENT, actionGlyph, inlineGigMoves, promoMoves } from '../shared/decisionCopy'
 import { GIG_STATUSES, isGigTransitionAllowed, normaliseGigStatus } from '../shared/gigStatus'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../shared/types'
 
@@ -203,6 +203,26 @@ describe('decision copy — the sentence names the decision', () => {
     expect(draft.decision.rationale).toContain('not been approved yet')
     expect(approved.decision.rationale).toContain('not been marked published')
   })
+
+  it('offers a promo draft only the next step its status allows', () => {
+    // Both used to appear on every promo card, as two identical checks.
+    const label = (status: string) =>
+      first({ promo: [promo({ id: 8, status })] }).decision.actions.map((a) => a.label)
+    expect(label('draft')).toEqual(['Approve'])
+    expect(label('approved')).toEqual(['Mark published'])
+    // A status nobody listed reads as approved, as its sentence does.
+    expect(label('scheduled')).toEqual(['Mark published'])
+    expect(label('published')).toEqual([])
+    expect(first({ promo: [promo({ id: 9, status: 'published' })] }).decision.rationale)
+      .not.toMatch(/not been/)
+  })
+
+  it('lets the Review bar publish a draft directly, as the Promo page does', () => {
+    // The card takes one step; the bar lists every step, and the card's is first.
+    expect(promoMoves('draft').map((m) => m.to)).toEqual(['approved', 'published'])
+    expect(promoMoves('approved').map((m) => m.to)).toEqual(['published'])
+    expect(promoMoves('published')).toEqual([])
+  })
 })
 
 describe('decision copy — invariants that hold for every item', () => {
@@ -246,7 +266,14 @@ describe('decision copy — invariants that hold for every item', () => {
         notes: "Submission status: NOT submitted. Drafted values: Contact Phone: needs Doug, not on file; Mailing Address: needs Doug, only 'Winnipeg, MB' on file.",
       }),
     ],
-    promo: [promo({ id: 16 })],
+    // Every promo status, including one the column is free to hold and no
+    // table names — the card that shipped two identical checks was a draft.
+    promo: [
+      promo({ id: 16 }),
+      promo({ id: 33, status: 'draft' }),
+      promo({ id: 34, status: 'published' }),
+      promo({ id: 35, status: 'scheduled' }),
+    ],
     today: INVARIANT_TODAY,
   })
 
@@ -296,13 +323,23 @@ describe('decision copy — invariants that hold for every item', () => {
   })
 
   it('offers at most one affirmative and one negative', () => {
+    // No exceptions. Promo drafts had one — Approve and Mark published, both
+    // affirmative — and it put two identical checks on the Overview card.
     for (const i of items) {
-      // Promo drafts are the exception, and an old one: approving copy and
-      // marking it published are both affirmative, and a promo draft has no
-      // negative outcome — you do not reject your own caption.
-      if (i.kind === 'promo') continue
-      expect(i.decision.actions.filter((a) => a.tone === 'go').length).toBeLessThanOrEqual(1)
-      expect(i.decision.actions.filter((a) => a.tone === 'no').length).toBeLessThanOrEqual(1)
+      expect(i.decision.actions.filter((a) => a.tone === 'go').length, i.title).toBeLessThanOrEqual(1)
+      expect(i.decision.actions.filter((a) => a.tone === 'no').length, i.title).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('never puts two actions on a card that the deck draws the same', () => {
+    // The deck shows an icon and no label; the words are only a tooltip. Two
+    // actions sharing an icon are two buttons you cannot tell apart, and the
+    // icon stops meaning anything. Asked of `actionGlyph` rather than of the
+    // tone, so a new icon rule is held to this too.
+    for (const i of items) {
+      const glyphs = i.decision.actions.map(actionGlyph)
+      expect(new Set(glyphs).size, `${i.title} (${i.kind}, ${i.status}): ${glyphs.join(', ')}`)
+        .toBe(glyphs.length)
     }
   })
 
