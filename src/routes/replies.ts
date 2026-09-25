@@ -7,6 +7,7 @@ import { eq, desc, isNull, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigReplies, gigCorrespondents, gigOpportunities, artistAssets } from '../db/schema'
 import { scoped, withTenant, type TenantId } from '../db/scope'
+import { readGigs, readGig } from '../db/gigRows'
 import { tenantOf, type AppEnv } from '../context'
 import { gmailConfigured, type GmailEnv } from '../lib/gmail'
 import { fetchReplies, planReplyScan, sentThreadIds } from '../lib/gmailReplies'
@@ -92,6 +93,7 @@ replies.get('/', async (c) => {
         .select()
         .from(gigOpportunities)
         .where(scoped(gigOpportunities, tenant, inArray(gigOpportunities.id, gigIds)))
+        .then(readGigs)
     : []
   const byId = new Map(gigs.map((g) => [g.id, g]))
 
@@ -141,7 +143,7 @@ export async function runReplyScan(
   const db = getDb(env.DB)
   const now = new Date().toISOString()
 
-  const allGigs = await db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant))
+  const allGigs = readGigs(await db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant)))
   const gigs = allGigs.map(toMatchable)
   const bindings = await loadBindings(env, tenant)
 
@@ -378,6 +380,7 @@ replies.get('/:id/draft', async (c) => {
         .from(gigOpportunities)
         .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, reply.gigId)))
         .get()
+        .then((row) => readGig(row))
     : null
   const assets = await db.select().from(artistAssets).where(scoped(artistAssets, tenant))
 
@@ -443,11 +446,13 @@ replies.post('/:id/accept', zValidator('json', AcceptSchema), async (c) => {
   // Scoped, and this one matters more than most: `gigId` can come straight
   // from the request body, so an unscoped lookup would let a reply be bound to
   // a stranger's gig by guessing an integer.
-  const gig = await db
-    .select()
-    .from(gigOpportunities)
-    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, gigId)))
-    .get()
+  const gig = readGig(
+    await db
+      .select()
+      .from(gigOpportunities)
+      .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, gigId)))
+      .get(),
+  )
   if (!gig) return c.json({ error: 'That gig does not exist.' }, 404)
 
   const now = new Date().toISOString()

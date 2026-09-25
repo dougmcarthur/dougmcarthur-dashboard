@@ -5,6 +5,7 @@ import { eq, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
 import { applicationFields, artistAssets, gigOpportunities } from '../db/schema'
 import { scoped, withTenant, type TenantId } from '../db/scope'
+import { readGig, gigStatusColumns } from '../db/gigRows'
 import { tenantOf, type AppEnv } from '../context'
 import {
   buildApplication,
@@ -92,11 +93,13 @@ function toWire(row: FieldRow): ApplicationField {
 async function loadPacket(env: Env, tenant: TenantId, gigId: number, today: string) {
   const db = getDb(env.DB)
 
-  const gig = await db
-    .select()
-    .from(gigOpportunities)
-    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, gigId)))
-    .get()
+  const gig = readGig(
+    await db
+      .select()
+      .from(gigOpportunities)
+      .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, gigId)))
+      .get(),
+  )
   if (!gig) return null
 
   const [rows, assets] = await Promise.all([
@@ -170,11 +173,13 @@ application.post('/prepare', zValidator('json', PrepareSchema), async (c) => {
   const tenant = tenantOf(c)
   const now = new Date().toISOString()
 
-  const gig = await db
-    .select()
-    .from(gigOpportunities)
-    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, gigId)))
-    .get()
+  const gig = readGig(
+    await db
+      .select()
+      .from(gigOpportunities)
+      .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, gigId)))
+      .get(),
+  )
   if (!gig) return c.json({ error: 'not found' }, 404)
 
   const url = body.url ?? gig.applicationUrl ?? gig.url
@@ -286,7 +291,7 @@ application.post('/prepare', zValidator('json', PrepareSchema), async (c) => {
   // status is left alone — a submitted application does not go backwards
   // because you re-read the form to check what you sent.
   if (outcome.status === 'ready' && normaliseGigStatus(gig.status) === 'shortlisted') {
-    if (isGigTransitionAllowed(gig.status, 'preparing')) updates.status = 'preparing'
+    if (isGigTransitionAllowed(gig.status, 'preparing')) Object.assign(updates, gigStatusColumns('preparing'))
   }
 
   await db

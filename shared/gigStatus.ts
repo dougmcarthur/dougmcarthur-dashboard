@@ -173,10 +173,14 @@ export const LEGACY_GIG_STATUS: Record<string, GigStatus> = {
   sent: 'submitted',
   // The stage names from shared/gigStage.ts, accepted on write ahead of the
   // data migration so an agent or a hand-made request can use the words the
-  // screens show. `closed` is absent: it needs an outcome to mean anything.
+  // screens show.
   new: 'discovered',
   in_progress: 'shortlisted',
   applied: 'submitted',
+  // A bare `closed` read from a string alone is a row archived without saying
+  // why. Anything that has the whole row reads it through `gigStatusFromStored`
+  // in shared/gigStage.ts, which also sees the outcome.
+  closed: 'archived',
 }
 
 const KNOWN = new Set<string>(GIG_STATUSES)

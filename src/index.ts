@@ -44,6 +44,7 @@ import { eq } from 'drizzle-orm'
 import { getDb } from './db'
 import { gigOpportunities } from './db/schema'
 import { scoped, type TenantId } from './db/scope'
+import { readGigs } from './db/gigRows'
 import { reconcileAllGigs, type GigRow } from './lib/gigNudges'
 import { readNudgePreferences } from './lib/nudgeSettings'
 import type { RootEnv } from './context'
@@ -405,10 +406,12 @@ async function reconcileGigNudges(env: Env, tenant: TenantId, today: string): Pr
     env,
     {
       gigs: async () =>
-        (await db
-          .select()
-          .from(gigOpportunities)
-          .where(scoped(gigOpportunities, tenant))) as unknown as GigRow[],
+        readGigs(
+          await db
+            .select()
+            .from(gigOpportunities)
+            .where(scoped(gigOpportunities, tenant)),
+        ) as unknown as GigRow[],
       save: async (id, patch) => {
         // `updated_at` is deliberately left alone. Recording where a reminder
         // went is not a change to the gig, and touching it would wake every

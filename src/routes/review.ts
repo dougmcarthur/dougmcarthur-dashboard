@@ -5,6 +5,7 @@ import { desc, eq, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets, promoDrafts, reminders } from '../db/schema'
 import { scoped } from '../db/scope'
+import { readGigs } from '../db/gigRows'
 import { tenantOf, type AppEnv } from '../context'
 import { buildReviewQueue, matchesFilter, summariseQueue, type ReviewFilter } from '../../shared/reviewQueue'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
@@ -68,7 +69,7 @@ review.get('/', async (c) => {
   const tenant = tenantOf(c)
 
   const [gigs, sync, promo, [orphans]] = await Promise.all([
-    db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant)).orderBy(desc(gigOpportunities.discoveredAt)),
+    db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant)).orderBy(desc(gigOpportunities.discoveredAt)).then(readGigs),
     db.select().from(syncTargets).where(scoped(syncTargets, tenant)).orderBy(desc(syncTargets.discoveredAt)),
     db.select().from(promoDrafts).where(scoped(promoDrafts, tenant)).orderBy(desc(promoDrafts.createdAt)),
     // Reminders reference entities by (type, id) with no foreign key, so a

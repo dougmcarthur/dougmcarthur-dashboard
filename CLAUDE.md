@@ -724,12 +724,25 @@ exciting and is not a booking, so it stays Applied and nothing reaches the
 calendar until it is Accepted. `archived` rows show as Closed with no outcome,
 because archiving never recorded why.
 
-**Storage has not moved, on purpose** — that is step 1 of the two-deploy
-rename. The agents POST the old vocabulary, the queue, reply matcher and
-nudges read it, and `normaliseGigStatus` now also accepts `new`,
-`in_progress` and `applied` on write. Migrating the column to stages plus an
-outcome and flags is step 2, a later change. `test/gigStage.test.ts` fails if
-a screen imports `GIG_STATUSES`, `GIG_STATUS_META` or `gigStatusMeta` again.
+**Storage is moving to the same shape, in two steps.** Deploy 1 put stages
+on screen over the old values. Deploy 2a (migration 0029) adds `outcome` and
+`flag` beside `status`, and new writes store the stage in `status` with those
+two beside it. Deploy 2b converts the rows written before 0029; it has to be a
+later merge, because CI migrates before it deploys, and the Worker in that gap
+must already read `closed` — deploy 1 reads it as a gig nobody has looked at.
+
+**The code still reasons in the fourteen statuses, and that is deliberate.**
+The queue, the reply matcher, the nudges and the pipeline all read them and
+did not need to change, so storage is translated at one boundary:
+`src/db/gigRows.ts` — `readGig`/`readGigs` on every select, `gigStatusColumns`
+on every write. The API the screens and the agents read still says
+`status: 'booked'`. `preparing` and `acknowledged` do not survive a round trip;
+they are In progress and Applied, which is what they always meant.
+`normaliseGigStatus` accepts `new`, `in_progress`, `applied` and `closed` on
+write. `test/gigRows.test.ts` fails when a file selects gig rows without the
+translation, the way `test/tenantScope.test.ts` fails on a missing scope, and
+`test/gigStage.test.ts` fails if a screen imports `GIG_STATUSES`,
+`GIG_STATUS_META` or `gigStatusMeta` again.
 
 **A screen never offers a move the pipeline refuses.** The PATCH route
 validates against `nextGigStatuses`, so a button naming a status is a claim

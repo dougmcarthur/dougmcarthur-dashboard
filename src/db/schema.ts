@@ -56,6 +56,12 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
    * an announcement rather than the form. See migration 0011.
    */
   applicationUrl: text('application_url'),
+  /**
+   * How a closed gig ended, and what an Applied gig is waiting on. See
+   * migration 0029 and src/db/gigRows.ts — read through `readGig`, never raw.
+   */
+  outcome: text('outcome'),
+  flag: text('flag'),
   /** unread | ready | blocked | failed — whether the form has been read. */
   prepStatus: text('prep_status'),
   prepCheckedAt: text('prep_checked_at'),
