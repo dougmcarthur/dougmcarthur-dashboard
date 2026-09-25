@@ -28,9 +28,11 @@ function ActionIcon({ name }: { name: 'check' | 'x' }) {
 /**
  * One decision at a time, with the rest of the stack showing behind it.
  *
- * Order, copy and actions all come from the server (`GET /api/review`), so this
- * deck and the Review screen can never disagree about what matters, how to
- * describe it, or which moves are legal. Acting on a card, or skipping it,
+ * Order, copy and actions all come from the server (`GET /api/review?filter=deck`),
+ * so this deck and the Review screen can never disagree about how to describe
+ * an item or which moves are legal. The order is the deck's own — a reply owed,
+ * then what is new, then what is urgent (`deckItems` in shared/reviewQueue.ts)
+ * — but it is still decided there, not here. Acting on a card, or skipping it,
  * deals the next one.
  */
 
@@ -142,13 +144,58 @@ function DeckShell({ children, head }: { children: React.ReactNode; head: React.
   )
 }
 
+/**
+ * Why this card is here, in a word or two — `decision.badge`.
+ *
+ * It replaced the sentence on the card. The sentence is still one click away,
+ * in the item's detail on the Review screen, which is where reasoning gets
+ * read; a card is for deciding at a glance. New takes the accent, because new
+ * is what the deck is for. Anything the queue rated a warning or worse takes
+ * the same clay as the stripe above it, and everything else is neutral.
+ */
+function Badge({ item }: { item: ReviewItem }) {
+  const severity = item.flags[0]?.severity
+  const tone =
+    item.decision.badge === 'New'
+      ? 'bg-accent-soft text-accent'
+      : severity === 'danger'
+        ? 'bg-danger-bg text-danger-fg'
+        : severity === 'warn'
+          ? 'bg-warn-bg text-warn-fg'
+          : 'bg-raised text-ink border border-line-strong'
+  return (
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${tone}`}>
+      {item.decision.badge}
+    </span>
+  )
+}
+
+/**
+ * "3 in progress →" — gigs you said yes to that have not gone out.
+ *
+ * The pile the deck deals from only when something about it is urgent. A gig
+ * you already said yes to is a to-do rather than a decision, so it is a count
+ * and a way to the list instead of a card asking you again.
+ */
+function InProgressLink({ count, onNav }: { count: number; onNav: (page: string) => void }) {
+  if (count === 0) return null
+  return (
+    <button onClick={() => onNav('review/in_progress')} className="text-info-fg hover:underline">
+      {count} in progress →
+    </button>
+  )
+}
+
 export function DecisionDeck({
   items,
   total,
+  inProgress,
   onNav,
 }: {
   items: ReviewItem[]
   total: number
+  /** Gigs in the In progress stage, which the deck counts rather than deals. */
+  inProgress: number
   onNav: (page: string) => void
 }) {
   const qc = useQueryClient()
@@ -206,9 +253,9 @@ export function DecisionDeck({
     return (
       <DeckShell head={null}>
         <div className="rounded-xl border border-line bg-surface shadow-card px-5 py-8 text-center">
-          <p className="text-sm font-medium text-body">Nothing needs a decision.</p>
-          <p className="text-xs text-muted mt-1">
-            Anything still open is waiting on a date, not on you.{' '}
+          <p className="text-sm font-medium text-body">Nothing new, and nothing urgent.</p>
+          <p className="text-xs text-muted mt-1 space-x-3">
+            <InProgressLink count={inProgress} onNav={onNav} />
             <button onClick={() => onNav('review')} className="text-info-fg hover:underline">
               Open the review queue
             </button>
@@ -241,8 +288,9 @@ export function DecisionDeck({
   return (
     <DeckShell
       head={
-        <span className="text-xs text-muted tabular-nums">
-          {position} of {total} ·{' '}
+        <span className="text-xs text-muted tabular-nums space-x-3">
+          <span>{position} of {total}</span>
+          <InProgressLink count={inProgress} onNav={onNav} />
           <button onClick={() => onNav('review')} className="text-info-fg hover:underline">
             show the rest →
           </button>
@@ -259,19 +307,21 @@ export function DecisionDeck({
 
         <div className={`relative rounded-xl border border-line border-t-[3px] ${stripe} bg-surface shadow-raised p-5 lg:p-6`}>
           <div className="flex items-center gap-2 mb-1.5">
+            <Badge item={item} />
             <KindTag kind={item.kind} />
-            {item.flags[0] && (
-              <span className="text-xs text-muted">{item.flags[0].label}</span>
-            )}
             <span className="ml-auto text-xs text-faint tabular-nums">
               {remaining.length} left
             </span>
           </div>
 
           <h3 className="display text-xl font-bold text-ink leading-tight">{item.title}</h3>
-          <p className="mt-1.5 text-sm text-body leading-relaxed max-w-2xl">
-            {decision.rationale}
-          </p>
+          {/* What it is and where, in one line. Why it is here is the badge;
+              the full sentence is in the item's detail, one click away. */}
+          {(item.subtitle || item.parsed.location) && (
+            <p className="mt-1 text-sm text-muted truncate max-w-2xl">
+              {[item.subtitle, item.parsed.location].filter(Boolean).join(' · ')}
+            </p>
+          )}
 
           <Facts item={item} />
 

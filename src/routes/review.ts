@@ -6,7 +6,7 @@ import { getDb } from '../db'
 import { gigOpportunities, syncTargets, promoDrafts, reminders } from '../db/schema'
 import { scoped } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
-import { buildReviewQueue, matchesFilter, summariseQueue, type ReviewFilter } from '../../shared/reviewQueue'
+import { buildReviewQueue, deckItems, matchesFilter, summariseQueue, type ReviewFilter } from '../../shared/reviewQueue'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
 
 /**
@@ -18,8 +18,8 @@ import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
  * no production row carries, and the two could not agree.
  *
  * Query params:
- *   filter  needs | reply | conflict | blocked | paid | timing | waiting | snoozed | all
- *           (default: all)
+ *   filter  deck | in_progress | needs | reply | conflict | blocked | paid | timing | waiting | snoozed | all
+ *           (default: all; `deck` is the Overview's — see `deckItems`)
  *   limit   cap the number of items returned; counts always cover everything
  *
  * `counts` and `summary` are computed over the whole queue regardless of
@@ -35,6 +35,8 @@ import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
 const review = new Hono<AppEnv>()
 
 const FILTERS: ReviewFilter[] = [
+  'deck',
+  'in_progress',
   'needs',
   'reply',
   'conflict',
@@ -118,7 +120,12 @@ review.get('/', async (c) => {
   // mean the same thing; since snoozed items are excluded inside
   // matchesFilter(), skipping it would quietly leak them into an unfiltered
   // request — the one place the rule could be forgotten.
-  const filtered = items.filter((i) => matchesFilter(i, requested ?? 'all'))
+  //
+  // The deck is the one filter that also reorders — a reply owed, then what is
+  // new, then what is urgent — which the queue's single score cannot express.
+  // Its membership is still `matchesFilter`, so its count and its list agree.
+  const filtered =
+    requested === 'deck' ? deckItems(items) : items.filter((i) => matchesFilter(i, requested ?? 'all'))
 
   return c.json({
     items: limit ? filtered.slice(0, limit) : filtered,

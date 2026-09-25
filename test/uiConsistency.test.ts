@@ -142,6 +142,33 @@ describe('the frontend reads today on the local calendar', () => {
 })
 
 /**
+ * The deck card says why in a badge; the Review detail says why in a sentence.
+ *
+ * The sentence moved rather than went: a card is for deciding at a glance,
+ * and the reasoning is read where the item is opened. Drop it from the detail
+ * too and nothing anywhere says why an item is on your list — which is the
+ * state the detail pane was in before, and nobody noticed.
+ */
+describe('the deck badges, and the detail explains', () => {
+  const deck = withoutComments(readFileSync('frontend/src/components/DecisionDeck.tsx', 'utf8'))
+  const detail = withoutComments(readFileSync('frontend/src/pages/review/Detail.tsx', 'utf8'))
+
+  it('shows the badge on the card, not the sentence', () => {
+    expect(deck).toContain('item.decision.badge')
+    expect(deck).not.toMatch(/decision\.rationale/)
+  })
+
+  it('keeps the sentence in the Review detail', () => {
+    expect(detail).toContain('item.decision.rationale')
+  })
+
+  it('deals from the deck filter, never from "needs a decision"', () => {
+    const overview = readFileSync('frontend/src/pages/OverviewPage.tsx', 'utf8')
+    expect(overview).toContain("api.review({ filter: 'deck' })")
+  })
+})
+
+/**
  * A deadline is counted through the parser, against a date the screen was
  * handed.
  *

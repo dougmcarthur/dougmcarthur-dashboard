@@ -21,7 +21,7 @@
  */
 
 import { normaliseGigStatus, isGigSettled, hasBeenSubmitted, awaitsYourReply } from './gigStatus'
-import { gigStageLabel } from './gigStage'
+import { gigStage, gigStageLabel } from './gigStage'
 import type { GigOpportunity, SyncTarget, PromoDraft } from './types'
 import { decisionFor, type Decision } from './decisionCopy'
 import { visaLead } from './gigCost'
@@ -99,6 +99,8 @@ export interface ReviewItem {
 }
 
 export type ReviewFilter =
+  | 'deck'
+  | 'in_progress'
   | 'needs'
   | 'conflict'
   | 'reply'
@@ -707,6 +709,10 @@ export function matchesFilter(item: ReviewItem, filter: ReviewFilter): boolean {
   switch (filter) {
     case 'all':
       return true
+    case 'deck':
+      return isNew(item) || isUrgent(item)
+    case 'in_progress':
+      return isInProgress(item)
     case 'needs':
       return awaitingDecision(item)
     case 'conflict':
@@ -750,6 +756,74 @@ export function isAwaitingThem(item: ReviewItem): boolean {
   }
   if (item.kind === 'sync') return item.status === 'pitched' || item.status === 'sent'
   return false
+}
+
+/**
+ * Never acted on: nobody has said yes or no to it yet.
+ *
+ * Not "has a flag". A discovered gig with no deadline and no fee carries no
+ * flag at all, so `awaitingDecision` never raises it and the deck never dealt
+ * it — and a new opportunity that nothing is forcing is exactly the one to
+ * look at first, before the calendar starts forcing it.
+ */
+export function isNew(item: ReviewItem): boolean {
+  if (item.snooze.active) return false
+  if (item.kind === 'gig') return gigStage(item.status) === 'new'
+  if (item.kind === 'sync') return item.status === 'draft_ready'
+  return item.status === 'draft'
+}
+
+/**
+ * Something that bites if it waits, whatever stage it is in.
+ *
+ * The list is short on purpose: somebody is waiting on your answer, a permit
+ * cannot be got in time, or a deadline is close or gone. Two things the
+ * "needs a decision" filter carries are left out. A conflict is a data
+ * problem, and the Overview already reports it — the data-health block and
+ * the bell both count it — so dealing it too only held the top of the deck
+ * with a card that has no button. A silent application is real, but chasing
+ * it is not today's work.
+ */
+const URGENT_ALWAYS: FlagId[] = ['reply_due', 'visa_risk']
+const URGENT_UNLESS_SETTLED: FlagId[] = ['overdue', 'due_soon']
+
+export function isUrgent(item: ReviewItem): boolean {
+  if (item.snooze.active) return false
+  if (item.flags.some((f) => URGENT_ALWAYS.includes(f.id))) return true
+  return !isSettled(item) && item.flags.some((f) => URGENT_UNLESS_SETTLED.includes(f.id))
+}
+
+/**
+ * You said yes, and it has not gone out: the In progress stage.
+ *
+ * The pile the deck stops dealing from unless something about it is urgent.
+ * A gig you already said yes to is a to-do, not a decision, and dealing it
+ * back as one is how the deck filled with cards whose only honest answer was
+ * "I know". It gets a count and a link instead.
+ */
+export function isInProgress(item: ReviewItem): boolean {
+  if (item.snooze.active || item.kind !== 'gig') return false
+  return gigStage(item.status) === 'in_progress'
+}
+
+/**
+ * The Overview deck, in the order it deals: a reply owed, then what is new,
+ * then the rest of what is urgent — each tier keeping the queue's own ranking.
+ *
+ * New before urgent is the point: an opportunity nobody has looked at is the
+ * one the deck is for. A reply owed goes ahead of it anyway, because it is the
+ * one urgent thing with nowhere else on the Overview — deadlines have the
+ * timing strip, conflicts the health block — and somebody is waiting on it.
+ * Left in the urgent tier, an invitation would be dealt after every untouched
+ * opportunity in the queue.
+ */
+export function deckItems(items: ReviewItem[]): ReviewItem[] {
+  const deck = items.filter((i) => matchesFilter(i, 'deck'))
+  const replyOwed = (i: ReviewItem) => i.flags.some((f) => f.id === 'reply_due')
+  const first = deck.filter(replyOwed)
+  const fresh = deck.filter((i) => !replyOwed(i) && isNew(i))
+  const rest = deck.filter((i) => !replyOwed(i) && !isNew(i))
+  return [...first, ...fresh, ...rest]
 }
 
 export function countByFilter(items: ReviewItem[], filter: ReviewFilter): number {

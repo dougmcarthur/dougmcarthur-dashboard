@@ -23,6 +23,11 @@ import { Banner } from '../components/ui/Surface'
 const FILTERS: Array<{ id: ReviewFilter; label: string; hint: string }> = [
   { id: 'needs', label: 'Needs a decision', hint: 'Everything waiting on a call from you.' },
   {
+    id: 'in_progress',
+    label: 'In progress',
+    hint: 'You said yes, and it has not gone out yet. The Overview counts these rather than dealing them.',
+  },
+  {
     id: 'reply',
     label: 'Reply owed',
     hint: 'They invited you or asked a question. Nothing moves until you answer.',
@@ -56,6 +61,7 @@ const EMPTY: Partial<Record<ReviewFilter, string>> = {
   waiting: 'Nothing is out with an organiser. Anything applied to has already come back.',
   conflict: 'No row contradicts itself — every status agrees with its note.',
   needs: 'Nothing needs a decision. Anything still open is waiting on a date, not on you.',
+  in_progress: 'Nothing you said yes to is waiting to go out.',
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────

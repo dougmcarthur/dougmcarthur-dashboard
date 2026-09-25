@@ -52,6 +52,14 @@ export interface DecisionAction {
 }
 
 export interface Decision {
+  /**
+   * Two words or so saying what kind of thing this is — "New", "Due soon",
+   * "Reply owed". The Overview card shows this instead of the sentence: a card
+   * is for deciding at a glance, and the reasoning waits in the item's detail
+   * for whoever opens it. Set beside the rationale in every branch below, so
+   * the two can never describe different situations.
+   */
+  badge: string
   /** One sentence naming the decision. Never empty. */
   rationale: string
   /**
@@ -346,6 +354,7 @@ export function decisionFor(item: DecisionInput): Decision {
 
   if (kind === 'promo') {
     return {
+      badge: status === 'draft' ? 'New' : 'Not published',
       rationale:
         status === 'draft'
           ? 'A drafted post that has not been approved yet. Read it and decide whether it goes out as written.'
@@ -363,6 +372,7 @@ export function decisionFor(item: DecisionInput): Decision {
         : ''
       if (kind === 'sync') {
         return {
+          badge: 'Conflict',
           rationale:
             `Marked ${status.replace(/_/g, ' ')} in the tracker, but the note says it was never ` +
             `actually sent.${extra} Did this go out?`,
@@ -376,6 +386,7 @@ export function decisionFor(item: DecisionInput): Decision {
       // time. Naming the contradiction and sending you to the row is the only
       // thing here that is true.
       return {
+        badge: 'Conflict',
         rationale:
           `Marked ${gigStageLabel(status).label.toLowerCase()} in the tracker, but the note says it was never ` +
           `actually sent.${extra} One of the two is wrong, and fixing it is an edit rather ` +
@@ -391,6 +402,7 @@ export function decisionFor(item: DecisionInput): Decision {
         // decision about the row, and a card that offered "Pass" here would
         // be asking you to decide on the strength of the question itself.
         return {
+          badge: 'Visa question',
           rationale:
             'A US date, and nobody has said whether it is a showcase or a paid booking. ' +
             'Showcase enters as a business visitor and costs nothing; paid needs a P-2, about ' +
@@ -400,6 +412,7 @@ export function decisionFor(item: DecisionInput): Decision {
         }
       }
       return {
+        badge: 'Visa risk',
         rationale:
           'A paid US performance needs a P-2, and the ninety days it takes do not fit between ' +
           'the deadline and the show. Applying is still your call; counting on the permit is ' +
@@ -412,6 +425,7 @@ export function decisionFor(item: DecisionInput): Decision {
       if (normaliseGigStatus(status) === 'invited') {
         const award = item.source.kind === 'gig' && settledByAward(item.source.row.type)
         return {
+          badge: 'Offer',
           rationale: award
             ? 'They made an offer. It is not accepted until the award is confirmed in writing, ' +
               'so confirm it here once it is — and turning it down is you withdrawing, not them declining.'
@@ -430,6 +444,7 @@ export function decisionFor(item: DecisionInput): Decision {
       // button records that you sent it, which clears the flag and puts the
       // gig back to waiting. Nothing else moves the stage — it stays Applied.
       return {
+        badge: 'Reply owed',
         rationale:
           'They asked for something, and nothing moves until you answer. Send the answer ' +
           'from your mail, then mark it answered here.',
@@ -443,6 +458,7 @@ export function decisionFor(item: DecisionInput): Decision {
         ? 'They confirmed they had it'
         : 'It went out'
       return {
+        badge: 'No reply',
         rationale:
           `${sent} ${exact ? '' : 'about '}${days} days ago and nothing has come back. ` +
           `Chasing is an email rather than a button — send one and snooze this, or write ` +
@@ -454,6 +470,7 @@ export function decisionFor(item: DecisionInput): Decision {
     case 'overdue': {
       const days = Math.abs(deadline.daysUntil ?? 0)
       return {
+        badge: 'Deadline passed',
         rationale:
           `The deadline passed ${days} ${days === 1 ? 'day' : 'days'} ago and nothing was ` +
           `submitted. Either it went out and the tracker never heard, or the window closed on it.`,
@@ -468,11 +485,13 @@ export function decisionFor(item: DecisionInput): Decision {
       // money actually goes: at submission.
       if (kind === 'gig' && gigStage(status) === 'in_progress') {
         return {
+          badge: 'Entry fee',
           rationale: `Costs ${cost} to enter, paid when it is submitted. You already said yes to applying.`,
           actions: gigActions(kind, status, GIG_ACTIONS.spend),
         }
       }
       return {
+        badge: 'Entry fee',
         rationale:
           `Costs ${cost} to enter, so nobody can submit it without your say-so. ` +
           `Approving here is approving the spend.`,
@@ -486,6 +505,7 @@ export function decisionFor(item: DecisionInput): Decision {
         : 'Something about this needs a look.'
       const isDuplicate = /already exists|duplicate|two independent/i.test(detail)
       return {
+        badge: isDuplicate ? 'Duplicate' : 'Check this',
         rationale: isDuplicate ? `${detail} Pick one to send.` : detail,
         actions: isDuplicate && kind === 'sync' ? SYNC_PICK : gigActions(kind, status, GIG_ACTIONS.go_no),
       }
@@ -494,6 +514,7 @@ export function decisionFor(item: DecisionInput): Decision {
     case 'due_soon': {
       const days = deadline.daysUntil ?? 0
       return {
+        badge: days === 0 ? 'Due today' : 'Due soon',
         rationale:
           days === 0
             ? 'The deadline is today and nothing has been submitted yet.'
@@ -504,6 +525,7 @@ export function decisionFor(item: DecisionInput): Decision {
 
     case 'blocked': {
       return {
+        badge: 'Missing details',
         rationale: missingFields.length
           ? `Waiting on you for ${listFields(missingFields)}.`
           : blocker
@@ -516,6 +538,7 @@ export function decisionFor(item: DecisionInput): Decision {
     case 'not_submitted': {
       const how = parsed.submissionMethod ? ` It goes out by ${parsed.submissionMethod}.` : ''
       return {
+        badge: 'Not sent',
         rationale: `Drafted but never sent.${how} Decide whether it is worth doing.`,
         actions: gigActions(kind, status, GIG_ACTIONS.go_no),
       }
@@ -527,6 +550,7 @@ export function decisionFor(item: DecisionInput): Decision {
       // an email address, which reads badly mid-sentence.
       if (kind === 'sync') {
         return {
+          badge: status === 'draft_ready' ? 'New' : 'Open',
           rationale: 'A sync target with nothing outstanding on it. Worth pitching, or let it go?',
           actions: SYNC_PITCH,
         }
@@ -534,6 +558,7 @@ export function decisionFor(item: DecisionInput): Decision {
       const what = item.subtitle ? lowerFirst(condense(item.subtitle, 60)) : 'opportunity'
       const where = parsed.location ? ` in ${parsed.location}` : ''
       return {
+        badge: gigStage(status) === 'new' ? 'New' : 'Open',
         rationale: `A ${what}${where} with no deadline forcing the issue. Worth doing, or not?`,
         actions: gigActions(kind, status, GIG_ACTIONS.go_no),
       }

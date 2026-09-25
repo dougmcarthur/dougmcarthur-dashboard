@@ -8,7 +8,7 @@ import {
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../api'
 import type { ReviewItem } from '../../../../shared/reviewQueue'
 import { DecisionBar } from './DecisionBar'
-import { Card } from '../../components/ui/Surface'
+import { Caption, Card } from '../../components/ui/Surface'
 
 /**
  * Everything known about the selected item, on one surface.
@@ -197,6 +197,15 @@ export function Detail({
             Open listing ↗
           </a>
         )}
+      </div>
+
+      {/* Why it is on your list — the sentence the Overview card only badges.
+          Moved rather than repeated: a card is for deciding at a glance, and
+          this is where the reasoning gets read. Until the badge replaced it on
+          the card, this pane never showed it at all. */}
+      <div className="mt-4 rounded-lg border border-line bg-raised px-3.5 py-3">
+        <Caption>{item.decision.badge}</Caption>
+        <p className="mt-1 text-sm text-body leading-relaxed">{item.decision.rationale}</p>
       </div>
 
       {/* The facts a decision turns on, before anything else. */}

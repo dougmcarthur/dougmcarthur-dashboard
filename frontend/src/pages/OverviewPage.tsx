@@ -13,11 +13,15 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
     queryFn: api.overview,
   })
 
-  // The deck asks the Worker what needs deciding — the same endpoint and the
-  // same ordering the Review screen uses, so the two cannot drift apart.
+  // The deck asks the Worker what to deal — a reply owed, then what is new,
+  // then what is urgent (`deckItems` in shared/reviewQueue.ts). Its own order
+  // rather than the Review screen's, because "needs a decision" also carries
+  // gigs you already said yes to, and dealing those back as decisions is how
+  // the deck filled with cards whose only honest answer was "I know". Those
+  // are counted and linked instead.
   const queue = useQuery({
-    queryKey: ['review', 'needs'],
-    queryFn: () => api.review({ filter: 'needs' }),
+    queryKey: ['review', 'deck'],
+    queryFn: () => api.review({ filter: 'deck' }),
   })
 
   const patchGig = useMutation({
@@ -74,7 +78,8 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
           ) : (
             <DecisionDeck
               items={queue.data?.items ?? []}
-              total={queue.data?.counts.needs ?? 0}
+              total={queue.data?.counts.deck ?? 0}
+              inProgress={queue.data?.counts.in_progress ?? 0}
               onNav={onNav}
             />
           )}
@@ -109,7 +114,12 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
         </aside>
       </div>
 
-      {(queue.data?.counts.needs ?? 0) === 0 &&
+      {/* `needs` stays in this test although the deck no longer deals from it:
+          a conflict or a silent application is not a card any more, but it is
+          still not "all clear". */}
+      {(queue.data?.counts.deck ?? 0) === 0 &&
+        (queue.data?.counts.needs ?? 0) === 0 &&
+        (queue.data?.counts.in_progress ?? 0) === 0 &&
         (queue.data?.summary.timing.length ?? 0) === 0 &&
         (queue.data?.summary.backlog.openEnded ?? 0) === 0 &&
         dueReminders.length === 0 && (
