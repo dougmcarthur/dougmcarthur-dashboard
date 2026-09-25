@@ -58,7 +58,7 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   applicationUrl: text('application_url'),
   /**
    * How a closed gig ended, and what an Applied gig is waiting on. See
-   * migration 0029 and src/db/gigRows.ts — read through `readGig`, never raw.
+   * migration 0030 and src/db/gigRows.ts — read through `readGig`, never raw.
    */
   outcome: text('outcome'),
   flag: text('flag'),

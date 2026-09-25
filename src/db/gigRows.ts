@@ -1,7 +1,7 @@
 /**
  * The one boundary a gig's status crosses between D1 and the code.
  *
- * Since migration 0029 a row stores its stage in `status` with `outcome` and
+ * Since migration 0030 a row stores its stage in `status` with `outcome` and
  * `flag` beside it; before, `status` held one of fourteen values. Everything
  * above this file — the queue, the pipeline, the reply matcher, the nudges,
  * the API the screens and the research agents read — still speaks the

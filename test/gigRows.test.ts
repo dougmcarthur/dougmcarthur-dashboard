@@ -7,7 +7,7 @@ import { gigStatusFromStored, storedGigState } from '../shared/gigStage'
 import { readGig } from '../src/db/gigRows'
 
 /**
- * Storage holds a stage, an outcome and a flag (migration 0029); the code
+ * Storage holds a stage, an outcome and a flag (migration 0030); the code
  * reasons in fourteen statuses. The translation happens in src/db/gigRows.ts,
  * and a query that skips it reads `closed` as a gig nobody has looked at — so
  * this pins the round trip and that no query goes around it.
@@ -31,7 +31,7 @@ describe('the round trip', () => {
     expect(storedGigState('approved')).toEqual({ status: 'in_progress', outcome: null, flag: null })
   })
 
-  it('reads a row written before migration 0029 exactly as it did', () => {
+  it('reads a row written before migration 0030 exactly as it did', () => {
     expect(readGig({ status: 'declined', outcome: null, flag: null }).status).toBe('declined')
     expect(readGig({ status: 'approved' }).status).toBe('shortlisted')
   })

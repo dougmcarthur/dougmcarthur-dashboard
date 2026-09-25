@@ -233,7 +233,7 @@ for (const s of Object.keys(GIG_STATUS_META) as GigStatus[]) {
 }
 
 /**
- * The stored shape since migration 0029: the stage in `status`, with the
+ * The stored shape since migration 0030: the stage in `status`, with the
  * outcome and the flag beside it. Rows written before it carry one of the
  * fourteen statuses in `status` and nothing in the other two.
  */

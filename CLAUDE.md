@@ -725,9 +725,9 @@ calendar until it is Accepted. `archived` rows show as Closed with no outcome,
 because archiving never recorded why.
 
 **Storage is moving to the same shape, in two steps.** Deploy 1 put stages
-on screen over the old values. Deploy 2a (migration 0029) adds `outcome` and
+on screen over the old values. Deploy 2a (migration 0030) adds `outcome` and
 `flag` beside `status`, and new writes store the stage in `status` with those
-two beside it. Deploy 2b converts the rows written before 0029; it has to be a
+two beside it. Deploy 2b converts the rows written before 0030; it has to be a
 later merge, because CI migrates before it deploys, and the Worker in that gap
 must already read `closed` — deploy 1 reads it as a gig nobody has looked at.
 
