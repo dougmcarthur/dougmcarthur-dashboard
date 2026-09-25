@@ -864,6 +864,27 @@ on file. Contact details are never copied. Its photos refuse a foreign
 `Referer`, so an EPK that displays one needs its own copy. See
 `docs/artist-profile-plan.md`.
 
+**A share link publishes only what the artist has claimed.** The EPK
+profile page (`#epk/<token>`, token in the fragment, POSTed to
+`/api/public/epk` — the second entry in `PUBLIC_API_PREFIXES`) renders
+`shared/publicEpk.ts`: reviewed assets only, no uncredited photo, and facts
+and documents only from an allow-list, so a phone number or a W-8BEN never
+reaches a stranger because nobody classified it. `epk_shares` (migration
+0028) is a credential like `agent_tokens`: hashed, shown once, resolved in
+`src/lib/actor.ts`, not a domain table, deleted by tenant removal by name.
+`test/epkShare.test.ts` pins where the token travels and that the public route
+strips `withheld`.
+
+**The Drive folder is `drive.file`, and Google enforces the limit.** Scout
+reaches the folder it made on connect and files the artist picked in Google's
+picker — nothing else in their Drive, whatever this code does;
+`test/calendarGrant.test.ts` fails if a broad Drive scope appears in `src/`.
+Picking a *folder* grants the folder, not its contents, so the picker tells the
+artist to select the files inside. Picked files are copied, never moved;
+organising previews first; sharing is one permission on the folder that every
+file inherits; nothing is deleted. The picker needs `GOOGLE_PICKER_API_KEY` and
+`GOOGLE_CLOUD_PROJECT_NUMBER`, which are vars in `wrangler.toml`.
+
 **Gmail drafting is a grant the person makes, not a secret somebody pasted.**
 Every Google token before this one was obtained at a terminal and stored with
 `wrangler secret put`. That cannot work for a feature where the *user* decides

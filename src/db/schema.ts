@@ -463,6 +463,11 @@ export const googleGrants = sqliteTable('google_grants', {
    * keyed by purpose precisely so the two cannot be confused.
    */
   tasksListId: text('tasks_list_id'),
+  /**
+   * For a `drive` grant: the folder Scout made, the root of everything a
+   * `drive.file` grant may touch. See migration 0028.
+   */
+  driveFolderId: text('drive_folder_id'),
 })
 
 /**
@@ -561,6 +566,25 @@ export const agentTokens = sqliteTable('agent_tokens', {
   label: text('label').notNull(),
   createdAt: text('created_at').notNull(),
   lastUsedAt: text('last_used_at'),
+  revokedAt: text('revoked_at'),
+})
+
+/**
+ * A public link to the artist's EPK. See migration 0028.
+ *
+ * A credential with the agent token's shape: hashed, shown once, revocable,
+ * looked up by hash before a tenant is known — so, like `agentTokens`, it is
+ * not a domain table, and tenant removal deletes it by name.
+ */
+export const epkShares = sqliteTable('epk_shares', {
+  id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  /** festival | sync | press — which cut of the EPK the link shows. */
+  audience: text('audience').notNull().default('festival'),
+  label: text('label').notNull(),
+  createdAt: text('created_at').notNull(),
+  lastViewedAt: text('last_viewed_at'),
   revokedAt: text('revoked_at'),
 })
 

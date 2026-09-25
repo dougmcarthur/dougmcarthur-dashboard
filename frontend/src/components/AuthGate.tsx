@@ -4,6 +4,7 @@ import { api, UNAUTHENTICATED_EVENT } from '../api'
 import { LoginScreen } from './LoginScreen'
 import { JoinScreen } from './JoinScreen'
 import { useHashRoute } from '../hooks/useHashRoute'
+import { PublicEpkPage } from '../pages/epk/PublicEpkPage'
 
 /**
  * Nothing renders until the Worker says who is asking.
@@ -52,6 +53,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // check is one request against a cookie the browser already has, so the
   // gap is a frame or two — long enough to paint the wrong thing, too short
   // to be worth announcing.
+  // A shared EPK is for people who will never sign in, so it is answered
+  // before the session is — signed in or not, the link shows the same page.
+  if (page === 'epk' && arg) return <PublicEpkPage token={arg} />
+
   if (session.isLoading) return <div className="min-h-screen bg-canvas" />
 
   if (!session.data?.authenticated) {

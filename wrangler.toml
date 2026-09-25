@@ -68,6 +68,19 @@ MAIL_POSTAL_ADDRESS = "55 Tunis Bay, Winnipeg, MB R3T 2X2"
 # unset means a reply bounces rather than reaching anybody.
 # MAIL_REPLY_TO = ""
 
+# Google Picker, for adding files to an artist's EPK folder in their Drive.
+# Both are public by nature — the picker runs in the page — so they are vars.
+# Unset, the Drive tab connects and lists the folder but offers no picker, and
+# says so. Setup, all in the same Google Cloud project as GOOGLE_CLIENT_ID:
+#   1. APIs & Services → enable "Google Drive API" and "Google Picker API".
+#   2. OAuth consent screen → add the scope .../auth/drive.file (non-sensitive,
+#      no verification needed).
+#   3. Credentials → Create API key; restrict it to the Picker API and to the
+#      website https://scout.sundogsmusic.ca/*.
+#   4. The project NUMBER (not the id) is on the project's dashboard.
+# GOOGLE_PICKER_API_KEY = ""
+# GOOGLE_CLOUD_PROJECT_NUMBER = ""
+
 # API_TOKEN is a secret, not a var: `wrangler secret put API_TOKEN`. It is the
 # research agents' credential, and it is the thing to set BEFORE switching
 # Cloudflare Access off — headless callers cannot do a passkey ceremony, so
