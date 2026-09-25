@@ -100,7 +100,7 @@ describe('what a row may offer', () => {
     // A secret and a binding are set on the server. A Connect button beside
     // either is a button that cannot work, which is worse than no button.
     const connectable = INTEGRATIONS.filter(isConnectable).map((s) => s.id)
-    expect(connectable.sort()).toEqual(['calendar', 'calendar.primary', 'gmail.drafts', 'tasks'])
+    expect(connectable.sort()).toEqual(['calendar', 'calendar.primary', 'drive', 'gmail.drafts', 'tasks'])
   })
 
   it('gates exactly the one row whose permission is bigger than its purpose', () => {

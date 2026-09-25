@@ -5,6 +5,7 @@ import { desc } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets, promoDrafts, digestReports } from '../db/schema'
 import { scoped, withTenant, type TenantId } from '../db/scope'
+import { readGigs } from '../db/gigRows'
 import { tenantOf, type AppEnv } from '../context'
 import { buildReviewQueue } from '../../shared/reviewQueue'
 import { buildDigest, type Digest } from '../../shared/digest'
@@ -34,7 +35,7 @@ export async function composeDigest(
 ): Promise<{ digest: Digest; subject: string; html: string; text: string }> {
   const db = getDb(env.DB)
   const [gigs, sync, promo, prior] = await Promise.all([
-    db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant)).orderBy(desc(gigOpportunities.discoveredAt)),
+    db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant)).orderBy(desc(gigOpportunities.discoveredAt)).then(readGigs),
     db.select().from(syncTargets).where(scoped(syncTargets, tenant)).orderBy(desc(syncTargets.discoveredAt)),
     db.select().from(promoDrafts).where(scoped(promoDrafts, tenant)).orderBy(desc(promoDrafts.createdAt)),
     db.select().from(digestReports).where(scoped(digestReports, tenant)),

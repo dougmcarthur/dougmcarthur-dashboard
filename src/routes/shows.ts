@@ -22,6 +22,7 @@ import { and, gte, isNotNull } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities } from '../db/schema'
 import { scoped, type TenantId } from '../db/scope'
+import { readGigs } from '../db/gigRows'
 import type { Env } from '../types'
 import { tenantOf, type AppEnv } from '../context'
 import { decryptToken } from '../lib/googleGrant'
@@ -154,6 +155,7 @@ export async function collectShows(env: Env, tenant: TenantId, today: string) {
           and(isNotNull(gigOpportunities.performanceStart), gte(gigOpportunities.performanceStart, yearBefore(today))),
         ),
       )
+      .then(readGigs)
     for (const g of rows) {
       const date = (g.performanceStart ?? '').slice(0, 10)
       if (normaliseGigStatus(g.status) !== 'booked' || !ISO_DATE.test(date)) continue

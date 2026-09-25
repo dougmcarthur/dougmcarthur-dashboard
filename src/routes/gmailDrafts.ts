@@ -47,7 +47,7 @@ import {
   consentAvailable,
   settingsRedirect,
 } from '../lib/googleOAuth'
-import { completeGrant } from '../lib/googleConnect'
+import { completeBundle, completeGrant } from '../lib/googleConnect'
 import type { Env } from '../types'
 
 const gmail = new Hono<AppEnv>()
@@ -80,6 +80,17 @@ gmail.get('/callback', async (c) => {
   const check = checkCallback(c)
   if (!check.ok) return c.redirect(settingsRedirect(c.env, check.purpose, check.reason), 302)
 
+  if (check.purpose === 'google') {
+    const done = await completeBundle(c.env, tenantOf(c), check.code)
+    return c.redirect(
+      settingsRedirect(c.env, 'google', done.outcome, {
+        declined: done.declined,
+        failed: done.failed,
+        kept: done.kept,
+      }),
+      302,
+    )
+  }
   const outcome = await completeGrant(c.env, tenantOf(c), check.purpose, check.code)
   return c.redirect(settingsRedirect(c.env, check.purpose, outcome), 302)
 })

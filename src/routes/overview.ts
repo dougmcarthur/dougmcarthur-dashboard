@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { gigStatusFromStored } from '../../shared/gigStage'
 import { eq, and, lte, desc, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets, promoDrafts, taskRuns, reminders } from '../db/schema'
@@ -49,6 +50,8 @@ overview.get('/', async (c) => {
         gigName: gigOpportunities.name,
         gigDeadline: gigOpportunities.deadline,
         gigStatus: gigOpportunities.status,
+        gigOutcome: gigOpportunities.outcome,
+        gigFlag: gigOpportunities.flag,
       })
       .from(reminders)
       // The join carries the tenant too. A reminder is already scoped by the
@@ -81,7 +84,13 @@ overview.get('/', async (c) => {
       totalPromo: promoCount.count,
     },
     recentRuns,
-    dueReminders,
+    // Translated like every other gig read (src/db/gigRows.ts), and the two
+    // helper columns dropped: the screen reads `gigStatus` alone.
+    dueReminders: dueReminders.map(({ gigOutcome, gigFlag, ...r }) => ({
+      ...r,
+      gigStatus:
+        r.gigStatus === null ? null : gigStatusFromStored({ status: r.gigStatus, outcome: gigOutcome, flag: gigFlag }),
+    })),
   })
 })
 

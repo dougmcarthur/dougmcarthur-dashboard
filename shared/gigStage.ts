@@ -231,3 +231,57 @@ export const GIG_START_STATUS: Record<Exclude<GigStage, 'closed'>, GigStatus> = 
 for (const s of Object.keys(GIG_STATUS_META) as GigStatus[]) {
   if (!STAGE_OF[s]) throw new Error(`gig status ${s} has no stage`)
 }
+
+/**
+ * The stored shape since migration 0030: the stage in `status`, with the
+ * outcome and the flag beside it. Rows written before it carry one of the
+ * fourteen statuses in `status` and nothing in the other two.
+ */
+export interface StoredGigState {
+  status: string | null
+  outcome?: string | null
+  flag?: string | null
+}
+
+const FROM_OUTCOME: Record<GigOutcome, GigStatus> = {
+  accepted: 'booked',
+  not_selected: 'declined',
+  passed: 'passed',
+  missed: 'expired',
+  withdrawn: 'withdrawn',
+}
+
+/**
+ * The in-memory status a stored row means, whichever vocabulary it was
+ * written in.
+ *
+ * The queue, the reply matcher, the nudges and the pipeline all reason over
+ * the fourteen statuses, and that reasoning did not need to change — so rather
+ * than rewrite them, storage is translated at the one boundary rows cross
+ * (src/db/gigRows.ts). `preparing` and `acknowledged` do not survive a round
+ * trip: they are In progress and Applied, which is what they always meant.
+ */
+export function gigStatusFromStored(row: StoredGigState): GigStatus {
+  const status = row.status?.trim().toLowerCase() ?? ''
+  if (!isGigStage(status)) return normaliseGigStatus(row.status)
+  switch (status) {
+    case 'new':
+      return 'discovered'
+    case 'in_progress':
+      return 'shortlisted'
+    case 'applied':
+      return row.flag === 'reply_owed' ? 'info_requested' : row.flag === 'offer_pending' ? 'invited' : 'submitted'
+    case 'closed':
+      return FROM_OUTCOME[row.outcome as GigOutcome] ?? 'archived'
+  }
+}
+
+/** What to write for a status: the stage, and the outcome and flag beside it. */
+export function storedGigState(status: string | null | undefined): {
+  status: GigStage
+  outcome: GigOutcome | null
+  flag: GigFlag | null
+} {
+  const s = normaliseGigStatus(status)
+  return { status: gigStage(s), outcome: gigOutcome(s), flag: gigFlag(s) }
+}

@@ -114,6 +114,25 @@ export const GRANT_PURPOSES: GrantPurpose[] = [
   'drive',
 ]
 
+/**
+ * What one "Connect Google account" asks for, in one consent.
+ *
+ * Most people keep calendar, mail and files under one Google account, so the
+ * common path is one press rather than four. Google shows these as separate
+ * checkboxes (granular consent) and any can be unticked, so what comes back is
+ * checked service by service and each is stored as its own grant — which is
+ * what keeps every consumer of `google_grants` unchanged, and lets one service
+ * be moved to a different account later without touching the rest.
+ *
+ * `calendar.primary` is not here: it is an opt-in with its own warning, and a
+ * bundle is not the place to ask for the broadest scope in the app.
+ */
+export const BUNDLE_PURPOSES: GrantPurpose[] = ['calendar', 'tasks', 'gmail.compose', 'drive']
+
+export function bundleScopes(): string {
+  return [...BUNDLE_PURPOSES.map((p) => SCOPE_FOR[p]), 'openid', 'email'].join(' ')
+}
+
 /** The purpose `gmailDrafts.ts` has always meant, named so its callers read. */
 export const GRANT_PURPOSE: GrantPurpose = 'gmail.compose'
 
@@ -412,4 +431,80 @@ export async function markGrantUsed(env: Env, tenant: TenantId): Promise<void> {
     .update(googleGrants)
     .set({ lastUsedAt: new Date().toISOString() })
     .where(scoped(googleGrants, tenant, eq(googleGrants.purpose, GRANT_PURPOSE)))
+}
+
+/* --------------------------------------------------------------------- */
+/* Accounts                                                               */
+/* --------------------------------------------------------------------- */
+
+export interface GoogleAccount {
+  /** Null only for a grant made before the address was recorded. */
+  email: string | null
+  /** The services this account is connected for, in `GRANT_PURPOSES` order. */
+  purposes: GrantPurpose[]
+  /** When the most recent of them was connected. */
+  connectedAt: string | null
+}
+
+/**
+ * The tenant's grants, grouped by the Google account behind them.
+ *
+ * The screen talks about accounts because that is what a person connected —
+ * "doug@…, for Calendar, Tasks and Drive" — while storage stays one row per
+ * service, which is what the code that uses a grant reads.
+ */
+export async function listGoogleAccounts(env: Env, tenant: TenantId): Promise<GoogleAccount[]> {
+  const rows = await getDb(env.DB).select().from(googleGrants).where(scoped(googleGrants, tenant))
+  const byEmail = new Map<string, GoogleAccount>()
+  for (const row of rows) {
+    const key = row.accountEmail?.trim().toLowerCase() ?? ''
+    const account = byEmail.get(key) ?? { email: row.accountEmail, purposes: [], connectedAt: null }
+    if ((GRANT_PURPOSES as string[]).includes(row.purpose)) account.purposes.push(row.purpose as GrantPurpose)
+    if (!account.connectedAt || row.grantedAt > account.connectedAt) account.connectedAt = row.grantedAt
+    byEmail.set(key, account)
+  }
+  const order = (p: GrantPurpose) => GRANT_PURPOSES.indexOf(p)
+  return [...byEmail.values()]
+    .map((a) => ({ ...a, purposes: a.purposes.sort((x, y) => order(x) - order(y)) }))
+    .sort((a, b) => b.purposes.length - a.purposes.length)
+}
+
+/**
+ * Disconnect one Google account from every service it covers.
+ *
+ * The token is revoked at Google as well as forgotten here, so the account's
+ * "Third-party access" page stops listing Scout — which is where a careful
+ * person goes to check, and a disconnect that leaves the permission standing
+ * there is one that did half its job. Best effort: a revoke Google refuses
+ * (already revoked, say) must not leave the rows behind.
+ *
+ * The per-service disconnects do not revoke, deliberately: one token backs
+ * several services, and revoking it to drop one would drop them all.
+ */
+export async function forgetGoogleAccount(env: Env, tenant: TenantId, email: string | null): Promise<GrantPurpose[]> {
+  const db = getDb(env.DB)
+  const key = email?.trim().toLowerCase() ?? ''
+  const rows = (await db.select().from(googleGrants).where(scoped(googleGrants, tenant))).filter(
+    (r) => (r.accountEmail?.trim().toLowerCase() ?? '') === key,
+  )
+  const tokens = new Set<string>()
+  for (const row of rows) {
+    try {
+      tokens.add(await decryptToken(env, row.refreshToken))
+    } catch {
+      // A token that cannot be decrypted cannot be revoked either; the row
+      // still goes.
+    }
+  }
+  for (const token of tokens) {
+    await fetch('https://oauth2.googleapis.com/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ token }),
+    }).catch(() => undefined)
+  }
+  for (const row of rows) {
+    await db.delete(googleGrants).where(scoped(googleGrants, tenant, eq(googleGrants.purpose, row.purpose)))
+  }
+  return rows.map((r) => r.purpose as GrantPurpose)
 }

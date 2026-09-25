@@ -5,6 +5,7 @@ import { eq, desc, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, reminders } from '../db/schema'
 import { scoped, withTenant } from '../db/scope'
+import { gigStatusColumns, readGig, readGigs } from '../db/gigRows'
 import { tenantOf, type AppEnv } from '../context'
 import { syncGigNudges, removeGigNudges, type GigRow } from '../lib/gigNudges'
 import { readNudgePreferences } from '../lib/nudgeSettings'
@@ -72,7 +73,6 @@ gigs.get('/', async (c) => {
   const type = c.req.query('type')
 
   const conditions = []
-  if (status) conditions.push(eq(gigOpportunities.status, status))
   // What the screens filter by. A stage the route does not know is refused
   // rather than ignored — a filter that quietly shows everything is how you
   // conclude nothing is in it.
@@ -93,7 +93,11 @@ gigs.get('/', async (c) => {
     .where(scoped(gigOpportunities, tenantOf(c), ...conditions))
     .orderBy(desc(gigOpportunities.discoveredAt))
 
-  return c.json(rows)
+  // `?status=` is filtered after the read rather than in SQL: it names one of
+  // the fourteen, and storage holds a stage plus an outcome and a flag, so the
+  // comparison only means something once the row has been translated.
+  const read = readGigs(rows)
+  return c.json(status ? read.filter((r) => r.status === normaliseGigStatus(status)) : read)
 })
 
 gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
@@ -145,7 +149,7 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
       // Normalised on the way in: the research agents that POST here still
       // send `approved`, and a row should land in the right column rather
       // than carrying a word the pipeline no longer uses.
-      status: normaliseGigStatus(b.status),
+      ...gigStatusColumns(b.status),
       // The research agents POST rows at whatever status they found them in.
       // One arriving already submitted has been sent, and `ts` is the closest
       // thing to a send date that will ever exist for it — better than the
@@ -168,7 +172,7 @@ gigs.get('/:id', async (c) => {
     .get()
 
   if (!row) return c.json({ error: 'not found' }, 404)
-  return c.json(row)
+  return c.json(readGig(row))
 })
 
 gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
@@ -180,11 +184,13 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
   // Fetch the row before patching so we can detect status transitions. Scoped,
   // which is also what makes every write below safe: they all key off `id`, and
   // this read is the one place that establishes the id is this artist's.
-  const before = await db
-    .select()
-    .from(gigOpportunities)
-    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
-    .get()
+  const before = readGig(
+    await db
+      .select()
+      .from(gigOpportunities)
+      .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
+      .get(),
+  )
 
   if (!before) return c.json({ error: 'not found' }, 404)
 
@@ -215,7 +221,10 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
   // (`approved`, `pending_review`), so normalise on the way in rather than
   // storing a value nothing else recognises. See shared/gigStatus.ts.
   const newStatus = normaliseGigStatus(b.status ?? before.status)
-  if (b.status !== undefined) updates.status = newStatus
+  // Written as the three stored columns, never as the status string: see
+  // src/db/gigRows.ts. `...b` above carried the raw value, so it goes first.
+  delete updates.status
+  if (b.status !== undefined) Object.assign(updates, gigStatusColumns(newStatus))
 
   // The pipeline is a shape, not a free-for-all. Refused here rather than only
   // in the picker, because the research agents PATCH this route too and a row
@@ -322,7 +331,7 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
     .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
     .get()
 
-  return c.json(row)
+  return c.json(readGig(row))
 })
 
 gigs.delete('/:id', async (c) => {

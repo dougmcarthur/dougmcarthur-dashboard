@@ -328,8 +328,24 @@ export interface HealthStatus {
   tasksGrant: CalendarGrant
   /** The opt-in that writes into the artist's own calendars. */
   primaryCalendarGrant: CalendarGrant
+  /** The EPK folder in the artist's Drive. */
+  driveGrant: CalendarGrant
   /** Whether this deployment offers that opt-in at all. */
   primaryCalendarOffered: boolean
+}
+
+/** One Google account and the services it is connected for. */
+export interface GoogleAccount {
+  email: string | null
+  purposes: string[]
+  connectedAt: string | null
+}
+
+export interface GoogleAccountList {
+  configured: boolean
+  /** What one press of "Connect Google account" asks for. */
+  bundle: string[]
+  accounts: GoogleAccount[]
 }
 
 export interface CalendarGrant {
@@ -1094,6 +1110,16 @@ export const api = {
     delete: (id: string) => apiFetch<{ ok: boolean }>(`/reference-docs/${id}`, { method: 'DELETE' }),
   },
   health: () => apiFetch<HealthStatus>('/health'),
+  /** Google as accounts: one connect for every service, one disconnect per account. */
+  google: {
+    accounts: () => apiFetch<GoogleAccountList>('/google/accounts'),
+    connectHref: '/api/google/connect',
+    disconnect: (email: string | null) =>
+      apiFetch<{ ok: boolean; removed: string[] }>('/google/disconnect', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+  },
   /** Spend each refresh token once and record what Google said. */
   checkCredentials: () =>
     apiFetch<{ credentials: CredentialHealth[] }>('/health/check', { method: 'POST' }),

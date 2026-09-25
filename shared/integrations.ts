@@ -22,6 +22,7 @@ export type IntegrationId =
   | 'calendar.primary'
   | 'tasks'
   | 'gmail.drafts'
+  | 'drive'
   | 'gmail.mailbox'
   | 'email.sending'
 
@@ -137,6 +138,20 @@ export const INTEGRATIONS: IntegrationSpec[] = [
     breaks: 'Pitches have to be copied into a compose window by hand.',
   },
   {
+    id: 'drive',
+    name: 'Google Drive',
+    purpose: 'Keeps your EPK files in one folder you can share with juries and organisers.',
+    kind: 'grant',
+    access: [
+      'Create a folder in your Drive for your EPK, with a subfolder for each kind of file.',
+      'Open files you pick for it in Google’s own file picker, and copy them into that folder.',
+    ],
+    cannot: [
+      'See anything else in your Drive — Google does not give it the permission, so this holds even if the code is wrong.',
+    ],
+    breaks: 'EPK files have to be attached by hand each time somebody asks.',
+  },
+  {
     id: 'gmail.mailbox',
     name: 'Gmail mailbox',
     purpose: 'Reads replies from organisers so they can be matched to the right gig.',
@@ -214,4 +229,107 @@ export function integrationSpec(id: IntegrationId): IntegrationSpec {
 /** Only a grant can be connected or disconnected from the screen. */
 export function isConnectable(spec: IntegrationSpec): boolean {
   return spec.kind === 'grant'
+}
+
+/**
+ * The Google side of each row: which grant purpose it is, and what one press
+ * of "Connect Google account" covers. `calendar.primary` is a grant but not
+ * in the bundle — it is an opt-in with its own warning.
+ */
+export type GooglePurpose = 'calendar' | 'calendar.primary' | 'tasks' | 'gmail.compose' | 'drive'
+
+export const GOOGLE_PURPOSE_OF: Partial<Record<IntegrationId, GooglePurpose>> = {
+  calendar: 'calendar',
+  'calendar.primary': 'calendar.primary',
+  tasks: 'tasks',
+  'gmail.drafts': 'gmail.compose',
+  drive: 'drive',
+}
+
+/** Short names, for "Connected for Calendar, Tasks and Gmail drafts". */
+export const GOOGLE_SERVICE_LABEL: Record<GooglePurpose, string> = {
+  calendar: 'Calendar',
+  'calendar.primary': 'your own calendar',
+  tasks: 'Tasks',
+  'gmail.compose': 'Gmail drafts',
+  drive: 'Drive',
+}
+
+/** "Calendar, Tasks and Drive". */
+export function listServices(purposes: string[]): string {
+  const names = purposes.map((p) => GOOGLE_SERVICE_LABEL[p as GooglePurpose] ?? p)
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+export interface ConnectNotice {
+  tone: 'success' | 'warn' | 'danger'
+  lines: string[]
+}
+
+/**
+ * What to say when Google's consent round trip lands back on Settings.
+ *
+ * The callback always reported how it went — `#settings?calendar=failed` —
+ * and nothing read it, so a connection that failed after Google's screen said
+ * yes looked exactly like one that had never been tried. That is how a
+ * calendar was "successfully connected" with nothing stored. Each outcome
+ * says what happened and what to do; a partial one names every service it
+ * could not connect and why, since "connected three of four" without saying
+ * which is the worse answer.
+ */
+export function connectNotice(query: URLSearchParams): ConnectNotice | null {
+  const google = query.get('google')
+  const split = (key: string) => (query.get(key) ?? '').split(',').filter(Boolean)
+  const PER_SERVICE: Record<string, GooglePurpose> = { calendar: 'calendar', tasks: 'tasks', gmail: 'gmail.compose' }
+
+  const common = (outcome: string, what: string): ConnectNotice | null => {
+    switch (outcome) {
+      case 'access_denied':
+        return { tone: 'warn', lines: ['Cancelled on Google’s screen. Nothing was connected.'] }
+      case 'state_mismatch':
+        return {
+          tone: 'warn',
+          lines: ['That connection expired or was started in another tab. Nothing was connected — try again.'],
+        }
+      case 'failed':
+        return {
+          tone: 'danger',
+          lines: [
+            `Google said yes, but Scout could not finish connecting ${what}, so nothing was saved.`,
+            'The usual cause is the Google API for that service not being enabled in the Google Cloud project. Try again; if it keeps failing, the Worker log names the reason.',
+          ],
+        }
+      case 'missing_scope':
+        return {
+          tone: 'warn',
+          lines: [`${what} was left unticked on Google’s screen, so it is connected without permission to do anything. Connect it again and leave it ticked.`],
+        }
+      default:
+        return null
+    }
+  }
+
+  if (google) {
+    if (google === 'connected') return { tone: 'success', lines: ['Google account connected.'] }
+    if (google === 'partial') {
+      const lines = ['Google account connected, with gaps:']
+      const declined = split('declined')
+      const failed = split('failed')
+      const kept = split('kept')
+      if (declined.length) lines.push(`${listServices(declined)} ${declined.length === 1 ? 'was' : 'were'} left unticked on Google’s screen. Connect again to add ${declined.length === 1 ? 'it' : 'them'}.`)
+      if (failed.length) lines.push(`${listServices(failed)} could not be set up. The usual cause is its Google API not being enabled in the Google Cloud project.`)
+      if (kept.length) lines.push(`${listServices(kept)} stayed on the other Google account ${kept.length === 1 ? 'it was' : 'they were'} already connected to.`)
+      return { tone: failed.length ? 'danger' : 'warn', lines }
+    }
+    return common(google, 'your Google account')
+  }
+
+  for (const [key, purpose] of Object.entries(PER_SERVICE)) {
+    const outcome = query.get(key)
+    if (!outcome) continue
+    if (outcome === 'connected') return { tone: 'success', lines: [`${GOOGLE_SERVICE_LABEL[purpose]} connected.`] }
+    return common(outcome, GOOGLE_SERVICE_LABEL[purpose])
+  }
+  return null
 }

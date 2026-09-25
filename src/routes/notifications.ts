@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { desc, eq, inArray, lt, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import { scoped, withTenant, type TenantId } from '../db/scope'
+import { readGigs } from '../db/gigRows'
 import { tenantOf, type AppEnv } from '../context'
 import {
   gigOpportunities,
@@ -71,7 +72,7 @@ export async function composeFeed(env: Env, tenant: TenantId, now = new Date()) 
   const db = getDb(env.DB)
 
   const [gigs, sync, promo, [orphans], marks, events, runs] = await Promise.all([
-    db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant)).orderBy(desc(gigOpportunities.discoveredAt)),
+    db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant)).orderBy(desc(gigOpportunities.discoveredAt)).then(readGigs),
     db.select().from(syncTargets).where(scoped(syncTargets, tenant)).orderBy(desc(syncTargets.discoveredAt)),
     db.select().from(promoDrafts).where(scoped(promoDrafts, tenant)).orderBy(desc(promoDrafts.createdAt)),
     // Same predicate the Review screen's health row uses. Deliberately not

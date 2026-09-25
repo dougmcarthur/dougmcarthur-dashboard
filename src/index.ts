@@ -30,6 +30,7 @@ import manitobaMusic from './routes/manitobaMusic'
 import associationsRoute, { scanProfiles } from './routes/associations'
 import showsRoute from './routes/shows'
 import driveRoute from './routes/drive'
+import googleAccounts from './routes/googleAccounts'
 import { epk as epkRoute, publicEpk } from './routes/epk'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
 import { isDigestDue } from '../shared/digestSchedule'
@@ -44,6 +45,7 @@ import { eq } from 'drizzle-orm'
 import { getDb } from './db'
 import { gigOpportunities } from './db/schema'
 import { scoped, type TenantId } from './db/scope'
+import { readGigs } from './db/gigRows'
 import { reconcileAllGigs, type GigRow } from './lib/gigNudges'
 import { readNudgePreferences } from './lib/nudgeSettings'
 import type { RootEnv } from './context'
@@ -196,6 +198,7 @@ app.route('/api/connectors', connectors)
 app.route('/api/shows', showsRoute)
 app.route('/api/epk', epkRoute)
 app.route('/api/drive', driveRoute)
+app.route('/api/google', googleAccounts)
 app.route('/api/public', publicEpk)
 // The oversight surface. See ADMIN_API_PREFIX above for what the middleware
 // does with it, in both directions.
@@ -419,10 +422,12 @@ async function reconcileGigNudges(env: Env, tenant: TenantId, today: string): Pr
     env,
     {
       gigs: async () =>
-        (await db
-          .select()
-          .from(gigOpportunities)
-          .where(scoped(gigOpportunities, tenant))) as unknown as GigRow[],
+        readGigs(
+          await db
+            .select()
+            .from(gigOpportunities)
+            .where(scoped(gigOpportunities, tenant)),
+        ) as unknown as GigRow[],
       save: async (id, patch) => {
         // `updated_at` is deliberately left alone. Recording where a reminder
         // went is not a change to the gig, and touching it would wake every

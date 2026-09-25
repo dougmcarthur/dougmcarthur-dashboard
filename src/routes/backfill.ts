@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets } from '../db/schema'
 import { scoped, type TenantId } from '../db/scope'
+import { readGigs } from '../db/gigRows'
 import { tenantOf, type AppEnv } from '../context'
 import { gigNoteColumns, syncNoteColumns, changesFor, type ColumnChange } from '../../shared/noteColumns'
 import { readSetting, writeSetting, ONCE_KEYS } from '../lib/settings'
@@ -36,7 +37,7 @@ export interface RowPlan {
 
 async function plan(env: Env, tenant: TenantId): Promise<{ rows: RowPlan[]; scanned: number }> {
   const db = getDb(env.DB)
-  const gigs = await db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant))
+  const gigs = readGigs(await db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant)))
   const syncs = await db.select().from(syncTargets).where(scoped(syncTargets, tenant))
   const rows: RowPlan[] = []
 
