@@ -133,8 +133,9 @@ export const SESSION_COOKIE = '__Host-mhq_session'
  *
  * It comes from `DASHBOARD_URL` rather than from the request, because a
  * request header is written by whoever is asking. The request URL is only
- * consulted when no dashboard URL is configured at all, which in practice
- * means `wrangler dev`.
+ * consulted when no dashboard URL is configured, or the configured one is
+ * itself local — which is what `npm run dev:api` passes, because plain
+ * `wrangler dev` would serve the production value from `[vars]`.
  */
 export interface RelyingParty {
   rpId: string

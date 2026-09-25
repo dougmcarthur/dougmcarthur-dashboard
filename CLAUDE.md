@@ -460,10 +460,27 @@ relying-party ID, which is baked into every credential at registration and
 checked on every assertion — so changing the hostname invalidates every passkey
 already enrolled. It is read from the var rather than from the request because
 a request header is written by whoever is asking; the request URL is only
-consulted when nothing is configured, which in practice means `wrangler dev`.
-`relyingParty` in `shared/auth.ts` is where that decision lives, and local
-development is deliberately two origins, because Vite serves the browser on
-5173 and proxies to wrangler on 8787.
+consulted when nothing is configured, or when what is configured is itself
+`localhost`. `relyingParty` in `shared/auth.ts` is where that decision lives,
+and local development is deliberately two origins, because Vite serves the
+browser on 5173 and proxies to wrangler on 8787.
+
+**Run the Worker locally with `npm run dev:api`, never bare `wrangler dev`.**
+`wrangler dev` reads `[vars]`, so it serves with the production
+`DASHBOARD_URL` — the relying party becomes `scout.sundogsmusic.ca`, and "Add a
+passkey" at `localhost:8787` fails with *The RP ID "scout.sundogsmusic.ca" is
+invalid for this domain*. It used to say "nothing configured in practice means
+`wrangler dev`" here, which was never true while the var sat in `[vars]`.
+`dev:api` passes `--var DASHBOARD_URL:http://localhost:8787`, which outranks
+`[vars]`; a local value hands the decision back to the request host, so
+`127.0.0.1` works as well. It is a script argument rather than a `.dev.vars`
+line because `.dev.vars` is gitignored and copied by hand, so a clean checkout
+would still be broken. `test/auth.test.ts` fails if the script loses it.
+
+The local database scripts run wrangler through `scripts/lib/wrangler.mjs` —
+wrangler's own bin under `process.execPath` — rather than `npx`: on Windows npx
+is `npx.cmd`, which `execFileSync` cannot find, and `shell: true` would let
+cmd.exe re-split the SQL and paths the scripts pass.
 
 **The read path is three unbounded scans, and they are indexed now.**
 `composeFeed` and `buildReviewQueue` both open by reading every gig, every

@@ -50,7 +50,7 @@ describe('form controls come from one place', () => {
   it('has no per-page copy of the input class string', () => {
     const copies = FILES.filter(
       (f) =>
-        !f.includes('/ui/') &&
+        !/[\\/]ui[\\/]/.test(f) &&
         /border border-line-strong rounded-md[^'"]*focus:ring-accent/.test(readFileSync(f, 'utf8')),
     )
     expect(copies).toEqual([])
@@ -566,7 +566,9 @@ describe('the shapes that were being spelled out by hand', () => {
       const p = join(dir, name)
       return statSync(p).isDirectory() ? walk(p) : p.endsWith('.tsx') ? [p] : []
     })
-  })('frontend/src').filter((f) => !f.includes('/ui/'))
+  // Either separator: `join` writes backslashes on Windows, where a '/ui/'
+  // test exempted nothing and failed on the shared components themselves.
+  })('frontend/src').filter((f) => !/[\\/]ui[\\/]/.test(f))
 
   const sources = files.map((f) => [f, readFileSync(f, 'utf8')] as const)
 

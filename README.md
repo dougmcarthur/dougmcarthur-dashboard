@@ -621,6 +621,14 @@ npm run dev:api
 npm run dev:ui
 ```
 
+Start the Worker with `npm run dev:api` rather than bare `wrangler dev`. The
+script overrides `DASHBOARD_URL` to `http://localhost:8787`; without it wrangler
+serves the production value from `[vars]`, the passkey relying party becomes
+`scout.sundogsmusic.ca`, and "Add a passkey" fails on localhost. Run
+`npm run build:ui` once first: wrangler refuses to start while the `[assets]`
+directory, `dist/`, does not exist. The same pair, `npm run build:ui && npm run
+dev:api`, serves the built UI and the API together on :8787 without Vite.
+
 Copy `.dev.vars.example` to `.dev.vars` and fill in the Google/Gmail secrets
 for local integration testing (see `docs/google-calendar-setup.md` and
 `docs/gmail-setup.md`). `.dev.vars` is gitignored.
