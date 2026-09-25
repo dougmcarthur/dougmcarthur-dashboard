@@ -92,7 +92,7 @@ describe('shape', () => {
     expect(out.audio).toHaveLength(1)
   })
 
-  it('opens on the shortest bio', () => {
+  it('orders bios shortest first, so the switch reads Short → Long', () => {
     const out = epk([
       asset({ kind: 'bio', label: 'Long', value: 'word '.repeat(300) }),
       asset({ kind: 'bio', label: 'Short', value: 'Five words is enough here.' }),

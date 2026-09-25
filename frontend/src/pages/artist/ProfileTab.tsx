@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, type EpkAudience, type EpkShare } from '../../api'
+import { api, type EpkAudience, type EpkShare, type PublicEpk } from '../../api'
 import { EpkView } from '../../components/epk/EpkView'
 import { Button } from '../../components/ui/Button'
 import { FIELD } from '../../components/ui/Field'
 import { Card } from '../../components/ui/Surface'
 import { relativeTime, shortDate } from '../../format'
-import { WITHHELD_REASONS } from '../../../../shared/publicEpk'
+import { WITHHELD_REASONS, type WithheldReason } from '../../../../shared/publicEpk'
 
 /**
  * The EPK as the page a share link opens, and the links themselves.
@@ -148,10 +148,24 @@ function ShareLinks({ audience }: { audience: EpkAudience }) {
   )
 }
 
+/**
+ * What the page is missing, in the order a programmer would notice. Only the
+ * artist sees this; the page itself never apologises for an empty section.
+ */
+function pageGaps(epk: PublicEpk, audience: EpkAudience): string[] {
+  const out: string[] = []
+  if (epk.photos.length === 0) out.push('A press photo with the photographer credited — the page opens on it.')
+  if (audience !== 'sync' && epk.videos.length === 0) out.push('A live video — the first thing a programmer watches.')
+  if (audience === 'sync' && epk.audio.length === 0) out.push('Recordings — a supervisor listens before reading anything.')
+  if (epk.bios.length === 0) out.push('A bio you have marked right.')
+  return out
+}
+
 export function ProfileTab() {
   const [audience, setAudience] = useState<EpkAudience>('festival')
   const preview = useQuery({ queryKey: ['epk-preview', audience], queryFn: () => api.epk.preview(audience) })
   const withheld = preview.data?.epk.withheld ?? []
+  const gaps = preview.data ? pageGaps(preview.data.epk, audience) : []
 
   return (
     <div className="space-y-4">
@@ -173,26 +187,48 @@ export function ProfileTab() {
 
       <ShareLinks audience={audience} />
 
-      {withheld.length > 0 && (
-        <Card className="space-y-2">
-          <p className="text-sm text-ink">
-            {withheld.length === 1 ? 'One thing in your library is' : `${withheld.length} things in your library are`} not on
-            this page.
-          </p>
-          <ul className="text-xs text-muted space-y-0.5">
-            {withheld.map((w, i) => (
-              <li key={`${w.label}-${i}`}>
-                <span className="text-body">{w.label}</span> — {WITHHELD_REASONS[w.reason]}
-              </li>
-            ))}
-          </ul>
+      {preview.data && (gaps.length > 0 || withheld.length > 0) && (
+        <Card className="space-y-3">
+          {gaps.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-ink">What would make this page stronger</p>
+              <ul className="text-xs text-body space-y-0.5 list-disc pl-4">
+                {gaps.map((g) => (
+                  <li key={g}>{g}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {withheld.length > 0 && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-sm text-ink">
+                {withheld.length === 1 ? 'One thing in your library is' : `${withheld.length} things in your library are`} not
+                on this page
+              </summary>
+              <ul className="mt-2 space-y-1.5">
+                {(Object.keys(WITHHELD_REASONS) as WithheldReason[])
+                  .filter((r) => withheld.some((w) => w.reason === r))
+                  .map((r) => (
+                    <li key={r}>
+                      <span className="text-body">
+                        {withheld
+                          .filter((w) => w.reason === r)
+                          .map((w) => w.label)
+                          .join(', ')}
+                      </span>
+                      <span className="text-muted"> — {WITHHELD_REASONS[r]}</span>
+                    </li>
+                  ))}
+              </ul>
+            </details>
+          )}
         </Card>
       )}
 
       {preview.isLoading && <p className="text-sm text-muted">Building the page…</p>}
       {preview.data && (
         <div className="rounded-xl border border-line overflow-hidden">
-          <p className="px-4 py-2 text-xs text-muted bg-sunken border-b border-line">
+          <p className="relative z-10 px-4 py-2 text-xs text-muted bg-sunken border-b border-line">
             This is what a share link shows.
           </p>
           <EpkView page={preview.data} />

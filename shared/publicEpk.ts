@@ -32,17 +32,34 @@
 import { assembleEpk, normaliseAssetKind, type ArtistAsset, type EpkAudience } from './artistAssets'
 
 /** Facts a public profile may state. Everything else a form can ask for stays private. */
-const PUBLIC_FACTS = new Set(['genre', 'hometown', 'lineup', 'set_length', 'streaming_stats', 'influences', 'one_liner', 'artist_name'])
+const PUBLIC_FACTS = new Set([
+  'genre', 'hometown', 'lineup', 'set_length', 'streaming_stats', 'influences', 'one_liner', 'artist_name',
+  // What the press has said and what you have done: the reason a stranger reads an EPK at all.
+  'press_quote', 'career_highlights', 'previous_performances',
+])
+
+/** A link its own label calls private is not one to publish, whatever else it is. */
+const PRIVATE_LINK = /\b(private|unlisted|internal|demos? only)\b/i
+/** A link for one audience — a sync pitch page — is noise on the others. */
+const SYNC_ONLY_LINK = /\bsync\b|\bpitch\b|\blicens/i
+/**
+ * A writing style guide describes how to write, not the artist. Its "Voice in
+ * One Sentence" is filed as a one-liner, correctly by the heading and wrongly
+ * for a page, where it read as the opening bio.
+ */
+const STYLE_GUIDE_SOURCE = /style[- ]?guide/i
 
 const PUBLIC_DOCUMENT = /stage ?plot|input ?list|rider|tech(nical)? (spec|sheet)|one[ -]?sheet|press ?kit|\bepk\b/i
 const PUBLIC_DOCUMENT_KINDS = new Set(['tech_requirements', 'epk'])
 
-export type WithheldReason = 'unreviewed' | 'no_credit' | 'private'
+export type WithheldReason = 'unreviewed' | 'no_credit' | 'private' | 'style_guide' | 'other_audience'
 
 export const WITHHELD_REASONS: Record<WithheldReason, string> = {
   unreviewed: 'not reviewed yet — mark it right in your library to publish it',
   no_credit: 'a photo with no photographer credit',
   private: 'kept private — contact details, fees and paperwork stay off the public page',
+  style_guide: 'from your writing style guide — notes on how to write, not about you',
+  other_audience: 'only on the version for the audience it is meant for',
 }
 
 export interface PublicItem {
@@ -54,11 +71,15 @@ export interface PublicItem {
   credit: string | null
   /** When the artist last confirmed it — a number is only as true as its date. */
   asOf: string
+  /** What question it answers, so the page can place it. */
+  questionKind: string | null
 }
 
 export interface PublicEpk {
   audience: EpkAudience
   bios: PublicItem[]
+  /** One-line descriptions: filed as bios, read as a subtitle. */
+  taglines: PublicItem[]
   facts: PublicItem[]
   videos: Array<PublicItem & { youtubeId: string | null }>
   audio: PublicItem[]
@@ -92,6 +113,7 @@ export function youtubeId(url: string): string | null {
 
 function whyPrivate(a: ArtistAsset): boolean {
   const kind = normaliseAssetKind(a.kind)
+  if (kind === 'link') return PRIVATE_LINK.test(a.label)
   if (kind === 'fact') return !PUBLIC_FACTS.has(a.questionKind ?? '')
   if (kind === 'document') {
     return !(PUBLIC_DOCUMENT_KINDS.has(a.questionKind ?? '') || PUBLIC_DOCUMENT.test(a.label))
@@ -106,7 +128,7 @@ export function buildPublicEpk(
   const epk = assembleEpk(assets, options)
   const out: PublicEpk = {
     audience: options.audience,
-    bios: [], facts: [], videos: [], audio: [], photos: [], documents: [], links: [], withheld: [],
+    bios: [], taglines: [], facts: [], videos: [], audio: [], photos: [], documents: [], links: [], withheld: [],
   }
 
   for (const section of epk.sections) {
@@ -118,6 +140,14 @@ export function buildPublicEpk(
       const withhold = (reason: WithheldReason) => out.withheld.push({ label: a.label, kind, reason })
       if (whyPrivate(a)) {
         withhold('private')
+        continue
+      }
+      if (STYLE_GUIDE_SOURCE.test(a.source ?? '')) {
+        withhold('style_guide')
+        continue
+      }
+      if (kind === 'link' && options.audience !== 'sync' && SYNC_ONLY_LINK.test(a.label)) {
+        withhold('other_audience')
         continue
       }
       if (a.health.freshness === 'unreviewed') {
@@ -135,8 +165,14 @@ export function buildPublicEpk(
         variant: a.variant,
         credit: a.credit?.trim() || null,
         asOf: a.updatedAt.slice(0, 10),
+        questionKind: a.questionKind ?? null,
       }
-      if (kind === 'bio') out.bios.push(item)
+      // A one-liner the artist typed in outranks one lifted from a document.
+      if (kind === 'bio' && a.questionKind === 'one_liner') {
+        if (!a.source || a.source === 'written') out.taglines.unshift(item)
+        else out.taglines.push(item)
+      }
+      else if (kind === 'bio') out.bios.push(item)
       else if (kind === 'fact') out.facts.push(item)
       else if (kind === 'video') out.videos.push({ ...item, youtubeId: youtubeId(value) })
       else if (kind === 'audio') out.audio.push(item)
@@ -146,8 +182,8 @@ export function buildPublicEpk(
     }
   }
 
-  // Shortest bio first: the page opens on the version a stranger will read,
-  // and offers the longer ones behind a switch.
+  // Shortest bio first, so the switch reads Short → Long; the page opens on
+  // the one nearest a hundred words (`epkProfile`).
   out.bios.sort((x, y) => x.value.length - y.value.length)
   return out
 }

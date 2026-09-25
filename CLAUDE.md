@@ -875,6 +875,16 @@ reaches a stranger because nobody classified it. `epk_shares` (migration
 `test/epkShare.test.ts` pins where the token travels and that the public route
 strips `withheld`.
 
+**The page never renders a library value raw.** Those values were written for
+forms: "Artist Name" is three lines of markdown, "Genre" a paragraph plus an
+FFO list plus influences, the quote carries its source on a dash line. The
+first version printed them verbatim and shipped a heading reading "Doug" under
+four lines of uppercase. `shared/epkProfile.ts` splits each along the seams the
+documents use and nothing cleverer; one-liners are a tagline, not a bio; a
+link whose label says *private* is withheld, a sync pitch page only shows on
+the sync version, and anything sourced from the writing style guide stays off
+— it describes how to write, not the artist.
+
 **The Drive folder is `drive.file`, and Google enforces the limit.** Scout
 reaches the folder it made on connect and files the artist picked in Google's
 picker — nothing else in their Drive, whatever this code does;
