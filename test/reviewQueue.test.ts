@@ -5,6 +5,7 @@ import {
   summariseQueue,
   isSettled,
   awaitingDecision,
+  deckItems,
 } from '../shared/reviewQueue'
 import type { GigOpportunity, SyncTarget } from '../shared/types'
 
@@ -782,5 +783,76 @@ describe('the queue reads the columns, not just the prose', () => {
     })
     expect(item.parsed.blockers).toEqual(['Needs a photo credit'])
     expect(item.flags.some((f) => f.id === 'blocked')).toBe(true)
+  })
+})
+
+// --- the Overview deck --------------------------------------------------------
+
+/**
+ * What the homepage deals, and in what order.
+ *
+ * It dealt from "needs a decision", ranked by flag weight, so a gig you had
+ * already said yes to kept coming back as a decision, and conflicts weighted
+ * 100 sat above opportunities nobody had looked at — while a discovered gig
+ * with no flag was never dealt at all. Now: a reply owed, then what is new,
+ * then only what bites. The In progress pile is a count and a link.
+ */
+describe('the Overview deck — a reply owed, then new, then urgent', () => {
+  const DECK_TODAY = '2026-08-25'
+  const queue = (input: Omit<Parameters<typeof buildReviewQueue>[0], 'today'>) =>
+    buildReviewQueue({ ...input, today: DECK_TODAY })
+  const titles = (items: ReturnType<typeof buildReviewQueue>) => items.map((i) => i.title)
+
+  const rows = {
+    // Never acted on, and nothing forcing it: no flag at all.
+    quietNew: gig({ id: 1, name: 'Quiet new', status: 'discovered' }),
+    // Never acted on, with a fee — flagged, still new.
+    paidNew: gig({ id: 2, name: 'Paid new', status: 'discovered', paid: 1, fee: '$25' }),
+    // Said yes, deadline months away: a to-do, not a card.
+    inProgress: gig({ id: 3, name: 'In progress', status: 'shortlisted', deadline: '2026-11-30' }),
+    // Said yes, due in five days: bites.
+    inProgressDue: gig({ id: 4, name: 'In progress, due soon', status: 'shortlisted', deadline: '2026-08-30' }),
+    // They want you, and are waiting on your answer.
+    invited: gig({ id: 5, name: 'Invited', status: 'invited' }),
+    // Marked sent, note says not: a conflict, which the deck leaves to the
+    // health block and the bell.
+    conflict: gig({ id: 6, name: 'Conflict', status: 'submitted', fitNotes: 'Submission status: NOT submitted.' }),
+    // New, but snoozed.
+    snoozed: gig({
+      id: 7, name: 'Snoozed new', status: 'discovered',
+      snoozedUntil: '2026-10-01', snoozedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z',
+    }),
+  }
+
+  it('deals a reply owed first, then everything new, then the rest of what bites', () => {
+    const order = titles(deckItems(queue({ gigs: Object.values(rows) })))
+    expect(order[0]).toBe('Invited')
+    expect(order.slice(1, 3).sort()).toEqual(['Paid new', 'Quiet new'])
+    expect(order.slice(3)).toEqual(['In progress, due soon'])
+  })
+
+  it('deals a new opportunity with no flag at all', () => {
+    // The one `awaitingDecision` never raised, so the old deck never dealt it.
+    const items = queue({ gigs: [rows.quietNew] })
+    expect(awaitingDecision(items[0])).toBe(false)
+    expect(titles(deckItems(items))).toEqual(['Quiet new'])
+  })
+
+  it('counts what you said yes to rather than dealing it, unless it bites', () => {
+    const items = queue({ gigs: Object.values(rows) })
+    expect(titles(deckItems(items))).not.toContain('In progress')
+    expect(items.filter((i) => matchesFilter(i, 'in_progress')).map((i) => i.title).sort())
+      .toEqual(['In progress', 'In progress, due soon'])
+  })
+
+  it('holds neither a conflict nor a snoozed item', () => {
+    const order = titles(deckItems(queue({ gigs: Object.values(rows) })))
+    expect(order).not.toContain('Conflict')
+    expect(order).not.toContain('Snoozed new')
+  })
+
+  it('agrees with the deck filter on membership, so the count matches the cards', () => {
+    const items = queue({ gigs: Object.values(rows) })
+    expect(deckItems(items).length).toBe(items.filter((i) => matchesFilter(i, 'deck')).length)
   })
 })

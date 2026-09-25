@@ -1327,6 +1327,20 @@ queue — the idle piles carry no flags and are the shape of the backlog — but
 anything it counts under a *flag* bucket has to be something the filter will
 show.
 
+**The Overview deck deals from its own filter, on purpose.** It used to deal
+"needs a decision" by flag weight, which kept dealing gigs you had already said
+yes to, put conflicts (weight 100) above opportunities nobody had looked at,
+and never dealt a discovered gig with no flag at all. `deckItems` deals a reply
+owed first, then what is new (`isNew`), then what bites (`isUrgent`); the In
+progress stage is a count and a link instead of cards. A reply owed goes ahead
+of what is new because it is the one urgent thing with nowhere else on the
+Overview — deadlines have the timing strip, conflicts the health block and the
+bell. The "all clear" line still tests `needs` as well, so a conflict or a
+silent application leaving the deck does not make the page claim nothing is
+wrong. Cards show `decision.badge` rather than the sentence, and the sentence
+moved to the Review detail, which had never shown it; `test/uiConsistency.test.ts`
+fails if either half goes.
+
 **Note prose names the artist.** The research agents wrote "pending Doug's
 review", so `depersonalise` rewrites the name into the second person on the way
 to the screen; the stored text is untouched. Two rules it must keep: pronouns

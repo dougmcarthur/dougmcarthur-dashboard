@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildReviewQueue } from '../shared/reviewQueue'
+import { buildReviewQueue, isNew } from '../shared/reviewQueue'
 import { GIG_STATUS_BY_INTENT, inlineGigMoves } from '../shared/decisionCopy'
 import { GIG_STATUSES, isGigTransitionAllowed, normaliseGigStatus } from '../shared/gigStatus'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../shared/types'
@@ -252,6 +252,25 @@ describe('decision copy — invariants that hold for every item', () => {
 
   it('always produces a non-empty sentence', () => {
     for (const i of items) expect(i.decision.rationale.trim().length).toBeGreaterThan(0)
+  })
+
+  it('always produces a badge short enough to be a badge', () => {
+    // The Overview card shows this instead of the sentence. A badge that grows
+    // into a phrase is the forty-word card coming back one word at a time.
+    for (const i of items) {
+      expect(i.decision.badge.trim().length, i.title).toBeGreaterThan(0)
+      expect(i.decision.badge.length, i.title).toBeLessThanOrEqual(16)
+    }
+  })
+
+  it('badges as New exactly what the deck deals as new', () => {
+    // The badge is chosen by the sentence's branch and the deck's tier by
+    // `isNew`; they must not disagree. A flagged new row takes its flag's
+    // badge instead — "Entry fee" says more than "New" — so this runs one
+    // way: a New badge is always on a new item.
+    for (const i of items.filter((i) => i.decision.badge === 'New')) {
+      expect(isNew(i), i.title).toBe(true)
+    }
   })
 
   it('never offers a gig a move the pipeline would refuse', () => {
