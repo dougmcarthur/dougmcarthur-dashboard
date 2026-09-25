@@ -1,6 +1,7 @@
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../api'
 import type { ReviewItem } from '../../../../shared/reviewQueue'
 import { gigMoves, gigStageLabel, type GigMove } from '../../../../shared/gigStage'
+import { promoMoves } from '../../../../shared/decisionCopy'
 import { Button, type ButtonVariant } from '../../components/ui/Button'
 
 /**
@@ -60,9 +61,16 @@ export function DecisionBar({
     buttons.push({ label: 'Archive', variant: 'neutral', run: () => onSync({ status: 'archived' }) })
   }
 
+  // From `promoMoves`, the table the deck card takes its one button from. The
+  // fixed pair that used to sit here offered Approve on copy already published.
   if (item.source.kind === 'promo') {
-    buttons.push({ label: 'Approve', variant: 'primary', run: () => onPromo({ status: 'approved' }) })
-    buttons.push({ label: 'Mark published', variant: 'neutral', run: () => onPromo({ status: 'published' }) })
+    promoMoves(item.source.row.status).forEach((move, i) => {
+      buttons.push({
+        label: move.action.label,
+        variant: i === 0 ? 'primary' : 'neutral',
+        run: () => onPromo({ status: move.to }),
+      })
+    })
   }
 
   // An archived gig has nowhere left to go, and a row of no buttons under a
@@ -70,7 +78,9 @@ export function DecisionBar({
   if (buttons.length === 0) {
     return (
       <p className="text-xs text-muted">
-        Nothing left to decide — {gigStageLabel(item.status).meaning.toLowerCase()}
+        {item.kind === 'gig'
+          ? `Nothing left to decide — ${gigStageLabel(item.status).meaning.toLowerCase()}`
+          : item.decision.rationale}
       </p>
     )
   }

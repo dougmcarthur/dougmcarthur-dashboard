@@ -2,7 +2,12 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type GigOpportunity, type SyncTarget, type PromoDraft } from '../api'
 import type { ReviewItem } from '../../../shared/reviewQueue'
-import { GIG_STATUS_BY_INTENT, type DecisionIntent } from '../../../shared/decisionCopy'
+import {
+  GIG_STATUS_BY_INTENT,
+  actionGlyph,
+  type ActionGlyph,
+  type DecisionIntent,
+} from '../../../shared/decisionCopy'
 import { KindTag } from './ReviewPanels'
 import { SnoozeMenu } from './SnoozeMenu'
 import { shortDate } from '../format'
@@ -14,9 +19,11 @@ import { shortDate } from '../format'
  * happens to be — the button no longer reads "Approve the spend" on one card
  * and "Approve email" on the next. A label that changes per item has to be
  * read every time; a fixed icon in a fixed position becomes muscle memory.
- * The words survive as the accessible name and the tooltip.
+ * The words survive as the accessible name and the tooltip. Which icon an
+ * action gets is `actionGlyph`, in shared/, so a test can hold every card to
+ * one of each: two checks on one card make the icon a guess again.
  */
-function ActionIcon({ name }: { name: 'check' | 'x' }) {
+function ActionIcon({ name }: { name: ActionGlyph }) {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"
          strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
@@ -350,7 +357,7 @@ export function DecisionDeck({
                     : 'bg-transparent border-danger-line text-danger-fg hover:bg-danger-bg'
                 }`}
               >
-                <ActionIcon name={a.tone === 'go' ? 'check' : 'x'} />
+                <ActionIcon name={actionGlyph(a)} />
               </button>
             ))}
             <button

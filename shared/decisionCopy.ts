@@ -317,10 +317,54 @@ const GIG_ACTIONS: Record<string, DecisionAction[]> = {
   ],
 }
 
-const PROMO_ACTIONS: [DecisionAction, DecisionAction] = [
-  { label: 'Approve', intent: 'approve', tone: 'go' },
-  { label: 'Mark published', intent: 'publish', tone: 'go' },
-]
+/**
+ * How an action looks on the Overview deck, which draws it as an icon alone.
+ *
+ * The icon follows the tone and nothing else, so the check always goes
+ * forward and the cross always ends it — a fixed icon in a fixed place is
+ * what makes the deck quick to use without reading. That only holds while a
+ * card never carries two actions with the same icon, so the choice lives
+ * here, where a test can check it against every card, rather than in the JSX.
+ */
+export type ActionGlyph = 'check' | 'x'
+
+export function actionGlyph(action: DecisionAction): ActionGlyph {
+  return action.tone === 'go' ? 'check' : 'x'
+}
+
+export interface PromoMove {
+  /** The status this writes. */
+  to: 'approved' | 'published'
+  action: DecisionAction
+}
+
+const APPROVE_PROMO: PromoMove = {
+  to: 'approved',
+  action: { label: 'Approve', intent: 'approve', tone: 'go' },
+}
+const PUBLISH_PROMO: PromoMove = {
+  to: 'published',
+  action: { label: 'Mark published', intent: 'publish', tone: 'go' },
+}
+
+/**
+ * The forward moves a promo draft offers, nearest first.
+ *
+ * The card used to offer Approve and Mark published together, whatever the
+ * status: two checks side by side, with only a tooltip to tell them apart,
+ * and Approve still showing on copy already published. A card takes the first
+ * move here; the Review bar lists them all, since going straight from draft to
+ * published is allowed — the Promo page's Publish button does exactly that.
+ *
+ * The column is free text (see shared/types.ts), so a status not named here is
+ * read as approved, which is what the sentence says about it too: only
+ * `draft` is unapproved and only `published` is finished.
+ */
+export function promoMoves(status: string): PromoMove[] {
+  if (status === 'draft') return [APPROVE_PROMO, PUBLISH_PROMO]
+  if (status === 'published') return []
+  return [PUBLISH_PROMO]
+}
 
 const SYNC_SENT_CHECK: [DecisionAction, DecisionAction] = [
   { label: 'It went out', intent: 'confirm_sent', tone: 'go' },
@@ -353,13 +397,18 @@ export function decisionFor(item: DecisionInput): Decision {
     .map((f) => f.label)
 
   if (kind === 'promo') {
+    // One button: the next step for this status. See `promoMoves`.
+    const actions = promoMoves(status).slice(0, 1).map((m) => m.action)
+    if (status === 'published') {
+      return { badge: 'Published', rationale: 'Published. Nothing left to decide.', actions }
+    }
     return {
       badge: status === 'draft' ? 'New' : 'Not published',
       rationale:
         status === 'draft'
           ? 'A drafted post that has not been approved yet. Read it and decide whether it goes out as written.'
           : 'Approved copy that has not been marked published. Confirm once it is out.',
-      actions: PROMO_ACTIONS,
+      actions,
     }
   }
 
