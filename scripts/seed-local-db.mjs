@@ -483,6 +483,12 @@ const statements = [
   ...insert('task_runs', taskRuns),
   ...insert('gig_replies', replies),
   ...insert('auth_enrolment_codes', [codeRow]),
+  // The gig rows above are written in the fourteen-status vocabulary, which is
+  // readable and is how rows looked before the rename — but production was
+  // converted by migration 0031, and the seed runs after the migrations, so
+  // without this the fixture would exercise a read path production no longer
+  // takes. The migration's own file, so the two conversions cannot drift.
+  readFileSync('migrations/0031_gig_status_to_stage.sql', 'utf8'),
 ]
 
 const counts = {

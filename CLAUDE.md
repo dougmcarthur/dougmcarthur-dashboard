@@ -727,9 +727,25 @@ because archiving never recorded why.
 **Storage is moving to the same shape, in two steps.** Deploy 1 put stages
 on screen over the old values. Deploy 2a (migration 0030) adds `outcome` and
 `flag` beside `status`, and new writes store the stage in `status` with those
-two beside it. Deploy 2b converts the rows written before 0030; it has to be a
-later merge, because CI migrates before it deploys, and the Worker in that gap
-must already read `closed` — deploy 1 reads it as a gig nobody has looked at.
+two beside it. Deploy 2b (migration 0031) converts the rows written before
+0030; it had to be a later merge, because CI migrates before it deploys, and
+the Worker in that gap must already read `closed` — deploy 1 reads it as a gig
+nobody has looked at.
+
+0031 converts only the seventeen spellings it knows, the fourteen statuses and
+four legacy words (`rejected` becomes Closed/passed — your decision, never
+theirs). Anything else, NULL included, is left as written: an unknown value
+already reads as a new gig, and rewriting it to `new` would read the same and
+destroy what it said. It leaves `updated_at` alone, so no snooze wakes.
+`test/gigStatusMigration.test.ts` builds the production schema in
+`node:sqlite` from `schema.sql` and every earlier migration, runs the file, and
+fails if any row reads back as a different stage. The local seed ends by
+applying the same file, so the fixture holds the shape production does.
+
+**The dual read stays.** `gigStatusFromStored` still accepts the fourteen, the
+"read both spellings" move `normaliseGigStatus` makes: it is what made 0031
+safe to run under the Worker before it, and removing it buys nothing while it
+guards a row somebody writes by hand.
 
 **The code still reasons in the fourteen statuses, and that is deliberate.**
 The queue, the reply matcher, the nudges and the pipeline all read them and
