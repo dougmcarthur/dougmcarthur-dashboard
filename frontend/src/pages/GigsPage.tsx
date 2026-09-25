@@ -11,7 +11,10 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { api, type GigOpportunity } from '../api'
-import { GIG_STATUSES, GIG_STATUS_META, normaliseGigStatus } from '../../../shared/gigStatus'
+import { GIG_STAGES, GIG_STAGE_META, type GigStage } from '../../../shared/gigStage'
+import { inlineGigMoves } from '../../../shared/decisionCopy'
+import { parseDeadline } from '../../../shared/reviewParse'
+import { localToday, shortDate } from '../format'
 import { StatusBadge } from '../components/StatusBadge'
 import { Chevron } from '../components/Chevron'
 import { SkeletonTable } from '../components/Skeleton'
@@ -26,6 +29,17 @@ import { Banner, CAPTION_CLASS, Card } from '../components/ui/Surface'
 // can never disagree about what a status is or what it means.
 
 const col = createColumnHelper<GigOpportunity>()
+
+/**
+ * The name column, pinned to the left edge below `md` while the rest of the
+ * table scrolls under it. The rule on its right edge is a shadow rather than a
+ * border so it does not change the column's width.
+ */
+const PINNED_CELL = 'max-md:sticky max-md:left-0 max-md:z-10 max-md:shadow-[1px_0_0_rgb(var(--c-line))]'
+
+/** An expanded row's `bg-info-bg/40`, laid over the pinned cell's opaque surface. */
+const PINNED_TINT =
+  'max-md:[background-image:linear-gradient(rgb(var(--c-info-bg)/0.4),rgb(var(--c-info-bg)/0.4))]'
 
 const TYPE_COLORS: Record<string, string> = {
   festival: 'bg-cat-violet-bg text-cat-violet-fg',
@@ -65,12 +79,14 @@ export function GigsPage() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [statusFilter, setStatusFilter] = useState('')
+  // Four stages, not fourteen statuses: see shared/gigStage.ts. The route
+  // maps a stage to the stored statuses in it.
+  const [stageFilter, setStageFilter] = useState<GigStage | ''>('')
   const [showCreate, setShowCreate] = useState(false)
 
   const { data = [], isLoading, error } = useQuery({
-    queryKey: ['gigs', statusFilter],
-    queryFn: () => api.gigs.list(statusFilter ? { status: statusFilter } : undefined),
+    queryKey: ['gigs', stageFilter],
+    queryFn: () => api.gigs.list(stageFilter ? { stage: stageFilter } : undefined),
   })
 
   const patchMutation = useMutation({
@@ -101,6 +117,10 @@ export function GigsPage() {
   }
 
   const isPatching = patchMutation.isPending
+
+  // Read once per render and handed to every cell, so the whole table counts
+  // from the same day and no cell reads the clock for itself.
+  const today = localToday()
 
   /**
    * Whether any row in the table has ever filled this in.
@@ -153,16 +173,40 @@ export function GigsPage() {
       : []),
     col.accessor('deadline', {
       header: 'Deadline',
+      // Most rows hold prose here, not a date — "None — rolling artist roster
+      // intake" — and a Date built from prose is Invalid Date, whose
+      // countdown is NaN and never urgent. `parseDeadline` goes through `splitDeadline`
+      // and counts against the `today` this render was handed.
       cell: (info) => {
-        const d = info.getValue()
-        if (!d) return <span className="text-faint">—</span>
-        const days = Math.round((new Date(d).getTime() - Date.now()) / 86400_000)
+        const row = info.row.original
+        const d = parseDeadline(info.getValue(), { note: row.deadlineNote, opensAt: row.opensAt, today })
+        // No closing date, but the window's opening is known — the fixture's
+        // "applications open in three weeks" row. An em-dash there reads as
+        // "nothing known", which is the one thing it is not.
+        if (!d.raw && !d.note) {
+          return d.opensAt
+            ? <span className="text-xs text-muted whitespace-nowrap">Opens {shortDate(d.opensAt)}</span>
+            : <span className="text-faint">—</span>
+        }
+        // Where a date was recovered from prose the prose stays beside it,
+        // exactly as the Review pane does: the recovery is a reading, and
+        // "Nov 20" alone claims a certainty the column does not have.
+        const prose = d.exact ? d.note : (d.raw ?? d.note)
+        if (!d.date) {
+          return <span className="max-w-56 text-xs text-muted line-clamp-2" title={prose ?? undefined}>{prose}</span>
+        }
+        const days = d.daysUntil ?? -1
         const urgent = days >= 0 && days <= 14
         return (
-          <span className={urgent ? 'text-cat-orange-fg font-medium' : 'text-body'}>
-            {d}
-            {urgent && days <= 7 && <span className="ml-1 text-xs text-cat-orange-fg">({days}d)</span>}
-          </span>
+          <div className="max-w-56">
+            <span className={`whitespace-nowrap ${urgent ? 'text-cat-orange-fg font-medium' : 'text-body'}`}>
+              {shortDate(d.date)}
+              {urgent && days <= 7 && (
+                <span className="ml-1 text-xs text-cat-orange-fg">({days === 0 ? 'today' : `${days}d`})</span>
+              )}
+            </span>
+            {prose && <span className="text-xs text-muted line-clamp-2" title={prose}>{prose}</span>}
+          </div>
         )
       },
     }),
@@ -194,33 +238,31 @@ export function GigsPage() {
       : []),
     col.accessor('status', {
       header: 'Status',
-      cell: (info) => <StatusBadge status={info.getValue()} kind="gig" />,
+      cell: (info) => <StatusBadge status={info.getValue()} kind="gig" gigType={info.row.original.type} />,
     }),
     col.display({
       id: 'actions',
       header: '',
+      // Asked of the pipeline, never listed here. This cell used to hardcode
+      // Will apply / Pass on a discovered row and Applied on a shortlisted one
+      // — legal today, but a claim about legality nothing checked, and the
+      // Review bar's fixed four went wrong exactly that way. `inlineGigMoves`
+      // keeps the cell to the obvious next step; every other legal move is in
+      // the expanded row's picker.
       cell: (info) => {
         const row = info.row.original
+        // `whitespace-nowrap` because the header is empty and the column is
+        // the first squeezed: "Will apply" broke onto two lines, and its Pass
+        // stretched beside it to a 44px pill in a row of 26px ones.
         return (
-          <div className="flex gap-1 justify-end">
-            {normaliseGigStatus(row.status) === 'discovered' && (
-              <>
-                <Button variant="good" size="sm" disabled={isPatching}
-                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'shortlisted' } })}>
-                  Will apply
-                </Button>
-                <Button variant="danger" size="sm" disabled={isPatching}
-                  onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'passed' } })}>
-                  Pass
-                </Button>
-              </>
-            )}
-            {normaliseGigStatus(row.status) === 'shortlisted' && (
-              <Button variant="info" size="sm" disabled={isPatching}
-                onClick={() => patchMutation.mutate({ id: row.id, body: { status: 'submitted' } })}>
-                Applied
+          <div className="flex gap-1 justify-end whitespace-nowrap">
+            {inlineGigMoves(row.status, row.type).map(({ to, tone, label, meaning }) => (
+              <Button key={to} variant={tone === 'go' ? 'good' : 'danger'} size="sm" disabled={isPatching}
+                title={meaning}
+                onClick={() => patchMutation.mutate({ id: row.id, body: { status: to } })}>
+                {label}
               </Button>
-            )}
+            ))}
           </div>
         )
       },
@@ -248,14 +290,14 @@ export function GigsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-ink">Gig Opportunities</h1>
-        <div className="flex gap-2 items-center">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER}>
-            <option value="">All statuses</option>
-            {GIG_STATUSES.map((s) => (
-              <option key={s} value={s} title={GIG_STATUS_META[s].meaning}>
-                {GIG_STATUS_META[s].label}
+        <div className="flex flex-wrap gap-2 items-center">
+          <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as GigStage | '')} className={FILTER}>
+            <option value="">All stages</option>
+            {GIG_STAGES.map((s) => (
+              <option key={s} value={s} title={GIG_STAGE_META[s].meaning}>
+                {GIG_STAGE_META[s].label}
               </option>
             ))}
           </select>
@@ -282,14 +324,25 @@ export function GigsPage() {
         <SkeletonTable rows={6} cols={8} />
       ) : (
         <Card pad="none" clip>
-          <div className="overflow-x-auto">
+          {/*
+            On a phone this table is twice the width of the screen, and it stays
+            a table — scrolling sideways — with two things pinned so it reads:
+            the name, so a status three columns over still says whose it is,
+            and the expanded detail, which was the table's full width and ran
+            every line of prose 390px off the glass. `container-type` is what
+            lets the detail size itself to the visible width as `100cqw`
+            without restating the page gutters at each breakpoint.
+          */}
+          <div className="overflow-x-auto [container-type:inline-size]">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-sunken border-b border-line">
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id}>
-                  {hg.headers.map((header) => (
+                  {hg.headers.map((header, i) => (
                     <th key={header.id} onClick={header.column.getToggleSortingHandler()}
-                      className={`px-4 py-2.5 text-left ${CAPTION_CLASS} select-none cursor-pointer whitespace-nowrap hover:text-body transition-colors`}>
+                      className={`px-4 py-2.5 text-left ${CAPTION_CLASS} select-none cursor-pointer whitespace-nowrap hover:text-body transition-colors ${
+                        i === 0 ? PINNED_CELL + ' max-md:bg-sunken' : ''
+                      }`}>
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       <span className="ml-1 text-faint">
                         {header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : ''}
@@ -303,15 +356,23 @@ export function GigsPage() {
               {table.getRowModel().rows.map((row) => (
                 <Fragment key={row.id}>
                   <tr className={`transition-colors ${expanded.has(row.original.id) ? 'bg-info-bg/40' : 'hover:bg-sunken'}`}>
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-3 text-body">
+                    {row.getVisibleCells().map((cell, i) => (
+                      <td key={cell.id} className={`px-4 py-3 text-body ${
+                        // Pinned, so it needs a background of its own or the
+                        // columns scroll through it; an expanded row's tint
+                        // is laid over it as a gradient to match the row.
+                        i === 0
+                          ? `${PINNED_CELL} max-md:bg-surface ${expanded.has(row.original.id) ? PINNED_TINT : ''}`
+                          : ''
+                      }`}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
                   </tr>
                   {expanded.has(row.original.id) && (
                     <tr>
-                      <td colSpan={columns.length} className="px-6 pb-5 pt-3 bg-info-bg/40 border-b border-info-line">
+                      <td colSpan={columns.length} className="p-0 bg-info-bg/40 border-b border-info-line">
+                        <div className="px-6 pb-5 pt-3 max-md:px-4 max-md:sticky max-md:left-0 max-md:w-[100cqw]">
                         {editingId === row.original.id ? (
                           <EditGigPanel
                             gig={row.original}
@@ -332,6 +393,7 @@ export function GigsPage() {
                             isPatching={isPatching}
                           />
                         )}
+                        </div>
                       </td>
                     </tr>
                   )}

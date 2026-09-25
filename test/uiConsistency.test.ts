@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+// posix, so paths read `frontend/src/components/ui/…` on Windows too and the
+// `/ui/` exclusions below match there as well as in CI.
+import { join } from 'node:path/posix'
 
 /**
  * Source-level guards for mistakes that typecheck and render fine.
@@ -81,7 +83,7 @@ describe('gig transitions are asked for, not listed', () => {
     // was no way to record a booking at all. Nothing typechecked wrong and
     // nothing rendered wrong — you found out by clicking.
     expect(src).not.toMatch(/onGig\(\{\s*status:\s*['"`]/)
-    expect(src).toContain('nextGigStatuses')
+    expect(src).toContain('gigMoves')
   })
 
   it('the overview deck resolves gig intents through the shared table', () => {
@@ -95,6 +97,37 @@ describe('gig transitions are asked for, not listed', () => {
 
   it('the timing strip asks whether a move is legal rather than listing it', () => {
     expect(read('frontend/src/components/TimingStrip.tsx')).toContain('isGigTransitionAllowed')
+  })
+
+  it('the gigs table writes no gig status it chose itself', () => {
+    const src = read('frontend/src/pages/GigsPage.tsx')
+    // Missed when Review and Overview were fixed: the actions cell carried
+    // `body: { status: 'shortlisted' }` and two siblings, gated on
+    // `normaliseGigStatus(row.status) === 'discovered'`. All three happened
+    // to be legal, which is why nobody noticed — a claim about the pipeline
+    // that nothing checks is right only until the pipeline changes.
+    expect(src).not.toMatch(/status:\s*['"`]/)
+    expect(src).not.toMatch(/===\s*['"`](?:discovered|shortlisted|preparing|submitted|invited)['"`]/)
+    expect(src).toContain('inlineGigMoves')
+  })
+})
+
+/**
+ * A deadline is counted through the parser, against a date the screen was
+ * handed.
+ *
+ * Most gig rows hold prose in `deadline`, and `new Date(prose)` is Invalid
+ * Date: its countdown is NaN, never urgent and never an error, so the table
+ * silently stopped warning about anything written as a sentence. And a cell
+ * that reads `Date.now()` is logic reading the clock, which is how a queue
+ * fixture passed one day and failed in CI the next.
+ */
+describe('the gigs table reads deadlines through the parser', () => {
+  const src = readFileSync('frontend/src/pages/GigsPage.tsx', 'utf8')
+
+  it('never turns the column into a Date itself', () => {
+    expect(src).not.toMatch(/new Date\(|Date\.now\(\)/)
+    expect(src).toContain('parseDeadline(')
   })
 })
 
@@ -241,6 +274,8 @@ describe('a panel that writes in bulk previews first', () => {
     'frontend/src/pages/artist/SourcePanel.tsx',
     'frontend/src/components/NotesBackfillCard.tsx',
     'frontend/src/components/GmailDraftsPanel.tsx',
+    'frontend/src/pages/artist/AssociationPanel.tsx',
+    'frontend/src/pages/artist/DriveTab.tsx',
   ]
 
   it('uses the shared shell rather than a third hand-rolled one', () => {
@@ -254,8 +289,9 @@ describe('a panel that writes in bulk previews first', () => {
     // first is one you find out about afterwards.
     for (const file of BULK) {
       const src = readFileSync(file, 'utf8')
-      const preview = src.search(/\.(?:preview|sourcePreview)\(\)/)
-      const write = src.search(/\.(?:apply|source)\(\)/)
+      // With or without an argument: a panel per association passes its id.
+      const preview = src.search(/\.(?:preview|sourcePreview)\([\w.]*\)/)
+      const write = src.search(/\.(?:apply|source)\([\w.]*\)/)
       expect(preview, file).toBeGreaterThan(-1)
       expect(write, file).toBeGreaterThan(-1)
       expect(preview, file).toBeLessThan(write)
@@ -638,5 +674,148 @@ describe('density: a thing that is always the same is not information', () => {
     // `opacity`, so the buttons stay in the tab order for `:focus-within` to
     // find. `display: none` would take them out of it.
     expect(css).toMatch(/\.row-actions \{\s*opacity: 0;/)
+  })
+})
+
+/**
+ * Every colour token has to accept an opacity modifier.
+ *
+ * The tokens were `var(--c-warn-bg)`, a finished colour, and Tailwind cannot
+ * put an alpha on one — so for `bg-canvas/90` it emitted no rule at all. That
+ * typechecks, builds and renders: the modal backdrop was transparent, so page
+ * text showed straight through behind modal text, and the sticky header and
+ * every warning banner had no background. Eleven classes, none of them visible
+ * as a fault in the source.
+ *
+ * The fix is two halves that have to agree, so both are checked: the config
+ * wraps each variable as `rgb(var(--c-x) / <alpha-value>)`, and the stylesheet
+ * stores bare channels for that to wrap. A hex value on the CSS side makes
+ * `rgb(#0b0c0b / 0.9)`, which is invalid and every bit as silently transparent.
+ */
+describe('colour tokens take an opacity modifier', () => {
+  const css = readFileSync('frontend/src/index.css', 'utf8')
+
+  it('declares every colour in the Tailwind config with <alpha-value>', async () => {
+    const config = (await import('../tailwind.config.js')).default
+    const colors = config.theme.extend.colors as Record<string, string>
+    const bare = Object.entries(colors).filter(([, v]) => !v.includes('<alpha-value>'))
+    expect(bare.map(([k, v]) => `${k}: ${v}`)).toEqual([])
+    expect(Object.keys(colors).length).toBeGreaterThan(0)
+  })
+
+  it('stores every --c- colour as RGB channels, never a finished colour', () => {
+    const finished = [...css.matchAll(/(--c-[a-z-]+):\s*([^;]+);/g)]
+      .filter(([, , value]) => !/^\d{1,3} \d{1,3} \d{1,3}$/.test(value.trim()))
+      .map(([, name, value]) => `${name}: ${value}`)
+    expect(finished).toEqual([])
+  })
+
+  it('wraps a --c- variable in rgb() wherever it is read directly', () => {
+    const naked = [...css.matchAll(/(.{0,4})var\(--c-[a-z-]+\)/g)].filter(([, before]) => !before.endsWith('rgb('))
+    expect(naked.map(([m]) => m)).toEqual([])
+  })
+})
+
+/**
+ * A modal's backdrop dims the page; it does not replace it.
+ *
+ * Seeing where you were is what makes a dialog feel like a detour you can
+ * leave rather than a screen you have been moved to. The backdrop was a 90%
+ * canvas wash: near-opaque, and in the light theme it lightened the page to
+ * white instead of dimming it. `scrim` is dark in both themes, and the page
+ * behind stays recognisable through a light blur.
+ */
+describe('a modal backdrop leaves the page in view', () => {
+  const src = readFileSync('frontend/src/components/ui/Modal.tsx', 'utf8')
+  const backdrop = src.match(/className="(fixed inset-0[^"]*)"/)?.[1] ?? ''
+
+  it('tints with the scrim, translucently, never with a surface colour', () => {
+    const alpha = Number(backdrop.match(/\bbg-scrim\/(\d+)\b/)?.[1])
+    expect(alpha, backdrop).toBeGreaterThan(0)
+    expect(alpha, backdrop).toBeLessThanOrEqual(60)
+    expect(backdrop).not.toMatch(/\bbg-(canvas|surface|raised|sunken)\b/)
+  })
+
+  it('softens the page rather than hiding it', () => {
+    expect(backdrop).toMatch(/\bbackdrop-blur(-sm|-\[\dpx\])?\b/)
+  })
+
+  it('never centres in a way that can push the top out of reach', () => {
+    // `items-center` on a scrolling backdrop puts an over-tall dialog's top
+    // above the scroll origin. On a phone held sideways that was the title
+    // and the Close button, at -40px, with no way to scroll up to them. The
+    // panel centres itself with an auto margin, which gives way instead.
+    expect(backdrop).not.toMatch(/\bitems-center\b/)
+    expect(src).toMatch(/className="[^"]*\bmy-auto\b[^"]*"/)
+  })
+
+  it('opens at the top rather than scrolled to fit', () => {
+    // Focusing a dialog taller than the screen scrolls it into view, which
+    // took the top margin away on a 320×640 phone.
+    expect(src).toContain('focus({ preventScroll: true })')
+  })
+})
+
+/**
+ * Nothing is hidden behind a hover a phone cannot make.
+ *
+ * The notification dismiss button was `opacity-0 group-hover:opacity-100`, so
+ * on every touch screen it was invisible: the only way to dismiss a
+ * notification on a phone was to tap an empty-looking corner. `row-actions`
+ * in index.css does the same job gated on `(hover: hover)`, which is the
+ * whole reason it is a media query rather than a Tailwind variant.
+ */
+describe('a control hidden until hover is shown on a touch screen', () => {
+  it('reveals on hover through row-actions, never through a hover variant', () => {
+    const offenders = FILES.filter((f) =>
+      /\b(group-)?hover:opacity-100\b/.test(withoutComments(readFileSync(f, 'utf8'))),
+    )
+    expect(offenders).toEqual([])
+  })
+})
+
+/**
+ * Choosing an item on a phone brings the item to you.
+ *
+ * Below `lg` the queue and the detail stack, and the queue is the whole list,
+ * so the detail sat a screen or more below the row you tapped. The tap
+ * changed something nobody could see and looked dead. `choose` scrolls the
+ * detail into view after it renders; a row wired straight to
+ * `setSelectedKey` would typecheck and quietly bring the dead tap back.
+ */
+describe('the review queue reveals what you chose', () => {
+  const src = readFileSync('frontend/src/pages/ReviewPage.tsx', 'utf8')
+
+  it('selects through choose, never by setting the key directly', () => {
+    expect(src).toMatch(/onSelect=\{\(\) => choose\(item\.key\)\}/)
+    expect(src).not.toMatch(/onSelect=\{\(\) => setSelectedKey/)
+  })
+
+  it('scrolls after the chosen item renders, not at the tap', () => {
+    // At the tap the page still held the previous detail, and a longer new
+    // one stopped short where the old page ended.
+    const choose = src.slice(src.indexOf('const choose'), src.indexOf('useEffect(', src.indexOf('const choose')))
+    expect(choose).toContain('pendingReveal.current = key')
+    expect(choose).not.toMatch(/setSelectedKey\(key\)[\s\S]*reveal\(/)
+  })
+})
+
+/**
+ * FIELD fills its container; a width beside it is a second answer that loses.
+ *
+ * `${FIELD} w-20` put two widths on one element, and Tailwind emits `w-full`
+ * after `w-20`, so the fee's currency select filled its whole column. It
+ * could not shrink, and pushed the amount box outside the column — at every
+ * width, desktop included, in both gig forms. A fixed width goes on a wrapper
+ * and the field fills that.
+ */
+describe('a FIELD is sized by its container', () => {
+  it('never adds a width utility to FIELD, which already says w-full', () => {
+    const offenders = FILES.flatMap((f) =>
+      [...withoutComments(readFileSync(f, 'utf8')).matchAll(/\$\{FIELD\}[^`]*?(?<![\w-])w-[\w[\]().-]+/g)].map(
+        (m) => `${f}: ${m[0]}`,
+      ),
+    )
+    expect(offenders).toEqual([])
   })
 })

@@ -11,7 +11,11 @@ import { Button } from '../components/ui/Button'
 import { FILTER } from '../components/ui/Field'
 import { AssetRow } from './artist/AssetRow'
 import { AssetForm } from './artist/AssetForm'
+import { ShowsPanel } from './artist/ShowsPanel'
+import { ProfileTab } from './artist/ProfileTab'
+import { DriveTab } from './artist/DriveTab'
 import { SourcePanel } from './artist/SourcePanel'
+import { AssociationPanels } from './artist/AssociationPanel'
 import { Explainer } from '../components/ui/Explainer'
 import { Caption, Card } from '../components/ui/Surface'
 
@@ -29,13 +33,15 @@ const AUDIENCES: Array<{ id: EpkAudience; label: string; blurb: string }> = [
  * still see. A document exported last March cannot tell you its photo credit
  * went missing in April.
  */
-export function ArtistPage() {
+export function ArtistPage({ initialTab = null }: { initialTab?: string | null }) {
   const qc = useQueryClient()
   const [kindFilter, setKindFilter] = useState('')
   // Which freshness the library is narrowed to, or '' for all of it. Driven
   // by the counts below, which were previously a number with nowhere to go.
   const [freshness, setFreshness] = useState('')
-  const [tab, setTab] = useState<'library' | EpkAudience>('library')
+  const [tab, setTab] = useState<'library' | 'profile' | 'drive' | EpkAudience>(
+    initialTab === 'drive' || initialTab === 'profile' ? initialTab : 'library',
+  )
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
 
@@ -47,7 +53,7 @@ export function ArtistPage() {
   const epk = useQuery({
     queryKey: ['artist-epk', tab],
     queryFn: () => api.artist.epk(tab as EpkAudience),
-    enabled: tab !== 'library',
+    enabled: tab !== 'library' && tab !== 'profile' && tab !== 'drive',
   })
 
   const invalidate = () => {
@@ -143,23 +149,42 @@ export function ArtistPage() {
         </div>
       )}
 
-      <div className="flex gap-0.5 border-b border-line">
-        {(['library', ...AUDIENCES.map((a) => a.id)] as const).map((id) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`px-3.5 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              tab === id ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'
-            }`}
-          >
-            {id === 'library' ? 'Library' : `EPK — ${AUDIENCES.find((a) => a.id === id)!.label}`}
-          </button>
-        ))}
+      {/* One row that scrolls sideways on a phone, rather than tabs that wrap
+          into two rows or squeeze their labels onto two lines. The rule lives
+          on the inner strip, sized to the tabs but never narrower than the
+          page: an overflow container clips at its padding box, so the -mb-px
+          overlap between a tab's underline and the rule has to happen inside
+          it or it becomes a 1px vertical scroll. */}
+      <div className="overflow-x-auto">
+        <div className="flex gap-0.5 border-b border-line w-max min-w-full">
+          {(['library', 'profile', 'drive', ...AUDIENCES.map((a) => a.id)] as const).map((id) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                tab === id ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'
+              }`}
+            >
+              {id === 'library'
+                ? 'Library'
+                : id === 'profile'
+                  ? 'Profile page'
+                  : id === 'drive'
+                    ? 'Drive folder'
+                    : `Checklist — ${AUDIENCES.find((a) => a.id === id)!.label}`}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {tab === 'library' ? (
+      {tab === 'profile' ? (
+        <ProfileTab />
+      ) : tab === 'drive' ? (
+        <DriveTab outcome={new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('drive')} />
+      ) : tab === 'library' ? (
         <div className="space-y-4">
           <SourcePanel onDone={invalidate} />
+          <AssociationPanels onDone={invalidate} />
           {adding && (
             <AssetForm
               onSave={(body) => create.mutate(body)}
@@ -238,6 +263,8 @@ export function ArtistPage() {
               ))}
             </>
           )}
+          {/* Programmers and press want dates; a music supervisor does not. */}
+          {tab !== 'sync' && <ShowsPanel />}
         </div>
       )}
     </div>

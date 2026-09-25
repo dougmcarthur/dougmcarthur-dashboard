@@ -41,8 +41,11 @@ export function Modal({
 
     // Move focus into the dialog. Without this a keyboard is still on the page
     // behind the overlay, which is invisible to a mouse and ruinous otherwise.
+    // `preventScroll`, because focusing a dialog taller than the screen
+    // scrolls it into view as it opens: on a 320×640 phone that took the top
+    // margin away and left the title 5px from the edge. It opens at the top.
     const previous = document.activeElement as HTMLElement | null
-    panel.current?.focus()
+    panel.current?.focus({ preventScroll: true })
 
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -56,20 +59,29 @@ export function Modal({
 
   if (!open) return null
 
+  // The backdrop dims and softens the page; it does not hide it. Seeing where
+  // you were is what tells you the dialog is a detour you can leave, not a new
+  // screen you have been moved to. A near-opaque canvas wash did the opposite,
+  // and in the light theme it lightened the page rather than dimming it.
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-canvas/90 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim/40 backdrop-blur-sm p-4"
       // A click on the backdrop closes; a click inside must not bubble out to
       // it, which is the other half people forget.
       onClick={onClose}
     >
+      {/* Centred by `my-auto`, never by `items-center` on the backdrop. When
+          the dialog is taller than the screen, `items-center` pushes its top
+          above the scroll origin where no scrolling reaches — on a phone held
+          sideways the title and Close sat at -40px. An auto margin centres
+          when there is room and gives way to the top when there is not. */}
       <div
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="w-full max-w-lg rounded-xl border border-line-strong bg-raised shadow-pop outline-none"
+        className="w-full max-w-lg sm:my-auto rounded-xl border border-line-strong bg-raised shadow-pop outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line p-4">

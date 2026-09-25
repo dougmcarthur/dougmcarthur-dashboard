@@ -463,6 +463,38 @@ export const googleGrants = sqliteTable('google_grants', {
    * keyed by purpose precisely so the two cannot be confused.
    */
   tasksListId: text('tasks_list_id'),
+  /**
+   * For a `drive` grant: the folder Scout made, the root of everything a
+   * `drive.file` grant may touch. See migration 0028.
+   */
+  driveFolderId: text('drive_folder_id'),
+})
+
+/**
+ * Outside services that already know something about the artist, read with
+ * the artist's own credential. See migration 0027 and `shared/bandsintown.ts`.
+ *
+ * The sixteenth scoped table. One row per tenant per `kind`; the unique index
+ * is in the migration, and writes are delete-then-insert like `storeGrant`, so
+ * no statement names a conflict target.
+ */
+export const artistConnectors = sqliteTable('artist_connectors', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  /** Which artist's row this is. See src/db/scope.ts. */
+  tenantId: text('tenant_id'),
+  /** `bandsintown` today. */
+  kind: text('kind').notNull(),
+  /** What the service calls the artist — a Bandsintown artist name or id. */
+  account: text('account').notNull(),
+  /** AES-GCM, like a Google refresh token. Never returned by any route. */
+  secret: text('secret'),
+  /** The last probe: unverified | working | rejected | unreachable. */
+  status: text('status').notNull().default('unverified'),
+  /** The service's own words for the last outcome, trimmed. */
+  statusNote: text('status_note'),
+  checkedAt: text('checked_at'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
 })
 
 /* --------------------------------------------------------------------- */
@@ -534,6 +566,25 @@ export const agentTokens = sqliteTable('agent_tokens', {
   label: text('label').notNull(),
   createdAt: text('created_at').notNull(),
   lastUsedAt: text('last_used_at'),
+  revokedAt: text('revoked_at'),
+})
+
+/**
+ * A public link to the artist's EPK. See migration 0028.
+ *
+ * A credential with the agent token's shape: hashed, shown once, revocable,
+ * looked up by hash before a tenant is known — so, like `agentTokens`, it is
+ * not a domain table, and tenant removal deletes it by name.
+ */
+export const epkShares = sqliteTable('epk_shares', {
+  id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  /** festival | sync | press — which cut of the EPK the link shows. */
+  audience: text('audience').notNull().default('festival'),
+  label: text('label').notNull(),
+  createdAt: text('created_at').notNull(),
+  lastViewedAt: text('last_viewed_at'),
   revokedAt: text('revoked_at'),
 })
 

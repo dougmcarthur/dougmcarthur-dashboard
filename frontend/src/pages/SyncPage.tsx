@@ -55,7 +55,7 @@ function CreateSyncForm({ onDone }: { onDone: () => void }) {
   return (
     <Card pad="md" className="space-y-4">
       <h2 className="text-sm font-semibold text-ink">New Sync Target</h2>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label>Name *</Label>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="Epitaph Records" className={FIELD} autoFocus />
@@ -82,11 +82,11 @@ function CreateSyncForm({ onDone }: { onDone: () => void }) {
             {SYNC_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Notes</Label>
           <textarea rows={2} value={draft.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Context about this target…" className={`${FIELD} resize-none`} />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Pitch draft</Label>
           <textarea rows={4} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} placeholder="Dear…" className={`${FIELD} resize-y`} />
         </div>
@@ -130,7 +130,7 @@ function EditSyncPanel({
 
   return (
     <div className="space-y-4 max-w-2xl">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label>Name</Label>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={FIELD} />
@@ -147,15 +147,15 @@ function EditSyncPanel({
           <Label>Contact role</Label>
           <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} className={FIELD} />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Confirm via</Label>
           <input value={draft.confirmationMethod} onChange={(e) => set('confirmationMethod', e.target.value)} className={FIELD} />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Notes</Label>
           <textarea rows={3} value={draft.notes} onChange={(e) => set('notes', e.target.value)} className={`${FIELD} resize-none`} />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Pitch draft</Label>
           <textarea rows={6} value={draft.pitchDraft} onChange={(e) => set('pitchDraft', e.target.value)} className={`${FIELD} resize-y`} />
         </div>
@@ -275,9 +275,9 @@ export function SyncPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-ink">Sync Targets</h1>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER}>
             <option value="">All statuses</option>
             {SYNC_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
@@ -321,10 +321,12 @@ export function SyncPage() {
               <div key={target.id}>
                 <div
                   onClick={() => toggleExpand(target.id)}
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isOpen ? 'bg-cat-violet-bg/40' : 'hover:bg-sunken'}`}
+                  className={`flex flex-wrap items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isOpen ? 'bg-cat-violet-bg/40' : 'hover:bg-sunken'}`}
                 >
                   <Chevron open={isOpen} />
-                  <div className="min-w-0 flex-1">
+                  {/* basis-40, so the actions drop to their own line only when a
+                      name would get less than 10rem, not whenever it is long. */}
+                  <div className="min-w-0 flex-1 basis-40">
                     <p className="text-sm font-medium text-ink truncate">{target.name}</p>
                     <div className="flex gap-2 mt-0.5 flex-wrap">
                       {target.agencyType && <span className="text-xs text-muted capitalize">{target.agencyType}</span>}
@@ -332,7 +334,7 @@ export function SyncPage() {
                       {target.contactRole && <span className="text-xs text-muted">· {target.contactRole}</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 ml-auto">
                     <StatusBadge status={target.status} />
                     {target.status === 'draft_ready' && (
                       <Button variant="info" size="sm" disabled={isPatching}
@@ -362,7 +364,7 @@ export function SyncPage() {
                 </div>
 
                 {isOpen && (
-                  <div className="px-6 pb-5 pt-3 bg-cat-violet-bg/40 border-t border-cat-violet-line">
+                  <div className="px-4 sm:px-6 pb-5 pt-3 bg-cat-violet-bg/40 border-t border-cat-violet-line">
                     {isEditing ? (
                       <EditSyncPanel
                         target={target}

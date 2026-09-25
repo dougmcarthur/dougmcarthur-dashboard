@@ -6,7 +6,7 @@
  * real ones stop registering. Waiting on you is neutral; only rejected,
  * declined and failed are clay.
  */
-import { GIG_STATUS_META, normaliseGigStatus } from '../../../shared/gigStatus'
+import { flagLabel, gigFlag, gigOutcome, gigStage, gigStageLabel } from '../../../shared/gigStage'
 
 const STATUS_COLORS: Record<string, string> = {
   // Gig pipeline. Green is reserved for the two states that are genuinely
@@ -47,32 +47,48 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 /**
- * Gig statuses render through their own vocabulary.
+ * A gig renders as its stage, never its stored status.
  *
- * Two things the raw string cannot do: `shortlisted` reads as jargon where
- * "Will apply" says the thing, and a legacy `approved` row would otherwise
- * show a word the pipeline no longer uses. The tooltip carries who decided,
- * because that is the distinction the whole rename exists to protect.
+ * Four stages, not fourteen statuses — see shared/gigStage.ts. A closed gig
+ * shows its outcome instead of the word "Closed", because "Closed" alone makes
+ * you open the row to learn whether it was good news. Green is kept for the
+ * one outcome that is: accepted. An offer is shown as a flag beside Applied,
+ * in green too but as a flag — it is exciting and it is not a booking.
  */
-export function StatusBadge({ status, kind }: { status: string; kind?: 'gig' }) {
+const STAGE_COLORS = {
+  new: 'bg-raised text-ink border border-line-strong',
+  in_progress: 'bg-raised text-ink border border-line-strong',
+  applied: 'bg-info-bg text-info-fg',
+  closed: 'bg-sunken text-muted',
+  accepted: 'bg-success-bg text-success-fg',
+}
+
+const FLAG_COLORS = {
+  reply_owed: 'bg-danger-bg text-danger-fg',
+  offer_pending: 'bg-success-bg text-success-fg',
+}
+
+const PILL = 'inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium'
+
+export function StatusBadge({ status, kind, gigType }: { status: string; kind?: 'gig'; gigType?: string | null }) {
   if (kind === 'gig') {
-    const key = normaliseGigStatus(status)
-    const meta = GIG_STATUS_META[key]
+    const stage = gigStage(status)
+    const shown = gigStageLabel(status)
+    const flag = gigFlag(status)
+    const color = gigOutcome(status) === 'accepted' ? STAGE_COLORS.accepted : STAGE_COLORS[stage]
     return (
-      <span
-        title={`${meta.meaning}${meta.decider === 'them' ? ' (their decision)' : ''}`}
-        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-          STATUS_COLORS[key] ?? 'bg-sunken text-body'
-        }`}
-      >
-        {meta.label}
+      <span className="inline-flex flex-wrap items-center gap-1">
+        <span title={shown.meaning} className={`${PILL} ${color}`}>
+          {shown.label}
+        </span>
+        {flag && <span className={`${PILL} ${FLAG_COLORS[flag]}`}>{flagLabel(flag, gigType)}</span>}
       </span>
     )
   }
 
   const color = STATUS_COLORS[status] ?? 'bg-sunken text-body'
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
       {status.replace(/_/g, ' ')}
     </span>
   )

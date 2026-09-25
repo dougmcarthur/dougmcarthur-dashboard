@@ -171,6 +171,12 @@ export const LEGACY_GIG_STATUS: Record<string, GigStatus> = {
   // `declined`. Getting this backwards would rewrite history.
   rejected: 'passed',
   sent: 'submitted',
+  // The stage names from shared/gigStage.ts, accepted on write ahead of the
+  // data migration so an agent or a hand-made request can use the words the
+  // screens show. `closed` is absent: it needs an outcome to mean anything.
+  new: 'discovered',
+  in_progress: 'shortlisted',
+  applied: 'submitted',
 }
 
 const KNOWN = new Set<string>(GIG_STATUSES)
@@ -234,10 +240,9 @@ export function hasBeenSubmitted(raw: string | null | undefined): boolean {
  * A map rather than something derived from `phase`, because the interesting
  * entries are the ones the phase order would get wrong. Two in particular:
  *
- *  - From `invited` there is no route to `declined`. Declining is *their* verb.
- *    Turning down an invitation is `withdrawn`, and offering the other word
- *    would let one mis-click record that you were rejected from a festival that
- *    wanted you.
+ *  - From `invited`, `declined` means the offer fell through on their side,
+ *    and is labelled that way; turning an offer down yourself is `withdrawn`.
+ *    Declining is always *their* verb.
  *  - `passed` stays reachable from `shortlisted` and `preparing`. Changing your
  *    mind before anything is sent is still you passing, not you withdrawing —
  *    they never saw it either way.
@@ -254,8 +259,13 @@ const NEXT: Record<GigStatus, GigStatus[]> = {
   submitted: ['acknowledged', 'info_requested', 'invited', 'declined', 'withdrawn', 'expired'],
   acknowledged: ['info_requested', 'invited', 'declined', 'withdrawn', 'expired'],
   info_requested: ['acknowledged', 'invited', 'declined', 'withdrawn'],
-  // Not `declined`. See above.
-  invited: ['booked', 'withdrawn'],
+  // `declined` here is "the offer fell through" — their side ended it before
+  // anything was signed. It used to be refused, so that one mis-click could
+  // not record a rejection from a festival that wanted you; the button that
+  // writes it now says "Offer fell through" (shared/gigStage.ts), which is a
+  // sentence nobody clicks by reflex. Turning an offer down yourself is still
+  // `withdrawn`.
+  invited: ['booked', 'declined', 'withdrawn'],
   declined: ['archived'],
   booked: ['withdrawn', 'archived'],
   expired: ['archived'],

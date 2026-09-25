@@ -25,14 +25,16 @@
  *    deploy, not of the Access removal — see docs/passkey-login.md.
  */
 
-import { eq, lt } from 'drizzle-orm'
+import { desc, eq, isNull, lt, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import {
   authChallenges,
   authEnrolmentCodes,
   authSessions,
   passkeyCredentials,
+  users,
 } from '../db/schema'
+import { normaliseAddress } from '../../shared/recipients'
 import {
   CHALLENGE_TTL_SECONDS,
   ENROLMENT_CODE_MAX_ATTEMPTS,
@@ -378,29 +380,54 @@ export async function countCredentials(env: Env): Promise<number> {
 /* --------------------------------------------------------------------- */
 
 /**
- * Where a break-glass code is sent, or null when nowhere is configured.
+ * The owner's configured recovery address, or null when none is set.
  *
- * **Never user-supplied, and that is the whole point.** An address typed on
- * the login screen would decide where an enrolment code goes, so anyone who
- * could load the page could mail themselves one and take the account. The
- * destination is deployment configuration; what a person types can only ever
- * be a *lookup key* for an address already on file.
- *
- * A settings row would be worse still — a way to redirect the recovery
- * channel from inside the app, which is exactly what an attacker holding a
- * session would reach for.
- *
- * There is no default. It used to fall back to a hardcoded personal address,
- * which worked for exactly one deployment and silently mailed somebody else's
- * inbox on any other. Unset now means recovery is unavailable and the screen
- * says so — a missing input is never a guess.
- *
- * The `send_email` allowlist in wrangler.toml is the real boundary either
- * way: the Worker cannot mail an address that is not on it, whatever this
- * returns.
+ * Deployment configuration, never a settings row — a row would be a way to
+ * redirect the recovery channel from inside the app, which is exactly what an
+ * attacker holding a session would reach for. There is no default: it used to
+ * fall back to a hardcoded personal address, which mailed a stranger's inbox
+ * on any other deployment.
  */
 export function enrolmentRecipient(env: Env): string | null {
   return env.AUTH_EMAIL?.trim() || null
+}
+
+export interface RecoveryAccount {
+  /** Whose account a code sent to `address` would add a passkey to. */
+  userId: string | null
+  /** The address on file. Never the string that was typed. */
+  address: string
+}
+
+/**
+ * The account a typed address names, or null.
+ *
+ * **What a person types is a lookup key, never a destination.** The code goes
+ * to the address already on file for the account that matched — the owner's
+ * configured `AUTH_EMAIL`, or the address an invitation fixed at issue time —
+ * so typing a stranger's address mails the stranger, which does the typist no
+ * good, and typing your own address mails you only if it is already yours.
+ *
+ * The caller answers the same way whether or not this matched: anything else
+ * is an oracle for which addresses have accounts.
+ */
+export async function recoveryAccount(env: Env, typed: string): Promise<RecoveryAccount | null> {
+  const key = normaliseAddress(typed)
+  if (!key) return null
+  const db = getDb(env.DB)
+
+  const configured = enrolmentRecipient(env)
+  if (configured && normaliseAddress(configured) === key) {
+    const owner = await db.select().from(users).where(eq(users.role, 'owner')).get()
+    return { userId: owner?.id ?? null, address: configured }
+  }
+
+  const row = await db
+    .select()
+    .from(users)
+    .where(sql`lower(trim(${users.email})) = ${key}`)
+    .get()
+  return row?.email ? { userId: row.id, address: row.email } : null
 }
 
 export interface IssuedCode {
@@ -409,25 +436,39 @@ export interface IssuedCode {
   expiresAt: string
 }
 
-/** When the live code was issued, for the cooldown. Null when there is none. */
-export async function lastCodeIssuedAt(env: Env): Promise<string | null> {
-  const row = await getDb(env.DB).select().from(authEnrolmentCodes).get()
+/**
+ * One account's codes. A null user is a code issued before accounts existed,
+ * which only the owner can have held.
+ */
+const codesFor = (userId: string | null) =>
+  userId === null ? isNull(authEnrolmentCodes.userId) : eq(authEnrolmentCodes.userId, userId)
+
+/** When this account's live code was issued, for the cooldown. Null when there is none. */
+export async function lastCodeIssuedAt(env: Env, userId: string | null): Promise<string | null> {
+  const row = await getDb(env.DB)
+    .select()
+    .from(authEnrolmentCodes)
+    .where(codesFor(userId))
+    .orderBy(desc(authEnrolmentCodes.createdAt))
+    .get()
   return row?.createdAt ?? null
 }
 
 /**
- * Issues a code, invalidating any earlier one.
+ * Issues a code, invalidating any earlier one *for the same account*.
  *
- * One live code at a time, because two means a phone showing the older email
- * is a code that does not work and no way to tell which is which.
+ * One live code per account, because two means a phone showing the older
+ * email is a code that does not work and no way to tell which is which. Per
+ * account rather than per deployment, because otherwise one artist asking for
+ * a code would cancel the one another artist is typing.
  */
 export async function issueEnrolmentCode(
   env: Env,
-  input: { userId: string | null; now?: Date } = { userId: null },
+  input: { userId: string | null; now?: Date },
 ): Promise<IssuedCode> {
   const now = input.now ?? new Date()
   const db = getDb(env.DB)
-  await db.delete(authEnrolmentCodes)
+  await db.delete(authEnrolmentCodes).where(codesFor(input.userId))
 
   const bytes = new Uint8Array(4)
   crypto.getRandomValues(bytes)
@@ -437,10 +478,7 @@ export async function issueEnrolmentCode(
 
   await db.insert(authEnrolmentCodes).values({
     id,
-    // Whose account this code enrols a passkey for. Today it is the owner's,
-    // because `enrolmentRecipient` is deployment configuration and there is
-    // one address. When accounts arrive the typed address becomes a lookup
-    // key and this is the account it matched — never the address typed.
+    // The account the typed address matched — never the address typed.
     userId: input.userId,
     codeHash: await sha256Hex(code),
     attempts: 0,
@@ -456,16 +494,28 @@ export type CodeCheck =
   | { ok: false; reason: EnrolmentCodeState | 'none' | 'wrong' }
 
 /**
- * Checks a code without spending it — the ceremony is two round trips, and a
- * code spent at `options` time would be gone before the browser answered.
- * `spendEnrolmentCode` marks it used once a credential actually lands.
+ * Checks a code against one account's live code, without spending it — the
+ * ceremony is two round trips, and a code spent at `options` time would be
+ * gone before the browser answered. `spendEnrolmentCode` marks it used once a
+ * credential actually lands.
  *
- * A wrong guess costs an attempt whether or not a code is live, which is what
- * keeps the attempt counter from being reset by simply guessing early.
+ * Scoped to the account the address names, so the attempt counter belongs to
+ * that account's code: five wrong guesses lock *it*, and guessing against one
+ * account cannot burn another's.
  */
-export async function checkEnrolmentCode(env: Env, code: string, now = new Date()): Promise<CodeCheck> {
+export async function checkEnrolmentCode(
+  env: Env,
+  userId: string | null,
+  code: string,
+  now = new Date(),
+): Promise<CodeCheck> {
   const db = getDb(env.DB)
-  const row = await db.select().from(authEnrolmentCodes).get()
+  const row = await db
+    .select()
+    .from(authEnrolmentCodes)
+    .where(codesFor(userId))
+    .orderBy(desc(authEnrolmentCodes.createdAt))
+    .get()
   if (!row) return { ok: false, reason: 'none' }
 
   const state = enrolmentCodeState({ now, code: row })

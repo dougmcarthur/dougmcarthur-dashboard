@@ -50,7 +50,7 @@ import type {
 } from '@simplewebauthn/server'
 import { getDb } from '../db'
 import { passkeyCredentials } from '../db/schema'
-import { accountById, accountForSession, actorForSession, ownerTenant, ownerUserId } from '../lib/actor'
+import { accountById, accountForSession, actorForSession, ownerTenant } from '../lib/actor'
 import {
   base64url,
   checkEnrolmentCode,
@@ -60,13 +60,13 @@ import {
   destroyAllSessions,
   destroySession,
   elevateSession,
-  enrolmentRecipient,
   fromBase64url,
   issueEnrolmentCode,
   lastCodeIssuedAt,
   listCredentials,
   credentialsForUser,
   readSession,
+  recoveryAccount,
   sessionCookie,
   setSessionMode,
   spendEnrolmentCode,
@@ -163,8 +163,9 @@ auth.get('/session', async (c) => {
     enrolled: credentials.length > 0,
     // Whether the break-glass path can work at all. A deployment with no
     // email binding and no passkeys is one nobody can get into, and the
-    // screen should say so rather than offering a button that 500s.
-    recoveryAvailable: mailerConfigured(c.env) && enrolmentRecipient(c.env) !== null,
+    // screen should say so rather than offering a button that 500s. It says
+    // nothing about any particular address — that would be an oracle.
+    recoveryAvailable: mailerConfigured(c.env),
   })
 })
 
@@ -607,49 +608,68 @@ auth.post('/elevate/verify', zValidator('json', assertion), async (c) => {
   return c.json({ ok: true, confirmedUntil: state.expiresAt })
 })
 
-auth.post('/enrol/request', async (c) => {
+/**
+ * The same sentence whether or not the address matched an account.
+ *
+ * Anything else — a different message, a different status, a masked address
+ * echoed back — tells whoever is asking which addresses have accounts. The
+ * cooldown is folded in for the same reason: a 429 only for real accounts is
+ * the oracle again, arriving by status code.
+ */
+export const CODE_REQUEST_ANSWER = `If that address belongs to an account, a setup code is on its way. It is good for ${ENROLMENT_CODE_TTL_MINUTES} minutes.`
+
+const codeRequest = z.object({ email: z.string().trim().min(1).max(254) })
+
+auth.post('/enrol/request', zValidator('json', codeRequest), async (c) => {
   if (!mailerConfigured(c.env)) {
     return c.json({ error: 'This site cannot send email, so a setup code cannot be sent.' }, 503)
   }
 
-  const to = enrolmentRecipient(c.env)
-  if (!to) {
-    return c.json({ error: 'This site has no recovery address set up yet.' }, 503)
-  }
-
   const now = new Date()
+  const typed = c.req.valid('json').email
 
-  // Throttled, because this is the one endpoint that takes no credential and
-  // sends mail. Unthrottled it is a button anybody can hold down to fill an
-  // inbox — and because each request invalidates the previous code, it is also
-  // a way for a stranger to keep expiring the code you are typing.
-  const cooldown = enrolmentCooldown({ now, lastIssuedAt: await lastCodeIssuedAt(c.env) })
-  if (!cooldown.allowed) {
-    c.header('Retry-After', String(cooldown.retryAfterSeconds))
-    return c.json(
-      { error: `a code was just sent — try again in ${cooldown.retryAfterSeconds}s` },
-      429,
-    )
+  const work = async () => {
+    // A lookup key, never a destination: the code goes to the address on file
+    // for the account the key matched. See `recoveryAccount`.
+    const account = await recoveryAccount(c.env, typed)
+    if (!account) return
+
+    // Throttled per account, because this is the one endpoint that takes no
+    // credential and sends mail. Unthrottled it is a button anybody can hold
+    // down to fill an inbox — and because each request invalidates the
+    // previous code, a way for a stranger to keep expiring the one you are
+    // typing. Silently: the answer below does not change.
+    const cooldown = enrolmentCooldown({
+      now,
+      lastIssuedAt: await lastCodeIssuedAt(c.env, account.userId),
+    })
+    if (!cooldown.allowed) return
+
+    const issued = await issueEnrolmentCode(c.env, { userId: account.userId, now })
+    // What the email says about the code is a security claim — see authMail.ts.
+    const mail = setupCodeEmail({
+      code: issued.code,
+      ttlMinutes: ENROLMENT_CODE_TTL_MINUTES,
+      identity: senderIdentity(c.env),
+    })
+    await sendMail(c.env, {
+      to: account.address,
+      audience: 'account',
+      from: c.env.AUTH_EMAIL_SENDER ?? 'login@sundogsmusic.ca',
+      ...mail,
+    })
   }
 
-  // The code enrols a passkey for the account the configured recovery address
-  // belongs to, which today is the owner's. Nothing the requester typed picks
-  // it — that is the whole rule the recovery address exists under.
-  const issued = await issueEnrolmentCode(c.env, { userId: await ownerUserId(c.env), now })
+  // After the response, so a matched address and an unmatched one take the
+  // same time to answer as well as giving the same answer.
+  const running = work().catch((err) => console.error('enrol/request:', err))
+  try {
+    c.executionCtx.waitUntil(running)
+  } catch {
+    await running
+  }
 
-  // What the email says about the code is a security claim — see authMail.ts.
-  const mail = setupCodeEmail({
-    code: issued.code,
-    ttlMinutes: ENROLMENT_CODE_TTL_MINUTES,
-    identity: senderIdentity(c.env),
-  })
-  await sendMail(c.env, {
-    to,
-    from: c.env.AUTH_EMAIL_SENDER ?? 'login@sundogsmusic.ca',
-    ...mail,
-  })
-
-  return c.json({ sent: true, to: maskAddress(to), expiresAt: issued.expiresAt })
+  return c.json({ accepted: true, message: CODE_REQUEST_ANSWER })
 })
 
 /* --------------------------------------------------------------------- */
@@ -659,13 +679,16 @@ auth.post('/enrol/request', async (c) => {
 const enrolRequest = z.object({
   /** Omitted when an existing session is doing the asking. */
   code: z.string().trim().optional(),
+  /** The address the code was requested with. A lookup key, as there. */
+  email: z.string().trim().max(254).optional(),
 })
 
 auth.post('/register/options', zValidator('json', enrolRequest), async (c) => {
   const party = rp(c)
   if (!party) return c.json({ error: SITE_MISCONFIGURED }, 500)
 
-  const authorised = await authoriseEnrolment(c.env, c.req.header('Cookie'), c.req.valid('json').code)
+  const request = c.req.valid('json')
+  const authorised = await authoriseEnrolment(c.env, c.req.header('Cookie'), request.code, request.email)
   if (!authorised.ok) {
     return c.json({ error: authorised.error, needsElevation: authorised.needsElevation }, authorised.status)
   }
@@ -705,6 +728,7 @@ const attestation = z.object({
   ceremony: z.string().min(1),
   response: z.record(z.unknown()),
   code: z.string().trim().optional(),
+  email: z.string().trim().max(254).optional(),
   label: z.string().trim().max(80).optional(),
 })
 
@@ -716,7 +740,7 @@ auth.post('/register/verify', zValidator('json', attestation), async (c) => {
   // Re-checked rather than trusted from the options call: the two requests are
   // independent, and "I already passed this a moment ago" is a claim the
   // second one is in no position to make.
-  const authorised = await authoriseEnrolment(c.env, c.req.header('Cookie'), body.code)
+  const authorised = await authoriseEnrolment(c.env, c.req.header('Cookie'), body.code, body.email)
   if (!authorised.ok) {
     return c.json({ error: authorised.error, needsElevation: authorised.needsElevation }, authorised.status)
   }
@@ -850,6 +874,7 @@ async function authoriseEnrolment(
   env: Env,
   cookie: string | null | undefined,
   code: string | undefined,
+  email: string | undefined,
 ): Promise<Authorised> {
   const session = await readSession(env, cookie)
   if (session) {
@@ -866,7 +891,12 @@ async function authoriseEnrolment(
 
   if (!code) return { ok: false, error: 'a setup code is required', status: 401 }
 
-  const check = await checkEnrolmentCode(env, code)
+  // The code is checked against the account the address names. An address
+  // that names nobody gets the answer a wrong code gets, not a different one.
+  const account = email ? await recoveryAccount(env, email) : null
+  if (!account) return { ok: false, error: 'that code is not right', status: 403 }
+
+  const check = await checkEnrolmentCode(env, account.userId, code)
   if (check.ok) return { ok: true, codeId: check.id, userId: check.userId }
 
   switch (check.reason) {

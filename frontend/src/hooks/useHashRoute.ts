@@ -8,16 +8,22 @@ import { useEffect, useState } from 'react'
  * contradict themselves" that drops you on an unfiltered queue makes you
  * redo the filtering the number already did.
  */
-function parse(hash: string, defaultPage: string): [string, string | null] {
-  const [page, arg] = hash.replace(/^#/, '').split('/')
+export function parseHash(hash: string, defaultPage: string): [string, string | null] {
+  // The query after `?` is a message for the page — `#settings?calendar=connected`
+  // is where Google's consent round trip lands — never part of the route.
+  // Splitting on `/` alone read that as a page called
+  // "settings?calendar=connected", which matched nothing and drew a blank
+  // screen at the end of every connect.
+  const [path] = hash.replace(/^#/, '').split('?')
+  const [page, arg] = path.split('/')
   return [page || defaultPage, arg || null]
 }
 
 export function useHashRoute(defaultPage = 'overview') {
-  const [[page, arg], setRoute] = useState(() => parse(window.location.hash, defaultPage))
+  const [[page, arg], setRoute] = useState(() => parseHash(window.location.hash, defaultPage))
 
   useEffect(() => {
-    const handler = () => setRoute(parse(window.location.hash, defaultPage))
+    const handler = () => setRoute(parseHash(window.location.hash, defaultPage))
     window.addEventListener('hashchange', handler)
     return () => window.removeEventListener('hashchange', handler)
   }, [defaultPage])

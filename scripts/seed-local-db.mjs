@@ -34,11 +34,11 @@
  * one enrolment code described below, and never touches `d1_migrations`.
  */
 
-import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { wrangler } from './lib/wrangler.mjs'
 
 const APPLY = process.argv.includes('--apply')
 
@@ -512,11 +512,11 @@ const db = databaseName()
 const file = join(mkdtempSync(join(tmpdir(), 'scout-seed-')), 'seed.sql')
 writeFileSync(file, statements.join('\n'))
 
-execFileSync('npx', ['wrangler', 'd1', 'execute', db, '--local', `--file=${file}`], {
+wrangler(['d1', 'execute', db, '--local', `--file=${file}`], {
   stdio: ['inherit', 'inherit', 'inherit'],
 })
 
 console.log(`\nSeeded ${db} (local).`)
-console.log(`\nTo sign in: start the app, choose "Add a passkey", and use setup code ${SETUP_CODE}.`)
+console.log(`\nTo sign in: start the app, choose "Add a passkey", enter owner@example.test, and use setup code ${SETUP_CODE}.`)
 console.log('That code is seeded straight into the local database because there is no')
 console.log('mailer in local development. It enrols a passkey, exactly as the real one does.')

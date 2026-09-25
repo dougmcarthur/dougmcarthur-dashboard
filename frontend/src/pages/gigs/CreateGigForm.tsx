@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type GigOpportunity, type GigStatus } from '../../api'
-import { GIG_STATUSES, GIG_STATUS_META } from '../../../../shared/gigStatus'
+import { GIG_STAGE_META, GIG_START_STATUS } from '../../../../shared/gigStage'
 import { FIELD } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
 import { SUBMISSION_METHODS } from './constants'
@@ -65,8 +65,8 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
     <Card pad="md" className="space-y-4">
       <h2 className="text-sm font-semibold text-ink">New Gig Opportunity</h2>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="col-span-2 grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label>Name *</Label>
             <input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="SXSW 2027" className={FIELD} autoFocus />
@@ -89,10 +89,15 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
         <div>
           <Label>Fee amount</Label>
           <div className="flex gap-1.5">
-            <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={`${FIELD} w-20 shrink-0`}>
-              {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
-            </select>
-            <input type="number" min="0" value={draft.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} placeholder="0" className={FIELD} />
+            {/* Width on a wrapper, never `${FIELD} w-20`: see EditGigPanel. */}
+            <div className="w-20 shrink-0">
+              <select value={draft.feeCurrency} onChange={(e) => set('feeCurrency', e.target.value)} className={FIELD}>
+                {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map((c) => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            {/* min-w-0, as in EditGigPanel: the input's default width is
+                otherwise its floor beside the fixed-width currency. */}
+            <input type="number" min="0" value={draft.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} placeholder="0" className={`${FIELD} min-w-0`} />
           </div>
         </div>
         <div>
@@ -115,7 +120,7 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
           </select>
         </div>
 
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Why it fits</Label>
           <textarea rows={3} value={draft.fitRationale} onChange={(e) => set('fitRationale', e.target.value)} placeholder="Describe the fit…" className={`${FIELD} resize-none`} />
         </div>
@@ -125,11 +130,12 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
           <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} placeholder="https://…" className={FIELD} />
         </div>
         <div>
-          <Label>Status</Label>
+          <Label>Stage</Label>
+          {/* Three of the four: a gig is not added already closed. */}
           <select value={draft.status} onChange={(e) => set('status', e.target.value as GigStatus)} className={FIELD}>
-            {GIG_STATUSES.map((s) => (
-              <option key={s} value={s} title={GIG_STATUS_META[s].meaning}>
-                {GIG_STATUS_META[s].label}
+            {(Object.keys(GIG_START_STATUS) as Array<keyof typeof GIG_START_STATUS>).map((stage) => (
+              <option key={stage} value={GIG_START_STATUS[stage]} title={GIG_STAGE_META[stage].meaning}>
+                {GIG_STAGE_META[stage].label}
               </option>
             ))}
           </select>

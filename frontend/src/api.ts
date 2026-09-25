@@ -41,6 +41,9 @@ export type {
 } from '../../shared/artistAssets'
 
 import type { ArtistAsset, AssetHealth, Epk, EpkAudience } from '../../shared/artistAssets'
+import type { MergedShow, ShowSource } from '../../shared/showMerge'
+import type { PublicEpk } from '../../shared/publicEpk'
+import type { PlannedChange, Subfolder } from '../../shared/driveOrganise'
 
 /** An asset with the freshness the server worked out, which the UI never recomputes. */
 export type ArtistAssetWithHealth = ArtistAsset & { health: AssetHealth }
@@ -404,6 +407,12 @@ export const UNAUTHENTICATED_EVENT = 'mhq:unauthenticated'
  */
 export class ElevationRequired extends Error {}
 
+/** The viewer's own date, `YYYY-MM-DD`, for routes that ask what "today" is. */
+function localToday(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -490,6 +499,156 @@ export interface TenantHealth {
   unscoped: number
 }
 
+/** A connector, as Settings sees it. Never the key. */
+export interface ConnectorSummary {
+  kind: string
+  account: string
+  hasKey: boolean
+  /** unverified | working | rejected | unreachable */
+  status: string
+  statusNote: string | null
+  checkedAt: string | null
+}
+
+export interface ConnectorList {
+  canStore: boolean
+  bandsintown: ConnectorSummary | null
+  /** `account` is the profile address; `statusNote` the name read off it. */
+  manitobaMusic: ConnectorSummary | null
+}
+
+/** What a Manitoba Music profile says about who it belongs to. */
+export interface MmIdentity {
+  url: string
+  name: string
+  photo: string | null
+  genres: string[]
+  counts: { bio: number; links: number; videos: number; releases: number; files: number; photos: number }
+}
+
+export interface AssociationSummary {
+  id: string
+  name: string
+  region: string
+  url: string
+  profileName: string | null
+  status: string
+  statusNote: string | null
+  checkedAt: string | null
+}
+
+export interface AssociationList {
+  connected: AssociationSummary[]
+  /** Profile addresses already in the artist's library, not yet connected. */
+  fromLibrary: Array<{ id: string; name: string; url: string }>
+  directory: Array<{ id: string; name: string; region: string; profiles: boolean; note: string | null }>
+}
+
+export type AssociationIdentity = MmIdentity & { association: { id: string; name: string } }
+
+export type AssociationImportPlan =
+  | { connected: false }
+  | { connected: true; error: string }
+  | {
+      connected: true
+      association: { id: string; name: string }
+      name: string
+      url: string
+      proposals: AssetProposal[]
+      skipped: Array<{ heading: string; reason: string }>
+      existing: number
+      wouldAdd: number
+    }
+
+export type MmImportPlan =
+  | { connected: false }
+  | { connected: true; error: string }
+  | {
+      connected: true
+      name: string
+      url: string
+      proposals: AssetProposal[]
+      skipped: Array<{ heading: string; reason: string }>
+      existing: number
+      wouldAdd: number
+    }
+
+/** One show, merged across every source. See shared/showMerge.ts. */
+export type { MergedShow, ShowSource }
+
+export interface ShowsResponse {
+  /** Listings that are connected, whether or not they answered. */
+  connected: Array<ShowSource>
+  /** How each connected listing answered this time. */
+  sources: Array<{ source: ShowSource; status: string; note: string | null }>
+  upcoming: Array<MergedShow>
+  past: Array<MergedShow>
+}
+
+/** The EPK as a page: what a share link shows, and for the artist what it leaves out. */
+export interface EpkPage {
+  name: string | null
+  audience: EpkAudience
+  epk: PublicEpk
+  shows: { upcoming: MergedShow[]; past: MergedShow[] }
+}
+
+export type { PublicEpk }
+
+/** A share link, as the artist's list shows it. Never the token. */
+export interface EpkShare {
+  id: string
+  label: string
+  audience: EpkAudience
+  createdAt: string
+  lastViewedAt: string | null
+  revokedAt: string | null
+}
+
+export interface DriveStatus {
+  connected: boolean
+  configured: boolean
+  accountEmail: string | null
+  driveFolderId: string | null
+  folderUrl: string | null
+  picker: { available: boolean; apiKey: string | null; appId: string | null }
+}
+
+export interface DriveFileRow {
+  id: string
+  name: string
+  mimeType: string
+  size: number | null
+  folder: Subfolder | null
+  belongsIn: Subfolder
+  width: number | null
+  height: number | null
+  viewUrl: string | null
+  downloadUrl: string | null
+}
+
+export type DriveFiles =
+  | { connected: false }
+  | { connected: true; folderUrl: string; shared: boolean; files: DriveFileRow[] }
+
+export type { PlannedChange, Subfolder }
+
+/** A research agent's credential, as Settings sees it. Never the token. */
+export interface AgentTokenSummary {
+  id: string
+  label: string
+  createdAt: string
+  lastUsedAt: string | null
+  revokedAt: string | null
+}
+
+/** The one moment an agent token exists outside the agent's configuration. */
+export interface IssuedAgentToken {
+  id: string
+  label: string
+  token: string
+}
+
 /** An invitation, as the oversight surface sees it. Never the token. */
 export interface InviteSummary {
   id: string
@@ -504,7 +663,7 @@ export interface InviteSummary {
 
 export interface InviteList {
   items: InviteSummary[]
-  /** False while the mail binding's allowlist is the boundary. See the route. */
+  /** Whether Scout can email the link itself. False with no mail binding. */
   canMail: boolean
 }
 
@@ -513,6 +672,9 @@ export interface IssuedInvite {
   id: string
   token: string
   expiresAt: string
+  /** True when it was emailed as well. The link is returned either way. */
+  mailed: boolean
+  mailError: string | null
 }
 
 /**
@@ -579,16 +741,17 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
-    requestCode: () =>
-      apiFetch<{ sent: boolean; to: string; expiresAt: string }>('/auth/enrol/request', {
+    requestCode: (body: { email: string }) =>
+      apiFetch<{ accepted: boolean; message: string }>('/auth/enrol/request', {
         method: 'POST',
+        body: JSON.stringify(body),
       }),
-    registerOptions: (body: { code?: string }) =>
+    registerOptions: (body: { code?: string; email?: string }) =>
       apiFetch<{ ceremony: string; options: Record<string, unknown> }>('/auth/register/options', {
         method: 'POST',
         body: JSON.stringify(body),
       }),
-    registerVerify: (body: { ceremony: string; response: unknown; code?: string; label?: string }) =>
+    registerVerify: (body: { ceremony: string; response: unknown; code?: string; email?: string; label?: string }) =>
       apiFetch<{ ok: boolean; label: string }>('/auth/register/verify', {
         method: 'POST',
         body: JSON.stringify(body),
@@ -670,13 +833,104 @@ export const api = {
     /** Rows with no owner, per table. Should be zero, and is worth checking. */
     health: () => apiFetch<TenantHealth>('/admin/health'),
     invites: () => apiFetch<InviteList>('/admin/invites'),
-    invite: (body: { email: string; displayName?: string }) =>
+    invite: (body: { email: string; displayName?: string; send?: boolean }) =>
       apiFetch<IssuedInvite>('/admin/invites', { method: 'POST', body: JSON.stringify(body) }),
     revokeInvite: (id: string) =>
       apiFetch<{ id: string; revoked: boolean }>(`/admin/invites/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }),
   },
+  /**
+   * Outside services read with the artist's own credential. `today` is the
+   * viewer's local date, so a show tonight is still upcoming tonight.
+   */
+  connectors: {
+    list: () => apiFetch<ConnectorList>('/connectors'),
+    saveBandsintown: (body: { account: string; apiKey: string }) =>
+      apiFetch<{ bandsintown: ConnectorSummary; upcoming: number }>(
+        `/connectors/bandsintown?today=${localToday()}`,
+        { method: 'PUT', body: JSON.stringify(body) },
+      ),
+    checkBandsintown: () =>
+      apiFetch<{ bandsintown: ConnectorSummary }>(`/connectors/bandsintown/check?today=${localToday()}`, {
+        method: 'POST',
+      }),
+    removeBandsintown: () => apiFetch<{ ok: boolean }>('/connectors/bandsintown', { method: 'DELETE' }),
+  },
+  /**
+   * Member profiles on the provincial music associations' sites. Check writes
+   * nothing; save needs the "Is this you?" yes. Import is preview, then apply —
+   * the reference documents' shape, and the guard in uiConsistency holds it.
+   */
+  associations: {
+    list: () => apiFetch<AssociationList>('/connectors/associations'),
+    check: (url: string) =>
+      apiFetch<AssociationIdentity>('/connectors/associations/check', { method: 'POST', body: JSON.stringify({ url }) }),
+    save: (url: string) =>
+      apiFetch<{ association: AssociationSummary }>('/connectors/associations', { method: 'PUT', body: JSON.stringify({ url }) }),
+    remove: (id: string) => apiFetch<{ ok: boolean }>(`/connectors/associations/${id}`, { method: 'DELETE' }),
+    preview: (id: string) => apiFetch<AssociationImportPlan>(`/connectors/associations/${id}/import`),
+    apply: (id: string) =>
+      apiFetch<{ added: number; existing: number }>(`/connectors/associations/${id}/import`, { method: 'POST' }),
+  },
+
+  /**
+   * The research agents' credentials. Issuing and revoking both come back
+   * asking for the passkey, so callers go through `withConfirmation`.
+   */
+  agentTokens: {
+    list: () => apiFetch<{ items: AgentTokenSummary[] }>('/agent-tokens'),
+    issue: (label: string) =>
+      apiFetch<IssuedAgentToken>('/agent-tokens', {
+        method: 'POST',
+        body: JSON.stringify({ label }),
+      }),
+    revoke: (id: string) =>
+      apiFetch<{ id: string; revoked: boolean }>(`/agent-tokens/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
+  },
+  /** The artist's own view of their EPK page, and the links that share it. */
+  epk: {
+    preview: (audience: EpkAudience) =>
+      apiFetch<EpkPage>(`/epk/preview?audience=${audience}&today=${localToday()}`),
+    shares: () => apiFetch<{ items: EpkShare[] }>('/epk/shares'),
+    share: (body: { label: string; audience: EpkAudience }) =>
+      apiFetch<EpkShare & { token: string }>('/epk/shares', { method: 'POST', body: JSON.stringify(body) }),
+    revoke: (id: string) =>
+      apiFetch<{ id: string; revoked: boolean }>(`/epk/shares/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  },
+  /**
+   * The public read a share link opens. The token comes from the URL fragment
+   * and travels in the body, like an invitation's — never in a path.
+   */
+  publicEpk: (token: string) =>
+    apiFetch<EpkPage>('/public/epk', { method: 'POST', body: JSON.stringify({ token, today: localToday() }) }),
+  drive: {
+    status: () => apiFetch<DriveStatus>('/drive/status'),
+    files: () => apiFetch<DriveFiles>('/drive/files'),
+    pickerToken: () =>
+      apiFetch<{ accessToken: string; folderId: string; apiKey: string; appId: string }>('/drive/picker-token'),
+    adopt: (fileIds: string[]) =>
+      apiFetch<{ copied: number; failed: Array<{ id: string; error: string }> }>('/drive/adopt', {
+        method: 'POST',
+        body: JSON.stringify({ fileIds }),
+      }),
+    share: (shared: boolean) =>
+      apiFetch<{ shared: boolean }>('/drive/share', { method: 'POST', body: JSON.stringify({ shared }) }),
+    disconnect: () => apiFetch<{ ok: boolean }>('/drive/disconnect', { method: 'POST' }),
+    connectHref: '/api/drive/connect',
+  },
+  /** Tidying the Drive folder: preview, then apply, like every bulk write. */
+  driveOrganise: {
+    preview: () => apiFetch<{ changes: PlannedChange[] }>('/drive/organise'),
+    apply: () =>
+      apiFetch<{ applied: number; failed: Array<{ name: string; error: string }> }>('/drive/organise', {
+        method: 'POST',
+      }),
+  },
+  /** Every show from every source, merged. `today` is the viewer's own date. */
+  shows: () => apiFetch<ShowsResponse>(`/shows?today=${localToday()}`),
   /** What to call this artist. One field, set by them, read by oversight. */
   profile: {
     read: () => apiFetch<{ displayName: string | null }>('/profile'),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type GigOpportunity, type SyncTarget, type PromoDraft } from '../api'
 import { SkeletonList } from '../components/Skeleton'
@@ -95,6 +95,44 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
     if (selected && selected.key !== selectedKey) setSelectedKey(selected.key)
   }, [selected, selectedKey])
 
+  /*
+   * Below `lg` the queue and the detail stack, and the queue is the full list.
+   * On a phone that put the detail a screen or more below the row you tapped,
+   * so choosing an item changed something nobody could see and the tap looked
+   * dead. Choosing now brings the detail to you; side by side it is already
+   * in view and nothing moves.
+   */
+  const detailRef = useRef<HTMLDivElement>(null)
+  const queueRef = useRef<HTMLDivElement>(null)
+  const stacked = () => !window.matchMedia('(min-width: 1024px)').matches
+  const reveal = (el: HTMLElement | null) => {
+    const still =
+      document.documentElement.dataset.motion === 'reduced' ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el?.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' })
+  }
+  // The scroll waits for the chosen item to render. Run at the tap, it
+  // measured the page with the previous detail still in it, and a longer new
+  // one stopped short where the old page ended.
+  //
+  // A deep link starts out pending: it is a choice made on another screen —
+  // the Overview deck opens a card here — and gets the same treatment once
+  // its row arrives.
+  const pendingReveal = useRef<string | null>(deepLinked)
+  const choose = (key: string) => {
+    if (key === selected?.key) {
+      if (stacked()) reveal(detailRef.current)
+      return
+    }
+    pendingReveal.current = key
+    setSelectedKey(key)
+  }
+  useEffect(() => {
+    if (!pendingReveal.current || selected?.key !== pendingReveal.current) return
+    pendingReveal.current = null
+    if (stacked()) reveal(detailRef.current)
+  }, [selected])
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['review'] })
     qc.invalidateQueries({ queryKey: ['gigs'] })
@@ -164,8 +202,11 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
               the shown item against a total it is not part of. */}
           {filter === 'snoozed'
             ? `${visible.length} snoozed`
-            : `${visible.length} of ${counts?.all ?? 0} items`}{' '}
-          · <kbd className="font-semibold">j</kbd>/<kbd className="font-semibold">k</kbd> to move
+            : `${visible.length} of ${counts?.all ?? 0} items`}
+          {/* Only where there is likely a keyboard to press them on. */}
+          <span className="hidden [@media(hover:hover)]:inline">
+            {' '}· <kbd className="font-semibold">j</kbd>/<kbd className="font-semibold">k</kbd> to move
+          </span>
         </p>
       </div>
 
@@ -225,29 +266,44 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
         </p>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[19rem_minmax(0,1fr)]">
-          <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl border border-line bg-surface shadow-card divide-y divide-line">
+          <div
+            ref={queueRef}
+            className="scroll-mt-20 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl border border-line bg-surface shadow-card divide-y divide-line"
+          >
             {visible.map((item) => (
               <QueueRow
                 key={item.key}
                 item={item}
                 active={item.key === selected?.key}
-                onSelect={() => setSelectedKey(item.key)}
+                onSelect={() => choose(item.key)}
               />
             ))}
           </div>
 
           {selected && (
-            <Detail
-              key={selected.key}
-              item={selected}
-              isSaving={isSaving}
-              onGig={(body) => patchGig.mutate({ id: selected.id, body })}
-              onSync={(body) => patchSync.mutate({ id: selected.id, body })}
-              onPromo={(body) => patchPromo.mutate({ id: selected.id, body })}
-              onSnooze={(until) =>
-                snooze.mutate({ kind: selected.kind as 'gig' | 'sync', id: selected.id, until })
-              }
-            />
+            // `scroll-mt-20` clears the sticky header when this is scrolled to.
+            <div ref={detailRef} className="min-w-0 scroll-mt-20">
+              {/* The way back up, only where the queue is above rather than
+                  beside. Its gap is its own margin, so it leaves with it. */}
+              <button
+                type="button"
+                onClick={() => reveal(queueRef.current)}
+                className="lg:hidden mb-2 py-1 text-xs font-semibold text-info-fg"
+              >
+                ↑ Back to the queue
+              </button>
+              <Detail
+                key={selected.key}
+                item={selected}
+                isSaving={isSaving}
+                onGig={(body) => patchGig.mutate({ id: selected.id, body })}
+                onSync={(body) => patchSync.mutate({ id: selected.id, body })}
+                onPromo={(body) => patchPromo.mutate({ id: selected.id, body })}
+                onSnooze={(until) =>
+                  snooze.mutate({ kind: selected.kind as 'gig' | 'sync', id: selected.id, until })
+                }
+              />
+            </div>
           )}
         </div>
       )}

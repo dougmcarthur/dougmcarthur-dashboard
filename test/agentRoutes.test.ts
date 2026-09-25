@@ -162,3 +162,33 @@ describe('help carries every field description', () => {
     expect(lines.find((l) => l.startsWith('country?:'))).toContain('CA, US')
   })
 })
+
+/**
+ * The Settings card, read off the source.
+ *
+ * The token is a credential that writes to the account, so the rules are the
+ * invitation's: the list never carries it, issuing and revoking go through the
+ * passkey, and the issued value stays in the card's own state rather than the
+ * query cache, where every later render of the list could reach it.
+ */
+describe('the agent token card', () => {
+  const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const read = (rel: string) =>
+    strip(readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8'))
+  const card = read('../frontend/src/components/AgentTokensCard.tsx')
+  const route = read('../src/routes/agentTokens.ts')
+
+  it('never gets a token from the list route', () => {
+    const list = route.slice(route.indexOf("tokens.get('/'"), route.indexOf("tokens.post('/'"))
+    expect(list).not.toMatch(/\btoken\b|tokenHash/)
+  })
+
+  it('asks for the passkey on both writes', () => {
+    expect(card).toContain('withConfirmation(() => api.agentTokens.issue(')
+    expect(card).toContain('withConfirmation(() => api.agentTokens.revoke(')
+  })
+
+  it('keeps the issued token out of the query cache', () => {
+    expect(card).not.toMatch(/setQueryData/)
+  })
+})

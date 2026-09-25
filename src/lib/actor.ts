@@ -20,7 +20,7 @@
 
 import { asc, eq } from 'drizzle-orm'
 import { getDb } from '../db'
-import { agentTokens, tenants, users } from '../db/schema'
+import { agentTokens, epkShares, tenants, users } from '../db/schema'
 import { asTenantId, type TenantId } from '../db/scope'
 import { sha256Hex, timingSafeEqual, type ActiveSession } from './auth'
 import type { Env } from '../types'
@@ -177,6 +177,33 @@ export async function actorForBearer(env: Env, header: string | null | undefined
     .where(eq(agentTokens.id, row.id))
 
   return { kind: 'agent', tenant: asTenantId(row.tenantId), tokenId: row.id }
+}
+
+/**
+ * The artist a public EPK link belongs to, and which cut it shows.
+ *
+ * Here beside the agent token because it is the same act: a credential from
+ * outside, hashed and looked up before any tenant is known, resolved to one.
+ * Null for an unknown link and a revoked one alike — the page says the same
+ * thing for both, so a guessed token cannot tell "never existed" from
+ * "withdrawn".
+ */
+export async function tenantForEpkShare(
+  env: Env,
+  offered: string,
+): Promise<{ tenant: TenantId; audience: string; shareId: string } | null> {
+  if (!offered || offered.length < 20) return null
+  const db = getDb(env.DB)
+  const row = await db
+    .select()
+    .from(epkShares)
+    .where(eq(epkShares.tokenHash, await sha256Hex(offered)))
+    .get()
+  if (!row || row.revokedAt) return null
+  // Read on every view: "last opened" is how the artist learns a festival
+  // looked, which is worth a write on a page opened a handful of times.
+  await db.update(epkShares).set({ lastViewedAt: new Date().toISOString() }).where(eq(epkShares.id, row.id))
+  return { tenant: asTenantId(row.tenantId), audience: row.audience, shareId: row.id }
 }
 
 /**

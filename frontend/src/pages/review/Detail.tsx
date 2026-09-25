@@ -170,7 +170,11 @@ export function Detail({
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
             <KindTag kind={item.kind} />
-            <StatusBadge status={item.status} kind={item.kind === 'gig' ? 'gig' : undefined} />
+            <StatusBadge
+              status={item.status}
+              kind={item.kind === 'gig' ? 'gig' : undefined}
+              gigType={item.source.kind === 'gig' ? item.source.row.type : undefined}
+            />
             {stateChips.map((f) => (
               <span key={f.id} className="text-xs text-muted">
                 {f.label}

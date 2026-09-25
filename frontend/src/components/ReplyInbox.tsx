@@ -2,7 +2,8 @@ import { matchStrength, strengthNote, STRENGTH_LABELS } from '../../../shared/re
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type GigReply } from '../api'
-import { gigStatusMeta, normaliseGigStatus, nextGigStatuses, type GigStatus } from '../../../shared/gigStatus'
+import { type GigStatus } from '../../../shared/gigStatus'
+import { gigMoves } from '../../../shared/gigStage'
 import { shortDate } from '../format'
 import { Button } from './ui/Button'
 import { Select } from './ui/Field'
@@ -39,7 +40,7 @@ function Card({
   onDismiss,
 }: {
   reply: GigReply
-  gigs: Array<{ id: number; name: string; status: string }>
+  gigs: Array<{ id: number; name: string; status: string; type?: string | null }>
   busy: boolean
   onAccept: (gigId: number, status: GigStatus | null) => void
   onDismiss: () => void
@@ -53,8 +54,8 @@ function Card({
   // Offered only when the pipeline actually allows it from where the row is —
   // a reply reading as `declined` on a gig already marked declined has nothing
   // to apply, and the button would 400.
-  const canApply =
-    proposed && gig && nextGigStatuses(normaliseGigStatus(gig.status)).includes(proposed)
+  const move = proposed && gig ? gigMoves(gig.status, gig.type).find((m) => m.to === proposed) : undefined
+  const canApply = Boolean(move)
 
   return (
     <div className="border border-line rounded-lg p-3 bg-surface">
@@ -163,9 +164,9 @@ function Card({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mt-2.5">
-        <label className="flex items-center gap-1.5 text-xs text-muted">
+        <label className="flex min-w-0 max-w-full items-center gap-1.5 text-xs text-muted">
           About
-          <Select filter value={chosen} disabled={busy} onChange={(e) => setChosen(e.target.value === '' ? '' : Number(e.target.value))}>
+          <Select filter className="min-w-0 max-w-full" value={chosen} disabled={busy} onChange={(e) => setChosen(e.target.value === '' ? '' : Number(e.target.value))}>
             <option value="">— pick an application —</option>
             {gigs.map((g) => (
               <option key={g.id} value={g.id}>
@@ -177,7 +178,7 @@ function Card({
 
         {canApply && (
           <Button variant="primary" disabled={busy} onClick={() => onAccept(gigId!, proposed)}>
-            Yes — mark {gigStatusMeta(proposed).label.toLowerCase()}
+            Yes — {move?.label.toLowerCase()}
           </Button>
         )}
         <Button variant="good" disabled={busy || gigId === null} onClick={() => onAccept(gigId!, null)}>

@@ -5,6 +5,7 @@ import { kindByKey } from '../../../../shared/questionKinds'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea, Select } from '../../components/ui/Field'
 import { Caption } from '../../components/ui/Surface'
+import { PrefillLink } from './PrefillLink'
 
 /**
  * Phase 3 on screen: the questions this application asks, and what the artist
@@ -289,6 +290,8 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
           ))}
         </ul>
       )}
+
+      {fields.length > 0 && <PrefillLink formUrl={data.gig.applicationUrl ?? null} fields={fields} />}
 
       {fields.length > 0 && (
         <div className="space-y-2">

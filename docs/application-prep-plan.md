@@ -95,11 +95,22 @@ state. Only from `shortlisted`, and only when the read produced fields — a for
 nobody could open has not been started, and a submitted application does not go
 backwards because you re-read the form to check what you sent.
 
-## Not built
+## Opening a Google Form pre-filled
 
-- **Sourcing the artist database.** Still by hand or by the research agents;
-  nothing reads the three reference docs in D1, Drive, or the website. Phase 3
-  makes the gap obvious rather than closing it — every "Nothing on file answers
-  this yet" is that gap, named.
-- **Phase 4's inbound classification** (step E), which is what would move a row
-  off `submitted` on its own.
+Copy per field is still the way in everywhere, and on a Google Form there is
+also a link that opens it with every answer you have read already typed in
+(`shared/formPrefill.ts`). Suggestions stay out, choices must be ones the form
+offers, over-long answers stay out, and whatever is left out is named with a
+reason. It opens the form and stops; the form's own button is still yours to
+press. The answers travel in the address, and the panel says so.
+
+## What this left open, and where it went
+
+- **Sourcing the artist database.** Built: `shared/artistSource.ts` fills
+  `artist_assets` from the reference docs in D1, behind a preview. Drive and
+  the website are still unread, and press photos are entered by hand — so an
+  answer that is on neither is still reported as "Nothing on file answers this
+  yet".
+- **Phase 4's inbound classification** (step E). Built — see
+  [reply-matching-plan.md](./reply-matching-plan.md). It proposes a reading of
+  the organiser's reply; moving the row off `submitted` is still yours.
