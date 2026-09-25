@@ -274,7 +274,7 @@ describe('a panel that writes in bulk previews first', () => {
     'frontend/src/pages/artist/SourcePanel.tsx',
     'frontend/src/components/NotesBackfillCard.tsx',
     'frontend/src/components/GmailDraftsPanel.tsx',
-    'frontend/src/pages/artist/ManitobaMusicPanel.tsx',
+    'frontend/src/pages/artist/AssociationPanel.tsx',
     'frontend/src/pages/artist/DriveTab.tsx',
   ]
 
@@ -289,8 +289,9 @@ describe('a panel that writes in bulk previews first', () => {
     // first is one you find out about afterwards.
     for (const file of BULK) {
       const src = readFileSync(file, 'utf8')
-      const preview = src.search(/\.(?:preview|sourcePreview)\(\)/)
-      const write = src.search(/\.(?:apply|source)\(\)/)
+      // With or without an argument: a panel per association passes its id.
+      const preview = src.search(/\.(?:preview|sourcePreview)\([\w.]*\)/)
+      const write = src.search(/\.(?:apply|source)\([\w.]*\)/)
       expect(preview, file).toBeGreaterThan(-1)
       expect(write, file).toBeGreaterThan(-1)
       expect(preview, file).toBeLessThan(write)

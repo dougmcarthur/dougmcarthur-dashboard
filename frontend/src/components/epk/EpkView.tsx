@@ -1,62 +1,81 @@
 import { useState } from 'react'
 import type { EpkPage, MergedShow } from '../../api'
-import type { PublicItem } from '../../../../shared/publicEpk'
-import { wordCount } from '../../../../shared/publicEpk'
+import { epkProfile, type EpkProfile, type ProfileLink } from '../../../../shared/epkProfile'
 
 /**
  * The EPK as an artist page — what a festival programmer, a music supervisor
  * or a journalist sees when they open a share link.
  *
  * Built for a screen first, a phone included: the research found juries
- * reviewing on portals and screens, not paper. So live video leads, because
- * it is what a programmer watches before deciding; music is one click away;
- * the bio has the three lengths forms ask for, with Copy. The print
- * stylesheet is the fallback for the one case a file is still needed — an
- * application's "upload your EPK (PDF)" field — and costs nothing to keep:
- * the browser's Save as PDF turns this same page into that file.
+ * reviewing on portals and screens, not paper. The order is the order a
+ * programmer decides in — who is this and what do they sound like, then
+ * proof (a quote, a video), then the detail. The print stylesheet is the
+ * fallback for an application's "upload your EPK (PDF)" field: the browser's
+ * Save as PDF turns this same page into that file.
+ *
+ * Nothing here reads a raw library value: `epkProfile` has already taken the
+ * markdown out and split the genre, the quote and the highlights along their
+ * seams, so what reaches JSX is text meant to be read.
  *
  * Every image is loaded with no referrer: Manitoba Music, where many of these
  * photos live, refuses an image request that names another site.
  */
 
 const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const WRAP = 'max-w-5xl mx-auto px-5 sm:px-10'
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-4 break-inside-avoid">
+    <section id={id} className="space-y-5 break-inside-avoid scroll-mt-6">
       <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-ink">{title}</h2>
       {children}
     </section>
   )
 }
 
-function linkClass(primary = false) {
-  return primary
-    ? 'inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full bg-accent text-accent-fg font-semibold hover:bg-accent-hover transition-colors print:hidden'
-    : 'inline-flex items-center justify-center h-11 px-5 rounded-full border border-line-strong text-ink hover:bg-sunken transition-colors print:hidden'
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return <h3 className="text-xs font-semibold uppercase tracking-widest text-muted">{children}</h3>
 }
 
-function Bio({ bios }: { bios: PublicItem[] }) {
-  const [i, setI] = useState(0)
-  const [copied, setCopied] = useState(false)
-  const bio = bios[Math.min(i, bios.length - 1)]
+function pill(primary: boolean) {
+  return primary
+    ? 'inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full bg-accent text-accent-fg font-semibold hover:bg-accent-hover transition-colors print:hidden'
+    : 'inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full border border-line-strong text-ink hover:bg-sunken transition-colors print:hidden'
+}
+
+function Play() {
   return (
-    <div className="space-y-3">
-      {bios.length > 1 && (
-        <div role="group" aria-label="Bio length" className="flex flex-wrap gap-1 p-1 rounded-lg border border-line bg-surface w-fit print:hidden">
-          {bios.map((b, k) => (
+    <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4 2.5v11l9-5.5z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function Bio({ profile }: { profile: EpkProfile }) {
+  const [i, setI] = useState(profile.bioIndex)
+  const [copied, setCopied] = useState(false)
+  const bio = profile.bios[Math.min(i, profile.bios.length - 1)]
+  return (
+    <div className="space-y-4">
+      {profile.bios.length > 1 && (
+        <div role="group" aria-label="Bio length" className="inline-flex gap-1 p-1 rounded-full border border-line bg-surface print:hidden">
+          {profile.bios.map((b, k) => (
             <button
               key={k}
-              onClick={() => setI(k)}
+              onClick={() => {
+                setI(k)
+                setCopied(false)
+              }}
               aria-pressed={k === i}
-              className={`h-9 px-3 rounded-md text-sm transition-colors ${k === i ? 'bg-raised text-ink font-semibold' : 'text-body hover:text-ink'}`}
+              className={`h-8 px-3.5 rounded-full text-sm transition-colors ${k === i ? 'bg-raised text-ink font-semibold' : 'text-body hover:text-ink'}`}
             >
-              {b.variant || `${wordCount(b.value)} words`}
+              {b.label}
+              <span className={`ml-1.5 text-xs ${k === i ? 'text-muted' : 'text-faint'}`}>{b.words}w</span>
             </button>
           ))}
         </div>
       )}
-      <p className="text-base sm:text-lg leading-relaxed text-body whitespace-pre-line max-w-prose">{bio.value}</p>
+      <p className="text-base sm:text-[17px] leading-relaxed text-body whitespace-pre-line max-w-prose">{bio.value}</p>
       <button
         onClick={() =>
           navigator.clipboard.writeText(bio.value).then(
@@ -64,10 +83,27 @@ function Bio({ bios }: { bios: PublicItem[] }) {
             () => setCopied(false),
           )
         }
-        className="text-sm text-info-fg underline print:hidden"
+        className="text-sm text-muted hover:text-ink underline underline-offset-2 print:hidden"
       >
-        {copied ? 'Copied' : `Copy this bio (${wordCount(bio.value)} words)`}
+        {copied ? 'Copied' : `Copy this bio · ${bio.words} words`}
       </button>
+    </div>
+  )
+}
+
+function Names({ title, names }: { title: string; names: string[] }) {
+  return (
+    <div className="space-y-2">
+      <Eyebrow>{title}</Eyebrow>
+      {/* Each name kept whole: "I Mother Earth" must not break after the I. */}
+      <p className="text-sm text-body leading-relaxed">
+        {names.map((n, i) => (
+          <span key={n}>
+            {i > 0 && <span className="text-faint"> · </span>}
+            <span className="whitespace-nowrap">{n}</span>
+          </span>
+        ))}
+      </p>
     </div>
   )
 }
@@ -75,7 +111,7 @@ function Bio({ bios }: { bios: PublicItem[] }) {
 function ShowRow({ show }: { show: MergedShow }) {
   const [, m, d] = show.date.split('-')
   return (
-    <li className="flex items-center gap-4 py-3 border-b border-line">
+    <li className="flex items-center gap-4 py-3 border-b border-line last:border-b-0">
       <div className="w-12 shrink-0 text-center rounded-lg bg-sunken py-1.5">
         <div className="text-[11px] font-semibold text-accent uppercase">{MONTH[Number(m) - 1]}</div>
         <div className="text-lg font-semibold text-ink leading-tight">{Number(d)}</div>
@@ -93,99 +129,138 @@ function ShowRow({ show }: { show: MergedShow }) {
   )
 }
 
+function LinkColumn({ title, links }: { title: string; links: ProfileLink[] }) {
+  if (links.length === 0) return null
+  return (
+    <div className="space-y-2.5 min-w-0">
+      <Eyebrow>{title}</Eyebrow>
+      <ul className="space-y-1.5">
+        {links.map((l) => (
+          <li key={l.url} className="min-w-0">
+            <a href={l.url} target="_blank" rel="noreferrer" className="text-sm text-ink hover:text-accent transition-colors">
+              {l.label}
+            </a>
+            {/* The address, printed — a link is useless on paper. */}
+            <span className="hidden print:block text-[10px] text-muted break-all">{l.url}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function EpkView({ page }: { page: EpkPage }) {
   const { epk, shows } = page
-  const name = page.name ?? 'Artist'
+  const p = epkProfile(epk, page.name)
   const hero = epk.photos[0]
-  const genre = epk.facts.find((f) => /genre/i.test(f.label))
-  const home = epk.facts.find((f) => /home|based/i.test(f.label))
-  const listeners = epk.facts.find((f) => /listener|stream|follower/i.test(f.label))
   const firstVideo = epk.videos.find((v) => v.youtubeId)
-  const glance = epk.facts.filter((f) => f !== genre)
+  const listen = epk.audio[0]?.value ?? p.links.listen[0]?.url
+  const listenLabel = epk.audio[0] ? 'Listen' : p.links.listen[0] ? `Listen on ${p.links.listen[0].label}` : null
+  const watch = firstVideo ? '#live' : p.links.watch[0]?.url
+  const hasSidebar = p.glance.length > 0 || p.fansOf.length > 0 || p.influences.length > 0
+  const hasLinks = Object.values(p.links).some((l) => l.length > 0)
+  // With no photo the hero's second column carries the first quote instead:
+  // proof beside the name, rather than an empty half of the screen.
+  const heroQuote = hero ? null : p.quotes[0] ?? null
+  const quotes = heroQuote ? p.quotes.slice(1) : p.quotes
 
   return (
     <article className="bg-canvas text-ink">
-      {/* Hero */}
-      <header className="relative">
-        {hero ? (
-          <img
-            src={hero.value}
-            alt=""
-            referrerPolicy="no-referrer"
-            className="w-full h-[46vh] sm:h-[60vh] max-h-[640px] object-cover bg-raised print:h-64"
-          />
-        ) : (
-          <div className="h-40 sm:h-56 bg-raised" />
-        )}
-        <div className="px-4 sm:px-10 lg:px-20 py-6 sm:py-8 bg-surface/95 sm:absolute sm:inset-x-0 sm:bottom-0 print:static">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
-            <div className="space-y-2 min-w-0">
-              {genre && <p className="text-xs sm:text-sm font-semibold uppercase tracking-widest text-accent">{genre.value}</p>}
-              <h1 className="font-serif text-4xl sm:text-6xl lg:text-7xl font-semibold leading-none tracking-tight">{name}</h1>
-              <p className="text-sm sm:text-base text-body">
-                {[home?.value, listeners ? `${listeners.value} ${listeners.label.toLowerCase()}` : null].filter(Boolean).join(' · ')}
-                {listeners && <span className="text-faint"> · as of {listeners.asOf}</span>}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {firstVideo && (
-                <a href="#live" className={linkClass(true)}>
-                  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor" /></svg>
-                  Watch live
-                </a>
-              )}
-              {epk.audio[0] && (
-                <a href={epk.audio[0].value} target="_blank" rel="noreferrer" className={linkClass()}>
-                  Listen
-                </a>
+      {/* Who, and what they sound like */}
+      <header className="border-b border-line bg-surface">
+        <div className={`${WRAP} py-10 sm:py-16 grid grid-cols-1 gap-10 items-end ${hero || heroQuote ? 'md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]' : ''}`}>
+          <div className="space-y-5 min-w-0">
+            {p.genre && <p className="text-sm font-medium text-accent max-w-xl">{p.genre}</p>}
+            <div className="space-y-2">
+              <h1 className="font-serif text-5xl sm:text-7xl font-semibold leading-[0.95] tracking-tight text-balance">{p.name}</h1>
+              {p.descriptor.length > 0 && (
+                <p className="text-sm sm:text-base text-muted">{p.descriptor.join(' · ')}</p>
               )}
             </div>
+            {p.tagline && <p className="text-lg sm:text-xl leading-snug text-body max-w-2xl text-pretty">{p.tagline}</p>}
+            {(listen || watch) && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {listen && listenLabel && (
+                  <a href={listen} target="_blank" rel="noreferrer" className={pill(true)}>
+                    <Play />
+                    {listenLabel}
+                  </a>
+                )}
+                {watch && (
+                  <a href={watch} {...(firstVideo ? {} : { target: '_blank', rel: 'noreferrer' })} className={pill(!listen)}>
+                    {firstVideo ? 'Watch live' : `Watch on ${p.links.watch[0].label}`}
+                  </a>
+                )}
+              </div>
+            )}
           </div>
+          {hero && (
+            <figure className="space-y-1.5">
+              <img
+                src={hero.value}
+                alt={`${p.name}${hero.label ? ` — ${hero.label}` : ''}`}
+                referrerPolicy="no-referrer"
+                className="w-full aspect-[4/5] object-cover rounded-2xl bg-raised"
+              />
+              <figcaption className="text-xs text-muted">Photo: {hero.credit}</figcaption>
+            </figure>
+          )}
+          {heroQuote && (
+            <figure className="border-l-2 border-accent pl-5 break-inside-avoid">
+              <blockquote className="font-serif text-lg leading-snug text-ink text-pretty">“{heroQuote.text}”</blockquote>
+              {heroQuote.source && <figcaption className="mt-3 text-sm text-muted">— {heroQuote.source}</figcaption>}
+            </figure>
+          )}
         </div>
-        {hero?.credit && (
-          <span className="absolute top-3 right-3 text-xs text-body bg-canvas/80 px-2 py-1 rounded">Photo: {hero.credit}</span>
-        )}
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-10 lg:px-20 py-10 sm:py-14 space-y-12 sm:space-y-16">
+      <div className={`${WRAP} py-12 sm:py-16 space-y-14 sm:space-y-20`}>
+        {quotes.length > 0 && (
+          <div className="space-y-10">
+            {quotes.map((q, i) => (
+              <figure key={i} className="max-w-3xl border-l-2 border-accent pl-5 sm:pl-8 break-inside-avoid">
+                <blockquote className="font-serif text-xl sm:text-2xl leading-snug text-ink text-pretty">“{q.text}”</blockquote>
+                {q.source && <figcaption className="mt-3 text-sm text-muted">— {q.source}</figcaption>}
+              </figure>
+            ))}
+          </div>
+        )}
+
         {(epk.videos.length > 0 || epk.audio.length > 0) && (
-          <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <div className={`grid grid-cols-1 gap-12 ${epk.videos.length > 0 && epk.audio.length > 0 ? 'lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]' : ''}`}>
             {epk.videos.length > 0 && (
-              <div id="live">
-                <Section title="Live">
-                  {firstVideo && (
-                    <div className="aspect-video rounded-xl overflow-hidden bg-raised print:hidden">
-                      <iframe
-                        className="w-full h-full"
-                        src={`https://www.youtube-nocookie.com/embed/${firstVideo.youtubeId}`}
-                        title={firstVideo.label}
-                        allow="encrypted-media; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  )}
-                  <ul className="space-y-1.5">
-                    {epk.videos.map((v) => (
-                      <li key={v.value}>
-                        <a href={v.value} target="_blank" rel="noreferrer" className="text-info-fg underline">
-                          {v.label}
-                        </a>
-                        {/* The address, printed — a link is useless on paper. */}
-                        <span className="hidden print:inline text-xs text-muted"> — {v.value}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </Section>
-              </div>
+              <Section id="live" title="Live">
+                {firstVideo && (
+                  <div className="aspect-video rounded-xl overflow-hidden bg-raised print:hidden">
+                    <iframe
+                      className="w-full h-full"
+                      src={`https://www.youtube-nocookie.com/embed/${firstVideo.youtubeId}`}
+                      title={firstVideo.label}
+                      allow="encrypted-media; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                )}
+                <ul className="space-y-1.5">
+                  {epk.videos.map((v) => (
+                    <li key={v.value}>
+                      <a href={v.value} target="_blank" rel="noreferrer" className="text-ink hover:text-accent transition-colors">
+                        {v.label}
+                      </a>
+                      <span className="hidden print:inline text-xs text-muted"> — {v.value}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Section>
             )}
             {epk.audio.length > 0 && (
               <Section title="Music">
                 <ol className="divide-y divide-line border-y border-line">
                   {epk.audio.map((a, i) => (
                     <li key={a.value} className="flex items-center gap-3 py-3">
-                      <span className="w-5 text-right text-faint text-sm">{i + 1}</span>
+                      <span className="w-5 text-right text-faint text-sm tabular-nums">{i + 1}</span>
                       <div className="min-w-0 flex-1">
-                        <a href={a.value} target="_blank" rel="noreferrer" className="text-ink hover:underline">
+                        <a href={a.value} target="_blank" rel="noreferrer" className="text-ink hover:text-accent transition-colors">
                           {a.label}
                         </a>
                         {a.variant && <p className="text-xs text-muted">{a.variant}</p>}
@@ -198,41 +273,59 @@ export function EpkView({ page }: { page: EpkPage }) {
           </div>
         )}
 
-        {(epk.bios.length > 0 || glance.length > 0) && (
-          <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-            {epk.bios.length > 0 && (
+        {(p.bios.length > 0 || hasSidebar) && (
+          <div className={`grid grid-cols-1 gap-12 ${p.bios.length > 0 && hasSidebar ? 'lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]' : ''}`}>
+            {p.bios.length > 0 && (
               <Section title="About">
-                <Bio bios={epk.bios} />
+                <Bio profile={p} />
               </Section>
             )}
-            {glance.length > 0 && (
-              <aside className="rounded-xl border border-line bg-surface p-5 space-y-3 h-fit break-inside-avoid">
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-muted">At a glance</h3>
-                <dl className="space-y-2.5">
-                  {glance.map((f) => (
-                    <div key={f.label} className="flex justify-between gap-4 text-sm border-b border-line pb-2.5">
-                      <dt className="text-muted">{f.label}</dt>
-                      <dd className="text-ink text-right">{f.value}</dd>
-                    </div>
-                  ))}
-                </dl>
+            {hasSidebar && (
+              <aside className="space-y-7 lg:pt-14 break-inside-avoid">
+                {p.glance.length > 0 && (
+                  <dl className="space-y-4">
+                    {p.glance.map((f) => (
+                      <div key={f.label} className="space-y-1">
+                        <dt className="text-xs font-semibold uppercase tracking-widest text-muted">{f.label}</dt>
+                        <dd className="text-sm text-ink whitespace-pre-line">{f.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {p.fansOf.length > 0 && <Names title="For fans of" names={p.fansOf} />}
+                {p.influences.length > 0 && <Names title="Influences" names={p.influences} />}
               </aside>
             )}
           </div>
         )}
 
+        {p.highlights.length > 0 && (
+          <Section title="Highlights">
+            <dl className="grid grid-cols-1 sm:grid-cols-[9rem_minmax(0,1fr)] gap-x-8 border-t border-line">
+              {p.highlights.map((h, i) => (
+                <div key={i} className="contents">
+                  <dt className="pt-4 sm:pb-4 sm:border-b border-line text-xs font-semibold uppercase tracking-widest text-muted">
+                    {h.label ?? ''}
+                  </dt>
+                  <dd className="pt-1 pb-4 sm:pt-4 border-b border-line text-sm sm:text-base text-body leading-relaxed">{h.text}</dd>
+                </div>
+              ))}
+            </dl>
+          </Section>
+        )}
+
         {(shows.upcoming.length > 0 || shows.past.length > 0) && (
           <Section title="Shows">
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
               {shows.upcoming.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-muted mb-1">Upcoming</h3>
+                <div className="space-y-1">
+                  <Eyebrow>Upcoming</Eyebrow>
                   <ul>{shows.upcoming.map((s) => <ShowRow key={s.key} show={s} />)}</ul>
                 </div>
               )}
               {shows.past.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-muted mb-1">Recently played</h3>
+                <div className="space-y-1">
+                  <Eyebrow>Recently played</Eyebrow>
                   <ul>{shows.past.map((s) => <ShowRow key={s.key} show={s} />)}</ul>
                 </div>
               )}
@@ -243,12 +336,12 @@ export function EpkView({ page }: { page: EpkPage }) {
         {epk.photos.length > 0 && (
           <Section title="Press photos">
             <ul className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-              {epk.photos.map((p) => (
-                <li key={p.value} className="space-y-1.5 break-inside-avoid">
-                  <a href={p.value} target="_blank" rel="noreferrer" referrerPolicy="no-referrer" className="block">
-                    <img src={p.value} alt={p.label} referrerPolicy="no-referrer" loading="lazy" className="w-full aspect-[4/5] object-cover rounded-lg bg-raised" />
+              {epk.photos.map((ph) => (
+                <li key={ph.value} className="space-y-1.5 break-inside-avoid">
+                  <a href={ph.value} target="_blank" rel="noreferrer" referrerPolicy="no-referrer" className="block">
+                    <img src={ph.value} alt={ph.label} referrerPolicy="no-referrer" loading="lazy" className="w-full aspect-[4/5] object-cover rounded-lg bg-raised" />
                   </a>
-                  <p className="text-xs text-muted">Photo: {p.credit}</p>
+                  <p className="text-xs text-muted">Photo: {ph.credit}</p>
                 </li>
               ))}
             </ul>
@@ -272,16 +365,16 @@ export function EpkView({ page }: { page: EpkPage }) {
         )}
       </div>
 
-      <footer className="border-t border-line">
-        <div className="max-w-6xl mx-auto px-4 sm:px-10 lg:px-20 py-6 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-          <nav aria-label="Artist links" className="flex flex-wrap gap-x-5 gap-y-2">
-            {epk.links.map((l) => (
-              <a key={l.value} href={l.value} target="_blank" rel="noreferrer" className="text-info-fg hover:underline">
-                {l.label}
-                <span className="hidden print:inline text-xs text-muted"> ({l.value})</span>
-              </a>
-            ))}
-          </nav>
+      <footer className="border-t border-line bg-surface">
+        <div className={`${WRAP} py-10 space-y-8`}>
+          {hasLinks && (
+            <nav aria-label="Artist links" className="grid grid-cols-2 sm:grid-cols-4 gap-8">
+              <LinkColumn title="Listen" links={p.links.listen} />
+              <LinkColumn title="Watch" links={p.links.watch} />
+              <LinkColumn title="Follow" links={p.links.follow} />
+              <LinkColumn title="More" links={p.links.more} />
+            </nav>
+          )}
           <p className="text-xs text-faint">Kept current with Sun Dogs Music Scout</p>
         </div>
       </footer>

@@ -526,6 +526,40 @@ export interface MmIdentity {
   counts: { bio: number; links: number; videos: number; releases: number; files: number; photos: number }
 }
 
+export interface AssociationSummary {
+  id: string
+  name: string
+  region: string
+  url: string
+  profileName: string | null
+  status: string
+  statusNote: string | null
+  checkedAt: string | null
+}
+
+export interface AssociationList {
+  connected: AssociationSummary[]
+  /** Profile addresses already in the artist's library, not yet connected. */
+  fromLibrary: Array<{ id: string; name: string; url: string }>
+  directory: Array<{ id: string; name: string; region: string; profiles: boolean; note: string | null }>
+}
+
+export type AssociationIdentity = MmIdentity & { association: { id: string; name: string } }
+
+export type AssociationImportPlan =
+  | { connected: false }
+  | { connected: true; error: string }
+  | {
+      connected: true
+      association: { id: string; name: string }
+      name: string
+      url: string
+      proposals: AssetProposal[]
+      skipped: Array<{ heading: string; reason: string }>
+      existing: number
+      wouldAdd: number
+    }
+
 export type MmImportPlan =
   | { connected: false }
   | { connected: true; error: string }
@@ -822,24 +856,24 @@ export const api = {
         method: 'POST',
       }),
     removeBandsintown: () => apiFetch<{ ok: boolean }>('/connectors/bandsintown', { method: 'DELETE' }),
-    checkManitobaMusic: (url: string) =>
-      apiFetch<MmIdentity>('/connectors/manitoba-music/check', { method: 'POST', body: JSON.stringify({ url }) }),
-    saveManitobaMusic: (url: string) =>
-      apiFetch<{ manitobaMusic: ConnectorSummary }>('/connectors/manitoba-music', {
-        method: 'PUT',
-        body: JSON.stringify({ url }),
-      }),
-    removeManitobaMusic: () => apiFetch<{ ok: boolean }>('/connectors/manitoba-music', { method: 'DELETE' }),
   },
   /**
-   * Filling the library from a Manitoba Music profile. Preview, then apply —
+   * Member profiles on the provincial music associations' sites. Check writes
+   * nothing; save needs the "Is this you?" yes. Import is preview, then apply —
    * the reference documents' shape, and the guard in uiConsistency holds it.
    */
-  manitobaMusic: {
-    preview: () => apiFetch<MmImportPlan>('/connectors/manitoba-music/import'),
-    apply: () =>
-      apiFetch<{ added: number; existing: number }>('/connectors/manitoba-music/import', { method: 'POST' }),
+  associations: {
+    list: () => apiFetch<AssociationList>('/connectors/associations'),
+    check: (url: string) =>
+      apiFetch<AssociationIdentity>('/connectors/associations/check', { method: 'POST', body: JSON.stringify({ url }) }),
+    save: (url: string) =>
+      apiFetch<{ association: AssociationSummary }>('/connectors/associations', { method: 'PUT', body: JSON.stringify({ url }) }),
+    remove: (id: string) => apiFetch<{ ok: boolean }>(`/connectors/associations/${id}`, { method: 'DELETE' }),
+    preview: (id: string) => apiFetch<AssociationImportPlan>(`/connectors/associations/${id}/import`),
+    apply: (id: string) =>
+      apiFetch<{ added: number; existing: number }>(`/connectors/associations/${id}/import`, { method: 'POST' }),
   },
+
   /**
    * The research agents' credentials. Issuing and revoking both come back
    * asking for the passkey, so callers go through `withConfirmation`.

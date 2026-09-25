@@ -15,7 +15,7 @@ import { ShowsPanel } from './artist/ShowsPanel'
 import { ProfileTab } from './artist/ProfileTab'
 import { DriveTab } from './artist/DriveTab'
 import { SourcePanel } from './artist/SourcePanel'
-import { ManitobaMusicPanel } from './artist/ManitobaMusicPanel'
+import { AssociationPanels } from './artist/AssociationPanel'
 import { Explainer } from '../components/ui/Explainer'
 import { Caption, Card } from '../components/ui/Surface'
 
@@ -184,7 +184,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
       ) : tab === 'library' ? (
         <div className="space-y-4">
           <SourcePanel onDone={invalidate} />
-          <ManitobaMusicPanel onDone={invalidate} />
+          <AssociationPanels onDone={invalidate} />
           {adding && (
             <AssetForm
               onSave={(body) => create.mutate(body)}

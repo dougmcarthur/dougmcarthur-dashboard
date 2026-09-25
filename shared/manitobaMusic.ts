@@ -45,6 +45,13 @@ export const MM_HOST = 'www.manitobamusic.com'
  * other pages, because reading one of those as a profile would file a news
  * article as a bio.
  */
+/** Top-level pages of the site, which the short profile form must not be mistaken for. */
+const SITE_SECTIONS = new Set([
+  'deadlines', 'news', 'livemusic', 'profiles', 'events', 'jobs', 'classifieds', 'resources', 'members',
+  'membership', 'about', 'contact', 'search', 'login', 'logout', 'register', 'programs', 'services',
+  'education', 'directory', 'calendar', 'opportunities', 'support', 'donate', 'store', 'uploads', 'account',
+])
+
 export function profileUrl(input: string): { url: string; slug: string } | { error: string } {
   const raw = input.trim()
   if (!raw) return { error: 'Paste the address of your Manitoba Music profile.' }
@@ -59,6 +66,14 @@ export function profileUrl(input: string): { url: string; slug: string } | { err
     return { error: 'That is not a Manitoba Music address.' }
   }
   const m = u.pathname.match(/^\/profiles\/view,(\d+)\/([a-z0-9_-]+?)(?:\.(?:rss|ics))?\/?$/i)
+  // The short form, manitobamusic.com/<name>, serves the same profile and is
+  // the one members put in their bios and link lists. It maps onto the long
+  // form the site itself links to; a section of the site is not a name.
+  const vanity = u.pathname.match(/^\/([a-z0-9_-]{2,60})\/?$/i)
+  if (!m && vanity && !SITE_SECTIONS.has(vanity[1].toLowerCase())) {
+    const slug = vanity[1].toLowerCase()
+    return { url: `https://${MM_HOST}/profiles/view,499/${slug}`, slug }
+  }
   if (!m) {
     return {
       error: 'That is a Manitoba Music page, but not a profile. Open your profile and copy the address from there — it has /profiles/view in it.',
@@ -291,16 +306,22 @@ export function parseProfile(html: string): MmProfile | null {
  * profile slug plus what the item is (a video id, a URL), never its position,
  * so reordering the profile does not re-propose everything.
  */
-export function proposalsFrom(profile: MmProfile, slug: string): { proposals: AssetProposal[]; skipped: SkippedSection[] } {
-  const src = (key: string) => `manitoba-music:${slug}#${key}`
-  const note = 'From your Manitoba Music profile.'
+export function proposalsFrom(
+  profile: MmProfile,
+  slug: string,
+  // The other associations' profiles (`shared/associationProfile.ts`) come
+  // out in this same shape, so they share these proposals under their own name.
+  origin: { name: string; sourcePrefix: string } = { name: 'Manitoba Music', sourcePrefix: 'manitoba-music' },
+): { proposals: AssetProposal[]; skipped: SkippedSection[] } {
+  const src = (key: string) => `${origin.sourcePrefix}:${slug}#${key}`
+  const note = `From your ${origin.name} profile.`
   const proposals: AssetProposal[] = []
   const skipped: SkippedSection[] = []
 
   if (profile.bio) {
     proposals.push({
       kind: 'bio', label: 'Bio', value: profile.bio, questionKind: 'bio',
-      variant: 'Manitoba Music', source: src('bio'), notes: note,
+      variant: origin.name, source: src('bio'), notes: note,
     })
   }
   if (profile.genres.length) {
@@ -343,11 +364,11 @@ export function proposalsFrom(profile: MmProfile, slug: string): { proposals: As
     proposals.push({
       kind: 'photo', label: 'Press photo', value: p, questionKind: null, variant: null,
       source: src(`photo:${key}`),
-      notes: `${note} Manitoba Music does not say who took it — add the photographer's credit before using it.`,
+      notes: `${note} ${origin.name} does not say who took it — add the photographer's credit before using it.`,
     })
   }
 
-  skipped.push({ heading: 'Contact', reason: 'phone and email are left on Manitoba Music, not copied into Scout' })
+  skipped.push({ heading: 'Contact', reason: `phone and email are left on ${origin.name}, not copied into Scout` })
   if (profile.shows.length) {
     skipped.push({ heading: 'Shows', reason: `${profile.shows.length} listed — shows come from Bandsintown, so these are not filed twice` })
   }

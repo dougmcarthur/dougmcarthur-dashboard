@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api'
 import { EpkView } from '../../components/epk/EpkView'
+import { epkProfile } from '../../../../shared/epkProfile'
 
 /**
  * A shared EPK, opened from its link — by somebody who is not signed in and
@@ -19,9 +20,10 @@ export function PublicEpkPage({ token }: { token: string }) {
     retry: false,
   })
 
+  const name = data ? epkProfile(data.epk, data.name).name : null
   useEffect(() => {
-    if (data?.name) document.title = `${data.name} — EPK`
-  }, [data?.name])
+    if (name) document.title = `${name} — EPK`
+  }, [name])
 
   if (isLoading) return <div className="min-h-screen bg-canvas" />
   if (error || !data) {
@@ -37,7 +39,7 @@ export function PublicEpkPage({ token }: { token: string }) {
   return (
     <main className="min-h-screen bg-canvas">
       <EpkView page={data} />
-      <div className="max-w-6xl mx-auto px-4 sm:px-10 lg:px-20 pb-10 print:hidden">
+      <div className="max-w-5xl mx-auto px-5 sm:px-10 py-6 print:hidden">
         <button onClick={() => window.print()} className="text-sm text-muted underline hover:text-ink">
           Save as PDF
         </button>

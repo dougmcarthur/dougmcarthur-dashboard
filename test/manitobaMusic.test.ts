@@ -14,6 +14,9 @@ describe('only a profile address is accepted', () => {
       'https://www.manitobamusic.com/profiles/view,499/dougmcarthur?utm_source=x',
       'https://www.manitobamusic.com/profiles/view,499/dougmcarthur.rss',
       '  https://www.manitobamusic.com/profiles/view,499/dougmcarthur.ics ',
+      // The short form members put in their link lists serves the same page.
+      'https://www.manitobamusic.com/dougmcarthur',
+      'manitobamusic.com/DougMcArthur/',
     ]) {
       expect(profileUrl(input)).toEqual({
         url: 'https://www.manitobamusic.com/profiles/view,499/dougmcarthur',
@@ -33,6 +36,8 @@ describe('only a profile address is accepted', () => {
     for (const input of [
       'https://www.manitobamusic.com/news/read,article/9290/festival',
       'https://www.manitobamusic.com/profiles',
+      'https://www.manitobamusic.com/deadlines',
+      'https://www.manitobamusic.com/livemusic/',
       'https://www.manitobamusic.com/profiles/view,499/',
       'https://www.manitobamusic.com/livemusic/display,event/113056/songwriter-showcase-5',
     ]) {

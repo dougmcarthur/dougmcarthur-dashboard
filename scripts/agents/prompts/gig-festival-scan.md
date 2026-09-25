@@ -21,7 +21,11 @@ not already have on file, and to file them for their review.
    Participants:** are candidates. The feed carries no article text, so open
    each candidate's link and judge it by the deadlines-page rules below. Skip
    everything else in the feed — staff news, roundups, headlines, job posts.
-5. **Only if the reference documents say the artist is based in Manitoba**,
+5. **If the artist is based outside Manitoba**, read their own province's
+   music industry association as well — see *Other provincial associations*
+   below. Do the same for any association the reference documents say they
+   are a member of.
+6. **Only if the reference documents say the artist is based in Manitoba**,
    read who is booking artists like them — see *Venue leads* below.
 
 ## Manitoba Music's deadlines page and news feed
@@ -65,6 +69,34 @@ Three rules specific to this page:
   page's wording in `deadlineNote`, and never again while it is on file. It
   matters when a booked show or a showcase needs travel, which is the artist's
   call to connect.
+
+## Other provincial associations
+
+Every province's association posts its own calls, and most of what it posts
+is for its own members or residents — which is exactly the artist this is
+for, when it is their province. Read the sources for the artist's province
+(and any association the reference documents name as theirs), and apply the
+Manitoba Music rules above: follow each item to the programme's own page,
+file showcases and what an artist applies to with their music, skip jobs,
+board seats and organisational grants, and give provincial funding only to
+residents. In a feed, only items from the last three weeks are candidates,
+and only those whose title reads as a call, a showcase or an opportunity.
+
+| Province | Association | Read |
+|---|---|---|
+| SK | SaskMusic | `https://www.saskmusic.org/news/sound-opportunities` |
+| AB | Alberta Music | `https://www.albertamusic.org` — its site often refuses automated visits; if it does, say so in your report rather than retrying |
+| BC | Music BC | `https://musicbc.org/feed/`, `https://musicbc.org/programs/export-opportunities/` |
+| ON | MusicOntario | `https://music-ontario.ca/news`, `https://music-ontario.ca/events` |
+| NB | Music NB | `https://www.musicnb.org/en/blog` |
+| NS | Music Nova Scotia | `https://musicnovascotia.ca/feed/`, `https://musicnovascotia.ca/events/` |
+| PE | Music PEI | `https://www.musicpei.com/resources/opportunities-and-submissions/`, `https://www.musicpei.com/feed/`, `https://www.musicpei.com/events-calendar/?ical=1` |
+| NL | MusicNL | `https://musicnl.ca/member-opportunities/`, `https://musicnl.ca/feed/` |
+| YT | Music Yukon | `https://musicyukon.com/feed/` |
+
+Say in `fitRationale` which association listed it. There is no entry for the
+Northwest Territories: Music NWT's site was carrying injected spam when this
+was written, and a page somebody else is writing into is not a source.
 
 ## Venue leads
 

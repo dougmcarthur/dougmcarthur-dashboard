@@ -900,7 +900,10 @@ research.
 found by name.** Most of the next testers are Winnipeg artists with a member
 profile, which carries a bio, links, videos, releases, downloads and photos in
 the same server-rendered markup on every page. `profileUrl` in
-`shared/manitobaMusic.ts` accepts `/profiles/view,<n>/<slug>` and nothing else,
+`shared/manitobaMusic.ts` accepts `/profiles/view,<n>/<slug>` and the short
+`manitobamusic.com/<slug>` form members put in their link lists (not a site
+section), and nothing else; a short link already in the library is offered on
+the Settings card without pasting,
 and connecting shows the name and photo on that page — "Is this you?" — before
 saving, because a search by name files a stranger's bio the day there are two
 of you. The import is the reference-document shape: preview, then write, all
@@ -908,6 +911,25 @@ never reviewed, a proposal dropped when its source *or* its value is already
 on file. Contact details are never copied. Its photos refuse a foreign
 `Referer`, so an EPK that displays one needs its own copy. See
 `docs/artist-profile-plan.md`.
+
+**Every provincial association is a source, read the same way.**
+`shared/musicAssociations.ts` lists the ten worth reading — what each site
+offers was fetched, not assumed from Manitoba's. Seven have public member
+profiles on four different platforms; Music BC's are behind a login and
+MusicNL's and Music Yukon's are drawn in the browser, and the card says so
+rather than failing. Music NWT is left out because its site was carrying
+injected spam, and ADISQ has no artist profiles. Manitoba Music keeps its own
+parser and its `manitoba_music` row; every other site goes through
+`shared/associationProfile.ts`, which reads **by subtraction**: it fetches the
+association's homepage beside the profile and drops every link, paragraph and
+share image the two share. That removes the association's own Instagram and
+Facebook — which a naive read files as the artist's — without knowing one
+class name, so a redesign does not break it. A paragraph with an email or
+phone number in it is never taken. One connector row per association
+(`association:<id>`), because an artist who moved provinces can belong to two.
+The gig agent reads each province's calls and feeds, and
+`test/musicAssociations.test.ts` fails if the registry names a source the
+prompt does not.
 
 **A share link publishes only what the artist has claimed.** The EPK
 profile page (`#epk/<token>`, token in the fragment, POSTed to
@@ -919,6 +941,16 @@ reaches a stranger because nobody classified it. `epk_shares` (migration
 `src/lib/actor.ts`, not a domain table, deleted by tenant removal by name.
 `test/epkShare.test.ts` pins where the token travels and that the public route
 strips `withheld`.
+
+**The page never renders a library value raw.** Those values were written for
+forms: "Artist Name" is three lines of markdown, "Genre" a paragraph plus an
+FFO list plus influences, the quote carries its source on a dash line. The
+first version printed them verbatim and shipped a heading reading "Doug" under
+four lines of uppercase. `shared/epkProfile.ts` splits each along the seams the
+documents use and nothing cleverer; one-liners are a tagline, not a bio; a
+link whose label says *private* is withheld, a sync pitch page only shows on
+the sync version, and anything sourced from the writing style guide stays off
+— it describes how to write, not the artist.
 
 **The Drive folder is `drive.file`, and Google enforces the limit.** Scout
 reaches the folder it made on connect and files the artist picked in Google's

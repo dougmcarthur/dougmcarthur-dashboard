@@ -1,39 +1,49 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, type AssetProposal } from '../../api'
+import { api, type AssetProposal, type AssociationSummary } from '../../api'
 import { Button } from '../../components/ui/Button'
 import { Disclosure } from '../../components/ui/Disclosure'
 
 /**
- * Filling the library from a Manitoba Music profile.
+ * Filling the library from a music association profile — one panel per
+ * association connected under Settings.
  *
  * The reference documents' panel again, pointed at a public page: preview,
  * then write, and everything added lands never reviewed. Shown only once a
- * profile is connected under Settings, because the address is the artist's to
- * give and this panel has no business guessing it.
+ * profile is connected, because the address is the artist's to give and this
+ * panel has no business guessing it.
  */
-export function ManitobaMusicPanel({ onDone }: { onDone: () => void }) {
+export function AssociationPanels({ onDone }: { onDone: () => void }) {
+  const list = useQuery({ queryKey: ['associations'], queryFn: api.associations.list })
+  return (
+    <>
+      {(list.data?.connected ?? []).map((a) => (
+        <AssociationPanel key={a.id} association={a} onDone={onDone} />
+      ))}
+    </>
+  )
+}
+
+function AssociationPanel({ association, onDone }: { association: AssociationSummary; onDone: () => void }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
-  const connectors = useQuery({ queryKey: ['connectors'], queryFn: api.connectors.list })
 
   const preview = useQuery({
-    queryKey: ['mm-import'],
-    queryFn: () => api.manitobaMusic.preview(),
+    queryKey: ['association-import', association.id],
+    queryFn: () => api.associations.preview(association.id),
     enabled: open,
   })
 
   const apply = useMutation({
-    mutationFn: () => api.manitobaMusic.apply(),
+    mutationFn: () => api.associations.apply(association.id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['artist'] })
       qc.invalidateQueries({ queryKey: ['artist-epk'] })
-      qc.invalidateQueries({ queryKey: ['mm-import'] })
+      qc.invalidateQueries({ queryKey: ['association-import'] })
       onDone()
     },
   })
 
-  if (!connectors.data?.manitobaMusic) return null
   const data = preview.data
 
   return (
@@ -41,10 +51,10 @@ export function ManitobaMusicPanel({ onDone }: { onDone: () => void }) {
       open={open}
       onOpen={() => setOpen(true)}
       onClose={() => setOpen(false)}
-      teaser="Your Manitoba Music profile already describes you."
-      hint="Read its bio, links, videos, releases and photos into the library."
+      teaser={`Your ${association.name} profile already describes you.`}
+      hint="Read its bio, links, videos and photos into the library."
       openLabel="Read the profile"
-      title="From your Manitoba Music profile"
+      title={`From your ${association.name} profile`}
       subtitle="Nothing is written until you say so, and everything added lands as never reviewed — the profile said it, you have not checked it here."
       loading={preview.isLoading}
       error={apply.isError ? 'Could not add them. Nothing was written.' : null}
