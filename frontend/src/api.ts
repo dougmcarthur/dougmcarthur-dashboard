@@ -42,6 +42,8 @@ export type {
 
 import type { ArtistAsset, AssetHealth, Epk, EpkAudience } from '../../shared/artistAssets'
 import type { MergedShow, ShowSource } from '../../shared/showMerge'
+import type { PublicEpk } from '../../shared/publicEpk'
+import type { PlannedChange, Subfolder } from '../../shared/driveOrganise'
 
 /** An asset with the freshness the server worked out, which the UI never recomputes. */
 export type ArtistAssetWithHealth = ArtistAsset & { health: AssetHealth }
@@ -549,6 +551,54 @@ export interface ShowsResponse {
   past: Array<MergedShow>
 }
 
+/** The EPK as a page: what a share link shows, and for the artist what it leaves out. */
+export interface EpkPage {
+  name: string | null
+  audience: EpkAudience
+  epk: PublicEpk
+  shows: { upcoming: MergedShow[]; past: MergedShow[] }
+}
+
+export type { PublicEpk }
+
+/** A share link, as the artist's list shows it. Never the token. */
+export interface EpkShare {
+  id: string
+  label: string
+  audience: EpkAudience
+  createdAt: string
+  lastViewedAt: string | null
+  revokedAt: string | null
+}
+
+export interface DriveStatus {
+  connected: boolean
+  configured: boolean
+  accountEmail: string | null
+  driveFolderId: string | null
+  folderUrl: string | null
+  picker: { available: boolean; apiKey: string | null; appId: string | null }
+}
+
+export interface DriveFileRow {
+  id: string
+  name: string
+  mimeType: string
+  size: number | null
+  folder: Subfolder | null
+  belongsIn: Subfolder
+  width: number | null
+  height: number | null
+  viewUrl: string | null
+  downloadUrl: string | null
+}
+
+export type DriveFiles =
+  | { connected: false }
+  | { connected: true; folderUrl: string; shared: boolean; files: DriveFileRow[] }
+
+export type { PlannedChange, Subfolder }
+
 /** A research agent's credential, as Settings sees it. Never the token. */
 export interface AgentTokenSummary {
   id: string
@@ -804,6 +854,45 @@ export const api = {
     revoke: (id: string) =>
       apiFetch<{ id: string; revoked: boolean }>(`/agent-tokens/${encodeURIComponent(id)}`, {
         method: 'DELETE',
+      }),
+  },
+  /** The artist's own view of their EPK page, and the links that share it. */
+  epk: {
+    preview: (audience: EpkAudience) =>
+      apiFetch<EpkPage>(`/epk/preview?audience=${audience}&today=${localToday()}`),
+    shares: () => apiFetch<{ items: EpkShare[] }>('/epk/shares'),
+    share: (body: { label: string; audience: EpkAudience }) =>
+      apiFetch<EpkShare & { token: string }>('/epk/shares', { method: 'POST', body: JSON.stringify(body) }),
+    revoke: (id: string) =>
+      apiFetch<{ id: string; revoked: boolean }>(`/epk/shares/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  },
+  /**
+   * The public read a share link opens. The token comes from the URL fragment
+   * and travels in the body, like an invitation's — never in a path.
+   */
+  publicEpk: (token: string) =>
+    apiFetch<EpkPage>('/public/epk', { method: 'POST', body: JSON.stringify({ token, today: localToday() }) }),
+  drive: {
+    status: () => apiFetch<DriveStatus>('/drive/status'),
+    files: () => apiFetch<DriveFiles>('/drive/files'),
+    pickerToken: () =>
+      apiFetch<{ accessToken: string; folderId: string; apiKey: string; appId: string }>('/drive/picker-token'),
+    adopt: (fileIds: string[]) =>
+      apiFetch<{ copied: number; failed: Array<{ id: string; error: string }> }>('/drive/adopt', {
+        method: 'POST',
+        body: JSON.stringify({ fileIds }),
+      }),
+    share: (shared: boolean) =>
+      apiFetch<{ shared: boolean }>('/drive/share', { method: 'POST', body: JSON.stringify({ shared }) }),
+    disconnect: () => apiFetch<{ ok: boolean }>('/drive/disconnect', { method: 'POST' }),
+    connectHref: '/api/drive/connect',
+  },
+  /** Tidying the Drive folder: preview, then apply, like every bulk write. */
+  driveOrganise: {
+    preview: () => apiFetch<{ changes: PlannedChange[] }>('/drive/organise'),
+    apply: () =>
+      apiFetch<{ applied: number; failed: Array<{ name: string; error: string }> }>('/drive/organise', {
+        method: 'POST',
       }),
   },
   /** Every show from every source, merged. `today` is the viewer's own date. */

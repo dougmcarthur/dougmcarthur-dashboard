@@ -125,7 +125,11 @@ export function checkCallback(c: Context<AppEnv>): CallbackCheck {
 
 /** Where the browser lands afterwards, with a word about how it went. */
 export function settingsRedirect(env: Env, purpose: GrantPurpose | null, outcome: string): string {
-  const base = `${(env.DASHBOARD_URL ?? '').replace(/\/$/, '')}/#settings`
+  const origin = (env.DASHBOARD_URL ?? '').replace(/\/$/, '')
+  // Drive's card lives with the EPK on the Artist page, so that is where the
+  // artist comes back to.
+  if (purpose === 'drive') return `${origin}/#artist/drive?drive=${encodeURIComponent(outcome)}`
+  const base = `${origin}/#settings`
   const key =
     purpose === 'calendar' || purpose === 'calendar.primary'
       ? 'calendar'

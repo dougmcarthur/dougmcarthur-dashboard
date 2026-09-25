@@ -106,6 +106,35 @@ describe('the calendar scope', () => {
   })
 })
 
+describe('the Drive grant', () => {
+  it('asks for drive.file and nothing wider', () => {
+    expect(scopeFor('drive')).toBe('https://www.googleapis.com/auth/drive.file')
+    expect(requestedScopes('drive')).toBe('https://www.googleapis.com/auth/drive.file openid email')
+  })
+
+  it('names no broad Drive scope anywhere in the Worker', () => {
+    // drive.file reaches only what Scout made or the artist picked. The broad
+    // scopes read the whole Drive and are Restricted: a Google security
+    // assessment, and a promise to artists this app would stop being able to
+    // keep.
+    const offenders: string[] = []
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, e.name)
+        if (e.isDirectory()) walk(path)
+        else if (/\.ts$/.test(e.name)) {
+          const src = readFileSync(path, 'utf8')
+          for (const scope of ["auth/drive'", 'auth/drive"', 'auth/drive.readonly', 'auth/drive.metadata']) {
+            if (src.includes(scope)) offenders.push(`${path} — ${scope}`)
+          }
+        }
+      }
+    }
+    walk('src')
+    expect(offenders).toEqual([])
+  })
+})
+
 describe('the consent state', () => {
   it('round-trips the nonce and the purpose', () => {
     const packed = packState('abc123', 'calendar')
@@ -129,7 +158,8 @@ describe('the consent state', () => {
 
   it('refuses a purpose it does not know rather than guessing one', () => {
     expect(unpackState('abc.calendars')).toBeNull()
-    expect(unpackState('abc.drive')).toBeNull()
+    expect(unpackState('abc.photos')).toBeNull()
+    expect(unpackState('abc.drive.readonly')).toBeNull()
     expect(unpackState('abc.')).toBeNull()
     // A near-miss on a real purpose is the one worth naming: it would be read
     // as the narrow calendar grant and complete a consent for the wide one.

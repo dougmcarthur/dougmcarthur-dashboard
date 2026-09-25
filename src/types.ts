@@ -36,6 +36,15 @@ export type Env = {
    */
   PRIMARY_CALENDAR_OPT_IN?: string
   /**
+   * Google Picker, for adding files to the artist's Drive folder: a browser
+   * API key restricted to the Picker API and this site, and the Cloud
+   * project number as the picker's app id. Both are public by nature — the
+   * picker runs in the page — so they are vars rather than secrets. Unset
+   * means the Drive card offers no picker and says why.
+   */
+  GOOGLE_PICKER_API_KEY?: string
+  GOOGLE_CLOUD_PROJECT_NUMBER?: string
+  /**
    * The mailing address every email's footer prints, beside the house mark.
    * Deployment configuration rather than a setting, like the recovery address:
    * it identifies whoever operates this deployment, which is not something a
