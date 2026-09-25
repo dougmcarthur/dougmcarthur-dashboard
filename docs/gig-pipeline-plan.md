@@ -23,6 +23,15 @@ not hypothetical: the database's largest state is its most ambiguous one.
 
 ## 2. The five phases, and the states they need
 
+> **Superseded on screen, 2026-09-25.** Fourteen statuses were too many to
+> read, and most described something inside a phase rather than a change of
+> one. The screens now show four stages — New, In progress, Applied, Closed
+> with an outcome — over the same stored statuses; the ones below that are not
+> a phase became flags (*they need more*, *offer — contract pending*) or
+> history. Accepted means the contract is signed or the award confirmed.
+> Storage is unchanged until the second deploy. See `shared/gigStage.ts` and
+> CLAUDE.md, "Screens show four stages".
+
 | Phase | What happens | States |
 |---|---|---|
 | 1 · Research & collect | The app scans for festivals, showcases and venues that fit | `discovered` |

@@ -517,6 +517,6 @@ wrangler(['d1', 'execute', db, '--local', `--file=${file}`], {
 })
 
 console.log(`\nSeeded ${db} (local).`)
-console.log(`\nTo sign in: start the app, choose "Add a passkey", and use setup code ${SETUP_CODE}.`)
+console.log(`\nTo sign in: start the app, choose "Add a passkey", enter owner@example.test, and use setup code ${SETUP_CODE}.`)
 console.log('That code is seeded straight into the local database because there is no')
 console.log('mailer in local development. It enrols a passkey, exactly as the real one does.')

@@ -56,6 +56,7 @@ const STATUS_BY_INTENT: Record<ReviewItem['kind'], Record<DecisionIntent, string
     withdraw: 'declined',
     book: 'confirmed',
     prepare: 'draft_ready',
+    answered: 'pitched',
   },
   promo: {
     confirm_sent: 'published',
@@ -68,6 +69,7 @@ const STATUS_BY_INTENT: Record<ReviewItem['kind'], Record<DecisionIntent, string
     withdraw: 'draft',
     book: 'published',
     prepare: 'draft',
+    answered: 'draft',
   },
 }
 

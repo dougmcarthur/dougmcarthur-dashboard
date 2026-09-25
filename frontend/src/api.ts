@@ -629,7 +629,7 @@ export interface InviteSummary {
 
 export interface InviteList {
   items: InviteSummary[]
-  /** False while the mail binding's allowlist is the boundary. See the route. */
+  /** Whether Scout can email the link itself. False with no mail binding. */
   canMail: boolean
 }
 
@@ -638,6 +638,9 @@ export interface IssuedInvite {
   id: string
   token: string
   expiresAt: string
+  /** True when it was emailed as well. The link is returned either way. */
+  mailed: boolean
+  mailError: string | null
 }
 
 /**
@@ -704,16 +707,17 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
-    requestCode: () =>
-      apiFetch<{ sent: boolean; to: string; expiresAt: string }>('/auth/enrol/request', {
+    requestCode: (body: { email: string }) =>
+      apiFetch<{ accepted: boolean; message: string }>('/auth/enrol/request', {
         method: 'POST',
+        body: JSON.stringify(body),
       }),
-    registerOptions: (body: { code?: string }) =>
+    registerOptions: (body: { code?: string; email?: string }) =>
       apiFetch<{ ceremony: string; options: Record<string, unknown> }>('/auth/register/options', {
         method: 'POST',
         body: JSON.stringify(body),
       }),
-    registerVerify: (body: { ceremony: string; response: unknown; code?: string; label?: string }) =>
+    registerVerify: (body: { ceremony: string; response: unknown; code?: string; email?: string; label?: string }) =>
       apiFetch<{ ok: boolean; label: string }>('/auth/register/verify', {
         method: 'POST',
         body: JSON.stringify(body),
@@ -795,7 +799,7 @@ export const api = {
     /** Rows with no owner, per table. Should be zero, and is worth checking. */
     health: () => apiFetch<TenantHealth>('/admin/health'),
     invites: () => apiFetch<InviteList>('/admin/invites'),
-    invite: (body: { email: string; displayName?: string }) =>
+    invite: (body: { email: string; displayName?: string; send?: boolean }) =>
       apiFetch<IssuedInvite>('/admin/invites', { method: 'POST', body: JSON.stringify(body) }),
     revokeInvite: (id: string) =>
       apiFetch<{ id: string; revoked: boolean }>(`/admin/invites/${encodeURIComponent(id)}`, {

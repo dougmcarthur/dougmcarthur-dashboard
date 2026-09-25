@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type GigOpportunity, type GigStatus } from '../../api'
-import { GIG_STATUSES, GIG_STATUS_META } from '../../../../shared/gigStatus'
+import { GIG_STAGE_META, GIG_START_STATUS } from '../../../../shared/gigStage'
 import { FIELD } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
 import { SUBMISSION_METHODS } from './constants'
@@ -130,11 +130,12 @@ export function CreateGigForm({ onDone }: { onDone: () => void }) {
           <input type="url" value={draft.url} onChange={(e) => set('url', e.target.value)} placeholder="https://…" className={FIELD} />
         </div>
         <div>
-          <Label>Status</Label>
+          <Label>Stage</Label>
+          {/* Three of the four: a gig is not added already closed. */}
           <select value={draft.status} onChange={(e) => set('status', e.target.value as GigStatus)} className={FIELD}>
-            {GIG_STATUSES.map((s) => (
-              <option key={s} value={s} title={GIG_STATUS_META[s].meaning}>
-                {GIG_STATUS_META[s].label}
+            {(Object.keys(GIG_START_STATUS) as Array<keyof typeof GIG_START_STATUS>).map((stage) => (
+              <option key={stage} value={GIG_START_STATUS[stage]} title={GIG_STAGE_META[stage].meaning}>
+                {GIG_STAGE_META[stage].label}
               </option>
             ))}
           </select>

@@ -12,7 +12,8 @@ owns rows — exists underneath them.
 **Steps 1 to 4 are done** (migrations 0021–0023; invites needed none, because
 their table arrived with 0021), and step 5 is half done (0024). What is left is
 the `NOT NULL` pass on the fourteen domain tables, which is deferred with three
-stated conditions, and two things gated on the mail allowlist. The release
+stated conditions. The two things that were gated on the mail allowlist —
+mailing invitations and per-artist recovery — are done. The release
 carrying all of it shipped on 2026-09-11 (run 61). Each step's section below
 carries a note on what it actually did and where the plan turned out to be
 wrong, which is worth more than a plan that reads as though it was right — and
@@ -502,6 +503,16 @@ it has to refuse to mail an address that is not on an invite or an account,
 because "send a code to this address" pointed at an arbitrary inbox is the
 account-takeover vector the recovery rule exists to prevent.
 
+**Built 2026-09-25.** The destination allowlist is gone from `wrangler.toml`,
+and the binding keeps `allowed_sender_addresses`, the half Cloudflare can
+still enforce. `sendMail` takes an audience — `owner`, `account` or `invite` —
+and `shared/recipients.ts` decides from a fresh read of `users`, `invites` and
+`AUTH_EMAIL` whether the address is on that audience's list. Invitations are
+emailed from the issue call (the token exists only then), and a failed send
+still returns the link. Recovery takes the account's address as a lookup key,
+answers identically whether or not it matched, and keeps one live code per
+account.
+
 ### The notification is the bell that already exists
 
 Redemption writes a `notification_events` row, which the owner's feed shows
@@ -539,9 +550,10 @@ rule that took `gig-festival-scan` off the screen.
    the invite list on the screen waits on step 4.
 4. Invite issue / redeem, with the redemption event. **Done — no migration
    needed, since `invites` arrived with 0021.** Outstanding: mailing the
-   invitation, and per-artist recovery. `sundogsmusic.ca` was onboarded to
-   Email Service on 2026-09-14, so both now wait only on widening the
-   `send_email` allowlist beyond the owner's address.
+   invitation, and per-artist recovery. **Both done** (2026-09-25): the
+   destination allowlist is gone and `sendMail` refuses any address that is
+   not on an account or a live invitation instead — see "Mail to an invited
+   artist" below.
 5. `tenant_id` to `NOT NULL` on the fourteen domain tables — and on `users`
    too, since every account owns a tenant now, including the owner's.
    **Half done — migration 0024.** `users` is `NOT NULL`. The fourteen are

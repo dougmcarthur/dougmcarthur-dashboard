@@ -50,7 +50,8 @@ describe('decision copy — the sentence names the decision', () => {
         fitNotes: 'Submission status: NOT submitted. Contact Phone: needs Doug, not on file.',
       })],
     })
-    expect(item.decision.rationale).toContain('Marked submitted in the tracker')
+    // The stage, not the stored status: the screens say "Applied".
+    expect(item.decision.rationale).toContain('Marked applied in the tracker')
     // No buttons. A conflict only arises once a gig claims to be sent, and the
     // pipeline has no route back from `submitted` — the old pair offered
     // "Not sent — reopen", which the PATCH route refused every single time.
@@ -70,10 +71,20 @@ describe('decision copy — the sentence names the decision', () => {
 
   it('states the cost and that approving is approving the spend', () => {
     const item = first({
-      gigs: [gig({ id: 2, name: 'CFMA', paid: 1, fee: '$85 CAD first entry' })],
+      gigs: [gig({ id: 2, name: 'CFMA', status: 'discovered', paid: 1, fee: '$85 CAD first entry' })],
     })
     expect(item.decision.rationale).toContain('Costs CAD 85 to enter')
     expect(item.decision.actions[0].label).toBe('Approve the spend')
+  })
+
+  it('stops asking to approve a spend once you are already applying', () => {
+    const item = first({
+      gigs: [gig({ id: 2, name: 'CFMA', status: 'shortlisted', paid: 1, fee: '$85 CAD first entry' })],
+    })
+    expect(item.decision.rationale).toContain('already said yes')
+    // "Approve the spend" here used to move the gig to `preparing`, which is
+    // the same stage — a button that changed nothing you could see.
+    expect(item.decision.actions.map((a) => a.label)).not.toContain('Approve the spend')
   })
 
   it('counts the days on an overdue item and offers a close-out', () => {
@@ -85,7 +96,7 @@ describe('decision copy — the sentence names the decision', () => {
     // already had — nothing was written and the identical card came straight
     // back — and `shortlisted → archived` is not a move the pipeline offers,
     // so the second returned a 400. `expired` is what actually happened.
-    expect(item.decision.actions.map((a) => a.label)).toEqual(['Applied', 'Window closed'])
+    expect(item.decision.actions.map((a) => a.label)).toEqual(['Mark as submitted', 'Missed the deadline'])
   })
 
   it('names the silence, and does not claim a sent application was never sent', () => {
@@ -129,8 +140,16 @@ describe('decision copy — the sentence names the decision', () => {
     })
     expect(item.flags[0].id).toBe('reply_due')
     expect(item.decision.rationale).toContain('withdrawing, not them declining')
-    // Never `declined`: turning down an invitation is your verb, not theirs.
-    expect(item.decision.actions.map((a) => a.label)).toEqual(['Confirm the booking', 'Withdraw'])
+    // Never `declined`: turning down an offer is your verb, not theirs. And
+    // the go is the contract, because an offer is not a booking.
+    expect(item.decision.actions.map((a) => a.label)).toEqual(['Contract signed', 'Withdraw'])
+  })
+
+  it('asks a grant for its confirmation, not a contract', () => {
+    const item = first({
+      gigs: [gig({ id: 42, name: 'Arts Council', type: 'Grant', status: 'invited' })],
+    })
+    expect(item.decision.actions.map((a) => a.label)).toEqual(['Award confirmed', 'Withdraw'])
   })
 
   it('tells you to answer a question rather than offering a button that cannot', () => {
@@ -138,9 +157,10 @@ describe('decision copy — the sentence names the decision', () => {
       gigs: [gig({ id: 41, name: 'Folk Alliance', status: 'info_requested' })],
     })
     expect(item.decision.rationale).toContain('nothing moves until you answer')
-    // A lone red "Withdraw" under "they asked a question" is a hazard, and
-    // there is no status that means "replied".
-    expect(item.decision.actions).toEqual([])
+    // A lone red "Withdraw" under "they asked a question" is a hazard. The one
+    // button records that you answered, which clears the flag.
+    expect(item.decision.actions).toEqual([{ label: 'Answered', intent: 'answered', tone: 'go' }])
+    expect(isGigTransitionAllowed('info_requested', GIG_STATUS_BY_INTENT.answered)).toBe(true)
   })
 
   it('tells you to pick one when two pitches went to the same inbox', () => {

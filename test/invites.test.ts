@@ -173,7 +173,7 @@ describe('the oversight screen cannot re-show an invitation', () => {
   })
 })
 
-describe('the invite panel offers Copy and never a send', () => {
+describe('the invite panel offers Copy, and never a mail handler', () => {
   const panel = source('frontend', 'src', 'components', 'InvitesPanel.tsx')
 
   it('has a copy button', () => {
@@ -181,9 +181,9 @@ describe('the invite panel offers Copy and never a send', () => {
   })
 
   it('offers no mail handler', () => {
-    // Scout cannot mail an invitation while the allowlist holds only the owner,
-    // and a compose window pre-filled with a credential would put one in a
-    // drafts folder besides. The screen says so instead.
+    // Scout emails the invitation itself now, from the Worker. A compose
+    // window pre-filled with a credential would still put one in a drafts
+    // folder, so there is no mailto, and no button labelled plain "Send".
     expect(panel).not.toContain('mailto:')
     expect(panel.toLowerCase()).not.toMatch(/>\s*send\s*</)
   })

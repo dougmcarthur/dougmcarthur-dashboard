@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { desc } from 'drizzle-orm'
@@ -10,7 +10,8 @@ import { buildReviewQueue } from '../../shared/reviewQueue'
 import { buildDigest, type Digest } from '../../shared/digest'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
 import { renderDigestEmail } from '../lib/digestMail'
-import { sendMail, mailerConfigured, senderIdentity } from '../lib/mailer'
+import { addressBook, sendMail, mailerConfigured, senderIdentity } from '../lib/mailer'
+import { recipientAllowed } from '../../shared/recipients'
 import { readDigestSettings, writeSetting, DIGEST_KEYS } from '../lib/settings'
 import { describeSchedule, nextRun } from '../../shared/digestSchedule'
 import type { Env } from '../types'
@@ -113,7 +114,23 @@ digest.get('/preview', async (c) => {
   })
 })
 
+/**
+ * The digest is the owner's: its schedule, recipient and sender are platform
+ * settings rather than a tenant's, and the cron sends it for the owner's
+ * tenant only. So sending one and changing where it goes are the owner's too.
+ * While the mail binding had a one-address allowlist this was moot; now an
+ * artist able to PATCH the recipient could point the owner's digest at an
+ * inbox of their choosing, or send their own digest to the owner.
+ */
+function ownerOnly(c: Context<AppEnv>) {
+  const actor = c.get('actor')
+  if (actor.kind === 'user' && actor.role === 'owner') return null
+  return c.json({ error: 'Only the owner can change or send the weekly digest.' }, 403)
+}
+
 digest.post('/send', async (c) => {
+  const refused = ownerOnly(c)
+  if (refused) return refused
   const settings = await readDigestSettings(c.env)
   if (!mailerConfigured(c.env)) {
     return c.json({ error: 'This site cannot send email yet.' }, 503)
@@ -128,6 +145,7 @@ digest.post('/send', async (c) => {
 
   const result = await sendMail(c.env, {
     to: settings.recipient,
+    audience: 'owner',
     from: settings.sender,
     subject,
     text,
@@ -161,7 +179,17 @@ const SettingsSchema = z.object({
 })
 
 digest.patch('/settings', zValidator('json', SettingsSchema), async (c) => {
+  const refused = ownerOnly(c)
+  if (refused) return refused
   const body = c.req.valid('json')
+  // Checked here as well as at send time, so a recipient the mailer would
+  // refuse is a 400 now rather than a critical in the bell next Monday.
+  if (
+    body.recipient !== undefined &&
+    !recipientAllowed({ to: body.recipient, audience: 'owner', book: await addressBook(c.env) })
+  ) {
+    return c.json({ error: 'The digest can only go to the owner’s own address.' }, 400)
+  }
   if (body.enabled !== undefined) await writeSetting(c.env, DIGEST_KEYS.enabled, String(body.enabled))
   if (body.recipient !== undefined) await writeSetting(c.env, DIGEST_KEYS.recipient, body.recipient)
   if (body.sender !== undefined) await writeSetting(c.env, DIGEST_KEYS.sender, body.sender)

@@ -274,6 +274,7 @@ async function runDigest(env: Env, tenant: TenantId): Promise<void> {
   try {
     await sendMail(env, {
       to: settings.recipient,
+      audience: 'owner',
       from: settings.sender,
       subject,
       text,

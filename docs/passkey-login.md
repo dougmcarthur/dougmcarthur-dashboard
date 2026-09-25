@@ -211,9 +211,12 @@ step 2 leaves you locked out of a dashboard nobody can reach.
 - **"No passkey registered" / the sign-in button does nothing.** No credential
   exists on this deployment. Use *New device? Add a passkey with an emailed
   code*.
-- **The code email never arrives.** The `send_email` allowlist in
-  `wrangler.toml` is the boundary; an address that is not on it cannot be
-  mailed. Check also that the Worker still has the `EMAIL` binding —
+- **The code email never arrives.** The screen says the same thing whether or
+  not the address matched an account, on purpose, so check the address is the
+  one on file: `AUTH_EMAIL` for the owner, the invitation's address for
+  everybody else. A second request inside the cooldown is dropped silently.
+  `sendMail` refuses any address not on an account (`shared/recipients.ts`),
+  and the Worker log says so. Check also that the Worker still has the `EMAIL` binding —
   `/api/auth/session` reports `recoveryAvailable: false` when it does not, and
   the login screen says so rather than offering a button that fails.
 - **The browser offers a passkey and the Worker rejects it.** Almost always

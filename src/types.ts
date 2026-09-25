@@ -19,8 +19,8 @@ export type Env = {
   // invalidates every passkey already enrolled.
   DASHBOARD_URL?: string
   /**
-   * Where a passkey setup code is emailed. The `send_email` allowlist in
-   * wrangler.toml is the real boundary; this only chooses among it.
+   * The owner's recovery address. A setup code goes here when this is the
+   * address typed on the sign-in screen; `sendMail` still checks it.
    */
   AUTH_EMAIL?: string
   AUTH_EMAIL_SENDER?: string

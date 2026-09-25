@@ -410,18 +410,36 @@ other. The owner keeps the original string, since their authenticators already
 hold credentials under it and switching would leave a duplicate keychain entry
 for nothing; everybody else is keyed by their account id.
 
-**Scout cannot mail an invitation yet, and says so.** The `send_email` binding
-sends through an allowlist of one address, the owner's — a real security
-property, not a limitation: the Worker cannot mail anywhere else even if the
-code is wrong. The platform gate was a **domain**, not a plan, and it is open:
-`sundogsmusic.ca` was onboarded to Email Service on 2026-09-14 and both
-senders (`login@`, `digest@`) moved to it. What remains is the allowlist,
-which is now the only boundary — widening it is the invitation-mail work, and
-it has to come with something that refuses an address not on an invite or an
-account. Until then the owner copies the link. The same work blocks per-artist
-recovery: the emailed setup code goes to the configured address and enrols the
-*owner's* account, which is safe — only the owner can read that inbox — but is
-not recovery for anybody else.
+**Scout mails invitations and per-artist setup codes, and the boundary moved
+into the code to do it.** The `send_email` binding used to carry an allowlist
+of one address, the owner's, which meant the Worker could not mail anywhere
+else even if the code was wrong. That had to go for anybody else to get mail,
+so `sendMail` in `src/lib/mailer.ts` is the boundary now: every send names an
+**audience**, and `shared/recipients.ts` refuses an address that audience has
+no record of — the digest reaches only the owner's addresses, a setup code
+only an address already on an account, an invitation only the address a live
+invitation was issued to. That is weaker in exactly one way, and worth saying:
+a bug there widens it, where a bug could not widen the allowlist. So it is one
+function with one caller, and `test/recipients.test.ts` fails if anything but
+the mailer touches `env.EMAIL` or if the check stops running before the send.
+The binding still enforces the *sender* (`allowed_sender_addresses`).
+
+The digest audience is deliberately narrower than "on file": an artist's
+address is on an account, and still not somewhere the owner's digest may go.
+`PATCH /api/digest/settings` and `POST /api/digest/send` are owner-only for
+the same reason — with the allowlist gone, an artist able to set the recipient
+could have had the owner's digest mailed to themselves.
+
+**Recovery is per account, and the typed address is a lookup key.** The
+sign-in screen asks for the account's email; `recoveryAccount` in
+`src/lib/auth.ts` matches it against `AUTH_EMAIL` (the owner) or `users.email`
+(fixed by the invitation), and the code goes to the address *on file*. The
+answer is the same sentence whether or not anything matched, the cooldown is
+applied silently rather than as a 429, and the work runs after the response so
+the timing matches too. Codes are one live per account rather than one per
+deployment, so one artist asking cannot cancel another's, and the address is
+sent again with the code at `register/*` so the check lands on that account's
+attempt counter.
 
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a
@@ -664,10 +682,37 @@ condition lasts a day; dismissing an event is permanent. See
 
 **The pipeline is a shape, not a free-for-all.** `nextGigStatuses` in
 `shared/gigStatus.ts` says which moves a status offers, and the PATCH route
-refuses anything else, whoever is calling it. The entry
-worth knowing: **there is no route from `invited` to `declined`.** Declining is
-their verb; turning down an invitation is `withdrawn`. One mis-click should not
-be able to record that you were rejected from a festival that wanted you.
+refuses anything else, whoever is calling it. Declining is always their verb;
+turning an offer down yourself is `withdrawn`. `invited → declined` used to be
+refused outright and is allowed now, because an offer is not a booking and
+terms can fall through on their side — the only button that writes it says
+**Offer fell through**, which nobody clicks by reflex.
+
+**Screens show four stages; storage still holds fourteen statuses.** The work
+has three phases and an end — **New** (apply or pass), **In progress** (you
+said yes; only confirming it went out moves it), **Applied** (waiting; only a
+settled answer ends it) and **Closed** with an outcome: Accepted, Not
+selected, Passed, Missed or Withdrawn. `shared/gigStage.ts` is that view, and
+every screen reads it: the badge, the filter (`GET /api/gigs?stage=`), the
+row's buttons, the Review bar, the reply inbox and the new-gig form.
+`gigMoves` is `nextGigStatuses` in the stage language and never wider.
+
+What used to be a status and is now smaller: `preparing` is In progress with
+a draft; `acknowledged` is a receipt, offered only as **Answered** to clear a
+question; `info_requested` and `invited` are **flags** on Applied — *they need
+more* and *offer — contract pending*. **Accepted means the terms are settled**:
+a signed contract for a festival or showcase, a written confirmation for a
+grant or award (`settledByAward` reads the free-text type). An invitation is
+exciting and is not a booking, so it stays Applied and nothing reaches the
+calendar until it is Accepted. `archived` rows show as Closed with no outcome,
+because archiving never recorded why.
+
+**Storage has not moved, on purpose** — that is step 1 of the two-deploy
+rename. The agents POST the old vocabulary, the queue, reply matcher and
+nudges read it, and `normaliseGigStatus` now also accepts `new`,
+`in_progress` and `applied` on write. Migrating the column to stages plus an
+outcome and flags is step 2, a later change. `test/gigStage.test.ts` fails if
+a screen imports `GIG_STATUSES`, `GIG_STATUS_META` or `gigStatusMeta` again.
 
 **A screen never offers a move the pipeline refuses.** The PATCH route
 validates against `nextGigStatuses`, so a button naming a status is a claim
