@@ -410,18 +410,36 @@ other. The owner keeps the original string, since their authenticators already
 hold credentials under it and switching would leave a duplicate keychain entry
 for nothing; everybody else is keyed by their account id.
 
-**Scout cannot mail an invitation yet, and says so.** The `send_email` binding
-sends through an allowlist of one address, the owner's — a real security
-property, not a limitation: the Worker cannot mail anywhere else even if the
-code is wrong. The platform gate was a **domain**, not a plan, and it is open:
-`sundogsmusic.ca` was onboarded to Email Service on 2026-09-14 and both
-senders (`login@`, `digest@`) moved to it. What remains is the allowlist,
-which is now the only boundary — widening it is the invitation-mail work, and
-it has to come with something that refuses an address not on an invite or an
-account. Until then the owner copies the link. The same work blocks per-artist
-recovery: the emailed setup code goes to the configured address and enrols the
-*owner's* account, which is safe — only the owner can read that inbox — but is
-not recovery for anybody else.
+**Scout mails invitations and per-artist setup codes, and the boundary moved
+into the code to do it.** The `send_email` binding used to carry an allowlist
+of one address, the owner's, which meant the Worker could not mail anywhere
+else even if the code was wrong. That had to go for anybody else to get mail,
+so `sendMail` in `src/lib/mailer.ts` is the boundary now: every send names an
+**audience**, and `shared/recipients.ts` refuses an address that audience has
+no record of — the digest reaches only the owner's addresses, a setup code
+only an address already on an account, an invitation only the address a live
+invitation was issued to. That is weaker in exactly one way, and worth saying:
+a bug there widens it, where a bug could not widen the allowlist. So it is one
+function with one caller, and `test/recipients.test.ts` fails if anything but
+the mailer touches `env.EMAIL` or if the check stops running before the send.
+The binding still enforces the *sender* (`allowed_sender_addresses`).
+
+The digest audience is deliberately narrower than "on file": an artist's
+address is on an account, and still not somewhere the owner's digest may go.
+`PATCH /api/digest/settings` and `POST /api/digest/send` are owner-only for
+the same reason — with the allowlist gone, an artist able to set the recipient
+could have had the owner's digest mailed to themselves.
+
+**Recovery is per account, and the typed address is a lookup key.** The
+sign-in screen asks for the account's email; `recoveryAccount` in
+`src/lib/auth.ts` matches it against `AUTH_EMAIL` (the owner) or `users.email`
+(fixed by the invitation), and the code goes to the address *on file*. The
+answer is the same sentence whether or not anything matched, the cooldown is
+applied silently rather than as a 429, and the work runs after the response so
+the timing matches too. Codes are one live per account rather than one per
+deployment, so one artist asking cannot cancel another's, and the address is
+sent again with the code at `register/*` so the check lands on that account's
+attempt counter.
 
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a

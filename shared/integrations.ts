@@ -148,11 +148,14 @@ export const INTEGRATIONS: IntegrationSpec[] = [
   {
     id: 'email.sending',
     name: 'Email sending',
-    purpose: 'Delivers the weekly digest and sign-in codes.',
+    purpose: 'Delivers the weekly digest, setup codes and invitations.',
     kind: 'binding',
-    access: ['Send to one allowlisted address.'],
+    access: [
+      'Send the digest to the owner, a setup code to an address already on an account, and an invitation to the address it was issued to.',
+    ],
     cannot: [
-      'Mail anybody else — the allowlist is enforced outside this code, so a bug cannot widen it.',
+      'Mail anybody else — every send is checked against the addresses on file before it goes. That check is in this code, so it is tested rather than guaranteed by Cloudflare.',
+      'Send from any address but the two it is configured with — that limit is enforced by Cloudflare.',
     ],
     breaks: 'No digest, and no way back in if you lose every passkey.',
   },

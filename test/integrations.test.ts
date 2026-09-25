@@ -64,8 +64,12 @@ describe('the disclosures that must not quietly disappear', () => {
     expect(spec.cannot.join(' ')).toMatch(/read the rest of your calendar/i)
   })
 
-  it('says the send binding cannot reach anybody but the one address', () => {
-    expect(integrationSpec('email.sending').cannot.join(' ')).toMatch(/allowlist|anybody else/i)
+  it('says the send binding cannot reach anybody not on file, and whose check that is', () => {
+    const cannot = integrationSpec('email.sending').cannot.join(' ')
+    expect(cannot).toMatch(/anybody else/i)
+    // The allowlist is gone, so the limit is ours rather than Cloudflare's —
+    // and a promise that implied otherwise would protect less than it reads.
+    expect(cannot).toMatch(/in this code/i)
   })
 
   it('says the mailbox credential is read-only', () => {
