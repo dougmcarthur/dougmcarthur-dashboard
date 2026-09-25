@@ -110,6 +110,35 @@ describe('gig transitions are asked for, not listed', () => {
     expect(src).not.toMatch(/===\s*['"`](?:discovered|shortlisted|preparing|submitted|invited)['"`]/)
     expect(src).toContain('inlineGigMoves')
   })
+
+  it("the row under it names a button for the move, not the state it lands in", () => {
+    const src = read('frontend/src/pages/gigs/GigDetail.tsx')
+    // Its quick buttons read `gigStatusMeta(s).label`: "Submitted" beside a
+    // table that said "Applied" for the same click, and "Invited" where you
+    // are recording that the organiser moved. `gigMoves` names each move in
+    // the stage language, including who moved.
+    expect(src).toContain('gigMoves(')
+    expect(src).not.toMatch(/gigStatusMeta\([^)]*\)\.label/)
+  })
+})
+
+/**
+ * The browser's `today` is the reader's calendar date, never the UTC one.
+ *
+ * `toISOString().slice(0, 10)` is the UTC date, which from 7pm in Winnipeg is
+ * already tomorrow — so every evening the visa lead time on a gig came up a
+ * day short and the snooze picker would not accept tomorrow. `localToday()` in
+ * frontend/src/format.ts is the one way to get it. The Worker is a different
+ * matter and is not covered here: it runs in UTC and takes `today` as an
+ * argument where it matters.
+ */
+describe('the frontend reads today on the local calendar', () => {
+  it('never takes a date from toISOString', () => {
+    const offenders = FILES.filter((f) =>
+      /toISOString\(\)\.(?:slice\(0,\s*10\)|split\(['"`]T)/.test(withoutComments(readFileSync(f, 'utf8'))),
+    )
+    expect(offenders).toEqual([])
+  })
 })
 
 /**

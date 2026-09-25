@@ -391,6 +391,7 @@ export function GigsPage() {
                               }
                             }}
                             isPatching={isPatching}
+                            today={today}
                           />
                         )}
                         </div>

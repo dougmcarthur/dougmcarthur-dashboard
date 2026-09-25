@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { snoozeOptions } from '../../../shared/snoozeOptions'
+import { addDays, snoozeOptions } from '../../../shared/snoozeOptions'
 import type { ReviewItem } from '../api'
-import { shortDate } from '../format'
+import { localToday, shortDate } from '../format'
 
 /**
  * The date picker behind the Snooze button.
@@ -39,9 +39,12 @@ export function SnoozeMenu({
     }
   }, [open])
 
-  const today = new Date().toISOString().slice(0, 10)
+  // The local date, not the UTC one: from 7pm in Winnipeg the UTC date is
+  // already tomorrow, which made "tomorrow" the earliest date the picker
+  // allowed the day after tomorrow, and counted every offer a day short.
+  const today = localToday()
   const options = snoozeOptions(item, today)
-  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+  const tomorrow = addDays(today, 1)
 
   const pick = (date: string) => {
     setOpen(false)

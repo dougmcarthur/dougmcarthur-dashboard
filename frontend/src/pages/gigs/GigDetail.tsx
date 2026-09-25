@@ -15,6 +15,7 @@ export function GigDetail({
   onStatusChange,
   onDelete,
   isPatching,
+  today,
 }: {
   gig: GigOpportunity
   onEdit: () => void
@@ -22,6 +23,8 @@ export function GigDetail({
   /** Absent where a caller has nothing to delete with. */
   onDelete?: () => void
   isPatching: boolean
+  /** The reader's local date, from the page — see `localToday`. */
+  today: string
 }) {
   const status = normaliseGigStatus(gig.status)
   // Every move the pipeline offers, in the stage language. The forward one
@@ -140,11 +143,13 @@ export function GigDetail({
       </div>
 
       {/*
-        The clock is read once, here, and handed down — `visaLead` takes the
-        date as an argument for the same reason the queue does.
+        The page reads the clock once and hands the date down — `visaLead`
+        takes it as an argument for the same reason the queue does. It used to
+        be read here as the UTC date, which from 7pm in Winnipeg is tomorrow,
+        so the visa lead time came up a day short every evening.
       */}
       <div className="border-t border-line pt-4">
-        <CostPanel gig={gig} today={new Date().toISOString().slice(0, 10)} />
+        <CostPanel gig={gig} today={today} />
       </div>
 
       {applying && (
