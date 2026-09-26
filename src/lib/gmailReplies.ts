@@ -26,7 +26,7 @@ import { decodeBase64, extractPlainText, type GmailEnv } from './gmail'
 const MAX_QUERY_CHARS = 1400
 
 /** Never look further back than this, whatever the pipeline says. */
-const MAX_WINDOW_DAYS = 1095
+export const MAX_WINDOW_DAYS = 1095
 /** Nor less far — an application submitted this morning still wants a window. */
 const MIN_WINDOW_DAYS = 30
 /** Slack either side of the oldest submission, for a clock that disagrees. */

@@ -15,6 +15,7 @@ import health from './routes/health'
 import calendarConnect from './routes/calendarConnect'
 import tasksConnect, { routing as nudgeRouting } from './routes/tasksConnect'
 import notifications, { pruneNotifications } from './routes/notifications'
+import { pruneReplies } from './lib/replyRetention'
 import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
 import replies, { runReplyScan } from './routes/replies'
@@ -353,6 +354,23 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
   if (marks || events || samples) {
     console.log(`pruned ${marks} marks, ${events} notification events, ${samples} usage rows`)
   }
+  // Mail you dismissed, per tenant because the rows are an artist's own:
+  // anything a dismissed reply still holds is forgotten, and a tombstone the
+  // scan can no longer reach is deleted. Dismissing already forgets in the
+  // same write, so after the first run this is a sweep that usually finds
+  // nothing — which is what a retention rule should look like from outside.
+  // See src/lib/replyRetention.ts.
+  let forgotten = 0
+  let tombstones = 0
+  for (const tenant of tenants) {
+    const done = await pruneReplies(env, tenant)
+    forgotten += done.forgotten
+    tombstones += done.deleted
+  }
+  if (forgotten || tombstones) {
+    console.log(`forgot the content of ${forgotten} dismissed replies, deleted ${tombstones} tombstones`)
+  }
+
   // Expired sessions, spent challenges and dead setup codes. Not a
   // correctness matter — every one of them is checked against the clock when
   // it is read — so this only stops three tables growing without limit.
