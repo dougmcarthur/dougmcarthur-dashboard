@@ -112,13 +112,14 @@ All routes are under `/api`; anything else falls through to static assets.
 
 > **Everything but `/api/auth/*` needs a credential.** A middleware in
 > `src/index.ts` answers 401 to anything carrying neither a session cookie nor
-> a bearer `API_TOKEN`, so the Worker — not Cloudflare Access — is now the
+> an issued agent token as a bearer, so the Worker — not Cloudflare Access — is now the
 > security boundary. A router added without a thought about auth is covered by
 > it; the only way to be public is to be named in `PUBLIC_API_PREFIXES`.
 >
-> The out-of-repo research agents authenticate with the bearer token, because
-> they run headless and WebAuthn has no non-interactive mode. Setting
-> `API_TOKEN` is not optional once Access is off — see
+> The out-of-repo research agents authenticate with a bearer token, because
+> they run headless and WebAuthn has no non-interactive mode. Each one holds an
+> agent token issued from **Settings → Agent tokens**, scoped to one artist and
+> limited to the research routes. The old shared `API_TOKEN` is retired — see
 > [`docs/passkey-login.md`](docs/passkey-login.md).
 
 > Route order matters. `/api/sync/reconcile` is registered **before**
@@ -745,7 +746,7 @@ optional variable:
 | Secret | Value |
 | --- | --- |
 | `ANTHROPIC_API_KEY` | Runs the agents' model calls |
-| `SCOUT_API_TOKEN` | The same value as the Worker's `API_TOKEN` secret — the bearer the middleware checks |
+| `SCOUT_API_TOKEN` | An agent token issued from **Settings → Agent tokens** (label it for GitHub, so it can be revoked on its own) |
 
 Gmail drafting (Settings → Sync → *Pitch drafts to Gmail*) needs one Worker
 secret and one thing registered with Google:
@@ -792,11 +793,11 @@ Set production secrets once with `wrangler secret put`:
   settings if you haven't already.
 - Run `wrangler whoami` and `wrangler deploy --dry-run` to confirm the config
   matches the live Worker before publishing.
-- `API_TOKEN` must be set (`wrangler secret put API_TOKEN`) and handed to the
-  research agents **before this Worker deploys** — not before Access is
-  switched off, which is the easy mistake. Access authenticated at the edge
-  and the Worker trusted whatever arrived, so it never supplied a credential
-  the new middleware accepts. Every agent POST becomes a 401 from the deploy
-  onwards, and nothing in the repository would notice.
+- Every research agent needs an issued agent token (**Settings → Agent
+  tokens**) before it can file anything: the routines' cloud environment
+  credential and the `SCOUT_API_TOKEN` GitHub secret each hold one. There is
+  no shared fallback — the old `API_TOKEN` secret is retired and the Worker
+  ignores it if it is still set — so an agent without a token gets a 401, and
+  `shared/taskCadence.ts` is what notices its schedule going quiet.
 - `DASHBOARD_URL` is now the WebAuthn relying-party ID as well as the digest's
   link base. Changing its hostname invalidates every enrolled passkey.

@@ -373,15 +373,16 @@ write to your account is squarely the "changes who can get in" rule. An agent
 is refused those routes: a credential that can issue its own successor makes
 revoking one a race rather than an ending.
 
-`API_TOKEN` is **not** withdrawn. `actorForBearer` still accepts it and
-resolves it to the owner's tenant, which is the same "read both spellings" move
+`API_TOKEN` was **not** withdrawn at first. `actorForBearer` accepted it and
+resolved it to the owner's tenant, which is the same "read both spellings" move
 `normaliseGigStatus` makes for the agents' status vocabulary. Withdrawing it in
 the deploy that introduced the table would have 401'd every agent until three
 GitHub secrets were rotated — a coordination with no upside while there is one
 tenant. It goes when `.github/workflows/agents.yml` and `scripts/agents/api.ts`
 hold a row instead, and that is the step most likely to be forgotten for
 exactly the reason above: nothing breaks visibly when a gig lands in the wrong
-tenant.
+tenant. It has since gone: once the routines and the GitHub fallback held
+issued tokens, the Worker stopped reading the secret.
 
 There is no Settings screen for these yet. The routes work without one, and the
 screen is step 3's.
@@ -539,10 +540,10 @@ rule that took `gig-festival-scan` off the screen.
    that name them and dropped the single-column index twins; the column
    defaults stay until step 5, because dropping them here would leave the
    pre-scoping Worker writing NULLs across the migrate-then-deploy gap.
-   Outstanding from this step: per-artist digest and mailbox configuration,
-   and retiring `API_TOKEN` once the agents hold rows. Tokens are issued and
-   revoked from **Settings → Agent tokens**, so that last one waits only on
-   moving the routines and `.github/workflows/agents.yml` onto an issued token.
+   Outstanding from this step: per-artist digest and mailbox configuration.
+   `API_TOKEN` is retired: the routines and the GitHub fallback hold issued
+   tokens, the Worker no longer reads the secret, and every agent is limited to
+   the research routes.
 3. Admin mode, reusing the elevation already built, then the `/admin` routes
    and screen. **Done — migration 0023 plus the oversight deploy.** The
    guarantee turned out to be a type rather than a rule; see below. Outstanding

@@ -7,9 +7,10 @@
  * festival page is untrusted text written by somebody else, and these agents
  * read a lot of festival pages.
  *
- * Everything here authenticates with the bearer token from `API_TOKEN`. That
- * is the credential the middleware in `src/index.ts` checks; see
- * `docs/passkey-login.md` for why the agents have one at all.
+ * Everything here authenticates with the bearer token in `SCOUT_API_TOKEN`,
+ * which holds an agent token issued from Settings: scoped to one artist,
+ * revocable, and limited by the Worker to shared/agentRoutes.ts. See
+ * `docs/passkey-login.md` for why the agents need a token at all.
  */
 
 export interface ApiConfig {

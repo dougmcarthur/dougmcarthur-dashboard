@@ -48,9 +48,8 @@ reads festival pages written by strangers.
 2. **The Worker limits what the token can do.** The proxy attaches the
    credential to *any* request for `scout.sundogsmusic.ca`, so hiding it does
    not stop `curl -X DELETE`. An issued token (`agent_tokens`) reaches seven
-   routes and nothing else — see `shared/agentRoutes.ts`. The legacy
-   `API_TOKEN` is not limited, and is never given to anything that reads
-   untrusted pages.
+   routes and nothing else — see `shared/agentRoutes.ts`. There is no
+   unlimited credential any more: the shared `API_TOKEN` was retired.
 3. **`cli.ts` is named operations, not a general client.** It is the easy path,
    so the session takes it; the Worker is what holds if it does not.
 
@@ -82,8 +81,8 @@ This needs `scripts/agents/cli.ts` on `main`, because a routine clones the
 default branch, and migration 0022 applied, because that is where
 `agent_tokens` lives.
 
-1. **Issue a token** for the routines, separate from `API_TOKEN` so either can
-   be revoked without touching the other: **Settings → Agent tokens**, name it
+1. **Issue a token** for the routines, separate from the GitHub fallback's
+   (`SCOUT_API_TOKEN`) so either can be revoked without touching the other: **Settings → Agent tokens**, name it
    *Research routines*, and confirm with your passkey. Or, from a terminal:
 
    ```bash

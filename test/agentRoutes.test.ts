@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AGENT_ROUTES, agentMayCall } from '../shared/agentRoutes'
@@ -54,12 +55,28 @@ describe('what an issued agent token may call', () => {
     }
   })
 
-  it('is applied by the middleware to issued tokens', () => {
-    // Source-level, because the middleware looks the token up in D1 and the
-    // test environment has none. What must not happen is the check existing
-    // here and being called nowhere.
+  it('is applied by the middleware to every agent, with no exemption', () => {
+    // Source-level beside the behavioural test in routes.test.ts, because what
+    // must not come back is the carve-out: it used to read
+    // `agent.tokenId !== null && …`, which let the shared API_TOKEN past the
+    // limit. There is no unlimited bearer now.
     const src = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8')
-    expect(src).toMatch(/agent\.tokenId !== null && !agentMayCall\(c\.req\.method, path\)/)
+    expect(src).toMatch(/if \(!agentMayCall\(c\.req\.method, path\)\)/)
+    expect(src).not.toMatch(/tokenId !== null/)
+  })
+
+  it('reads no shared API_TOKEN anywhere in the Worker', () => {
+    // Retired: a secret with no tenant, no route limit and no way to revoke it
+    // short of a redeploy. A read of it coming back is the credential coming
+    // back, whatever the comment beside it says.
+    const offenders = (function walk(dir: string): string[] {
+      return readdirSync(dir).flatMap((name) => {
+        const p = join(dir, name)
+        if (statSync(p).isDirectory()) return walk(p)
+        return p.endsWith('.ts') && /env\.API_TOKEN\b|\bAPI_TOKEN\?\s*:/.test(readFileSync(p, 'utf8')) ? [p] : []
+      })
+    })('src')
+    expect(offenders).toEqual([])
   })
 })
 

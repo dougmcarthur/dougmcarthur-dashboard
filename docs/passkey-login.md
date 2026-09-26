@@ -140,11 +140,18 @@ This is the one way this change breaks something quietly.
 The gig-research agents live outside this repo and POST and PATCH
 `/api/gigs`. They run headless, so they cannot do a passkey ceremony — and
 WebAuthn has no non-interactive mode to offer them. They authenticate with a
-bearer token instead:
+bearer token instead — an agent token issued from **Settings → Agent tokens**:
 
 ```
-Authorization: Bearer <API_TOKEN>
+Authorization: Bearer <an issued agent token>
 ```
+
+**Retired: the shared `API_TOKEN`.** The agents started on a Worker secret with
+no tenant and no route limit, which is what the rest of this section describes
+setting up. Once every agent held an issued token the Worker stopped reading
+it; a leftover secret is inert (`test/routes.test.ts` proves a request bearing
+it is refused) and can be deleted with `npx wrangler secret delete API_TOKEN`.
+What follows is kept as the record of the rollout.
 
 **Set it before you deploy, not before you remove Access.** This is the part
 that is easy to get backwards. Access authenticated at the *edge* and the
@@ -164,9 +171,10 @@ header. Until both halves are done they will 401, and because they retry on
 their own schedule the symptom is gig rows quietly failing to arrive rather
 than anything announcing itself.
 
-A token issued into `agent_tokens` is narrower than `API_TOKEN`: it reaches the
-seven routes research needs and nothing else (`shared/agentRoutes.ts`). That is
-the credential the Claude Code routines hold, because a routine has a shell and
+A token issued into `agent_tokens` is narrower than `API_TOKEN` was: it reaches
+the seven routes research needs and nothing else (`shared/agentRoutes.ts`). It
+is the only credential an agent can hold now — the Claude Code routines and the
+GitHub fallback each have one — because a routine has a shell and
 its credential rides on every request to this host — see
 `docs/agent-routines.md`.
 

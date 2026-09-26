@@ -54,15 +54,6 @@ export type Env = {
   /** Where replies go. The sending addresses have no mailbox behind them. */
   MAIL_REPLY_TO?: string
   /**
-   * The research agents' credential — set with `wrangler secret put`.
-   *
-   * They POST and PATCH from outside a browser and outside this repo, so they
-   * cannot do a passkey ceremony. Until Cloudflare Access was removed they
-   * did not need one; now this is the only way in for them, and leaving it
-   * unset is the way this change breaks something quietly.
-   */
-  API_TOKEN?: string
-  /**
    * Encrypts the Google refresh token in `google_grants`. A Worker secret, so
    * a copy of the database is not a working Gmail credential.
    */

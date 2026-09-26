@@ -123,8 +123,8 @@ app.use('/api/*', async (c, next) => {
 
   // Two credentials, and they are for two different callers: a browser sends
   // the session cookie, the out-of-repo research agents send a bearer token.
-  // The token is tried first because it is the cheaper lookup of the two and
-  // because an agent never sends a cookie.
+  // The token is tried first because an agent never sends a cookie; both are
+  // a single hashed-key read now that the shared-secret compare is gone.
   //
   // Both now answer the same question, and it is a wider one than they used to
   // answer. Authenticating a request was enough while one artist owned every
@@ -139,11 +139,12 @@ app.use('/api/*', async (c, next) => {
     // surface outright rather than being asked to switch to something it cannot
     // have.
     if (wantsAdmin) return c.json({ error: 'not available to an agent token' }, 403)
-    // An issued token is limited to what research needs. The Worker decides
+    // Every agent token is limited to what research needs. The Worker decides
     // that rather than the agent's tool list, because a routine has a shell and
     // its credential rides on every request to this host — see
-    // shared/agentRoutes.ts.
-    if (agent.tokenId !== null && !agentMayCall(c.req.method, path)) {
+    // shared/agentRoutes.ts. There is no unlimited bearer any more: the shared
+    // `API_TOKEN` that was is gone.
+    if (!agentMayCall(c.req.method, path)) {
       return c.json({ error: 'not available to an agent token' }, 403)
     }
     c.set('actor', agent)

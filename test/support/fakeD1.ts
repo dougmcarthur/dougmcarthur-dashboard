@@ -101,3 +101,56 @@ export const OWNER_USER: Row = {
 export function ownerOnlyD1(): D1Database {
   return fakeD1({ users: [OWNER_USER] })
 }
+
+/** The cookie value the route tests send. The fake ignores WHERE, so any value finds the row. */
+export const TEST_SESSION = 'test-session'
+
+/**
+ * The owner, signed in — the credential the route tests enter with.
+ *
+ * They used the shared `API_TOKEN` until it was retired, because it reached
+ * every router. What replaces it is the other door real requests use: a
+ * session on the artist surface. The expiry is fixed and far away rather than
+ * computed, because a fixture that reads the clock passes today and fails on
+ * the day real time crosses it.
+ *
+ * Only for tests that need to be let in. The fake answers every lookup with
+ * this row, so a test about a *wrong* cookie has to use `ownerOnlyD1`, where
+ * there is no session to find.
+ */
+export function signedInD1(): D1Database {
+  return fakeD1({
+    users: [OWNER_USER],
+    auth_sessions: [{
+      id: 'hash-of-test-session',
+      user_id: OWNER_USER.id,
+      credential_id: null,
+      label: 'route tests',
+      created_at: '2026-01-01T00:00:00.000Z',
+      last_seen_at: '2026-01-01T00:00:00.000Z',
+      expires_at: '2999-01-01T00:00:00.000Z',
+      elevated_at: null,
+      mode: 'artist',
+    }],
+  })
+}
+
+/**
+ * One issued agent token, live. Any bearer finds it, for the same reason any
+ * cookie finds the session above — so use it only where the question is what
+ * an agent may reach, never whether a wrong bearer is refused.
+ */
+export function agentTokenD1(): D1Database {
+  return fakeD1({
+    users: [OWNER_USER],
+    agent_tokens: [{
+      id: 'tok_test',
+      tenant_id: OWNER_USER.tenant_id,
+      label: 'route tests',
+      token_hash: 'hash-of-anything',
+      created_at: '2026-01-01T00:00:00.000Z',
+      last_used_at: null,
+      revoked_at: null,
+    }],
+  })
+}

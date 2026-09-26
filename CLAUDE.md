@@ -321,8 +321,8 @@ hand-applied. A production-only column would be dropped by a statement that
 succeeds. `GET /api/admin/health` counts rows with no owner so the precondition
 is something to look at rather than assume.
 
-**The agents' token now belongs to somebody, and the old one still works.**
-`API_TOKEN` is a Worker secret with no tenant attached — correct with one
+**The agents' token belongs to somebody, and the shared one is retired.**
+`API_TOKEN` was a Worker secret with no tenant attached — correct with one
 artist, wrong with two, and wrong invisibly: a gig filed to the wrong tenant
 just appears on a stranger's Overview. `agent_tokens` (migration 0022) is a
 hashed, revocable, per-tenant credential, issued and revoked through
@@ -331,12 +331,18 @@ write to your account is squarely "changes who can get in". An agent cannot
 manage tokens: a credential issuing its own successor makes revoking one a
 race rather than an ending.
 
-`actorForBearer` still accepts `API_TOKEN` and resolves it to the owner's
-tenant — the same "read both spellings" move `normaliseGigStatus` makes,
-because withdrawing it in this deploy would 401 every agent until three GitHub
-secrets were rotated. It goes when `.github/workflows/agents.yml` holds a row
-instead. **Settings → Agent tokens** issues and revokes them; the token is
-shown once and held only in the card's state, never the query cache.
+`actorForBearer` accepted `API_TOKEN` beside issued tokens for a while — the
+"read both spellings" move `normaliseGigStatus` makes — so the agents could
+move across without a coordinated cut-over. It stopped once they had: the
+routines and the GitHub fallback (`SCOUT_API_TOKEN` in
+`.github/workflows/agent-run.yml`) each hold an issued token, every agent is now
+limited to `shared/agentRoutes.ts`, and the route tests come in as a signed-in
+session rather than through the old unlimited door. A leftover `API_TOKEN`
+secret on the Worker is inert, and `test/routes.test.ts` proves it: the secret
+set, a request bearing it, 401. `test/agentRoutes.test.ts` fails if anything
+in `src/` reads it again. **Settings → Agent tokens** issues and revokes them;
+the token is shown once and held only in the card's state, never the query
+cache.
 
 **Admin mode is a different surface, not a bigger one.** The owner has two
 jobs and one account; `auth_sessions.mode` (migration 0023) says which surface
@@ -443,11 +449,11 @@ attempt counter.
 
 **The research agents lost their front door and were given a token.** They POST
 and PATCH from outside this repo and outside a browser, so they cannot do a
-passkey ceremony — WebAuthn has no non-interactive mode. `API_TOKEN` as a
-bearer is their credential, checked before the session because it is a string
-compare and the session is a D1 read. Unset, there is no bearer path at all, so
-an empty deployment cannot be opened by guessing the empty string — but unset
-*at deploy time* is how every agent request silently becomes a 401. **Not at
+passkey ceremony — WebAuthn has no non-interactive mode. A bearer is their
+credential — first the shared `API_TOKEN`, now an issued agent token — checked
+before the session because an agent never sends a cookie. When passkeys
+replaced Access, a credential missing *at deploy time* was how every agent
+request would silently have become a 401. **Not at
 Access-removal time**, which is the easy thing to get backwards: Access
 authenticated at the edge and the Worker then trusted whatever arrived, so it
 never supplied a credential this middleware would accept. The secret and the
@@ -547,9 +553,9 @@ Things about it that are not obvious:
   proxy after a request leaves the VM, so the session cannot leak it — but the
   proxy attaches it to *any* request for the host, so hiding it does not stop
   `curl -X DELETE`. `shared/agentRoutes.ts` limits an issued token to seven
-  routes: three reads, three creates and the run log. The legacy `API_TOKEN`
-  is not limited — the CI runner has no shell and the route tests use it to
-  reach every router — and nothing that reads untrusted pages is given it.
+  routes: three reads, three creates and the run log. That limit now applies
+  to every agent — the unlimited shared `API_TOKEN` is retired — so the CI
+  runner holds an issued token too.
 - **The agents get named, typed tools and never a general HTTP tool.**
   `create_gig_opportunity` is one prompt injection away from being safe;
   `http_request` would be one away from `DELETE /api/gigs/12`.

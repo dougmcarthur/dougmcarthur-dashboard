@@ -1,33 +1,25 @@
 import { describe, it, expect } from 'vitest'
 import { app, isReplyScanHour, REPLY_SCAN_HOURS } from '../src/index'
-import { ownerOnlyD1 } from './support/fakeD1'
+import { SESSION_COOKIE } from '../shared/auth'
+import { agentTokenD1, ownerOnlyD1, signedInD1, TEST_SESSION } from './support/fakeD1'
 
 /**
  * No integration secrets configured — enough to exercise routing without a DB.
  *
- * `API_TOKEN` is the exception and it is not an integration secret: since
- * passkey login replaced Cloudflare Access, `/api/*` is behind a middleware
- * that turns away anything with no credential, and every case below is about
- * what a route does *after* it has been let in. The bearer token is how the
- * research agents get in for real (src/lib/auth.ts), so using it here tests
- * the same door they use rather than a hole cut for the suite.
+ * Since passkey login replaced Cloudflare Access, `/api/*` is behind a
+ * middleware that turns away anything with no credential, and every case below
+ * is about what a route does *after* it has been let in. So each request comes
+ * in as the owner, signed in: a session cookie, the door the app itself uses.
+ * It used to be the shared `API_TOKEN`, which reached every router; that is
+ * retired, and an issued agent token reaches only research's seven routes.
  */
-const TEST_TOKEN = 'test-bearer-token'
+const emptyEnv = { DB: signedInD1() } as Record<string, unknown>
 
-/**
- * `DB` is here because the door now needs one. Since tenant scoping, a request
- * resolves to an artist before any route runs, and resolving one is a read —
- * so a binding is a prerequisite of reaching a handler at all, integration
- * secrets or not. `ownerOnlyD1` holds the bootstrap account and nothing else;
- * it ignores every WHERE, which is why nothing below asserts about scoping.
- */
-const emptyEnv = { API_TOKEN: TEST_TOKEN, DB: ownerOnlyD1() } as Record<string, unknown>
-
-/** `app.request`, authenticated. The middleware is exercised on its own below. */
+/** `app.request`, signed in. The middleware is exercised on its own below. */
 function request(path: string, init: RequestInit = {}, env: Record<string, unknown> = emptyEnv) {
   return app.request(
     path,
-    { ...init, headers: { ...((init.headers as Record<string, string>) ?? {}), Authorization: `Bearer ${TEST_TOKEN}` } },
+    { ...init, headers: { ...((init.headers as Record<string, string>) ?? {}), Cookie: `${SESSION_COOKIE}=${TEST_SESSION}` } },
     env,
   )
 }
@@ -381,7 +373,9 @@ describe('the artist freshness filter', () => {
  * router opts into.
  */
 describe('API authentication', () => {
-  const env = { API_TOKEN: 'test-bearer-token', DB: ownerOnlyD1() } as Record<string, unknown>
+  const env = { DB: ownerOnlyD1() } as Record<string, unknown>
+  const asAgent = (path: string, init: RequestInit = {}) =>
+    app.request(path, { ...init, headers: { Authorization: 'Bearer any-issued-token' } }, { DB: agentTokenD1() })
 
   it('turns away a request with no credential at all', async () => {
     const res = await app.request('/api/health', {}, env)
@@ -404,16 +398,40 @@ describe('API authentication', () => {
    * level in test/adminMode.test.ts instead of faked here.
    */
   it('refuses the oversight surface to an agent token', async () => {
-    const res = await request('/api/admin/artists', {}, env)
+    const res = await asAgent('/api/admin/artists')
     expect(res.status).toBe(403)
     expect((await res.json() as { error: string }).error).toContain('agent token')
   })
 
-  // Without the secret set there is no bearer path at all, so an empty
-  // deployment cannot be opened by guessing the empty string.
-  it('accepts no bearer token when API_TOKEN is unset', async () => {
-    const res = await app.request('/api/health', { headers: { Authorization: 'Bearer ' } }, { DB: ownerOnlyD1() })
+  /**
+   * The shared secret is retired, and setting it opens nothing.
+   *
+   * `API_TOKEN` was a Worker secret with no tenant and no route limit. The
+   * code no longer reads it — but a secret is deleted by hand, separately from
+   * any deploy, so a deployment can go on carrying one after the code stops
+   * looking. This is that deployment: the secret set, a request bearing it,
+   * and no issued token for it to match.
+   */
+  it('does not accept the retired shared API_TOKEN, even where it is still set', async () => {
+    const res = await app.request(
+      '/api/gigs',
+      { headers: { Authorization: 'Bearer the-old-shared-secret' } },
+      { API_TOKEN: 'the-old-shared-secret', DB: ownerOnlyD1() },
+    )
     expect(res.status).toBe(401)
+  })
+
+  it('accepts no empty bearer token', async () => {
+    const res = await app.request('/api/health', { headers: { Authorization: 'Bearer ' } }, env)
+    expect(res.status).toBe(401)
+  })
+
+  it('limits every agent token to the research routes', async () => {
+    // With the shared secret gone there is no unlimited bearer: a token that
+    // can file a gig cannot read the integrations or delete anything.
+    expect((await asAgent('/api/health')).status).toBe(403)
+    expect((await asAgent('/api/gigs/12', { method: 'DELETE' })).status).toBe(403)
+    expect([401, 403]).not.toContain((await asAgent('/api/gigs')).status)
   })
 
   it('lets the session endpoint answer without a session', async () => {

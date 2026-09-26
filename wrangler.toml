@@ -85,8 +85,8 @@ MAIL_POSTAL_ADDRESS = "55 Tunis Bay, Winnipeg, MB R3T 2X2"
 # GOOGLE_PICKER_API_KEY = ""
 # GOOGLE_CLOUD_PROJECT_NUMBER = ""
 
-# API_TOKEN is a secret, not a var: `wrangler secret put API_TOKEN`. It is the
-# research agents' credential, and it is the thing to set BEFORE switching
-# Cloudflare Access off — headless callers cannot do a passkey ceremony, so
-# without it every agent POST becomes a 401 the moment Access stops letting
-# them through.
+# There is no API_TOKEN any more. It was the research agents' shared secret —
+# no tenant, no route limit, revocable only by redeploying — and the Worker
+# stopped reading it once every agent held an issued token (Settings, Agent
+# tokens). A leftover `API_TOKEN` secret on the Worker is inert; delete it with
+# `wrangler secret delete API_TOKEN`.

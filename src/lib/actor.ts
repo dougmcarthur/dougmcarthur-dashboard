@@ -22,7 +22,7 @@ import { asc, eq } from 'drizzle-orm'
 import { getDb } from '../db'
 import { agentTokens, epkShares, tenants, users } from '../db/schema'
 import { asTenantId, type TenantId } from '../db/scope'
-import { sha256Hex, timingSafeEqual, type ActiveSession } from './auth'
+import { sha256Hex, type ActiveSession } from './auth'
 import type { Env } from '../types'
 
 export type Role = 'owner' | 'artist'
@@ -38,8 +38,8 @@ export interface UserActor {
 export interface AgentActor {
   kind: 'agent'
   tenant: TenantId
-  /** The `agent_tokens` row, or null when the legacy `API_TOKEN` was used. */
-  tokenId: string | null
+  /** The `agent_tokens` row. Every agent holds one; there is no shared secret. */
+  tokenId: string
 }
 
 /**
@@ -126,34 +126,21 @@ export async function actorForSession(
 /**
  * The tenant behind a bearer token, or null when the token is not one.
  *
- * Two spellings are accepted on purpose, which is the pattern this repo
- * already uses for a value being renamed: `normaliseGigStatus` reads both
- * `approved` and `shortlisted` so that agents outside this repository keep
- * working across the change.
+ * One kind of bearer: an `agent_tokens` row, hashed, scoped to one tenant,
+ * revocable, and limited to the routes in shared/agentRoutes.ts.
  *
- *  - An `agent_tokens` row, hashed, scoped to one tenant. What the agents
- *    should hold.
- *  - `API_TOKEN`, the platform secret they hold today, resolved to the owner's
- *    tenant. Correct while there is one artist and removed before there are
- *    two — but removing it in the same deploy that introduces the table would
- *    mean every agent 401s until three GitHub secrets are rotated, which is a
- *    coordination this does not need.
- *
- * Unset `API_TOKEN` still means no legacy path at all, so an empty deployment
- * cannot be opened by guessing the empty string.
+ * There used to be a second. `API_TOKEN` was a Worker secret with no tenant
+ * and no route limit, resolved to the owner's tenant, and it was accepted
+ * beside issued tokens — the "read both spellings" move `normaliseGigStatus`
+ * makes — so the agents could move across without a coordinated cut-over. It
+ * went once they had: correct with one artist, wrong with two, and wrong
+ * invisibly, since a gig filed to the wrong tenant just appears on a
+ * stranger's Overview. It was also the one credential here that nothing could
+ * revoke short of a redeploy.
  */
 export async function actorForBearer(env: Env, header: string | null | undefined): Promise<AgentActor | null> {
   const offered = /^Bearer\s+(.+)$/i.exec(header ?? '')?.[1]
   if (!offered) return null
-
-  // The platform secret first, because it is a string compare and the table is
-  // a read — the same ordering the middleware keeps between the bearer and the
-  // session, and for the same reason. It is also what every agent still sends.
-  const expected = env.API_TOKEN
-  if (expected && timingSafeEqual(offered, expected)) {
-    const tenant = await ownerTenant(env)
-    return tenant ? { kind: 'agent', tenant, tokenId: null } : null
-  }
 
   // Looked up by the hash of what was offered, so a wrong token finds no row
   // rather than being compared against a right one — which is why there is no
