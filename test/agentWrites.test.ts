@@ -204,7 +204,7 @@ async function setup() {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(NOW))
   const { d1, db } = sqliteD1()
-  const env = { DB: d1, DASHBOARD_URL: 'http://localhost:8787', API_TOKEN: 'legacy-secret' } as never
+  const env = { DB: d1, DASHBOARD_URL: 'http://localhost:8787' } as never
 
   // The migrations seed the owner on tnt_0001. The token belongs to an artist.
   db.exec(`INSERT INTO tenants (id, display_name, created_at) VALUES ('tnt_0002', 'Artist', '2026-01-01')`)
@@ -220,7 +220,6 @@ async function setup() {
     )
   const agent = (path: string, body: unknown) => send(path, body, { Authorization: 'Bearer issued-token' })
   const read = (path: string) => app.request(path, { headers: { Authorization: 'Bearer issued-token' } }, env)
-  const legacy = (path: string, body: unknown) => send(path, body, { Authorization: 'Bearer legacy-secret' })
   const person = async (path: string, body: unknown) => {
     const { token } = await createSession(env, { credentialId: null, label: 'test', userId: 'usr_0001' })
     return send(path, body, { Cookie: `${SESSION_COOKIE}=${token}` })
@@ -234,7 +233,7 @@ async function setup() {
     )
     for (let i = 0; i < n; i++) insert.run(tenant, `Seeded ${tenant} ${at} ${i}`, at, at)
   }
-  return { db, env, agent, read, legacy, person, count, seedGigs }
+  return { db, env, agent, read, person, count, seedGigs }
 }
 
 const FOLK = { name: 'Folk Fest', type: 'festival', url: 'https://folkfest.example/artists', fitRationale: 'Fits.', status: 'discovered' }
@@ -428,14 +427,6 @@ describe('POST /api/sync, /api/promo and /api/task-runs with an issued token', (
 })
 
 describe('who else reaches the same routes', () => {
-  it('ignores a run date from the legacy secret too, because neither runner sends one', async () => {
-    const t = await setup()
-    const res = await t.legacy('/api/task-runs', { task_id: 'gig-festival-scan', status: 'ok', run_at: '2099-01-01T00:00:00.000Z' })
-    expect(res.status).toBe(201)
-    const { run_at } = t.db.prepare(`SELECT run_at FROM task_runs WHERE tenant_id = 'tnt_0001'`).get() as { run_at: string }
-    expect(run_at).toBe(NOW)
-  })
-
   it('leaves a signed-in person\'s form alone', async () => {
     const t = await setup()
     // Everything an agent is refused, from the artist themselves.

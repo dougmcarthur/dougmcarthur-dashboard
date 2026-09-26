@@ -14,7 +14,8 @@ import { Banner, Card } from './ui/Surface'
  * Issuing had only a terminal script until this card, which meant the agents
  * stayed on `API_TOKEN` — a secret with no tenant and no route limit — because
  * moving them needed somebody at a shell. This is the same three routes behind
- * a button.
+ * a button, and since that secret was retired it is the only way an agent gets
+ * in at all.
  *
  * The token is **shown once**, like an invitation link: it is stored hashed,
  * so the list cannot print it and neither can anything else. It lives in this
@@ -130,8 +131,8 @@ export function AgentTokensCard() {
         </div>
       ) : live.length === 0 ? (
         <p className="text-sm text-muted">
-          None issued. Agents still using the deployment&rsquo;s shared token keep working, but
-          that one cannot be revoked from here and is not limited to the agents&rsquo; routes.
+          None issued, so no research agent can reach Scout. Issue one for each place an agent
+          runs.
         </p>
       ) : (
         <ul className="divide-y divide-line">
