@@ -1114,6 +1114,8 @@ export const api = {
   google: {
     accounts: () => apiFetch<GoogleAccountList>('/google/accounts'),
     connectHref: '/api/google/connect',
+    /** The same consent with Gmail never requested — see GoogleConsentModal. */
+    connectWithoutGmailHref: '/api/google/connect?gmail=skip',
     disconnect: (email: string | null) =>
       apiFetch<{ ok: boolean; removed: string[] }>('/google/disconnect', {
         method: 'POST',

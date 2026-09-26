@@ -43,8 +43,10 @@ import {
 import { encodeDraft, planDrafts } from '../../shared/gmailDraft'
 import {
   beginConsent,
+  bundlePurposes,
   checkCallback,
   consentAvailable,
+  isBundle,
   settingsRedirect,
 } from '../lib/googleOAuth'
 import { completeBundle, completeGrant } from '../lib/googleConnect'
@@ -80,13 +82,14 @@ gmail.get('/callback', async (c) => {
   const check = checkCallback(c)
   if (!check.ok) return c.redirect(settingsRedirect(c.env, check.purpose, check.reason), 302)
 
-  if (check.purpose === 'google') {
-    const done = await completeBundle(c.env, tenantOf(c), check.code)
+  if (isBundle(check.purpose)) {
+    const done = await completeBundle(c.env, tenantOf(c), check.code, bundlePurposes(check.purpose))
     return c.redirect(
-      settingsRedirect(c.env, 'google', done.outcome, {
+      settingsRedirect(c.env, check.purpose, done.outcome, {
         declined: done.declined,
         failed: done.failed,
         kept: done.kept,
+        skipped: done.skipped,
       }),
       302,
     )

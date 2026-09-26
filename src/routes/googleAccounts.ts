@@ -25,11 +25,22 @@ google.get('/accounts', async (c) =>
   }),
 )
 
+/**
+ * `?gmail=skip` is "Connect without Gmail": the same consent with the Gmail
+ * scope never requested, so saying no on Scout's screen means Google does not
+ * ask. A value it does not know is refused rather than read as "everything" —
+ * a switch that quietly ignores you is how Gmail would get asked for after
+ * somebody said no.
+ */
 google.get('/connect', async (c) => {
+  const gmail = c.req.query('gmail')
+  if (gmail !== undefined && gmail !== 'skip') {
+    return c.json({ error: `unknown gmail option "${gmail}"`, allowed: ['skip'] }, 400)
+  }
   if (!consentAvailable(c.env)) {
     return c.json({ error: 'Google client credentials or TOKEN_ENCRYPTION_KEY are not configured' }, 503)
   }
-  return beginConsent(c, 'google')
+  return beginConsent(c, gmail === 'skip' ? 'google.nogmail' : 'google')
 })
 
 /**

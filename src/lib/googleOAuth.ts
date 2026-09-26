@@ -23,16 +23,28 @@ import {
   grantConfigured,
   redirectUri,
   bundleScopes,
+  BUNDLE_PURPOSES,
+  BUNDLE_WITHOUT_GMAIL,
   requestedScopes,
   type GrantPurpose,
 } from './googleGrant'
 
 /**
- * What a consent is for: one service, or `google` — every service in
- * `BUNDLE_PURPOSES` in one pass, which is what the Connect button on Settings
- * starts.
+ * What a consent is for: one service, or a bundle — `google` is every service
+ * in `BUNDLE_PURPOSES` in one pass, and `google.nogmail` is the same with
+ * Gmail left out, which is what "Connect without Gmail" on Settings starts.
  */
-export type ConsentTarget = GrantPurpose | 'google'
+export type BundleTarget = 'google' | 'google.nogmail'
+export type ConsentTarget = GrantPurpose | BundleTarget
+
+export function isBundle(target: ConsentTarget | null | undefined): target is BundleTarget {
+  return target === 'google' || target === 'google.nogmail'
+}
+
+/** The services a bundle consent asks for. */
+export function bundlePurposes(target: BundleTarget): GrantPurpose[] {
+  return target === 'google' ? BUNDLE_PURPOSES : BUNDLE_WITHOUT_GMAIL
+}
 import type { Env } from '../types'
 
 /** Ten minutes is longer than a consent screen takes and shorter than a day. */
@@ -73,7 +85,7 @@ export function unpackState(state: string | null): { nonce: string; purpose: Con
   // googleGrant.ts cannot silently fail to survive the round trip — and a
   // near-miss like `calendar.primary.extra` is refused rather than read as the
   // narrow calendar grant, which would complete a consent for the wrong one.
-  if (purpose !== 'google' && !(GRANT_PURPOSES as string[]).includes(purpose)) return null
+  if (!isBundle(purpose as ConsentTarget) && !(GRANT_PURPOSES as string[]).includes(purpose)) return null
   return { nonce, purpose: purpose as ConsentTarget }
 }
 
@@ -91,7 +103,7 @@ export function beginConsent(c: Context<AppEnv>, purpose: ConsentTarget): Respon
   url.searchParams.set('client_id', c.env.GOOGLE_CLIENT_ID ?? '')
   url.searchParams.set('redirect_uri', redirectUri(c.env))
   url.searchParams.set('response_type', 'code')
-  url.searchParams.set('scope', purpose === 'google' ? bundleScopes() : requestedScopes(purpose))
+  url.searchParams.set('scope', isBundle(purpose) ? bundleScopes(bundlePurposes(purpose)) : requestedScopes(purpose))
   url.searchParams.set('access_type', 'offline')
   // `select_account` as well as `consent`: somebody signed in to two Google
   // accounts gets asked which one, rather than Google quietly picking the
@@ -144,7 +156,7 @@ export function settingsRedirect(
   detail: Record<string, string[]> = {},
 ): string {
   const origin = (env.DASHBOARD_URL ?? '').replace(/\/$/, '')
-  if (purpose === 'google') {
+  if (isBundle(purpose)) {
     const query = new URLSearchParams({ google: outcome })
     for (const [key, values] of Object.entries(detail)) if (values.length) query.set(key, values.join(','))
     return `${origin}/#settings?${query.toString()}`
