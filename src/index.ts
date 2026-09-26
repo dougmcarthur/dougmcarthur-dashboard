@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { logger } from 'hono/logger'
 import type { Env } from './types'
 import overview from './routes/overview'
 import review from './routes/review'
@@ -53,10 +52,12 @@ import { originAllowed, relyingParty } from '../shared/auth'
 import { agentMayCall } from '../shared/agentRoutes'
 import { localParts } from '../shared/digestSchedule'
 import { runCredentialChecks } from './lib/credentialCheck'
+import { requestLog } from './lib/requestLog'
 
 const app = new Hono<RootEnv>()
 
-app.use('/api/*', logger())
+// Paths only: a query string is where OAuth puts its code. See requestLog.ts.
+app.use('/api/*', requestLog())
 
 /**
  * CORS, narrowed to this deployment.
