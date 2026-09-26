@@ -30,7 +30,7 @@
 
 import { eq, getTableName } from 'drizzle-orm'
 import { getDb } from '../db'
-import { agentTokens, authSessions, epkShares, passkeyCredentials, tenants, usageDaily, users } from '../db/schema'
+import { agentTokens, authSessions, epkShares, feedback, passkeyCredentials, tenants, usageDaily, users } from '../db/schema'
 import { DOMAIN_TABLES, scoped, type TenantId } from '../db/scope'
 import { countRows } from './usage'
 import type { Env } from '../types'
@@ -103,6 +103,9 @@ export async function removeTenant(env: Env, tenant: TenantId): Promise<RemovalR
 
   await db.delete(agentTokens).where(eq(agentTokens.tenantId, tenant))
   await db.delete(epkShares).where(eq(epkShares.tenantId, tenant))
+  // What they sent the owner goes too. It is theirs, and "delete my data" does
+  // not have an exception for the parts addressed to somebody else.
+  await db.delete(feedback).where(eq(feedback.tenantId, tenant))
   await db.delete(usageDaily).where(eq(usageDaily.tenantId, tenant))
   await db.delete(users).where(eq(users.tenantId, tenant))
   await db.delete(tenants).where(eq(tenants.id, tenant))

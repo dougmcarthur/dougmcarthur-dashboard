@@ -117,6 +117,7 @@ const KIND_ICON: Record<NotificationKind, string> = {
   automation: 'bolt',
   digest: 'mail',
   reconcile: 'swap',
+  feedback: 'mail',
 }
 
 const TIER_ICON: Record<NotificationTier, string> = {

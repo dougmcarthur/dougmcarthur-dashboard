@@ -44,7 +44,7 @@ export type Tier = 'critical' | 'attention' | 'info'
 /**
  * What a notification is *about*, which is the axis worth filtering on.
  *
- * The first four are conditions, the last three events. That split matters to
+ * The first four are conditions, the last four events. That split matters to
  * this module and to dismissal, but not to someone scanning the list, so it is
  * not what the filter offers — the filter offers these.
  */
@@ -56,6 +56,7 @@ export type NotificationKind =
   | 'automation'
   | 'digest'
   | 'reconcile'
+  | 'feedback'
 
 /** Filter labels, here rather than in the UI so every consumer agrees. */
 export const KIND_LABELS: Record<NotificationKind, string> = {
@@ -66,6 +67,7 @@ export const KIND_LABELS: Record<NotificationKind, string> = {
   automation: 'Automation',
   digest: 'Digest',
   reconcile: 'Reconcile',
+  feedback: 'Feedback',
 }
 
 export interface Notification {

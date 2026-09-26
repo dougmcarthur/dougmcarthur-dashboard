@@ -125,13 +125,24 @@ export function InvitesPanel() {
           </label>
         )}
 
-        <Button
-          variant="primary"
-          onClick={() => issue.mutate()}
-          disabled={issue.isPending || !email.trim()}
-        >
-          {issue.isPending ? 'Confirming…' : 'Create an invitation'}
-        </Button>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Button
+            variant="primary"
+            onClick={() => issue.mutate()}
+            disabled={issue.isPending || !email.trim()}
+          >
+            {issue.isPending ? 'Waiting for your passkey…' : 'Create an invitation'}
+          </Button>
+          {/* Said before the prompt rather than discovered in it. An
+              invitation creates an account, so it is the "changes who can get
+              in" rule — and an operating-system dialog appearing unannounced
+              after pressing Create reads as something having gone wrong. Not
+              behind the Explainer toggle: it is what is about to happen, not
+              background. */}
+          <span className="text-xs text-muted">
+            Asks for your passkey first, unless you confirmed it in the last fifteen minutes.
+          </span>
+        </div>
 
         {error && <p className="text-sm text-danger-fg">{error}</p>}
 

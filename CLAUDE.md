@@ -1449,6 +1449,28 @@ the library for a grey badge. `GET /api/artist?freshness=` refuses a value it
 does not know rather than quietly showing everything — a filter that ignores
 you is how you conclude the library is fine.
 
+**A new account gets a checklist, and every tick is read off the account.**
+`shared/onboarding.ts` derives the steps — name, goals, a profile, Google —
+from state that exists for its own reasons, so a step done from Settings ticks
+itself and one undone comes back. The only thing stored is what nothing else
+could answer: the goals the artist chose (`tenant_settings`,
+`onboarding.goals`) and whether they hid the card. It sits on the Overview
+until the required steps are done, suppresses "All clear" while it is up
+(true and misleading on an empty account), and never pops up. Help can show it
+again. It promises nothing about research running for an account nobody has
+set it up for.
+
+**Feedback is a form, not telemetry.** The header's question mark (the
+drawer, on a phone) opens Help and *Send feedback*. The form attaches the page,
+the pages before it, failed requests from the last half hour in this tab, the
+build and the browser — kept in memory by `frontend/src/diagnostics.ts`, never
+stored or posted on its own — and lists all of it before the button, through
+`describeContext`, which the owner's inbox uses too, so what arrives is what
+was shown. It never carries what was on the page. `feedback` (migration 0032)
+is a platform table like `agent_tokens`, read on the admin surface, deleted by
+tenant removal; the owner hears through the bell. `test/feedback.test.ts` pins
+the rules.
+
 **Buttons and inputs come from `components/ui/`.** `Button` takes a variant
 named for meaning (`primary`, `neutral`, `quiet`, `good`, `danger`, `info`),
 `Field` exports `FIELD` and `FILTER`. Fourteen hand-rolled button strings and

@@ -620,3 +620,24 @@ export type UserRow = typeof users.$inferSelect
 export type InviteRow = typeof invites.$inferSelect
 export type UsageDailyRow = typeof usageDaily.$inferSelect
 export type AgentTokenRow = typeof agentTokens.$inferSelect
+
+/**
+ * Feedback sent from the app to whoever runs it. See migration 0032.
+ *
+ * Not a scoped table: it is a message to the platform rather than the artist's
+ * work, read on the oversight surface, and deleted by tenant removal by name.
+ */
+export const feedback = sqliteTable('feedback', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: text('tenant_id').notNull(),
+  userId: text('user_id'),
+  /** broken | idea | question — see shared/feedback.ts. */
+  kind: text('kind').notNull(),
+  message: text('message').notNull(),
+  /** JSON the sender was shown before sending. */
+  context: text('context').notNull(),
+  createdAt: text('created_at').notNull(),
+  readAt: text('read_at'),
+})
+
+export type FeedbackRow = typeof feedback.$inferSelect

@@ -58,6 +58,33 @@ describe('API route registration', () => {
   // With no Gmail secrets the reconcile preview returns 503 ("Gmail not
   // configured") *before* touching the DB — reaching that proves the
   // reconcile router handled the request.
+  // Feedback is a person's message. The legacy platform token resolves to an
+  // agent, and an agent has nothing to say here.
+  it('POST /api/feedback refuses an agent', async () => {
+    const res = await request('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kind: 'idea',
+        message: 'hello',
+        context: {
+          page: 'overview', section: null, trail: [], errors: [], build: 'dev',
+          viewport: '1×1', theme: 'light', timeZone: 'UTC', browser: 'Chrome on Linux',
+        },
+      }),
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it('PUT /api/onboarding/goals refuses a goal it does not know', async () => {
+    const res = await request('/api/onboarding/goals', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goals: ['world-domination'], reach: [] }),
+    })
+    expect(res.status).toBe(400)
+  })
+
   it('GET /api/sync/reconcile resolves to the reconcile router', async () => {
     const res = await request('/api/sync/reconcile', {}, emptyEnv)
     expect(res.status).toBe(503)
@@ -478,6 +505,8 @@ describe('API authentication', () => {
       '/api/replies',
       '/api/notifications',
       '/api/digest',
+      '/api/onboarding',
+      '/api/feedback',
     ]
     for (const path of paths) {
       const res = await app.request(path, {}, env)
