@@ -166,6 +166,16 @@ says "rolling" or "TBC" or gives a month with no day, leave `deadline` empty
 and put the page's own words in `deadlineNote`. Do not convert prose into a
 date you cannot defend.
 
+Always fill `location`, as "Town, Province" or "Town, State" with the
+two-letter code — "Lac du Bonnet, MB" — even when the town is already in the
+name. Scout measures the drive from the artist's home to that place, and it
+cannot read a place out of a title. Use "Online" for a virtual event and
+"National" for a programme with no single place, rather than leaving it empty.
+
+Keep `type` to one word from its list. A description of the room — "intimate
+acoustic listening room" — belongs in `fitRationale`; `type` is shown as a
+short label.
+
 ## Ending the run
 
 When you have worked the sources you can, stop and write a short report as

@@ -22,6 +22,16 @@
  */
 
 import type { GigOpportunity } from './types'
+import {
+  bandFromDistance,
+  driveCost,
+  driveNights,
+  formatDriveTime,
+  measuredDistance,
+  placeOf,
+  type MeasuredDistance,
+} from './travelDistance'
+export { placeOf } from './travelDistance'
 
 /** An estimate. Both ends always, never a midpoint. */
 export interface CostRange {
@@ -386,6 +396,12 @@ export interface CostLine {
   amount: CostRange
   /** The band came from a guess rather than from the row. Shown as "about". */
   inferred: boolean
+  /**
+   * Where a derived figure came from, when it was measured rather than
+   * guessed: a road route, or a straight line when no route was available.
+   * The screen credits OpenStreetMap beside either.
+   */
+  basis?: 'route' | 'straight_line'
 }
 
 export interface CostEstimate {
@@ -409,25 +425,11 @@ type CostRow = Pick<
   GigOpportunity,
   | 'location' | 'country' | 'travelBand' | 'lodgingTier' | 'nights' | 'performanceKind'
   | 'stipendAmount' | 'guaranteeAmount' | 'feeAmount' | 'feeCurrency' | 'paid'
-> & Partial<Pick<GigOpportunity, 'name'>>
+> & Partial<Pick<
+  GigOpportunity,
+  'name' | 'geoStatus' | 'geoPlace' | 'roadKm' | 'roadHours' | 'crowKm' | 'distanceSource'
+>>
 
-/**
- * Where a gig is, for guessing a band: the location, or failing that a place
- * the research agent put at the end of the name.
- *
- * The agents often title a gig "The Listening Room — Lac du Bonnet, MB" and
- * leave `location` empty. With nothing to read, a Canadian gig fell through
- * to a regional flight — $450–850 to drive 100 km — which is the home-town
- * error `local` and the Manitoba rule exist to prevent, arriving by a
- * different door. Only that exact shape is read: a dash, then "Town, XX" at
- * the very end. A looser match would take an organisation for a place —
- * "(Manitoba Music)" is who runs a night, not where it is.
- */
-export function placeOf(row: { location?: string | null; name?: string | null }): string | null {
-  if (row.location?.trim()) return row.location
-  const tail = (row.name ?? '').match(/[—–-]\s*([^—–-]+,\s*[A-Z]{2})\s*$/)
-  return tail ? tail[1].trim() : null
-}
 
 /**
  * The whole trip, as a range, with what it could not count named beside it.
@@ -437,20 +439,46 @@ export function placeOf(row: { location?: string | null; name?: string | null })
  * zero nights, because zero nights is a real answer that some rows genuinely
  * have and this is not one of them.
  */
+/**
+ * The travel line's words for a measured trip. A drive says its road distance
+ * and time; a flight says how far away the place is, because the road would
+ * be the wrong number twice over — nobody drives it, and the fare follows the
+ * straight line if it follows anything. Home is "in town", not "0 km (0 min)".
+ */
+function distanceLabel(band: TravelBand, m: MeasuredDistance): string {
+  const km = (n: number) => `${Math.round(n).toLocaleString('en-CA')} km`
+  if (band === 'local' && m.roadKm < 5) return `${TRAVEL_BANDS.local.label}, in town`
+  if (band === 'local' || band === 'drive') {
+    return `${TRAVEL_BANDS[band].label}, ${km(m.roadKm)} each way (about ${formatDriveTime(m.roadHours)})`
+  }
+  return `${TRAVEL_BANDS[band].label}, ${km(m.crowKm)} away`
+}
+
 export function estimateGigCost(row: CostRow): CostEstimate {
   const lines: CostLine[] = []
   const unknowns: string[] = []
 
   const country = normaliseCountry(row.country)
   const statedBand = travelBandOf(row.travelBand)
-  const band = statedBand ?? inferTravelBand(placeOf(row), country)
+  // A measured distance outranks the place-name guess and yields to a band a
+  // person set. See shared/travelDistance.ts.
+  const measured = statedBand ? null : measuredDistance(row)
+  const band =
+    statedBand ??
+    (measured
+      ? bandFromDistance({ roadKm: measured.roadKm, crowKm: measured.crowKm, overseas: country === 'other' })
+      : inferTravelBand(placeOf(row), country))
 
   if (band) {
+    // A drive is priced by its length when the length is known; a flight's
+    // fare does not follow distance, so it keeps the band's range.
+    const byDistance = measured && (band === 'drive' || band === 'local')
     lines.push({
       id: 'travel',
-      label: TRAVEL_BANDS[band].label,
-      amount: TRAVEL_BANDS[band].cost,
+      label: measured ? distanceLabel(band, measured) : TRAVEL_BANDS[band].label,
+      amount: byDistance ? driveCost(measured.roadKm) : TRAVEL_BANDS[band].cost,
       inferred: statedBand === null,
+      ...(measured ? { basis: measured.source } : {}),
     })
   } else {
     unknowns.push('No travel band, and nothing in the location to guess one from.')
@@ -462,6 +490,10 @@ export function estimateGigCost(row: CostRow): CostEstimate {
   const nights: { low: number; high: number } | null =
     statedNights !== null
       ? { low: statedNights, high: statedNights }
+      : measured && band === 'drive'
+      ? // A drive's nights follow its hours, not its band: an hour and a
+        // quarter to Lac du Bonnet is a day trip, eight to Saskatoon is not.
+        driveNights(measured.roadHours)
       : band
       ? NIGHTS_BY_BAND[band]
       : null

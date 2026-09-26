@@ -92,6 +92,22 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   lodgingTier: text('lodging_tier'), // none | standard | major
   nights: integer('nights'), // 0 is a real answer; null is not
   /**
+   * Distance from the artist's home base, from OpenStreetMap — migration 0032
+   * and src/lib/travelEnrich.ts. A cache, written by the hourly job and never
+   * by a request: `geo_place` and `geo_home` say which place and which home
+   * the numbers are for, so a stale pair is recomputed and nothing else is.
+   */
+  geoPlace: text('geo_place'),
+  geoHome: text('geo_home'),
+  geoStatus: text('geo_status'), // found | not_found
+  geoLat: real('geo_lat'),
+  geoLon: real('geo_lon'),
+  roadKm: real('road_km'),
+  roadHours: real('road_hours'),
+  crowKm: real('crow_km'),
+  distanceSource: text('distance_source'), // route | straight_line
+  geoCheckedAt: text('geo_checked_at'),
+  /**
    * showcase | paid. The fact that decides whether a US date needs a P-2
    * (about $800 and ninety days) or nothing at all. Nullable and treated as
    * an open question, never as "showcase".

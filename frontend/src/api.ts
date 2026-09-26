@@ -1101,6 +1101,13 @@ export const api = {
     preview: () => apiFetch<BackfillPlan>('/backfill/notes'),
     apply: () => apiFetch<BackfillResult>('/backfill/notes', { method: 'POST' }),
   },
+  /** Where the artist travels from — trip distances are measured from here. */
+  travel: {
+    home: () => apiFetch<{ home: { place: string } | null }>('/travel/home'),
+    setHome: (place: string) =>
+      apiFetch<{ home: { place: string } }>('/travel/home', { method: 'PUT', body: JSON.stringify({ place }) }),
+    clearHome: () => apiFetch<{ home: null }>('/travel/home', { method: 'DELETE' }),
+  },
   referenceDocs: {
     list: () => apiFetch<ReferenceDoc[]>('/reference-docs'),
     create: (body: { id: string; title: string; content: string }) =>

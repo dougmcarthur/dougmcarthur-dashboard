@@ -90,6 +90,24 @@ export interface GigOpportunity {
   lodgingTier?: string | null
   /** Nights away. 0 is a real answer; null is not. */
   nights?: number | null
+  /**
+   * Distance from the artist's home base, from OpenStreetMap (migration 0032).
+   * Written by the hourly job, never by a person; null until it has run, and
+   * for a place that is not a place ("National (Canada)").
+   */
+  geoPlace?: string | null
+  geoHome?: string | null
+  geoStatus?: string | null
+  geoLat?: number | null
+  geoLon?: number | null
+  /** One way, by road. */
+  roadKm?: number | null
+  roadHours?: number | null
+  /** One way, in a straight line — what a flight band turns on. */
+  crowKm?: number | null
+  /** route | straight_line */
+  distanceSource?: string | null
+  geoCheckedAt?: string | null
   /** showcase | paid. Unstated means unanswered, never "showcase". */
   performanceKind?: string | null
   /** What they pay you, CAD. `feeAmount` is what you pay them. */

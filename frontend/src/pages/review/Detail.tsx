@@ -10,6 +10,7 @@ import type { GigOpportunity, SyncTarget, PromoDraft } from '../../api'
 import type { ReviewItem } from '../../../../shared/reviewQueue'
 import { DecisionBar } from './DecisionBar'
 import { Caption, Card } from '../../components/ui/Surface'
+import { mapsLink } from '../../../../shared/travelDistance'
 
 /**
  * Everything known about the selected item, on one surface.
@@ -186,6 +187,19 @@ export function Detail({
           <p className="text-sm text-muted mt-0.5">
             {item.subtitle}
             {parsed.location && <span> · {parsed.location}</span>}
+            {item.source.kind === 'gig' && mapsLink({ ...item.source.row, location: item.source.row.location ?? parsed.location }) && (
+              <>
+                {' · '}
+                <a
+                  href={mapsLink({ ...item.source.row, location: item.source.row.location ?? parsed.location })!}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-info-fg hover:underline"
+                >
+                  Open in Maps ↗
+                </a>
+              </>
+            )}
           </p>
         </div>
         {item.url && (

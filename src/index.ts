@@ -16,6 +16,8 @@ import calendarConnect from './routes/calendarConnect'
 import tasksConnect, { routing as nudgeRouting } from './routes/tasksConnect'
 import notifications, { pruneNotifications } from './routes/notifications'
 import { pruneReplies } from './lib/replyRetention'
+import travel from './routes/travel'
+import { enrichTravel } from './lib/travelEnrich'
 import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
 import replies, { runReplyScan } from './routes/replies'
@@ -229,6 +231,7 @@ app.route('/api/nudges', nudgeRouting)
 app.route('/api/replies', replies)
 app.route('/api/notifications', notifications)
 app.route('/api/digest', digest)
+app.route('/api/travel', travel)
 
 app.notFound((c) => c.json({ error: 'not found' }, 404))
 
@@ -547,6 +550,21 @@ async function runScheduled(env: Env): Promise<void> {
       : Promise.resolve(),
     runHousekeeping(env, tenants).catch((err) => {
       console.error('housekeeping failed:', err)
+    }),
+    // Trip distances, per tenant, a few gigs an hour. Asks the map services
+    // nothing once every gig is measured, until a place or a home base
+    // changes — see src/lib/travelEnrich.ts. Sequential across tenants,
+    // because the one-request-a-second limit is the whole app's, not each
+    // artist's.
+    (async () => {
+      for (const tenant of tenants) {
+        const done = await enrichTravel(env, tenant)
+        if (done.measured || done.notFound || done.failed) {
+          console.log(`travel: measured ${done.measured}, not found ${done.notFound}, failed ${done.failed}, ${done.remaining} waiting`)
+        }
+      }
+    })().catch((err) => {
+      console.error('travel enrich failed:', err)
     }),
     // One-shot, and it un-arms itself. See runNotesBackfillOnce.
     runNotesBackfillOnce(env, tenants).catch((err) => {

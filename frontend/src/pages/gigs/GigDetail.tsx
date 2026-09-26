@@ -9,6 +9,7 @@ import { CostPanel } from './CostPanel'
 import { Caption } from '../../components/ui/Surface'
 import { DraftedMessage } from '../../components/DraftedMessage'
 import { depersonalise, splitDraftedMessage } from '../../../../shared/reviewParse'
+import { mappablePlace, mapsLink } from '../../../../shared/travelDistance'
 
 /** The read-only expansion under a table row. */
 export function GigDetail({
@@ -80,6 +81,21 @@ export function GigDetail({
       )}
 
       <div className="flex flex-wrap gap-2 text-xs">
+        {/*
+          Where it is, and a way to see it — only when there is one place to
+          show. A link rather than an embedded map: nothing loads from any map
+          service until somebody asks for it.
+        */}
+        {mapsLink(gig) && (
+          <a
+            href={mapsLink(gig)!}
+            target="_blank"
+            rel="noreferrer"
+            className="bg-surface px-2.5 py-1 rounded-md border border-line text-info-fg hover:bg-info-bg"
+          >
+            {mappablePlace(gig)} · Open in Maps ↗
+          </a>
+        )}
         {whoseMove && (
           <span className="bg-surface px-2.5 py-1 rounded-md border border-line text-body">{whoseMove}</span>
         )}

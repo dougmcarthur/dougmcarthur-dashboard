@@ -78,14 +78,27 @@ export const TOOL_SPECS = {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'The festival, venue or programme name' },
-        type: { type: 'string', description: 'festival, showcase, conference, venue, residency, grant, other' },
+        type: {
+          type: 'string',
+          description:
+            'Exactly one word: festival, showcase, conference, venue, residency, grant or other. ' +
+            'Anything more descriptive — "intimate acoustic listening room" — belongs in fitRationale, ' +
+            'because this is shown as a short label.',
+        },
         url: { type: 'string', description: 'The listing page' },
         applicationUrl: { type: 'string', description: 'The form itself, when it differs from the listing' },
         organizer: { type: 'string' },
         deadline: { type: 'string', description: 'ISO date when one is stated; omit if the page gives prose' },
         deadlineNote: { type: 'string', description: 'The deadline exactly as the page words it' },
         opensAt: { type: 'string', description: 'ISO date a submission window opens' },
-        location: { type: 'string' },
+        location: {
+          type: 'string',
+          description:
+            'Where it happens, as "Town, Province" or "Town, State" with the two-letter code — ' +
+            '"Lac du Bonnet, MB", "Austin, TX". "Online" for a virtual event; "National" for a programme ' +
+            'with no single place. Always fill it, even when the town is also in the name: Scout measures ' +
+            'the trip from this field and cannot read it out of a title.',
+        },
         country: { type: 'string', description: 'CA, US or other — the codes the rows on file use' },
         paid: { type: 'boolean', description: 'True when entry costs money' },
         feeAmount: { type: 'number' },
