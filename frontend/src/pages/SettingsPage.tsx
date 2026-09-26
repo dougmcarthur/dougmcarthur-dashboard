@@ -62,7 +62,6 @@ function DocEditor({
         ) : (
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-ink truncate">{doc.title}</p>
-            <p className="text-xs text-muted">{doc.id}</p>
           </div>
         )}
         <div className="flex gap-2 shrink-0">
@@ -268,10 +267,8 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="space-y-3 max-w-4xl">
-        <h2 className="text-sm font-semibold text-ink">Data</h2>
-        <NotesBackfillCard />
-      </div>
+      {/* Renders nothing — heading included — unless there is something to fill. */}
+      <NotesBackfillCard />
 
       <div className="space-y-3 max-w-4xl">
         <Explainer as="h2" title="Reference Docs">

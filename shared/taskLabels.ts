@@ -14,6 +14,8 @@
  * which are typed as `string` for exactly this reason.
  */
 
+import { humanise } from './humanise'
+
 /** The three that exist today. Adding one here is a nicety, not a requirement. */
 export const TASK_LABELS: Record<string, string> = {
   'gig-festival-scan': 'Gig research',
@@ -32,7 +34,5 @@ export function taskLabel(taskId: string): string {
   const known = TASK_LABELS[taskId]
   if (known) return known
 
-  const words = taskId.trim().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
-  if (!words) return 'An automated task'
-  return words.charAt(0).toUpperCase() + words.slice(1)
+  return humanise(taskId, 'An automated task')
 }
