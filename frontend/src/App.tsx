@@ -44,7 +44,7 @@ export default function App() {
         {page === 'sync' && <SyncPage />}
         {page === 'promo' && <PromoDraftsPage />}
         {page === 'runs' && <TaskRunsPage />}
-        {page === 'settings' && <SettingsPage />}
+        {page === 'settings' && <SettingsPage initialTab={arg} />}
       </ErrorBoundary>
     </Layout>
   )

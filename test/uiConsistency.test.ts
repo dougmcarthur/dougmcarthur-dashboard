@@ -515,8 +515,9 @@ describe('screens name things, they do not print identifiers', () => {
 
   it('prints no reference document id under its title', () => {
     // `doc_bio`, `artist-profile`: the key a document is stored under, shown
-    // as a subtitle on Settings. A title is already its name.
-    const src = readFileSync('frontend/src/pages/SettingsPage.tsx', 'utf8')
+    // as a subtitle on Settings. A title is already its name. The documents
+    // live on the Artist page now; the rule went with them.
+    const src = readFileSync('frontend/src/pages/artist/DocumentsTab.tsx', 'utf8')
     expect(src).not.toMatch(/>\s*\{doc\.id\}\s*</)
   })
 
