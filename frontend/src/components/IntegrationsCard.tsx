@@ -644,23 +644,23 @@ export function IntegrationsCard() {
   const attention = rows.filter(
     (r) => !r.serverReady || rowNeedsAttention(r.spec, r.state),
   ).length
-  // Counted separately, because "nothing is broken" and "everything is
-  // connected" are different claims and the summary used to make the second
-  // when it could only support the first.
-  const unconnected = rows.filter((r) => r.state === 'unconfigured').length
   const blocked = data?.grantMissingSecrets ?? []
 
   return (
     <Card>
+      {/*
+        A summary only when there is something to act on. "Everything is
+        working" and "4 of 6 connected" repeated what every row below already
+        says with its own pill — a line that restates the list is a line
+        between you and the list.
+      */}
       <div className="flex flex-col items-start gap-1.5 border-b border-line pb-3">
         <h2 className="text-sm font-semibold text-ink">Integrations</h2>
-        <p className="text-xs text-muted">
-          {attention > 0
-            ? `${attention} of ${rows.length} ${attention === 1 ? 'needs' : 'need'} attention.`
-            : unconnected > 0
-              ? `${rows.length - unconnected} of ${rows.length} connected, and nothing is broken.`
-              : 'Everything Scout talks to is working.'}
-        </p>
+        {attention > 0 ? (
+          <p className="text-xs text-warn-fg">
+            {attention} of {rows.length} {attention === 1 ? 'needs' : 'need'} attention.
+          </p>
+        ) : null}
       </div>
 
       {/*

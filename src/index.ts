@@ -297,7 +297,7 @@ async function runDigest(env: Env, tenant: TenantId): Promise<void> {
       tier: 'critical',
       title: 'Weekly digest failed to send',
       body: err instanceof Error ? err.message : String(err),
-      href: '#settings',
+      href: '#settings/reminders',
       action: 'Check email',
       dedupeKey: `digest:failed:${due.localDate}`,
     })

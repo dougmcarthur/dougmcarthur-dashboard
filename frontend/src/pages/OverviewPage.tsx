@@ -84,9 +84,18 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
             />
           )}
 
-          {/* Blocks C and D. Both come out of the same /api/review response as
-              the deck above, so the strip cannot claim something is urgent that
-              the deck does not rank, and vice versa. */}
+        </div>
+
+        <aside className="space-y-8 min-w-0" aria-label="Deadlines and backlog">
+          {/* Blocks C and D, in the rail beside the deck rather than under it.
+              Under it they pushed the deck's own height of empty page below
+              the fold while this column held one line of backlog. Both come
+              out of the same /api/review response as the deck, so the strip
+              cannot claim something is urgent that the deck does not rank,
+              and vice versa. Below xl the page is one column and this still
+              reads deck first, then deadlines. Not sticky: the rail is now the taller
+              column, and a sticky column taller than the screen hides its own
+              bottom. */}
           <TimingStrip
             rows={queue.data?.summary.timing ?? []}
             reminders={dueReminders}
@@ -98,9 +107,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
             onDismiss={(id: number) => dismissReminder.mutate(id)}
             dismissing={dismissReminder.isPending}
           />
-        </div>
 
-        <aside className="space-y-8 min-w-0 xl:sticky xl:top-20" aria-label="Backlog and activity">
           {queue.data && <OpenEndedRow backlog={queue.data.summary.backlog} onNav={onNav} />}
 
           {/* Block F, last and quiet. Renders nothing once the counts are zero,

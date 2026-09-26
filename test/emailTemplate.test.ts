@@ -89,8 +89,10 @@ describe('what each kind of footer promises', () => {
 
   it('a notification links to where it is switched off, and does not claim to be transactional', () => {
     const { html, text } = weekly()
-    expect(html).toContain(`href="${BASE}/#settings"`)
-    expect(text).toContain(`${BASE}/#settings`)
+    // The section, not just the page: Settings has tabs, and "where it is
+    // switched off" is the Reminders & digest one.
+    expect(html).toContain(`href="${BASE}/#settings/reminders"`)
+    expect(text).toContain(`${BASE}/#settings/reminders`)
     expect(text).not.toContain(NO_UNSUBSCRIBE)
     expect(text).toContain('not marketing')
   })

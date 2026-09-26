@@ -513,6 +513,31 @@ describe('screens name things, they do not print identifiers', () => {
     }
   })
 
+  it('prints no reference document id under its title', () => {
+    // `doc_bio`, `artist-profile`: the key a document is stored under, shown
+    // as a subtitle on Settings. A title is already its name. The documents
+    // live on the Artist page now; the rule went with them.
+    const src = readFileSync('frontend/src/pages/artist/DocumentsTab.tsx', 'utf8')
+    expect(src).not.toMatch(/>\s*\{doc\.id\}\s*</)
+  })
+
+  it('shows a gig type in words, not as the stored value', () => {
+    // CSS `capitalize` capitalises after a space, not an underscore, which is
+    // how "House_concert" reached the Gigs table.
+    const src = readFileSync('frontend/src/pages/GigsPage.tsx', 'utf8')
+    expect(src).toContain('{humanise(type)}')
+    expect(src).not.toMatch(/>\s*\{type\}\s*</)
+  })
+
+  it('says nothing about migrations to somebody reading Settings', () => {
+    // "The columns that have been empty since 0001" — a migration number, in
+    // the teaser of a card on the settings screen.
+    for (const file of FILES.filter((f) => f.endsWith('.tsx'))) {
+      const prose = withoutComments(readFileSync(file, 'utf8'))
+      expect(prose, file).not.toMatch(/since 00\d\d|migration 00\d\d/i)
+    }
+  })
+
   it('points at no file inside this repository', () => {
     // Two cards said "See docs/gmail-setup.md". Nobody holding only the app
     // can open that, and once there is a second artist it is meaningless. The

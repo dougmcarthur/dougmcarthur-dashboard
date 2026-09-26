@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Tabs } from '../components/ui/Tabs'
+import { DocumentsTab } from './artist/DocumentsTab'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type ArtistAssetInput, type EpkAudience } from '../api'
 import {
@@ -39,8 +41,8 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
   // Which freshness the library is narrowed to, or '' for all of it. Driven
   // by the counts below, which were previously a number with nowhere to go.
   const [freshness, setFreshness] = useState('')
-  const [tab, setTab] = useState<'library' | 'profile' | 'drive' | EpkAudience>(
-    initialTab === 'drive' || initialTab === 'profile' ? initialTab : 'library',
+  const [tab, setTab] = useState<'library' | 'documents' | 'profile' | 'drive' | EpkAudience>(
+    initialTab === 'drive' || initialTab === 'profile' || initialTab === 'documents' ? initialTab : 'library',
   )
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -53,7 +55,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
   const epk = useQuery({
     queryKey: ['artist-epk', tab],
     queryFn: () => api.artist.epk(tab as EpkAudience),
-    enabled: tab !== 'library' && tab !== 'profile' && tab !== 'drive',
+    enabled: tab !== 'library' && tab !== 'documents' && tab !== 'profile' && tab !== 'drive',
   })
 
   const invalidate = () => {
@@ -149,35 +151,23 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
         </div>
       )}
 
-      {/* One row that scrolls sideways on a phone, rather than tabs that wrap
-          into two rows or squeeze their labels onto two lines. The rule lives
-          on the inner strip, sized to the tabs but never narrower than the
-          page: an overflow container clips at its padding box, so the -mb-px
-          overlap between a tab's underline and the rule has to happen inside
-          it or it becomes a 1px vertical scroll. */}
-      <div className="overflow-x-auto">
-        <div className="flex gap-0.5 border-b border-line w-max min-w-full">
-          {(['library', 'profile', 'drive', ...AUDIENCES.map((a) => a.id)] as const).map((id) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                tab === id ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'
-              }`}
-            >
-              {id === 'library'
-                ? 'Library'
-                : id === 'profile'
-                  ? 'Profile page'
-                  : id === 'drive'
-                    ? 'Drive folder'
-                    : `Checklist — ${AUDIENCES.find((a) => a.id === id)!.label}`}
-            </button>
-          ))}
-        </div>
-      </div>
+      <Tabs
+        label="Artist sections"
+        active={tab}
+        onSelect={setTab}
+        tabs={[
+          { id: 'library', label: 'Library' },
+          // Beside the Library because the Library reads its facts from these.
+          { id: 'documents', label: 'Documents' },
+          { id: 'profile', label: 'Profile page' },
+          { id: 'drive', label: 'Drive folder' },
+          ...AUDIENCES.map((a) => ({ id: a.id, label: `Checklist — ${a.label}` })),
+        ]}
+      />
 
-      {tab === 'profile' ? (
+      {tab === 'documents' ? (
+        <DocumentsTab />
+      ) : tab === 'profile' ? (
         <ProfileTab />
       ) : tab === 'drive' ? (
         <DriveTab outcome={new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('drive')} />

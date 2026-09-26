@@ -201,7 +201,7 @@ export function renderDigestEmail(
       reason:
         `You received this because the weekly digest is turned on for your Sun Dogs Music Scout account. ` +
         `It is sent ${describeSchedule(schedule)} ${zoneName(schedule.timezone)}, and only when there is something to report.`,
-      manageUrl: `${base}/#settings`,
+      manageUrl: `${base}/#settings/reminders`,
       manageLabel: 'Turn off the digest or change its schedule in Settings',
     },
     identity,

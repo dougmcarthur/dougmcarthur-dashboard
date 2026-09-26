@@ -11,6 +11,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { api, type GigOpportunity } from '../api'
+import { humanise } from '../../../shared/humanise'
 import { GIG_STAGES, GIG_STAGE_META, type GigStage } from '../../../shared/gigStage'
 import { inlineGigMoves } from '../../../shared/decisionCopy'
 import { parseDeadline } from '../../../shared/reviewParse'
@@ -54,8 +55,8 @@ const TYPE_COLORS: Record<string, string> = {
 function TypeChip({ type }: { type: string }) {
   const color = TYPE_COLORS[type.toLowerCase()] ?? 'bg-sunken text-body'
   return (
-    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium capitalize ${color}`}>
-      {type}
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${color}`}>
+      {humanise(type)}
     </span>
   )
 }

@@ -267,22 +267,9 @@ export function AppearanceSettings() {
         />
       </Field>
 
-      <div className="mt-5 pt-4 border-t border-line">
-        <p className="text-xs font-medium text-muted mb-2">Preview</p>
-        <div className="rounded-lg border border-line bg-canvas p-4">
-          <p className="text-base font-semibold text-ink">A decision that needs you</p>
-          <p className="text-sm text-body mt-1 leading-relaxed">
-            Costs USD 55 to enter, so nobody can submit it without your say-so.
-          </p>
-          <p className="text-xs text-muted mt-2">Secondary detail, at tertiary weight.</p>
-          <div className="flex flex-wrap gap-2 mt-3">
-            <span className="text-xs px-2 py-0.5 rounded-md bg-danger-bg text-danger-fg border border-danger-line">Overdue</span>
-            <span className="text-xs px-2 py-0.5 rounded-md bg-warn-bg text-warn-fg border border-warn-line">Costs money</span>
-            <span className="text-xs px-2 py-0.5 rounded-md bg-success-bg text-success-fg border border-success-line">Submitted</span>
-            <span className="text-xs px-2 py-0.5 rounded-md bg-info-bg text-info-fg border border-info-line">Window opens later</span>
-          </div>
-        </div>
-      </div>
+      {/* No preview card. The settings apply to the whole app as they change,
+          so the page behind this one is the preview; a sample card of made-up
+          text restated that in a box. */}
     </Card>
   )
 }
