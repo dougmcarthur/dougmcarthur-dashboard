@@ -1,4 +1,5 @@
 import { StatusBadge } from '../../components/StatusBadge'
+import { DraftedMessage } from '../../components/DraftedMessage'
 import { PitchDiff } from '../../components/PitchDiff'
 import { SnoozeMenu } from '../../components/SnoozeMenu'
 import { shortDate } from '../../format'
@@ -326,14 +327,9 @@ export function Detail({
       )}
 
       {parsed.draftedMessage && (
-        <Section
-          title={`Drafted message${parsed.draftedMessage.channel ? ` — ${parsed.draftedMessage.channel}` : ''}`}
-          action={<CopyButton text={parsed.draftedMessage.body} />}
-        >
-          <p className="whitespace-pre-wrap rounded-md bg-sunken p-3 text-sm leading-relaxed text-ink">
-            {parsed.draftedMessage.body}
-          </p>
-        </Section>
+        <div className="mt-4">
+          <DraftedMessage body={parsed.draftedMessage.body} channel={parsed.draftedMessage.channel} />
+        </div>
       )}
 
       {sync?.pitchDraft && (

@@ -409,7 +409,25 @@ type CostRow = Pick<
   GigOpportunity,
   | 'location' | 'country' | 'travelBand' | 'lodgingTier' | 'nights' | 'performanceKind'
   | 'stipendAmount' | 'guaranteeAmount' | 'feeAmount' | 'feeCurrency' | 'paid'
->
+> & Partial<Pick<GigOpportunity, 'name'>>
+
+/**
+ * Where a gig is, for guessing a band: the location, or failing that a place
+ * the research agent put at the end of the name.
+ *
+ * The agents often title a gig "The Listening Room — Lac du Bonnet, MB" and
+ * leave `location` empty. With nothing to read, a Canadian gig fell through
+ * to a regional flight — $450–850 to drive 100 km — which is the home-town
+ * error `local` and the Manitoba rule exist to prevent, arriving by a
+ * different door. Only that exact shape is read: a dash, then "Town, XX" at
+ * the very end. A looser match would take an organisation for a place —
+ * "(Manitoba Music)" is who runs a night, not where it is.
+ */
+export function placeOf(row: { location?: string | null; name?: string | null }): string | null {
+  if (row.location?.trim()) return row.location
+  const tail = (row.name ?? '').match(/[—–-]\s*([^—–-]+,\s*[A-Z]{2})\s*$/)
+  return tail ? tail[1].trim() : null
+}
 
 /**
  * The whole trip, as a range, with what it could not count named beside it.
@@ -425,7 +443,7 @@ export function estimateGigCost(row: CostRow): CostEstimate {
 
   const country = normaliseCountry(row.country)
   const statedBand = travelBandOf(row.travelBand)
-  const band = statedBand ?? inferTravelBand(row.location, country)
+  const band = statedBand ?? inferTravelBand(placeOf(row), country)
 
   if (band) {
     lines.push({
@@ -453,7 +471,7 @@ export function estimateGigCost(row: CostRow): CostEstimate {
     unknowns.push('Nights away is not set, and there is no travel band to guess it from.')
   } else if (nights.high > 0) {
     const statedTier = lodgingTierOf(row.lodgingTier)
-    const tier = statedTier ?? inferLodgingTier(row.location, band)
+    const tier = statedTier ?? inferLodgingTier(placeOf(row), band)
     lines.push({
       id: 'lodging',
       label: `${LODGING_TIERS[tier].label}, ${describeNights(nights)}`,

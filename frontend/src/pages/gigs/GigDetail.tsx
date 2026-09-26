@@ -7,6 +7,8 @@ import { Select } from '../../components/ui/Field'
 import { ApplicationPanel } from './ApplicationPanel'
 import { CostPanel } from './CostPanel'
 import { Caption } from '../../components/ui/Surface'
+import { DraftedMessage } from '../../components/DraftedMessage'
+import { depersonalise, splitDraftedMessage } from '../../../../shared/reviewParse'
 
 /** The read-only expansion under a table row. */
 export function GigDetail({
@@ -41,17 +43,23 @@ export function GigDetail({
   const applying = stage === 'in_progress'
   // Asked of the stage and its flag: an Applied gig is their move unless they
   // asked for something or made an offer, and then it is yours again.
+  // The note is prose with, sometimes, a message to send buried in it. Split
+  // the message out so it can be read and copied on its own; the rest is the
+  // reasoning, in the second person like the Review screen shows it.
+  const why = splitDraftedMessage(gig.fitRationale ?? gig.fitNotes ?? '')
   const whoseMove =
     stage === 'closed' ? null : stage === 'applied' && !gigFlag(status) ? 'Their move' : 'Your move'
 
   return (
     <div className="space-y-4 max-w-3xl">
-      {(gig.fitRationale || gig.fitNotes) && (
+      {why.rest && (
         <div>
           <Caption spaced>Why it fits</Caption>
-          <p className="text-sm text-body leading-relaxed">{gig.fitRationale ?? gig.fitNotes}</p>
+          <p className="text-sm text-body leading-relaxed">{depersonalise(why.rest)}</p>
         </div>
       )}
+
+      {why.message && <DraftedMessage body={why.message.body} channel={why.message.channel} />}
 
       {/*
         Given its own line rather than a chip in the row below. A performance
