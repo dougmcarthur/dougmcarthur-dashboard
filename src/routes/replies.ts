@@ -315,7 +315,7 @@ export async function runReplyScan(
       body: decisive.length
         ? decisive.map((f) => `${f.gigName ?? 'Unmatched'}: ${REPLY_CLASS_LABELS[f.classification as keyof typeof REPLY_CLASS_LABELS]}`).join(' · ')
         : 'Acknowledgements only — nothing needs a decision.',
-      href: '#review/reply',
+      href: '#review/mail',
       action: 'Read them',
       dedupeKey: `replies:${now.slice(0, 13)}`,
     })

@@ -8,7 +8,6 @@ import { shortDate } from '../format'
 import { Button } from './ui/Button'
 import { Select } from './ui/Field'
 import { ReplyDraftPanel } from './ReplyDraftPanel'
-import { Caption } from './ui/Surface'
 import { Explainer } from './ui/Explainer'
 
 /**
@@ -263,15 +262,19 @@ export function ReplyInbox() {
 
   return (
     <div className="space-y-2">
+      {/* No caption: the chip that opened this already says New mail and how many. */}
       <div className="flex flex-wrap items-center gap-2">
-        <Caption>
-          Replies {items.length > 0 && `· ${items.length}`}
-        </Caption>
         <Button variant="neutral" disabled={busy} onClick={() => scan.mutate()}>
           {scan.isPending ? 'Reading your mail…' : 'Check mail'}
         </Button>
         {note && <span className="text-xs text-faint">{note}</span>}
       </div>
+
+      {items.length === 0 && !note && (
+        <p className="rounded-xl border border-line bg-surface shadow-card px-4 py-12 text-center text-sm text-muted">
+          No new mail from organisers. Scout checks three times a day.
+        </p>
+      )}
 
       {items.length > 0 && (
         <div className="space-y-2">

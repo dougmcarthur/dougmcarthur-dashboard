@@ -77,7 +77,10 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
   // might not contain it — landing on a queue that does not include the row
   // you asked for is the one outcome a deep link must not have.
   const arg = initialFilter ?? null
-  const deepLinked = arg !== null && !isFilter(arg) ? arg : null
+  // `#review/mail` is the inbox of organisers' replies — not a queue filter
+  // and not an item key, so it is caught before either reading.
+  const [mailOpen, setMailOpen] = useState(arg === 'mail')
+  const deepLinked = arg !== null && arg !== 'mail' && !isFilter(arg) ? arg : null
   const [filter, setFilter] = useState<ReviewFilter>(
     isFilter(arg) ? arg : deepLinked ? 'all' : 'needs',
   )
@@ -93,6 +96,10 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
 
   const visible = data?.items ?? []
   const counts = data?.counts
+  // The same query the inbox runs, so this is the cache rather than a second
+  // request: it is only here for the count on the chip.
+  const replies = useQuery({ queryKey: ['replies'], queryFn: () => api.replies.list() })
+  const newMail = replies.data?.unresolved ?? 0
 
   const selected = visible.find((i) => i.key === selectedKey) ?? visible[0] ?? null
 
@@ -182,6 +189,7 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
       const el = e.target as HTMLElement | null
       if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return
       if (e.key !== 'j' && e.key !== 'k') return
+      if (mailOpen) return
 
       const index = visible.findIndex((i) => i.key === selected?.key)
       const next = e.key === 'j' ? index + 1 : index - 1
@@ -189,7 +197,7 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [visible, selected])
+  }, [visible, selected, mailOpen])
 
   if (error) {
     return (
@@ -206,22 +214,17 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
         <p className="text-xs text-muted">
           {/* Snoozed items are excluded from `all`, so "n of all" would count
               the shown item against a total it is not part of. */}
-          {filter === 'snoozed'
-            ? `${visible.length} snoozed`
-            : `${visible.length} of ${counts?.all ?? 0} items`}
+          {mailOpen
+            ? null
+            : filter === 'snoozed'
+              ? `${visible.length} snoozed`
+              : `${visible.length} of ${counts?.all ?? 0} items`}
           {/* Only where there is likely a keyboard to press them on. */}
-          <span className="hidden [@media(hover:hover)]:inline">
+          <span className={mailOpen ? 'hidden' : 'hidden [@media(hover:hover)]:inline'}>
             {' '}· <kbd className="font-semibold">j</kbd>/<kbd className="font-semibold">k</kbd> to move
           </span>
         </p>
       </div>
-
-      {/*
-        Above the filters, because a reply is news and the queue is state. The
-        `reply` filter beside it answers the other half — those are the rows
-        where they have already moved and you have not moved back.
-      */}
-      <ReplyInbox />
 
       {/*
         A filter that would find nothing is not offered.
@@ -237,16 +240,40 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
         `Everything` always stays, because it is the way back.
       */}
       <div className="flex flex-wrap gap-1.5">
+        {/*
+          Organisers' replies to sort, as the first chip rather than a stack of
+          cards above the queue. Three replies used to push the whole queue —
+          list and detail — below the fold, on a screen whose job is the queue.
+          The count keeps it as visible as news should be, and the bell links
+          straight here (`#review/mail`). Always offered, like Everything,
+          because it is also where Check mail lives.
+
+          Not to be confused with Reply owed beside it: that is gigs where you
+          owe them an answer; this is mail they sent that Scout has not filed.
+        */}
+        <button
+          title="Organisers’ replies Scout found in your mail and has not filed yet."
+          onClick={() => setMailOpen(true)}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            mailOpen ? 'bg-accent text-accent-fg' : 'bg-surface border border-line text-body hover:bg-sunken'
+          }`}
+        >
+          New mail
+          <span className={`ml-1.5 text-xs ${mailOpen ? 'text-faint' : 'text-muted'}`}>{newMail}</span>
+        </button>
         {FILTERS.filter(
           (f) => (counts?.[f.id] ?? 0) > 0 || filter === f.id || f.id === 'all',
         ).map((f) => {
           const count = counts?.[f.id] ?? 0
-          const active = filter === f.id
+          const active = !mailOpen && filter === f.id
           return (
             <button
               key={f.id}
               title={f.hint}
-              onClick={() => setFilter(f.id)}
+              onClick={() => {
+                setMailOpen(false)
+                setFilter(f.id)
+              }}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 active ? 'bg-accent text-accent-fg' : 'bg-surface border border-line text-body hover:bg-sunken'
               }`}
@@ -264,7 +291,9 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
         </div>
       )}
 
-      {isLoading ? (
+      {mailOpen ? (
+        <ReplyInbox />
+      ) : isLoading ? (
         <SkeletonList rows={6} />
       ) : visible.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface shadow-card px-4 py-12 text-center text-sm text-muted">
