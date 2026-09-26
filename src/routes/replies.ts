@@ -12,6 +12,7 @@ import { tenantOf, type AppEnv } from '../context'
 import { gmailConfigured, type GmailEnv } from '../lib/gmail'
 import { fetchReplies, planReplyScan, sentThreadIds } from '../lib/gmailReplies'
 import { recordEvent } from '../lib/notificationEvents'
+import { FORGOTTEN_ON_DISMISS } from '../lib/replyRetention'
 import {
   matchReply,
   matchConfidence,
@@ -506,9 +507,12 @@ replies.post('/:id/dismiss', async (c) => {
   const row = await db.select().from(gigReplies).where(scoped(gigReplies, tenant, eq(gigReplies.id, id))).get()
   if (!row) return c.json({ error: 'not found' }, 404)
 
+  // The decision and the forgetting in one write: nothing shows a dismissed
+  // reply again, so its mail content has no job left. The id stays, which is
+  // what keeps the next scan from proposing it again — see replyRetention.ts.
   await db
     .update(gigReplies)
-    .set({ resolution: 'dismissed', resolvedAt: new Date().toISOString() })
+    .set({ resolution: 'dismissed', resolvedAt: new Date().toISOString(), ...FORGOTTEN_ON_DISMISS })
     .where(scoped(gigReplies, tenant, eq(gigReplies.id, id)))
 
   return c.json({ id, resolution: 'dismissed' })
