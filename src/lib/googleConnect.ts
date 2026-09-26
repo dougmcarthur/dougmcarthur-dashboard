@@ -74,6 +74,11 @@ export interface BundleOutcome {
   failed: GrantPurpose[]
   /** Already connected to a different Google account, and left there. */
   kept: GrantPurpose[]
+  /**
+   * Never asked for, because the person chose to leave it out before Google's
+   * screen — "Connect without Gmail". Not a gap: a decision already made.
+   */
+  skipped: GrantPurpose[]
 }
 
 /**
@@ -91,8 +96,23 @@ export interface BundleOutcome {
  *  - **One failure does not sink the rest.** A calendar that could not be made
  *    leaves Tasks and Drive connected, and the screen names what failed.
  */
-export async function completeBundle(env: Env, tenant: TenantId, code: string): Promise<BundleOutcome> {
-  const result: BundleOutcome = { outcome: 'failed', email: null, connected: [], declined: [], failed: [], kept: [] }
+export async function completeBundle(
+  env: Env,
+  tenant: TenantId,
+  code: string,
+  requested: GrantPurpose[] = BUNDLE_PURPOSES,
+): Promise<BundleOutcome> {
+  const result: BundleOutcome = {
+    outcome: 'failed', email: null, connected: [], declined: [], failed: [], kept: [], skipped: [],
+  }
+  // What was not asked for is left exactly as it was — an existing Gmail grant
+  // is neither renewed nor removed by a consent that did not mention it. It is
+  // reported as skipped only when it is not connected, so "Add them" for a
+  // missing calendar does not tell somebody whose Gmail works that it is off.
+  for (const purpose of BUNDLE_PURPOSES) {
+    if (requested.includes(purpose)) continue
+    if (!(await readGrant(env, tenant, purpose)).connected) result.skipped.push(purpose)
+  }
   let token
   try {
     token = await exchangeCode(env, code)
@@ -102,7 +122,7 @@ export async function completeBundle(env: Env, tenant: TenantId, code: string): 
     return result
   }
 
-  for (const purpose of BUNDLE_PURPOSES) {
+  for (const purpose of requested) {
     if (!token.scopes.includes(scopeFor(purpose))) {
       result.declined.push(purpose)
       continue

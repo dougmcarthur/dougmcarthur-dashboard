@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type GmailDraftResult } from '../api'
 import { Disclosure } from './ui/Disclosure'
 import { Button } from './ui/Button'
+import { GoogleConsentModal } from './GoogleConsentModal'
 
 /**
  * Put every ready pitch into Gmail as a draft, in one go.
@@ -25,6 +26,9 @@ export function GmailDraftsPanel() {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [result, setResult] = useState<GmailDraftResult | null>(null)
+  // Connecting goes through the same disclosure as Settings, never straight
+  // to Google: see GoogleConsentModal.
+  const [consenting, setConsenting] = useState(false)
 
   const preview = useQuery({
     queryKey: ['gmail', 'drafts'],
@@ -89,13 +93,14 @@ export function GmailDraftsPanel() {
             test fails the build if either appears. You can withdraw access any time, here or from
             your Google account.
           </p>
-          <a
-            href={api.gmail.connectHref}
-            className="inline-block text-xs px-3 py-1.5 rounded-md font-medium transition-colors
-                       bg-accent text-accent-fg hover:bg-accent-hover"
-          >
+          <Button variant="neutral" size="sm" onClick={() => setConsenting(true)}>
             Connect Gmail
-          </a>
+          </Button>
+          <GoogleConsentModal
+            mode={consenting ? 'gmail' : null}
+            gmailHref={api.gmail.connectHref}
+            onClose={() => setConsenting(false)}
+          />
         </div>
       )}
 

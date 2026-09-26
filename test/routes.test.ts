@@ -33,6 +33,25 @@ function request(path: string, init: RequestInit = {}, env: Record<string, unkno
 }
 
 describe('API route registration', () => {
+  // Connect without Gmail: the consent Google sees must not mention Gmail, and
+  // a value the switch does not know is refused rather than read as 'ask for
+  // everything' — the way Gmail would get requested after somebody said no.
+  it('GET /api/google/connect?gmail=skip asks Google for everything but Gmail', async () => {
+    const env = { ...emptyEnv, GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret', TOKEN_ENCRYPTION_KEY: 'key', DASHBOARD_URL: 'https://scout.example' }
+    const res = await request('/api/google/connect?gmail=skip', {}, env)
+    expect(res.status).toBe(302)
+    const scope = new URL(res.headers.get('Location') ?? '').searchParams.get('scope') ?? ''
+    expect(scope).toContain('calendar.app.created')
+    expect(scope).not.toContain('gmail')
+    const all = await request('/api/google/connect', {}, env)
+    expect(new URL(all.headers.get('Location') ?? '').searchParams.get('scope')).toContain('gmail.compose')
+  })
+
+  it('GET /api/google/connect refuses a gmail option it does not know', async () => {
+    const res = await request('/api/google/connect?gmail=please', {}, emptyEnv)
+    expect(res.status).toBe(400)
+  })
+
   // Regression guard for the /api/sync route-order bug: /api/sync/reconcile
   // must be matched by the reconcile router, NOT swallowed by the sync
   // router's GET /:id (which would treat "reconcile" as an id and 404).

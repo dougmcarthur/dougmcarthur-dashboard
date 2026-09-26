@@ -311,7 +311,16 @@ export function connectNotice(query: URLSearchParams): ConnectNotice | null {
   }
 
   if (google) {
-    if (google === 'connected') return { tone: 'success', lines: ['Google account connected.'] }
+    // Left out on Scout's own screen, before Google asked. Said as the choice
+    // it was, never listed among the gaps — and with what still works without
+    // it, because "you do not need to give us your mail" is the point.
+    const skipped = split('skipped')
+    const skippedLine = skipped.includes('gmail.compose')
+      ? 'Gmail is not connected, as you chose. Drafts still open in your own mail app, and you can connect Gmail here any time.'
+      : null
+    if (google === 'connected') {
+      return { tone: 'success', lines: skippedLine ? ['Google account connected.', skippedLine] : ['Google account connected.'] }
+    }
     if (google === 'partial') {
       const lines = ['Google account connected, with gaps:']
       const declined = split('declined')
@@ -320,6 +329,7 @@ export function connectNotice(query: URLSearchParams): ConnectNotice | null {
       if (declined.length) lines.push(`${listServices(declined)} ${declined.length === 1 ? 'was' : 'were'} left unticked on Google’s screen. Connect again to add ${declined.length === 1 ? 'it' : 'them'}.`)
       if (failed.length) lines.push(`${listServices(failed)} could not be set up. The usual cause is its Google API not being enabled in the Google Cloud project.`)
       if (kept.length) lines.push(`${listServices(kept)} stayed on the other Google account ${kept.length === 1 ? 'it was' : 'they were'} already connected to.`)
+      if (skippedLine) lines.push(skippedLine)
       return { tone: failed.length ? 'danger' : 'warn', lines }
     }
     return common(google, 'your Google account')

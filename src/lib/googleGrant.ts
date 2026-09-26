@@ -129,8 +129,19 @@ export const GRANT_PURPOSES: GrantPurpose[] = [
  */
 export const BUNDLE_PURPOSES: GrantPurpose[] = ['calendar', 'tasks', 'gmail.compose', 'drive']
 
-export function bundleScopes(): string {
-  return [...BUNDLE_PURPOSES.map((p) => SCOPE_FOR[p]), 'openid', 'email'].join(' ')
+/**
+ * The same bundle with Gmail left out — what "Connect without Gmail" asks for.
+ *
+ * Gmail is the one permission in the bundle that reaches a person's mail: the
+ * narrowest drafting scope Google offers also lets the holder read and delete
+ * drafts and send as you. So the screen explains it before Google does, and
+ * saying no there has to mean Google never asks — not a checkbox to remember
+ * to untick on the next screen.
+ */
+export const BUNDLE_WITHOUT_GMAIL: GrantPurpose[] = BUNDLE_PURPOSES.filter((p) => p !== 'gmail.compose')
+
+export function bundleScopes(purposes: GrantPurpose[] = BUNDLE_PURPOSES): string {
+  return [...purposes.map((p) => SCOPE_FOR[p]), 'openid', 'email'].join(' ')
 }
 
 /** The purpose `gmailDrafts.ts` has always meant, named so its callers read. */

@@ -1063,6 +1063,24 @@ screen says exactly that, in those words, because a permission that protects
 less than the reader assumes is the kind of thing to write down rather than
 imply.
 
+**Gmail is explained before Google asks, and no means Google never asks.**
+"Connect Google account" bundles Gmail drafting with Calendar, Tasks and Drive,
+so pressing it opens `GoogleConsentModal` first: what each service is for, and
+for Gmail what Google's permission allows (reading, changing and deleting
+drafts, and sending as you), what Scout does with it, what it cannot do (read
+the inbox — `gmail.compose` does not authorise `messages.get`), and that
+nothing depends on it, since every draft already has Copy and Open in Gmail.
+**Connect without Gmail** is the primary button and requests a consent that
+never mentions Gmail (`/api/google/connect?gmail=skip`, target
+`google.nogmail`); the Settings notice afterwards calls that a choice, not a
+gap. The rule the modal holds is that it is exact in both directions — as
+alarming as the permission is, and no more. Every route to the Gmail
+permission goes through it, including the Sync drafts panel and a second
+account; `test/googleAccounts.test.ts` fails if one goes straight to Google or
+if the key sentences are softened. The inbox scan (`gmail.readonly`) is not in
+this flow at all: it is the owner's server-held secret, and reads the whole
+mailbox as far as Google is concerned — the narrowness is this code's.
+
 The refresh token is **AES-GCM encrypted** with `TOKEN_ENCRYPTION_KEY`. It is
 the only value in D1 that is a credential somewhere else; everything else in
 there is prose.

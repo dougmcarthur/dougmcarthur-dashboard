@@ -14,6 +14,7 @@ import {
   type IntegrationSpec,
 } from '../../../shared/integrations'
 import { STATE_LABELS, STATE_NOTES, needsAttention } from '../../../shared/credentialHealth'
+import { GoogleConsentModal, type GoogleConsentMode } from './GoogleConsentModal'
 import { Button } from './ui/Button'
 import { Modal } from './ui/Modal'
 import { Explainer, InfoGlyph } from './ui/Explainer'
@@ -458,6 +459,7 @@ function GoogleAccounts({ serverReady }: { serverReady: boolean }) {
   const queryClient = useQueryClient()
   const { data } = useQuery({ queryKey: ['google', 'accounts'], queryFn: api.google.accounts })
   const [confirming, setConfirming] = useState<string | null>(null)
+  const [consent, setConsent] = useState<GoogleConsentMode | null>(null)
   const disconnect = useMutation({
     mutationFn: (email: string | null) => api.google.disconnect(email),
     onSuccess: () => {
@@ -471,9 +473,15 @@ function GoogleAccounts({ serverReady }: { serverReady: boolean }) {
   const bundle = data.bundle
   const covered = new Set(data.accounts.flatMap((a) => a.purposes))
   const missing = bundle.filter((p) => !covered.has(p))
+  // Anything that would ask Google for Gmail goes through the disclosure
+  // first. A reconnect that only adds Calendar, Tasks or Drive does not ask
+  // for Gmail at all, so it goes straight to Google — and leaves a Gmail grant
+  // that is already there exactly as it was.
   const connect = () => {
-    window.location.href = api.google.connectHref
+    if (missing.includes('gmail.compose')) setConsent('bundle')
+    else window.location.href = api.google.connectWithoutGmailHref
   }
+  const consentModal = <GoogleConsentModal mode={consent} onClose={() => setConsent(null)} />
 
   if (data.accounts.length === 0) {
     return (
@@ -481,8 +489,8 @@ function GoogleAccounts({ serverReady }: { serverReady: boolean }) {
         <div className="min-w-0 flex-1 space-y-1">
           <h3 className="text-sm font-medium text-ink">Google account</h3>
           <p className="text-xs text-muted">
-            One connection for {listServices(bundle)}. Google lists each on its own screen, and you
-            can untick any you do not want.
+            One connection for {listServices(bundle)}. Gmail is optional: before Google asks, Scout
+            shows exactly what it would allow, and you can connect everything else without it.
           </p>
         </div>
         {serverReady ? (
@@ -490,6 +498,7 @@ function GoogleAccounts({ serverReady }: { serverReady: boolean }) {
             Connect Google account
           </Button>
         ) : null}
+        {consentModal}
       </div>
     )
   }
@@ -544,6 +553,7 @@ function GoogleAccounts({ serverReady }: { serverReady: boolean }) {
           </Button>
         </div>
       ) : null}
+      {consentModal}
     </div>
   )
 }
@@ -556,6 +566,8 @@ function GoogleAccounts({ serverReady }: { serverReady: boolean }) {
  */
 function OtherAccounts({ rows }: { rows: RowState[] }) {
   const offered = rows.filter((r) => IN_BUNDLE.has(r.spec.id) && CONNECT_HREF[r.spec.id] && r.serverReady)
+  // Gmail on a second account is still Gmail: the same disclosure first.
+  const [consent, setConsent] = useState<GoogleConsentMode | null>(null)
   if (!offered.length) return null
   return (
     <details className="group pt-3">
@@ -574,13 +586,15 @@ function OtherAccounts({ rows }: { rows: RowState[] }) {
               variant="neutral"
               size="sm"
               onClick={() => {
-                window.location.href = CONNECT_HREF[r.spec.id] as string
+                if (r.spec.id === 'gmail.drafts') setConsent('gmail')
+                else window.location.href = CONNECT_HREF[r.spec.id] as string
               }}
             >
               {r.spec.name}
             </Button>
           ))}
         </div>
+        <GoogleConsentModal mode={consent} gmailHref={api.gmail.connectHref} onClose={() => setConsent(null)} />
       </div>
     </details>
   )
