@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { noteError } from '../diagnostics'
 
 interface Props {
   children: ReactNode
@@ -14,6 +15,11 @@ export class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     return { error }
+  }
+
+  // Remembered for the feedback form, which is exactly when somebody opens it.
+  componentDidCatch(error: Error) {
+    noteError(this.props.label ?? 'Page error', null, error.message)
   }
 
   render() {

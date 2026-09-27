@@ -5,6 +5,7 @@ import { withConfirmation } from '../confirmIdentity'
 import { Button } from '../components/ui/Button'
 import { Disclosure } from '../components/ui/Disclosure'
 import { InvitesPanel } from '../components/InvitesPanel'
+import { FeedbackInbox } from '../components/FeedbackInbox'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from '../components/ui/Explainer'
 import { Card } from '../components/ui/Surface'
@@ -78,6 +79,10 @@ export function AdminPage() {
       <hr className="border-line" />
 
       <InvitesPanel />
+
+      <hr className="border-line" />
+
+      <FeedbackInbox />
     </div>
   )
 }

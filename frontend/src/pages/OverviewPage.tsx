@@ -4,6 +4,7 @@ import { DecisionDeck } from '../components/DecisionDeck'
 import { TimingStrip } from '../components/TimingStrip'
 import { OpenEndedRow } from '../components/OpenEndedRow'
 import { DataHealthRow } from '../components/DataHealthRow'
+import { OnboardingCard } from '../components/OnboardingCard'
 
 export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
   const qc = useQueryClient()
@@ -23,6 +24,12 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
     queryKey: ['review', 'deck'],
     queryFn: () => api.review({ filter: 'deck' }),
   })
+
+  // The first-run checklist. Its own query, and its failure is silent: a
+  // checklist that cannot load is not a reason to show the Overview broken.
+  const onboarding = useQuery({ queryKey: ['onboarding'], queryFn: api.onboarding.read })
+  const checklist =
+    onboarding.data && !onboarding.data.hidden && !onboarding.data.complete ? onboarding.data : null
 
   const patchGig = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Parameters<typeof api.gigs.patch>[1] }) =>
@@ -57,6 +64,8 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-semibold text-ink tracking-tight">Overview</h1>
+
+      {checklist && <OnboardingCard state={checklist} />}
 
       {/*
         One column until xl, then a main column and a rail.
@@ -124,7 +133,11 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
       {/* `needs` stays in this test although the deck no longer deals from it:
           a conflict or a silent application is not a card any more, but it is
           still not "all clear". */}
-      {(queue.data?.counts.deck ?? 0) === 0 &&
+      {/* Not while the checklist is up: "all clear" on an account with nothing
+          set up is true and misleading — nothing needs attention because
+          nothing is there yet. */}
+      {!checklist &&
+        (queue.data?.counts.deck ?? 0) === 0 &&
         (queue.data?.counts.needs ?? 0) === 0 &&
         (queue.data?.counts.in_progress ?? 0) === 0 &&
         (queue.data?.summary.timing.length ?? 0) === 0 &&

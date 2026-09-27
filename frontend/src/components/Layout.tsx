@@ -3,6 +3,8 @@ import { useMutation } from '@tanstack/react-query'
 import { api } from '../api'
 import { useAppearance } from '../hooks/useAppearance'
 import { NotificationBell } from './NotificationBell'
+import { HelpMenu } from './HelpMenu'
+import { FeedbackModal } from './FeedbackModal'
 import { Button } from './ui/Button'
 
 const NAV_LINKS = [
@@ -93,6 +95,7 @@ export function Layout({
 }) {
   const { appearance, set, resolved } = useAppearance()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Route changes close the mobile menu; leaving it open over the new page is
@@ -166,6 +169,10 @@ export function Layout({
 
             <div className="flex items-center gap-1">
               {admin ? null : <NotificationBell onNav={onNav} />}
+              {/* Not in admin mode: Help describes the artist surface, and
+                  feedback is sent from it — an admin-mode session is refused
+                  the route. */}
+              {admin ? null : <HelpMenu className="hidden sm:block" onFeedback={() => setFeedbackOpen(true)} />}
 
               <button
                 type="button"
@@ -224,6 +231,28 @@ export function Layout({
                         {l.label}
                       </a>
                     ))}
+                    {/* The header's question mark, for a phone, where the
+                        header has no room for it. */}
+                    <span className="sm:hidden">
+                      <hr className="border-line my-1" />
+                      <a
+                        href="#help"
+                        aria-current={page === 'help' ? 'page' : undefined}
+                        className={`block ${linkClass('help')}`}
+                      >
+                        Help
+                      </a>
+                      <button
+                        type="button"
+                        className={`block w-full text-left ${linkClass('feedback')}`}
+                        onClick={() => {
+                          setMenuOpen(false)
+                          setFeedbackOpen(true)
+                        }}
+                      >
+                        Send feedback
+                      </button>
+                    </span>
                   </nav>
                 )}
               </div>
@@ -235,6 +264,8 @@ export function Layout({
       <main id="main" className="shell px-4 sm:px-6 lg:px-8 py-8 lg:py-10">
         {children}
       </main>
+
+      {admin ? null : <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />}
     </div>
   )
 }

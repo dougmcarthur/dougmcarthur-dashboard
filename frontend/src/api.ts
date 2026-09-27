@@ -1,4 +1,7 @@
 import type { CredentialHealth } from '../../shared/credentialHealth'
+import type { FeedbackContext, FeedbackKind } from '../../shared/feedback'
+import type { GoalId, Goals, OnboardingStep, ReachId } from '../../shared/onboarding'
+import { noteError } from './diagnostics'
 import type { NudgePreferences } from '../../shared/nudgeRouting'
 // Entity shapes live in shared/ because the Worker builds the review queue
 // from them too — see shared/types.ts. Re-exported here so UI code can keep
@@ -430,13 +433,20 @@ function localToday(): string {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    // The session cookie is same-origin and would be sent anyway; saying so
-    // keeps it working if the API ever moves to its own host.
-    credentials: 'same-origin',
-    ...init,
-  })
+  const what = `${init?.method ?? 'GET'} ${path}`
+  let res: Response
+  try {
+    res = await fetch(`/api${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      // The session cookie is same-origin and would be sent anyway; saying so
+      // keeps it working if the API ever moves to its own host.
+      credentials: 'same-origin',
+      ...init,
+    })
+  } catch (err) {
+    noteError(what, null, err instanceof Error ? err.message : 'Network error')
+    throw err
+  }
   if (!res.ok) {
     if (res.status === 401) window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT))
     const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
@@ -447,6 +457,9 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     // try again. Carried on the error rather than returned, because every
     // caller that does not know about it should keep failing loudly.
     if (err.needsElevation) throw new ElevationRequired(err.error)
+    // Kept in this tab for the feedback form, and nowhere else. A 401 is
+    // being signed out, which is not a fault anybody writes in about.
+    if (res.status !== 401) noteError(what, res.status, err.error ?? res.statusText)
     throw new Error(err.error)
   }
   return res.json()
@@ -849,6 +862,9 @@ export const api = {
     /** Rows with no owner, per table. Should be zero, and is worth checking. */
     health: () => apiFetch<TenantHealth>('/admin/health'),
     invites: () => apiFetch<InviteList>('/admin/invites'),
+    feedback: () => apiFetch<{ items: FeedbackItem[] }>('/admin/feedback'),
+    markFeedbackRead: (id: number) =>
+      apiFetch<{ ok: boolean }>(`/admin/feedback/${id}/read`, { method: 'POST' }),
     invite: (body: { email: string; displayName?: string; send?: boolean }) =>
       apiFetch<IssuedInvite>('/admin/invites', { method: 'POST', body: JSON.stringify(body) }),
     revokeInvite: (id: string) =>
@@ -950,6 +966,17 @@ export const api = {
   /** Every show from every source, merged. `today` is the viewer's own date. */
   shows: () => apiFetch<ShowsResponse>(`/shows?today=${localToday()}`),
   /** What to call this artist. One field, set by them, read by oversight. */
+  onboarding: {
+    read: () => apiFetch<OnboardingState>('/onboarding'),
+    saveGoals: (goals: { goals: GoalId[]; reach: ReachId[]; note: string | null }) =>
+      apiFetch<{ goals: Goals | null }>('/onboarding/goals', { method: 'PUT', body: JSON.stringify(goals) }),
+    hide: () => apiFetch<{ hidden: boolean }>('/onboarding/hide', { method: 'POST' }),
+    show: () => apiFetch<{ hidden: boolean }>('/onboarding/show', { method: 'POST' }),
+  },
+  feedback: {
+    send: (body: { kind: FeedbackKind; message: string; context: FeedbackContext }) =>
+      apiFetch<{ ok: boolean }>('/feedback', { method: 'POST', body: JSON.stringify(body) }),
+  },
   profile: {
     read: () => apiFetch<{ displayName: string | null }>('/profile'),
     save: (displayName: string | null) =>
@@ -1192,4 +1219,32 @@ export interface BackfillResult {
   scanned: number
   changed: number
   byColumn: Record<string, number>
+}
+
+/** The first-run checklist. See shared/onboarding.ts. */
+export interface OnboardingState {
+  steps: OnboardingStep[]
+  done: number
+  total: number
+  complete: boolean
+  goals: Goals | null
+  next: Array<{ label: string; href: string }>
+  hidden: boolean
+  options: {
+    goals: ReadonlyArray<{ id: GoalId; label: string }>
+    reach: ReadonlyArray<{ id: ReachId; label: string }>
+  }
+}
+
+/** One message in the owner's feedback inbox. */
+export interface FeedbackItem {
+  id: number
+  /** The sender's artist name, or null when they have not given one. */
+  from: string | null
+  kind: FeedbackKind
+  message: string
+  /** Null only if the stored context could not be read back. */
+  context: FeedbackContext | null
+  createdAt: string
+  readAt: string | null
 }

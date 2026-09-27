@@ -19,7 +19,7 @@ import type { Env } from '../types'
  * errors and logs them.
  */
 
-export type EventKind = 'automation' | 'digest' | 'reconcile'
+export type EventKind = 'automation' | 'digest' | 'reconcile' | 'feedback'
 
 /** Events older than this are pruned. Anything further back is History's job. */
 export const EVENT_RETENTION_DAYS = 30
