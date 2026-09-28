@@ -20,6 +20,18 @@ import { SourcePanel } from './artist/SourcePanel'
 import { AssociationPanels } from './artist/AssociationPanel'
 import { Explainer } from '../components/ui/Explainer'
 import { Caption, Card } from '../components/ui/Surface'
+import { Modal } from '../components/ui/Modal'
+import { StagePlotTab } from './artist/StagePlotTab'
+import {
+  GridView,
+  ProfileView,
+  TableView,
+  ViewSwitch,
+  loadLibraryView,
+  saveLibraryView,
+  type LibraryView,
+} from './artist/LibraryViews'
+import type { ArtistAssetWithHealth } from '../api'
 
 const AUDIENCES: Array<{ id: EpkAudience; label: string; blurb: string }> = [
   { id: 'festival', label: 'Festival', blurb: 'Live video, stage plot, the practical facts.' },
@@ -41,11 +53,18 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
   // Which freshness the library is narrowed to, or '' for all of it. Driven
   // by the counts below, which were previously a number with nowhere to go.
   const [freshness, setFreshness] = useState('')
-  const [tab, setTab] = useState<'library' | 'documents' | 'profile' | 'drive' | EpkAudience>(
-    initialTab === 'drive' || initialTab === 'profile' || initialTab === 'documents' ? initialTab : 'library',
+  const [tab, setTab] = useState<'library' | 'stageplot' | 'documents' | 'profile' | 'drive' | EpkAudience>(
+    initialTab === 'drive' || initialTab === 'profile' || initialTab === 'documents' || initialTab === 'stageplot'
+      ? initialTab
+      : 'library',
   )
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [view, setView] = useState<LibraryView>(loadLibraryView)
+  // The entry open in the Profile and Table views. Held as an id so the modal
+  // shows the entry as it is after an edit, not as it was when opened.
+  const [openId, setOpenId] = useState<number | null>(null)
+  const profile = useQuery({ queryKey: ['profile'], queryFn: api.profile.read })
 
   const { data, isLoading } = useQuery({
     queryKey: ['artist', kindFilter, freshness],
@@ -55,7 +74,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
   const epk = useQuery({
     queryKey: ['artist-epk', tab],
     queryFn: () => api.artist.epk(tab as EpkAudience),
-    enabled: tab !== 'library' && tab !== 'documents' && tab !== 'profile' && tab !== 'drive',
+    enabled: tab !== 'library' && tab !== 'documents' && tab !== 'profile' && tab !== 'drive' && tab !== 'stageplot',
   })
 
   const invalidate = () => {
@@ -83,10 +102,34 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
     kind: k,
     assets: items.filter((a) => normaliseAssetKind(a.kind) === k),
   })).filter((g) => g.assets.length > 0)
+  // Grouped by kind, in kind order: the grid reads like the old list did.
+  const ordered = grouped.flatMap((g) => g.assets)
+  const opened = items.find((a) => a.id === openId) ?? null
+
+  /** One entry in full, with its actions: the same in every view. */
+  const detail = (a: ArtistAssetWithHealth) =>
+    editingId === a.id ? (
+      <div className="p-3">
+        <AssetForm
+          asset={a}
+          onSave={(body) => patch.mutate({ id: a.id, body })}
+          onCancel={() => setEditingId(null)}
+          isSaving={patch.isPending}
+        />
+      </div>
+    ) : (
+      <AssetRow
+        asset={a}
+        busy={busy}
+        onReviewed={() => reviewed.mutate(a.id)}
+        onEdit={() => setEditingId(a.id)}
+        onArchive={() => patch.mutate({ id: a.id, body: { archived: !a.archived } })}
+      />
+    )
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
           <Explainer as="h1" title="Artist" titleClassName="text-2xl font-bold text-ink tracking-tight">
             Everything a programmer could ask for, so no application starts from a blank page.
@@ -116,7 +159,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
         twenty-two assets in the second bucket at once.
       */}
       {data && (data.needsReview > 0 || data.unreviewed > 0) && (
-        <div className="flex flex-wrap gap-2 text-sm">
+        <div className="flex flex-wrap gap-2 text-sm print:hidden">
           {data.needsReview > 0 && (
             <button
               onClick={() => { setFreshness(freshness === 'overdue' ? '' : 'overdue'); setTab('library') }}
@@ -151,12 +194,14 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
         </div>
       )}
 
+      <div className="print:hidden">
       <Tabs
         label="Artist sections"
         active={tab}
         onSelect={setTab}
         tabs={[
           { id: 'library', label: 'Library' },
+          { id: 'stageplot', label: 'Stage plot' },
           // Beside the Library because the Library reads its facts from these.
           { id: 'documents', label: 'Documents' },
           { id: 'profile', label: 'Profile page' },
@@ -164,8 +209,11 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
           ...AUDIENCES.map((a) => ({ id: a.id, label: `Checklist — ${a.label}` })),
         ]}
       />
+      </div>
 
-      {tab === 'documents' ? (
+      {tab === 'stageplot' ? (
+        <StagePlotTab />
+      ) : tab === 'documents' ? (
         <DocumentsTab />
       ) : tab === 'profile' ? (
         <ProfileTab />
@@ -188,38 +236,35 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
               Nothing here yet. Add a bio, a live video and a press photo and the EPK builds itself.
             </p>
           )}
-          {grouped.map((group) => (
-            <Card as="section" key={group.kind} pad="none" clip>
-              <header className="px-4 py-2.5 bg-sunken border-b border-line">
-                <Caption as="h2">
-                  {ASSET_KIND_META[group.kind].plural}
-                </Caption>
-              </header>
-              <div className="divide-y divide-line">
-                {group.assets.map((a) =>
-                  editingId === a.id ? (
-                    <div key={a.id} className="p-3">
-                      <AssetForm
-                        asset={a}
-                        onSave={(body) => patch.mutate({ id: a.id, body })}
-                        onCancel={() => setEditingId(null)}
-                        isSaving={patch.isPending}
-                      />
-                    </div>
-                  ) : (
-                    <AssetRow
-                      key={a.id}
-                      asset={a}
-                      busy={busy}
-                      onReviewed={() => reviewed.mutate(a.id)}
-                      onEdit={() => setEditingId(a.id)}
-                      onArchive={() => patch.mutate({ id: a.id, body: { archived: !a.archived } })}
-                    />
-                  ),
-                )}
-              </div>
-            </Card>
-          ))}
+          {!isLoading && items.length > 0 && (
+            <div className="flex justify-end">
+              <ViewSwitch
+                view={view}
+                onChange={(v) => {
+                  setView(v)
+                  saveLibraryView(v)
+                }}
+              />
+            </div>
+          )}
+          {!isLoading && items.length > 0 && view === 'profile' && (
+            <ProfileView items={items} name={profile.data?.displayName ?? null} onOpen={(a) => setOpenId(a.id)} />
+          )}
+          {!isLoading && items.length > 0 && view === 'grid' && <GridView items={ordered} detail={detail} />}
+          {!isLoading && items.length > 0 && view === 'table' && (
+            <TableView items={ordered} onOpen={(a) => setOpenId(a.id)} />
+          )}
+          <Modal
+            open={opened !== null}
+            onClose={() => {
+              setOpenId(null)
+              setEditingId(null)
+            }}
+            title={opened?.label ?? ''}
+            subtitle={opened ? ASSET_KIND_META[normaliseAssetKind(opened.kind)].label : undefined}
+          >
+            {opened && <div className="-m-4">{detail(opened)}</div>}
+          </Modal>
         </div>
       ) : (
         <div className="space-y-4">

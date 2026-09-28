@@ -1,0 +1,140 @@
+import { describe, it, expect } from 'vitest'
+import {
+  channelCount,
+  emptyPlot,
+  inputList,
+  layoutStage,
+  monitorMixes,
+  parseStagePlot,
+  performerRole,
+  powerDrops,
+  type StagePlot,
+} from '../shared/stagePlot'
+import { readClues } from '../shared/stagePlotClues'
+
+function band(): StagePlot {
+  const plot = emptyPlot('band', 4, 'Sam')
+  plot.performers[0] = { ...plot.performers[0], instruments: ['acoustic_guitar'], vocals: 'lead' }
+  plot.performers[1] = { ...plot.performers[1], name: 'Jen', instruments: ['fiddle'], vocals: 'backing' }
+  plot.performers[2] = { ...plot.performers[2], name: 'Ray', instruments: ['bass'], vocals: 'none' }
+  plot.performers[3] = { ...plot.performers[3], name: 'Lee', instruments: ['drums'], vocals: 'none' }
+  return plot
+}
+
+describe('inputList', () => {
+  it('patches drums first and vocals last, as a console is laid out', () => {
+    const lines = inputList(band())
+    expect(lines[0].label).toBe('Kick')
+    expect(lines.at(-1)?.label).toBe('BV — Jen')
+    expect(lines.at(-2)?.label).toBe('Lead vox — Sam')
+  })
+
+  it('gives a stereo source two channels', () => {
+    const plot = emptyPlot('solo', 1, 'Sam')
+    plot.performers[0].instruments = ['keys']
+    plot.performers[0].vocals = 'lead'
+    const lines = inputList(plot)
+    expect(lines.map((l) => l.ch)).toEqual([1, 3])
+    expect(channelCount(lines)).toBe(3)
+  })
+
+  it('adds playback once, not again for somebody who already runs a laptop', () => {
+    const plot = emptyPlot('solo', 1, 'Sam')
+    plot.playback = true
+    expect(inputList(plot).filter((l) => l.label === 'Playback')).toHaveLength(1)
+    plot.performers[0].instruments = ['laptop']
+    expect(inputList(plot).filter((l) => l.label === 'Playback')).toHaveLength(1)
+  })
+
+  it('names somebody nobody named, rather than leaving a blank on the strip', () => {
+    const plot = emptyPlot('duo', 2, '')
+    plot.performers[1].vocals = 'backing'
+    expect(inputList(plot).map((l) => l.label)).toContain('BV — Performer 2')
+  })
+})
+
+describe('layoutStage', () => {
+  it('puts the kit upstage centre and the lead singer centre of the front line', () => {
+    const placed = layoutStage(band())
+    const lee = placed.find((p) => p.name === 'Lee')!
+    const sam = placed.find((p) => p.name === 'Sam')!
+    expect(lee.y).toBeLessThan(sam.y)
+    expect(Math.abs(lee.x - 50)).toBeLessThan(10)
+    expect(Math.abs(sam.x - 50)).toBeLessThan(20)
+  })
+
+  it('keeps everybody on the stage', () => {
+    const plot = emptyPlot('band', 12, 'Sam')
+    plot.performers.forEach((p, i) => (p.instruments = i % 2 ? ['keys'] : ['fiddle']))
+    for (const p of layoutStage(plot)) {
+      expect(p.x).toBeGreaterThanOrEqual(0)
+      expect(p.x).toBeLessThanOrEqual(100)
+    }
+  })
+
+  it('draws wedges only when wedges were asked for', () => {
+    const plot = band()
+    plot.monitors = 'iem'
+    expect(layoutStage(plot).every((p) => p.wedge === null)).toBe(true)
+    plot.monitors = 'wedges'
+    expect(layoutStage(plot).every((p) => p.wedge !== null)).toBe(true)
+  })
+})
+
+describe('monitors and power', () => {
+  it('counts a mix per performer and a drop per powered rig', () => {
+    const plot = band()
+    expect(monitorMixes(plot)).toBe(4)
+    expect(powerDrops(plot)).toEqual(['Ray'])
+    plot.monitors = 'none'
+    expect(monitorMixes(plot)).toBe(0)
+  })
+})
+
+describe('parseStagePlot', () => {
+  it('reads back what it wrote, and drops what this build does not know', () => {
+    const plot = band()
+    plot.performers[0].instruments = ['acoustic_guitar', 'theremin' as never]
+    const back = parseStagePlot(JSON.stringify(plot))
+    expect(back?.performers[0].instruments).toEqual(['acoustic_guitar'])
+    expect(parseStagePlot('{broken')).toBeNull()
+    expect(parseStagePlot(JSON.stringify({ act: 'orchestra', performers: [] }))).toBeNull()
+  })
+
+  it('describes a performer in a phrase', () => {
+    expect(performerRole(band().performers[0])).toBe('Lead vocals, acoustic guitar')
+  })
+})
+
+describe('readClues', () => {
+  const clues = readClues([
+    {
+      source: 'Bio',
+      text:
+        'The Sundogs are a four-piece from Winnipeg, based in the Exchange. Jen Moss on fiddle and Ray Chu (bass, vocals) ' +
+        'hold it together.',
+    },
+    { source: 'Tech rider', text: 'Sam plays a Martin D-28 through an LR Baggs Venue DI. Ray uses an Ampeg SVT.' },
+  ])
+
+  it('finds the line-up size and quotes where it said so', () => {
+    expect(clues.act).toMatchObject({ act: 'band', size: 4, source: 'Bio' })
+  })
+
+  it('reads who plays what', () => {
+    expect(clues.members.map((m) => [m.name, m.instruments, m.vocals])).toEqual([
+      ['Jen Moss', ['fiddle'], false],
+      ['Ray Chu', ['bass'], true],
+    ])
+  })
+
+  it('does not read "based" as a bass', () => {
+    const only = readClues([{ source: 'Bio', text: 'Based in Winnipeg since 2019.' }])
+    expect(only.instruments).toEqual([])
+  })
+
+  it('finds named gear, and not a maker named on its own', () => {
+    expect(clues.gear.map((g) => g.item)).toEqual(['Martin D-28', 'LR Baggs Venue DI', 'Ampeg SVT'])
+    expect(readClues([{ source: 'x', text: 'I love Fender.' }]).gear).toEqual([])
+  })
+})

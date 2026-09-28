@@ -324,3 +324,33 @@
   transition-duration: 0.001ms !important;
   scroll-behavior: auto !important;
 }
+
+/*
+ * Printing is how a stage plot or an EPK becomes a PDF, and paper is white.
+ * The dark theme's pale text would print as near-invisible grey on it, so a
+ * printout always uses the light palette's surfaces, lines and text.
+ */
+@media print {
+  :root {
+    color-scheme: light;
+    --c-canvas: 255 255 255;
+    --c-surface: 255 255 255;
+    --c-raised: 247 248 245;
+    --c-sunken: 238 240 235;
+    --c-line: 223 226 219;
+    --c-line-strong: 160 166 155;
+    --c-ink: 20 23 18;
+    --c-body: 45 49 42;
+    --c-muted: 80 86 75;
+    --c-faint: 110 116 104;
+    --c-accent: 53 112 61;
+    --c-accent-soft: 234 242 234;
+    --c-warn-bg: 253 243 240;
+    --c-warn-line: 236 201 188;
+    --c-warn-fg: 164 67 47;
+  }
+  body {
+    background: white;
+  }
+}
+

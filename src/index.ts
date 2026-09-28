@@ -27,6 +27,7 @@ import admin from './routes/admin'
 import profile from './routes/profile'
 import onboarding from './routes/onboarding'
 import feedbackRoute from './routes/feedback'
+import stagePlotRoute from './routes/stagePlot'
 import connectors from './routes/connectors'
 import manitobaMusic from './routes/manitobaMusic'
 import associationsRoute, { scanProfiles } from './routes/associations'
@@ -198,6 +199,7 @@ app.route('/api/agent-tokens', agentTokens)
 app.route('/api/profile', profile)
 app.route('/api/onboarding', onboarding)
 app.route('/api/feedback', feedbackRoute)
+app.route('/api/stage-plot', stagePlotRoute)
 app.route('/api/connectors/manitoba-music', manitobaMusic)
 app.route('/api/connectors/associations', associationsRoute)
 app.route('/api/connectors', connectors)

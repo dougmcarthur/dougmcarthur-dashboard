@@ -1,6 +1,7 @@
 import type { CredentialHealth } from '../../shared/credentialHealth'
 import type { FeedbackContext, FeedbackKind } from '../../shared/feedback'
 import type { GoalId, Goals, OnboardingStep, ReachId } from '../../shared/onboarding'
+import type { StagePlot } from '../../shared/stagePlot'
 import { noteError } from './diagnostics'
 import type { NudgePreferences } from '../../shared/nudgeRouting'
 // Entity shapes live in shared/ because the Worker builds the review queue
@@ -972,6 +973,12 @@ export const api = {
       apiFetch<{ goals: Goals | null }>('/onboarding/goals', { method: 'PUT', body: JSON.stringify(goals) }),
     hide: () => apiFetch<{ hidden: boolean }>('/onboarding/hide', { method: 'POST' }),
     show: () => apiFetch<{ hidden: boolean }>('/onboarding/show', { method: 'POST' }),
+  },
+  stagePlot: {
+    read: () => apiFetch<{ plot: StagePlot | null }>('/stage-plot'),
+    save: (plot: Omit<StagePlot, 'updatedAt'>) =>
+      apiFetch<{ plot: StagePlot | null }>('/stage-plot', { method: 'PUT', body: JSON.stringify(plot) }),
+    remove: () => apiFetch<{ plot: null }>('/stage-plot', { method: 'DELETE' }),
   },
   feedback: {
     send: (body: { kind: FeedbackKind; message: string; context: FeedbackContext }) =>

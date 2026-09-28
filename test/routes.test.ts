@@ -76,6 +76,19 @@ describe('API route registration', () => {
     expect(res.status).toBe(403)
   })
 
+  it('PUT /api/stage-plot refuses an instrument it does not know', async () => {
+    const res = await request('/api/stage-plot', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        act: 'solo',
+        performers: [{ id: 'p1', name: 'Sam', instruments: ['theremin'], vocals: 'lead', gear: [] }],
+        monitors: 'wedges', playback: false, notes: null,
+      }),
+    })
+    expect(res.status).toBe(400)
+  })
+
   it('PUT /api/onboarding/goals refuses a goal it does not know', async () => {
     const res = await request('/api/onboarding/goals', {
       method: 'PUT',
@@ -507,6 +520,7 @@ describe('API authentication', () => {
       '/api/digest',
       '/api/onboarding',
       '/api/feedback',
+      '/api/stage-plot',
     ]
     for (const path of paths) {
       const res = await app.request(path, {}, env)

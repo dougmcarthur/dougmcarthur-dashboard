@@ -84,7 +84,8 @@ describe('parseGoals', () => {
  */
 describe('the welcome questions', () => {
   const read = (rel: string) => readFileSync(join(__dirname, '..', rel), 'utf8')
-  const flow = read('frontend/src/components/OnboardingFlow.tsx')
+  // The keys and the portal live in the shared shell both flows use.
+  const flow = read('frontend/src/components/flow/QuestionFlow.tsx')
 
   // The first version lived inside the checklist card, and saving the goals
   // completed the checklist, unmounted the card and closed the questions

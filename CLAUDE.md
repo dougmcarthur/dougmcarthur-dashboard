@@ -1467,6 +1467,26 @@ Each answer saves as its screen is left, so Esc keeps what was said. **The
 page hosts it, not the card**: answering can complete the checklist, and the
 card unmounting took the questions with it mid-answer the first time.
 
+**The Library opens as a profile.** Profile (default), Grid and Table are
+three layouts of the same entries (`pages/artist/LibraryViews.tsx`); what an
+entry says and its actions are one `detail` the page renders in all three, so
+a view never grows its own edit path. The choice is a per-browser preference.
+Values are shown through `plain()`, which strips markdown for reading and
+leaves the stored text alone.
+
+**A stage plot is derived, not drawn.** The survey (`StagePlotFlow`, the same
+full-screen shell as the welcome questions) asks what a musician knows
+offhand — solo, duo or band, who plays and sings what, named gear, monitors,
+playback — and `shared/stagePlot.ts` derives the rest: the input list in
+console order, stereo pairs, phantom power, stands, monitor mixes, power
+drops and the layout. The answers are one `tenant_settings` row
+(`stagePlot`), not a new table. `shared/stagePlotClues.ts` reads the
+documents and library for the line-up, members and named gear, with closed
+vocabularies and the quoting sentence, and the survey offers them as
+suggestions — nothing is filled in silently. Printing is the export. Photos,
+videos and manufacturer spec pages are **not** read: that needs a model and
+a decision about who pays for it.
+
 **Feedback is a form, not telemetry.** The header's question mark (the
 drawer, on a phone) opens Help and *Send feedback*. The form attaches the page,
 the pages before it, failed requests from the last half hour in this tab, the
