@@ -70,6 +70,19 @@ reads festival pages written by strangers.
   run. A schedule that *stops* is still caught — `taskCadence` raises a
   critical once it has been quiet longer than its own habit — but a single
   missed run is invisible.
+- **A routine can fail before it ever reaches `cli.ts`, and that failure looks
+  identical to a quiet week.** On 2026-09-28 the `gig-festival-scan` routine
+  fired and found every Bash call refused: Claude Code's own tool-permission
+  classifier reported itself overloaded for the whole session, which also
+  blocked spawning a subagent to retry and scheduling a later wakeup. Nothing
+  in the repository caused it and nothing in the repository could catch it —
+  `log_run` never ran, so there is no `failed` row, just an absence, same as
+  the August 2026 stoppage this whole setup exists to notice. `taskCadence`
+  still catches a *pattern* of this, but not the first missed run. If a
+  routine is down and a sweep cannot wait for the next scheduled fire, trigger
+  `.github/workflows/agents.yml` by hand from the Actions tab instead — it
+  runs through the Claude API rather than through this session's tool
+  classifier, so it does not share the failure.
 - **What a routine can read, an injected routine could send elsewhere.** The
   environment needs full network access to read festival pages, so the gig
   list and reference documents it reads could be passed to another host by a
