@@ -7,6 +7,7 @@ import { syncTargets, reminders } from '../db/schema'
 import { scoped, withTenant } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
 import { syncNoteColumns } from '../../shared/noteColumns'
+import { linkSync } from '../lib/catalog'
 
 const sync = new Hono<AppEnv>()
 
@@ -64,6 +65,10 @@ sync.post('/', zValidator('json', SyncInsertSchema), async (c) => {
     discoveredAt: ts,
     updatedAt: ts,
   })).returning({ id: syncTargets.id })
+
+  // Organisations go into the shared catalog; a person does not. See
+  // src/lib/catalog.ts.
+  await linkSync(c.env, tenantOf(c), { id: result[0].id, name: b.name, agencyType: b.agencyType }, ts, c.get('actor').kind === 'agent')
 
   return c.json({ id: result[0].id }, 201)
 })

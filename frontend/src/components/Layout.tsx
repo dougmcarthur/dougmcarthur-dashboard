@@ -129,7 +129,7 @@ export function Layout({
         Skip to content
       </a>
 
-      <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md border-b border-line">
+      <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md border-b border-line print:hidden">
         <div className="shell px-4 sm:px-6 lg:px-8">
           {/* Wraps, so admin mode can take a second row on a phone. The brand
               cannot give up the room — the product is never named on "Scout"

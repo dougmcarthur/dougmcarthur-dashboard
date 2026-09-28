@@ -1,10 +1,38 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type OnboardingState } from '../api'
 import type { OnboardingStep } from '../../../shared/onboarding'
 import { Button } from './ui/Button'
 import { Card, Caption } from './ui/Surface'
-import { GoalsForm } from './GoalsForm'
+import type { FlowScreen } from './OnboardingFlow'
+
+/** Set for the rest of the tab once the welcome questions have opened by themselves. */
+const AUTOSTART_KEY = 'scout.onboarding.autostarted'
+
+/**
+ * Open the welcome questions by themselves, once per tab, for an account that
+ * has never answered them.
+ *
+ * The page owns the flow rather than this card, because answering the goals
+ * can complete the checklist — and a card that unmounts on completion would
+ * take the questions with it, mid-answer.
+ */
+export function useOnboardingAutostart(state: OnboardingState | undefined, start: (s: FlowScreen) => void) {
+  useEffect(() => {
+    if (!state || state.goals !== null || state.hidden) return
+    let seen = false
+    try {
+      seen = sessionStorage.getItem(AUTOSTART_KEY) === '1'
+      sessionStorage.setItem(AUTOSTART_KEY, '1')
+    } catch {
+      // Storage refused: open anyway. Once more than intended is the safe
+      // direction; a first-run screen that never appears is not.
+    }
+    if (!seen) start('welcome')
+    // Decided on the first answer only; a later refetch must not reopen it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state === undefined])
+}
 
 /**
  * The first-run checklist, at the top of the Overview.
@@ -17,11 +45,24 @@ import { GoalsForm } from './GoalsForm'
  * Every tick is read off the account (shared/onboarding.ts), so a step done
  * from Settings or the Artist page ticks itself. It disappears once the
  * required steps are done, and **Hide** puts it away sooner — Help can bring
- * it back. It never pops up, never counts down, and never blocks a page.
+ * it back.
+ *
+ * The name and the goals are asked in `OnboardingFlow`, full screen, one
+ * question at a time, which the page hosts; `onStart` opens it at a step. It
+ * opens by itself **once per tab** for an account that has never answered
+ * (`useOnboardingAutostart`), since that is the first thing a new artist
+ * should see; Esc leaves it and the checklist offers it again.
  */
-export function OnboardingCard({ state, showDone = false }: { state: OnboardingState; showDone?: boolean }) {
+export function OnboardingCard({
+  state,
+  showDone = false,
+  onStart,
+}: {
+  state: OnboardingState
+  showDone?: boolean
+  onStart: (screen: FlowScreen) => void
+}) {
   const qc = useQueryClient()
-  const [editingGoals, setEditingGoals] = useState(false)
 
   const hide = useMutation({
     mutationFn: api.onboarding.hide,
@@ -32,22 +73,26 @@ export function OnboardingCard({ state, showDone = false }: { state: OnboardingS
   const optional = state.steps.filter((s) => s.optional)
   const next = required.find((s) => !s.done)
 
+  /** Where the welcome questions open for a step that is asked there. */
+  const flowFor = (step: OnboardingStep): FlowScreen | null =>
+    step.id === 'name' ? 'name' : step.id === 'goals' ? (step.done ? 'goals' : 'welcome') : null
+
   return (
     <Card pad="md" as="section" className="space-y-4" aria-labelledby="onboarding-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1 min-w-0">
           <h2 id="onboarding-title" className="text-base font-semibold text-ink">
-            {state.complete ? 'You’re set up' : 'Getting started with Scout'}
+            {state.complete ? 'You’re set up' : 'Get started with Scout'}
           </h2>
           <p className="text-sm text-body max-w-prose">
             {state.complete
-              ? 'Everything Scout needs is in place. The optional steps below are still worth a look.'
-              : 'Scout finds opportunities, drafts the paperwork, and keeps track of what you are waiting on. It works from your profile, so a few things need setting up first.'}
+              ? 'Everything Scout needs is in place. The optional steps below are still worth doing.'
+              : 'Scout finds opportunities for you, drafts applications and pitches, and tracks who you’re waiting to hear from. It works from your profile, so start with these steps.'}
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-xs text-muted tabular-nums" aria-label={`${state.done} of ${state.total} done`}>
-            {state.done} of {state.total}
+            {state.done} of {state.total} done
           </span>
           {!showDone && (
             <Button variant="quiet" size="sm" onClick={() => hide.mutate()} disabled={hide.isPending}>
@@ -58,34 +103,23 @@ export function OnboardingCard({ state, showDone = false }: { state: OnboardingS
       </div>
 
       <ol className="space-y-2">
-        {required.map((step, i) => {
-          const formOpen = step.id === 'goals' && (editingGoals || (step.id === next?.id && !step.done))
-          return (
+        {required.map((step, i) => (
           <StepRow
             key={step.id}
             step={step}
             number={i + 1}
             current={step.id === next?.id}
-            onEditGoals={() => setEditingGoals(true)}
-            formOpen={formOpen}
-          >
-            {formOpen && (
-              <div className="mt-3">
-                <GoalsForm
-                  state={state}
-                  onSaved={() => setEditingGoals(false)}
-                  onCancel={editingGoals ? () => setEditingGoals(false) : undefined}
-                />
-              </div>
-            )}
-          </StepRow>
-          )
-        })}
+            onOpen={(() => {
+              const screen = flowFor(step)
+              return screen ? () => onStart(screen) : undefined
+            })()}
+          />
+        ))}
       </ol>
 
       {optional.length > 0 && (
         <div className="space-y-2">
-          <Caption>Worth doing</Caption>
+          <Caption>Optional</Caption>
           <ul className="space-y-2">
             {optional.map((step) => (
               <StepRow key={step.id} step={step} current={false} />
@@ -98,8 +132,8 @@ export function OnboardingCard({ state, showDone = false }: { state: OnboardingS
         <div className="space-y-1.5 border-t border-line pt-4">
           <Caption>What happens next</Caption>
           <p className="text-sm text-body max-w-prose">
-            New opportunities show up on the Overview as cards to decide on — apply or pass. They
-            come from research run for your account, or from anything you add yourself.
+            New opportunities appear on the Overview as cards: apply or pass. You can add ones you
+            already know about at any time.
           </p>
           <ul className="flex flex-wrap gap-x-4 gap-y-1">
             {state.next.map((n) => (
@@ -143,16 +177,13 @@ function StepRow({
   step,
   number,
   current,
-  onEditGoals,
-  children,
-  formOpen = false,
+  onOpen,
 }: {
   step: OnboardingStep
   number?: number
   current: boolean
-  onEditGoals?: () => void
-  children?: ReactNode
-  formOpen?: boolean
+  /** Opens the welcome questions at this step, for the steps asked there. */
+  onOpen?: () => void
 }) {
   return (
     <li
@@ -169,7 +200,11 @@ function StepRow({
           {!step.done && <p className="text-xs text-muted mt-0.5 max-w-prose">{step.why}</p>}
         </div>
         <div className="shrink-0">
-          {step.href && !step.done ? (
+          {onOpen ? (
+            <Button variant={step.done ? 'quiet' : current ? 'primary' : 'neutral'} size="sm" onClick={onOpen}>
+              {step.done ? 'Change' : step.action}
+            </Button>
+          ) : step.href && !step.done ? (
             <a
               href={step.href}
               className={`inline-block rounded-md text-xs px-3 py-1.5 transition-colors ${
@@ -180,14 +215,9 @@ function StepRow({
             >
               {step.action}
             </a>
-          ) : step.id === 'goals' && onEditGoals && !formOpen ? (
-            <Button variant={step.done ? 'quiet' : 'neutral'} size="sm" onClick={onEditGoals}>
-              {step.done ? 'Change' : step.action}
-            </Button>
           ) : null}
         </div>
       </div>
-      {children}
     </li>
   )
 }

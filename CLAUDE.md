@@ -1456,9 +1456,73 @@ itself and one undone comes back. The only thing stored is what nothing else
 could answer: the goals the artist chose (`tenant_settings`,
 `onboarding.goals`) and whether they hid the card. It sits on the Overview
 until the required steps are done, suppresses "All clear" while it is up
-(true and misleading on an empty account), and never pops up. Help can show it
-again. It promises nothing about research running for an account nobody has
-set it up for.
+(true and misleading on an empty account), and Help can show it again. It
+promises nothing about research running for an account nobody has set it up
+for.
+
+The name and goals are asked full screen, one question per screen, driven by
+the keyboard (`OnboardingFlow`: Enter, letters, ↑/↓, Esc). It opens by itself
+once per tab for an account that has never answered, and never otherwise.
+Each answer saves as its screen is left, so Esc keeps what was said. **The
+page hosts it, not the card**: answering can complete the checklist, and the
+card unmounting took the questions with it mid-answer the first time.
+
+**The Library opens as a profile.** Profile (default), Grid and Table are
+three layouts of the same entries (`pages/artist/LibraryViews.tsx`); what an
+entry says and its actions are one `detail` the page renders in all three, so
+a view never grows its own edit path. The choice is a per-browser preference.
+Values are shown through `plain()`, which strips markdown for reading and
+leaves the stored text alone.
+
+**A stage plot is derived, not drawn.** The survey (`StagePlotFlow`, the same
+full-screen shell as the welcome questions) asks what a musician knows
+offhand — solo, duo or band, who plays and sings what, named gear, monitors,
+playback — and `shared/stagePlot.ts` derives the rest: the input list in
+console order, stereo pairs, phantom power, stands, monitor mixes, power
+drops and the layout. The answers are one `tenant_settings` row
+(`stagePlot`), not a new table. `shared/stagePlotClues.ts` reads the
+documents and library for the line-up, members and named gear, with closed
+vocabularies and the quoting sentence, and the survey offers them as
+suggestions — nothing is filled in silently. Printing is the export.
+The drawing is line art in `pages/artist/stagePlotIcons.tsx` — every
+instrument the survey offers plus amp, wedge, mic, DI, power and in-ears —
+drawn in a 48 box with `currentColor` and non-scaling strokes, so it follows
+the theme and prints as vectors. Each performer is a station: held
+instruments beside them, keyboards and laptops in front, the amp behind, DI
+and power either side. Names only under a station; a role line collided with
+the next one on a front line of three. `stationScale` draws small acts larger
+and the layout moves the front line up to make room. Photos,
+videos and manufacturer spec pages are **not** read: that needs a model and
+a decision about who pays for it.
+
+**Listing facts live once, in a shared catalog.** `opportunities` (migration
+0033) holds what is true of a call for everybody — name, page, closing date,
+place — and has no tenant and no column for anything an artist decided; each
+artist's gig and sync rows link to it by `opportunity_id`. `src/lib/catalog.ts`
+writes it: read-by-key then insert (no `ON CONFLICT`), a later sighting fills
+gaps and never overwrites — one research session reading a poisoned page must
+not rewrite what every artist sees — and linking is best-effort so a catalog
+failure never costs a filed gig. Sync targets are catalogued only when they
+are organisations; a supervisor's name stays on the artist's own row.
+
+**The logged-out page shows the catalog, and publishing is conservative.**
+Strangers see `LandingPage` (a browser that has signed in before still gets
+the sign-in screen; `#welcome` and `#signin` cross over). Its lists come from
+`/api/public/opportunities`, which reads only the catalog. An entry is public
+by default only when a research agent filed it, it has a listing URL on a
+public host (never a Doc, Drive file or mail thread), and it is a festival,
+showcase, funding call or sync organisation. The backfill could not know who
+filed older rows, so it published only ones the artist never acted on — the
+seed's "Mainstage Invitation" is an offer, not a call, and was the example.
+Admin mode's **Public listings** shows and hides anything.
+
+**Requesting an invitation creates nothing.** `invite_requests` holds a name,
+an address and a reason from somebody with no account. No email is sent to
+it — a typed address is exactly what `shared/recipients.ts` refuses — the
+bell tells the owner, and **Invite** only pre-fills the real invitation form.
+A honeypot field, a per-sender limit on a salted hash of the address (never
+the address) and a daily ceiling keep a flood cheap. Answered requests prune
+at 90 days, the rest at a year, which the form promises.
 
 **Feedback is a form, not telemetry.** The header's question mark (the
 drawer, on a phone) opens Help and *Send feedback*. The form attaches the page,

@@ -76,6 +76,46 @@ describe('API route registration', () => {
     expect(res.status).toBe(403)
   })
 
+  // Public, so no credential — and still validated before anything is stored.
+  it('POST /api/public/invite-requests answers without a session and refuses a bad address', async () => {
+    const res = await app.request(
+      '/api/public/invite-requests',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Sam', email: 'not-an-address', message: 'I play fiddle and want to apply more.' }),
+      },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('POST /api/public/invite-requests gives a bot the ordinary answer and stores nothing', async () => {
+    const res = await app.request(
+      '/api/public/invite-requests',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Bot', email: 'bot@example.com', message: 'Buy cheap things now please', website: 'x' }),
+      },
+      emptyEnv,
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it('PUT /api/stage-plot refuses an instrument it does not know', async () => {
+    const res = await request('/api/stage-plot', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        act: 'solo',
+        performers: [{ id: 'p1', name: 'Sam', instruments: ['theremin'], vocals: 'lead', gear: [] }],
+        monitors: 'wedges', playback: false, notes: null,
+      }),
+    })
+    expect(res.status).toBe(400)
+  })
+
   it('PUT /api/onboarding/goals refuses a goal it does not know', async () => {
     const res = await request('/api/onboarding/goals', {
       method: 'PUT',
@@ -507,6 +547,7 @@ describe('API authentication', () => {
       '/api/digest',
       '/api/onboarding',
       '/api/feedback',
+      '/api/stage-plot',
     ]
     for (const path of paths) {
       const res = await app.request(path, {}, env)

@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { nextSteps, onboardingSteps, parseGoals, type OnboardingFacts } from '../shared/onboarding'
 
 const EMPTY: OnboardingFacts = {
@@ -73,6 +75,38 @@ describe('parseGoals', () => {
   it('drops ids this build does not know, and duplicates', () => {
     expect(parseGoals(JSON.stringify({ goals: ['gigs', 'gigs', 'world-domination'], reach: ['mars', 'us'], note: '  ' })))
       .toEqual({ goals: ['gigs'], reach: ['us'], note: null })
+  })
+})
+
+/**
+ * Source-level, like test/uiConsistency.test.ts: each of these renders fine
+ * whichever way it goes.
+ */
+describe('the welcome questions', () => {
+  const read = (rel: string) => readFileSync(join(__dirname, '..', rel), 'utf8')
+  // The keys and the portal live in the shared shell both flows use.
+  const flow = read('frontend/src/components/flow/QuestionFlow.tsx')
+
+  // The first version lived inside the checklist card, and saving the goals
+  // completed the checklist, unmounted the card and closed the questions
+  // mid-answer.
+  it('is hosted by the page, never by the card it can complete', () => {
+    expect(read('frontend/src/components/OnboardingCard.tsx')).not.toMatch(/<OnboardingFlow\b/)
+    expect(read('frontend/src/pages/OverviewPage.tsx')).toMatch(/<OnboardingFlow\b/)
+  })
+
+  it('opens by itself only for an account that has never answered', () => {
+    expect(read('frontend/src/components/OnboardingCard.tsx')).toMatch(/state\.goals !== null \|\| state\.hidden\) return/)
+  })
+
+  it('keeps Esc, Enter and the letter keys', () => {
+    expect(flow).toMatch(/e\.key === 'Escape'/)
+    expect(flow).toMatch(/e\.key === 'Enter' && !e\.shiftKey/)
+    expect(flow).toMatch(/LETTERS\.indexOf\(e\.key\.toUpperCase\(\)\)/)
+  })
+
+  it('renders through a portal, so no ancestor can offset it', () => {
+    expect(flow).toMatch(/createPortal\(/)
   })
 })
 

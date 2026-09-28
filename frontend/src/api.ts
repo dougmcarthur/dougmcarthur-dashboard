@@ -1,6 +1,9 @@
 import type { CredentialHealth } from '../../shared/credentialHealth'
 import type { FeedbackContext, FeedbackKind } from '../../shared/feedback'
 import type { GoalId, Goals, OnboardingStep, ReachId } from '../../shared/onboarding'
+import type { StagePlot } from '../../shared/stagePlot'
+import type { PublicCategory, PublicOpportunity } from '../../shared/opportunityCatalog'
+import type { InviteRequestStatus } from '../../shared/inviteRequests'
 import { noteError } from './diagnostics'
 import type { NudgePreferences } from '../../shared/nudgeRouting'
 // Entity shapes live in shared/ because the Worker builds the review queue
@@ -863,6 +866,12 @@ export const api = {
     health: () => apiFetch<TenantHealth>('/admin/health'),
     invites: () => apiFetch<InviteList>('/admin/invites'),
     feedback: () => apiFetch<{ items: FeedbackItem[] }>('/admin/feedback'),
+    inviteRequests: () => apiFetch<{ items: InviteRequestItem[] }>('/admin/invite-requests'),
+    setInviteRequest: (id: number, status: InviteRequestStatus) =>
+      apiFetch<{ ok: boolean }>(`/admin/invite-requests/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    listings: () => apiFetch<{ items: ListingItem[] }>('/admin/listings'),
+    setListingPublic: (id: number, isPublic: boolean) =>
+      apiFetch<{ ok: boolean }>(`/admin/listings/${id}`, { method: 'PATCH', body: JSON.stringify({ public: isPublic }) }),
     markFeedbackRead: (id: number) =>
       apiFetch<{ ok: boolean }>(`/admin/feedback/${id}/read`, { method: 'POST' }),
     invite: (body: { email: string; displayName?: string; send?: boolean }) =>
@@ -972,6 +981,19 @@ export const api = {
       apiFetch<{ goals: Goals | null }>('/onboarding/goals', { method: 'PUT', body: JSON.stringify(goals) }),
     hide: () => apiFetch<{ hidden: boolean }>('/onboarding/hide', { method: 'POST' }),
     show: () => apiFetch<{ hidden: boolean }>('/onboarding/show', { method: 'POST' }),
+  },
+  /** The logged-out landing page. Public routes: no session needed or sent. */
+  publicSite: {
+    opportunities: () =>
+      apiFetch<{ categories: Record<PublicCategory, PublicOpportunity[]>; asOf: string }>('/public/opportunities'),
+    requestInvite: (body: { name: string; email: string; message: string; website?: string }) =>
+      apiFetch<{ ok: boolean; message: string }>('/public/invite-requests', { method: 'POST', body: JSON.stringify(body) }),
+  },
+  stagePlot: {
+    read: () => apiFetch<{ plot: StagePlot | null }>('/stage-plot'),
+    save: (plot: Omit<StagePlot, 'updatedAt'>) =>
+      apiFetch<{ plot: StagePlot | null }>('/stage-plot', { method: 'PUT', body: JSON.stringify(plot) }),
+    remove: () => apiFetch<{ plot: null }>('/stage-plot', { method: 'DELETE' }),
   },
   feedback: {
     send: (body: { kind: FeedbackKind; message: string; context: FeedbackContext }) =>
@@ -1247,4 +1269,28 @@ export interface FeedbackItem {
   context: FeedbackContext | null
   createdAt: string
   readAt: string | null
+}
+
+/** A request for an invitation, from the landing page. */
+export interface InviteRequestItem {
+  id: number
+  name: string
+  email: string
+  message: string
+  status: InviteRequestStatus
+  createdAt: string
+  handledAt: string | null
+}
+
+/** A catalog entry as the admin listings panel shows it. */
+export interface ListingItem {
+  id: number
+  category: string
+  name: string
+  organizer: string | null
+  url: string | null
+  deadline: string | null
+  location: string | null
+  public: boolean
+  firstSeenAt: string
 }

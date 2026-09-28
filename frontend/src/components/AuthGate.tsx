@@ -5,6 +5,7 @@ import { LoginScreen } from './LoginScreen'
 import { JoinScreen } from './JoinScreen'
 import { useHashRoute } from '../hooks/useHashRoute'
 import { PublicEpkPage } from '../pages/epk/PublicEpkPage'
+import { LandingPage } from '../pages/LandingPage'
 
 /**
  * Nothing renders until the Worker says who is asking.
@@ -79,6 +80,15 @@ export function AuthGate({ children }: { children: ReactNode }) {
       )
     }
 
+    // A stranger sees what Scout is; somebody who has signed in on this
+    // browser before sees the sign-in screen, as they always have. Either can
+    // reach the other: the landing page has Sign in, and `#welcome` shows the
+    // landing page to anybody.
+    const showLanding = page === 'welcome' || (page !== 'signin' && !hasSignedInHere())
+    if (showLanding) {
+      return <LandingPage onSignIn={() => (window.location.hash = 'signin')} />
+    }
+
     return (
       <LoginScreen
         session={
@@ -99,11 +109,40 @@ export function AuthGate({ children }: { children: ReactNode }) {
           // renders left the screen blank: the query it was watching no longer
           // existed, so it reported "still loading" forever. Signing in is
           // once per month and a fresh document is unambiguous.
+          //
+          // `#signin` and `#welcome` are signed-out routes the app does not
+          // have, so they are swapped for the Overview first.
+          if (page === 'signin' || page === 'welcome') window.location.assign('#overview')
           window.location.reload()
         }}
       />
     )
   }
 
+  rememberSignedInHere()
   return <>{children}</>
+}
+
+/**
+ * Whether this browser has been signed in before, so an expired session goes
+ * back to the sign-in screen rather than to a page explaining the product.
+ * A convenience only: storage that is refused or cleared shows the landing
+ * page, which has Sign in at the top.
+ */
+const RETURNING_KEY = 'scout.signedInHere'
+
+function hasSignedInHere(): boolean {
+  try {
+    return localStorage.getItem(RETURNING_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function rememberSignedInHere() {
+  try {
+    localStorage.setItem(RETURNING_KEY, '1')
+  } catch {
+    // Nothing to do: see hasSignedInHere.
+  }
 }
