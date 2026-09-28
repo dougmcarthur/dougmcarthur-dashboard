@@ -1507,8 +1507,14 @@ are organisations; a supervisor's name stays on the artist's own row.
 
 **The logged-out page shows the catalog, and publishing is conservative.**
 Strangers see `LandingPage` (a browser that has signed in before still gets
-the sign-in screen; `#welcome` and `#signin` cross over). Its lists come from
-`/api/public/opportunities`, which reads only the catalog. An entry is public
+the sign-in screen; `#welcome` and `#signin` cross over). It shows a small
+**sample** — eight open calls mixed across the categories by `publicSample`,
+in a miniature of the app's table (category, fee, closing date) faded out at
+the bottom so it reads as an example — from `/api/public/opportunities`,
+which reads only the catalog. The fee column is the fee as the listing
+stated it and nothing more: agents fill `fee_amount` without being told which
+way the money goes (the seed uses it for a guarantee), so the page never says
+"entry fee" and never says "Free" for a fee nobody stated. An entry is public
 by default only when a research agent filed it, it has a listing URL on a
 public host (never a Doc, Drive file or mail thread), and it is a festival,
 showcase, funding call or sync organisation. The backfill could not know who

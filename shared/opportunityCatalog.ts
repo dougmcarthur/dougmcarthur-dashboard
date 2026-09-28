@@ -33,7 +33,6 @@ export const PUBLIC_CATEGORIES = [
 
 export type PublicCategory = (typeof PUBLIC_CATEGORIES)[number]['id']
 
-export const PER_CATEGORY = 10
 
 /** The gig `type` column is free text written by research agents. */
 export function gigCategory(type: string | null | undefined): CatalogCategory {
@@ -127,6 +126,13 @@ export interface CatalogFacts {
   deadlineNote: string | null
   location: string | null
   country: string | null
+  /**
+   * The fee the listing states, as stated. Not interpreted: which way the
+   * money goes is not something the rows it comes from record reliably.
+   * Null when nothing was stated, which is not the same as free.
+   */
+  feeAmount: number | null
+  feeCurrency: string | null
 }
 
 function clip(s: string | null | undefined, max: number): string | null {
@@ -145,8 +151,12 @@ export function factsFromGig(gig: {
   deadlineNote?: string | null
   location?: string | null
   country?: string | null
+  feeAmount?: number | null
+  feeCurrency?: string | null
 }): CatalogFacts {
   const deadline = isoDate(gig.deadline)
+  const amount =
+    typeof gig.feeAmount === 'number' && Number.isFinite(gig.feeAmount) && gig.feeAmount > 0 ? gig.feeAmount : null
   return {
     category: gigCategory(gig.type),
     name: clip(gig.name, 160) ?? 'Untitled',
@@ -159,6 +169,10 @@ export function factsFromGig(gig: {
     deadlineNote: clip(gig.deadlineNote ?? (deadline ? null : gig.deadline), 80),
     location: clip(gig.location, 120),
     country: clip(gig.country, 20),
+    feeAmount: amount,
+    // The artist's row defaults its currency to USD whether or not there is
+    // an amount, so it is only carried beside a real one.
+    feeCurrency: amount !== null ? clip(gig.feeCurrency, 3) : null,
   }
 }
 
@@ -174,6 +188,8 @@ export function factsFromSync(target: { name: string; agencyType?: string | null
     deadlineNote: null,
     location: null,
     country: null,
+    feeAmount: null,
+    feeCurrency: null,
   }
 }
 
@@ -196,6 +212,7 @@ export interface CatalogRow extends CatalogFacts {
 }
 
 export interface PublicOpportunity {
+  category: PublicCategory
   name: string
   organizer: string | null
   kind: string | null
@@ -203,35 +220,49 @@ export interface PublicOpportunity {
   deadline: string | null
   deadlineNote: string | null
   location: string | null
+  feeAmount: number | null
+  feeCurrency: string | null
 }
 
+/** How many rows the landing page's sample shows. */
+export const SAMPLE_SIZE = 8
+
 /**
- * The landing page's lists: the most recently found in each category, and
- * nothing that has already closed.
+ * A few real entries for the landing page, mixed across the categories.
+ *
+ * A sample, not a feed: it exists to show what Scout keeps and how it lays it
+ * out, so it takes the most recent open entries a category at a time, in
+ * turn, until it has enough — a page of eight festivals says less about the
+ * product than two of each. Entries with a closing date and a stated fee go
+ * first within a category, because a row of dashes shows the columns and not
+ * what fills them. Nothing closed, nothing hidden.
  */
-export function publicListing(
-  rows: CatalogRow[],
-  today: string,
-): Record<PublicCategory, PublicOpportunity[]> {
-  const out = Object.fromEntries(PUBLIC_CATEGORIES.map((c) => [c.id, [] as PublicOpportunity[]])) as Record<
-    PublicCategory,
-    PublicOpportunity[]
-  >
-  const sorted = [...rows].sort((a, b) => (a.firstSeenAt < b.firstSeenAt ? 1 : a.firstSeenAt > b.firstSeenAt ? -1 : 0))
-  for (const r of sorted) {
-    if (!r.public || r.category === 'other') continue
-    if (r.deadline && r.deadline < today) continue
-    const list = out[r.category as PublicCategory]
-    if (list.length >= PER_CATEGORY) continue
-    list.push({
-      name: r.name,
-      organizer: r.organizer,
-      kind: r.kind,
-      url: r.category === 'sync' ? null : r.url,
-      deadline: r.deadline,
-      deadlineNote: r.deadlineNote,
-      location: r.location,
-    })
+export function publicSample(rows: CatalogRow[], today: string, size = SAMPLE_SIZE): PublicOpportunity[] {
+  const richness = (r: CatalogRow) => (r.deadline ? 2 : r.deadlineNote ? 1 : 0) + (r.feeAmount !== null ? 1 : 0)
+  const open = rows.filter((r) => r.public && r.category !== 'other' && !(r.deadline && r.deadline < today))
+  const queues = PUBLIC_CATEGORIES.map((c) =>
+    open
+      .filter((r) => r.category === c.id)
+      .sort((a, b) => richness(b) - richness(a) || (a.firstSeenAt < b.firstSeenAt ? 1 : a.firstSeenAt > b.firstSeenAt ? -1 : 0)),
+  )
+  const out: PublicOpportunity[] = []
+  while (out.length < size && queues.some((q) => q.length)) {
+    for (const q of queues) {
+      const r = q.shift()
+      if (!r || out.length >= size) continue
+      out.push({
+        category: r.category as PublicCategory,
+        name: r.name,
+        organizer: r.organizer,
+        kind: r.kind,
+        url: r.category === 'sync' ? null : r.url,
+        deadline: r.deadline,
+        deadlineNote: r.deadlineNote,
+        location: r.location,
+        feeAmount: r.feeAmount,
+        feeCurrency: r.feeCurrency,
+      })
+    }
   }
   return out
 }
@@ -241,6 +272,13 @@ export function fillMissing(existing: CatalogFacts, next: CatalogFacts): Partial
   const patch: Partial<CatalogFacts> = {}
   for (const key of ['organizer', 'kind', 'url', 'deadline', 'deadlineNote', 'location', 'country'] as const) {
     if (!existing[key] && next[key]) patch[key] = next[key]
+  }
+  // The fee is one fact in three columns, so it is filled as a unit: an
+  // amount from one sighting beside a currency from another would be a figure
+  // nobody stated.
+  if (existing.feeAmount === null && next.feeAmount !== null) {
+    patch.feeAmount = next.feeAmount
+    patch.feeCurrency = next.feeCurrency
   }
   return patch
 }

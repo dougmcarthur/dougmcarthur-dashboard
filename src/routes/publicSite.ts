@@ -3,7 +3,8 @@
  * `PUBLIC_API_PREFIXES` — so each is written as if the whole internet is
  * calling it, because it is.
  *
- * `GET /opportunities` reads the shared catalog and nothing else: the table
+ * `GET /opportunities` returns a small mixed sample from the shared catalog,
+ * and reads that table and nothing else: the table
  * has no column for anything an artist decided, so no bug in here can print
  * one. `POST /invite-requests` stores a name, an address and a message from
  * somebody with no account, and rings the owner's bell. It sends no email —
@@ -22,7 +23,7 @@ import type { RootEnv } from '../context'
 import { ownerTenant } from '../lib/actor'
 import { recordEvent } from '../lib/notificationEvents'
 import { sha256Hex } from '../lib/auth'
-import { publicListing, type CatalogCategory } from '../../shared/opportunityCatalog'
+import { publicSample, type CatalogCategory } from '../../shared/opportunityCatalog'
 import {
   INVITE_REQUEST_LIMITS,
   inviteRequestTitle,
@@ -38,14 +39,14 @@ site.get('/opportunities', async (c) => {
     .orderBy(desc(opportunities.firstSeenAt))
     .limit(400)
   const today = new Date().toISOString().slice(0, 10)
-  const listing = publicListing(
+  const sample = publicSample(
     rows.map((r) => ({ ...r, category: r.category as CatalogCategory, public: r.public === 1 })),
     today,
   )
   // Minutes-stale is fine for a page about calls that close in weeks, and it
   // keeps a busy landing page from being a D1 read per visitor.
   c.header('Cache-Control', 'public, max-age=300')
-  return c.json({ categories: listing, asOf: today })
+  return c.json({ sample, asOf: today })
 })
 
 const RequestSchema = z.object({

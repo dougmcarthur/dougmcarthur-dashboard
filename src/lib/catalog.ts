@@ -152,12 +152,16 @@ export async function runCatalogBackfillOnce(env: Env, tenants: TenantId[]): Pro
         location: gigOpportunities.location,
         country: gigOpportunities.country,
         discoveredAt: gigOpportunities.discoveredAt,
+        feeAmount: gigOpportunities.feeAmount,
+        feeCurrency: gigOpportunities.feeCurrency,
         status: gigOpportunities.status,
         outcome: gigOpportunities.outcome,
         flag: gigOpportunities.flag,
       })
       .from(gigOpportunities)
-      .where(scoped(gigOpportunities, tenant, isNull(gigOpportunities.opportunityId)))
+      // Every row, linked or not: v2 exists to carry the fee into entries v1
+      // already made. Re-linking lands on the same entry and only fills gaps.
+      .where(scoped(gigOpportunities, tenant))
     for (const gig of gigs) {
       // Nobody recorded who filed the rows that predate the catalog. One the
       // artist never touched is a research find; one already applied to,
