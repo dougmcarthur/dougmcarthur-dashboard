@@ -76,6 +76,33 @@ describe('API route registration', () => {
     expect(res.status).toBe(403)
   })
 
+  // Public, so no credential — and still validated before anything is stored.
+  it('POST /api/public/invite-requests answers without a session and refuses a bad address', async () => {
+    const res = await app.request(
+      '/api/public/invite-requests',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Sam', email: 'not-an-address', message: 'I play fiddle and want to apply more.' }),
+      },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('POST /api/public/invite-requests gives a bot the ordinary answer and stores nothing', async () => {
+    const res = await app.request(
+      '/api/public/invite-requests',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Bot', email: 'bot@example.com', message: 'Buy cheap things now please', website: 'x' }),
+      },
+      emptyEnv,
+    )
+    expect(res.status).toBe(200)
+  })
+
   it('PUT /api/stage-plot refuses an instrument it does not know', async () => {
     const res = await request('/api/stage-plot', {
       method: 'PUT',

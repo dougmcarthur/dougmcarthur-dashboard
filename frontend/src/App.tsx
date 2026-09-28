@@ -22,6 +22,12 @@ export default function App() {
   // The feedback form's "before that" trail. In memory only; see diagnostics.ts.
   useEffect(() => notePage(window.location.hash), [page, arg])
 
+  // The signed-out routes, opened while signed in, mean the Overview.
+  useEffect(() => {
+    if (page === 'welcome' || page === 'signin') navigate('overview')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
+
   /**
    * Two surfaces, and the app renders one of them.
    *

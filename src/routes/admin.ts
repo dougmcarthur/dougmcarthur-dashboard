@@ -27,7 +27,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { asc, desc, eq, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
-import { feedback, tenants, usageDaily, users } from '../db/schema'
+import { feedback, inviteRequests, opportunities, tenants, usageDaily, users } from '../db/schema'
 import { asTenantId } from '../db/scope'
 import { adminOf, type AdminEnv } from '../context'
 import { elevationState } from '../../shared/auth'
@@ -220,6 +220,78 @@ admin.post('/feedback/:id/read', async (c) => {
     .update(feedback)
     .set({ readAt: new Date().toISOString() })
     .where(eq(feedback.id, id))
+  return c.json({ ok: true })
+})
+
+/**
+ * Requests for an invitation from the landing page, newest first. A stranger's
+ * name, address and reason; nothing here grants anything. Issuing an
+ * invitation is still `POST /invites`, behind a passkey touch, and the owner
+ * types or confirms the address there.
+ */
+admin.get('/invite-requests', async (c) => {
+  const rows = await getDb(c.env.DB)
+    .select({
+      id: inviteRequests.id,
+      name: inviteRequests.name,
+      email: inviteRequests.email,
+      message: inviteRequests.message,
+      status: inviteRequests.status,
+      createdAt: inviteRequests.createdAt,
+      handledAt: inviteRequests.handledAt,
+    })
+    .from(inviteRequests)
+    .orderBy(desc(inviteRequests.createdAt))
+    .limit(200)
+  return c.json({ items: rows })
+})
+
+admin.patch(
+  '/invite-requests/:id',
+  zValidator('json', z.object({ status: z.enum(['new', 'invited', 'declined']) })),
+  async (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isInteger(id)) return c.json({ error: 'not found' }, 404)
+    const { status } = c.req.valid('json')
+    await getDb(c.env.DB)
+      .update(inviteRequests)
+      .set({ status, handledAt: status === 'new' ? null : new Date().toISOString() })
+      .where(eq(inviteRequests.id, id))
+    return c.json({ ok: true })
+  },
+)
+
+/**
+ * The shared catalog, as the landing page will show it, with the switch that
+ * takes an entry off it. Reads the catalog only — listing facts that belong to
+ * nobody — so nothing here reaches an artist's rows.
+ */
+admin.get('/listings', async (c) => {
+  const rows = await getDb(c.env.DB)
+    .select({
+      id: opportunities.id,
+      category: opportunities.category,
+      name: opportunities.name,
+      organizer: opportunities.organizer,
+      url: opportunities.url,
+      deadline: opportunities.deadline,
+      location: opportunities.location,
+      public: opportunities.public,
+      firstSeenAt: opportunities.firstSeenAt,
+    })
+    .from(opportunities)
+    .orderBy(desc(opportunities.firstSeenAt))
+    .limit(100)
+  return c.json({ items: rows.map((r) => ({ ...r, public: r.public === 1 })) })
+})
+
+admin.patch('/listings/:id', zValidator('json', z.object({ public: z.boolean() })), async (c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) return c.json({ error: 'not found' }, 404)
+  await getDb(c.env.DB)
+    .update(opportunities)
+    .set({ public: c.req.valid('json').public ? 1 : 0 })
+    .where(eq(opportunities.id, id))
   return c.json({ ok: true })
 })
 

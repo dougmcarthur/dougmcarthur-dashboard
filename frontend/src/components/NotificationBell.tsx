@@ -118,6 +118,7 @@ const KIND_ICON: Record<NotificationKind, string> = {
   digest: 'mail',
   reconcile: 'swap',
   feedback: 'mail',
+  signup: 'mail',
 }
 
 const TIER_ICON: Record<NotificationTier, string> = {
