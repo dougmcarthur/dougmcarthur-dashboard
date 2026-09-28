@@ -21,10 +21,10 @@
 export const GOALS = [
   { id: 'gigs', label: 'Find gigs, festivals and showcases' },
   { id: 'grants', label: 'Find grants, awards and funding' },
-  { id: 'sync', label: 'Pitch music for film, TV and ads' },
-  { id: 'applications', label: 'Spend less time filling in applications' },
-  { id: 'tracking', label: 'Keep track of deadlines and replies' },
-  { id: 'promo', label: 'Plan promotion around releases' },
+  { id: 'sync', label: 'Pitch my music for film, TV and ads' },
+  { id: 'applications', label: 'Spend less time on applications' },
+  { id: 'tracking', label: 'Stay on top of deadlines and replies' },
+  { id: 'promo', label: 'Plan promotion around a release' },
 ] as const
 
 export type GoalId = (typeof GOALS)[number]['id']
@@ -33,7 +33,7 @@ export type GoalId = (typeof GOALS)[number]['id']
 export const REACH = [
   { id: 'home', label: 'My province' },
   { id: 'canada', label: 'Across Canada' },
-  { id: 'us', label: 'The US' },
+  { id: 'us', label: 'The United States' },
   { id: 'international', label: 'Overseas' },
 ] as const
 
@@ -135,28 +135,29 @@ export function onboardingSteps(facts: OnboardingFacts, goals: Goals | null): On
   const steps: OnboardingStep[] = [
     {
       id: 'name',
-      title: 'Tell Scout what to call you',
-      why: 'Your artist or project name, as it should appear on your account.',
+      title: 'Add your artist name',
+      why: 'The name you perform or release music under.',
       done: Boolean(facts.displayName),
       optional: false,
-      href: '#settings/account',
+      // Asked in the welcome questions, like goals, rather than on Settings.
+      href: null,
       action: 'Add your name',
     },
     {
       id: 'goals',
-      title: 'Say what you want from Scout',
-      why: 'Scout does a lot. This decides what it puts in front of you first.',
+      title: 'Tell Scout what you’re looking for',
+      why: 'Four quick questions. Your answers decide what Scout suggests first.',
       done: goals !== null && goals.goals.length > 0,
       optional: false,
       href: null,
-      action: 'Choose',
+      action: 'Start',
     },
     {
       id: 'profile',
       title: 'Build your artist profile',
       why:
-        'Your bio, links, photos and facts. Matching and application drafts read from it, so ' +
-        'an empty profile means every form field reads "nothing on file".',
+        'Your bio, links, photos and key facts. Scout fills in applications and pitches from ' +
+        'your profile, so until it has something, every answer comes up blank.',
       done: hasProfile,
       optional: false,
       href: '#artist',
@@ -169,8 +170,8 @@ export function onboardingSteps(facts: OnboardingFacts, goals: Goals | null): On
       id: 'google',
       title: 'Connect your Google account',
       why:
-        'So confirmed shows land on a calendar, deadlines become tasks, and drafts can go ' +
-        'to Gmail for you to send. Scout never sends anything itself.',
+        'Confirmed shows go on a calendar, deadlines become tasks, and drafts can wait in ' +
+        'your Gmail drafts folder. Scout never sends email for you.',
       done: facts.googleConnected,
       optional: false,
       href: '#settings/connections',
@@ -184,7 +185,7 @@ export function onboardingSteps(facts: OnboardingFacts, goals: Goals | null): On
     steps.push({
       id: 'shows',
       title: 'Connect Bandsintown',
-      why: 'Your upcoming shows appear on your profile and share page without typing them twice.',
+      why: 'Your upcoming shows appear on your profile and share page automatically.',
       done: facts.bandsintownConnected,
       optional: true,
       href: '#settings/connections',
@@ -194,10 +195,10 @@ export function onboardingSteps(facts: OnboardingFacts, goals: Goals | null): On
 
   steps.push({
     id: 'backup',
-    title: 'Add a second passkey',
+    title: 'Add a backup passkey',
     why:
-      'On another device or a password manager, so losing one phone does not mean waiting ' +
-      'for an emailed code.',
+      'On a second device or in a password manager, so losing your phone doesn’t lock you ' +
+      'out.',
     done: facts.passkeys >= 2,
     optional: true,
     href: '#settings/account',
@@ -221,9 +222,9 @@ export function nextSteps(goals: Goals | null): Array<{ label: string; href: str
   const wants = (id: GoalId) => goals?.goals.includes(id) ?? false
   const out: Array<{ label: string; href: string }> = []
   if (!goals || wants('gigs') || wants('grants') || wants('applications')) {
-    out.push({ label: 'Add an opportunity you already know about', href: '#gigs' })
+    out.push({ label: 'Add a gig or grant you already know about', href: '#gigs' })
   }
-  if (wants('sync')) out.push({ label: 'Start a list of music supervisors to pitch', href: '#sync' })
+  if (wants('sync')) out.push({ label: 'Add music supervisors to pitch', href: '#sync' })
   if (!goals || wants('tracking')) {
     out.push({ label: 'Choose where reminders go', href: '#settings/reminders' })
   }

@@ -4,6 +4,7 @@ import { api } from '../api'
 import { Card } from '../components/ui/Surface'
 import { Button } from '../components/ui/Button'
 import { OnboardingCard } from '../components/OnboardingCard'
+import { OnboardingFlow, type FlowScreen } from '../components/OnboardingFlow'
 import { FeedbackModal } from '../components/FeedbackModal'
 
 /**
@@ -18,6 +19,7 @@ import { FeedbackModal } from '../components/FeedbackModal'
 export function HelpPage() {
   const qc = useQueryClient()
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [flow, setFlow] = useState<FlowScreen | null>(null)
   const onboarding = useQuery({ queryKey: ['onboarding'], queryFn: api.onboarding.read })
   const show = useMutation({
     mutationFn: api.onboarding.show,
@@ -45,7 +47,10 @@ export function HelpPage() {
         </div>
       </header>
 
-      {onboarding.data && <OnboardingCard state={onboarding.data} showDone />}
+      {onboarding.data && <OnboardingCard state={onboarding.data} showDone onStart={setFlow} />}
+      {flow && onboarding.data && (
+        <OnboardingFlow state={onboarding.data} startAt={flow} onClose={() => setFlow(null)} />
+      )}
 
       <Section title="The screens">
         <Entry name="Overview">

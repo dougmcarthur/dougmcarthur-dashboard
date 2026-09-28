@@ -1456,9 +1456,16 @@ itself and one undone comes back. The only thing stored is what nothing else
 could answer: the goals the artist chose (`tenant_settings`,
 `onboarding.goals`) and whether they hid the card. It sits on the Overview
 until the required steps are done, suppresses "All clear" while it is up
-(true and misleading on an empty account), and never pops up. Help can show it
-again. It promises nothing about research running for an account nobody has
-set it up for.
+(true and misleading on an empty account), and Help can show it again. It
+promises nothing about research running for an account nobody has set it up
+for.
+
+The name and goals are asked full screen, one question per screen, driven by
+the keyboard (`OnboardingFlow`: Enter, letters, ↑/↓, Esc). It opens by itself
+once per tab for an account that has never answered, and never otherwise.
+Each answer saves as its screen is left, so Esc keeps what was said. **The
+page hosts it, not the card**: answering can complete the checklist, and the
+card unmounting took the questions with it mid-answer the first time.
 
 **Feedback is a form, not telemetry.** The header's question mark (the
 drawer, on a phone) opens Help and *Send feedback*. The form attaches the page,

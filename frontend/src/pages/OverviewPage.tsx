@@ -4,7 +4,9 @@ import { DecisionDeck } from '../components/DecisionDeck'
 import { TimingStrip } from '../components/TimingStrip'
 import { OpenEndedRow } from '../components/OpenEndedRow'
 import { DataHealthRow } from '../components/DataHealthRow'
-import { OnboardingCard } from '../components/OnboardingCard'
+import { OnboardingCard, useOnboardingAutostart } from '../components/OnboardingCard'
+import { OnboardingFlow, type FlowScreen } from '../components/OnboardingFlow'
+import { useState } from 'react'
 
 export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
   const qc = useQueryClient()
@@ -30,6 +32,10 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
   const onboarding = useQuery({ queryKey: ['onboarding'], queryFn: api.onboarding.read })
   const checklist =
     onboarding.data && !onboarding.data.hidden && !onboarding.data.complete ? onboarding.data : null
+  // Held here, not in the card: answering can complete the checklist, and the
+  // card unmounting must not close the questions mid-answer.
+  const [flow, setFlow] = useState<FlowScreen | null>(null)
+  useOnboardingAutostart(onboarding.data, setFlow)
 
   const patchGig = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Parameters<typeof api.gigs.patch>[1] }) =>
@@ -65,7 +71,10 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
     <div className="space-y-8">
       <h1 className="text-2xl font-semibold text-ink tracking-tight">Overview</h1>
 
-      {checklist && <OnboardingCard state={checklist} />}
+      {checklist && <OnboardingCard state={checklist} onStart={setFlow} />}
+      {flow && onboarding.data && (
+        <OnboardingFlow state={onboarding.data} startAt={flow} onClose={() => setFlow(null)} />
+      )}
 
       {/*
         One column until xl, then a main column and a rail.
