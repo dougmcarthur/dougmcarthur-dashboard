@@ -37,7 +37,10 @@ export const ONCE_KEYS = {
    * shared catalog. See src/lib/catalog.ts. Idempotent like the notes
    * backfill: a row already linked is skipped.
    */
-  catalogBackfill: 'once.catalogBackfill.v1',
+  // v2 revisits rows v1 already linked, to carry the stated fee (migration
+  // 0034) into the catalog. A later sighting only fills gaps, so a re-run
+  // changes nothing it already knew.
+  catalogBackfill: 'once.catalogBackfill.v2',
 } as const
 
 export const DIGEST_KEYS = {

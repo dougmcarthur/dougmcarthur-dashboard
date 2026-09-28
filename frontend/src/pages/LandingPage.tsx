@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api } from '../api'
-import { PUBLIC_CATEGORIES, type PublicOpportunity } from '../../../shared/opportunityCatalog'
+import { type PublicCategory, type PublicOpportunity } from '../../../shared/opportunityCatalog'
 import { INVITE_REQUEST_LIMITS, UNHANDLED_RETENTION_DAYS } from '../../../shared/inviteRequests'
 import { Button } from '../components/ui/Button'
 import { FIELD } from '../components/ui/Field'
@@ -11,10 +11,11 @@ import { Card, Label } from '../components/ui/Surface'
  * What a stranger sees: what Sun Dogs Music Scout is, a live sample of what it
  * finds, and a way to ask in.
  *
- * The lists are the real catalog — the most recent calls in each category that
- * have not closed — because "we find opportunities" is a claim, and ten of
- * them is the evidence. They come from `/api/public/opportunities`, which reads
- * a table with no column for anything an artist decided.
+ * The sample is real — a few open calls from the shared catalog, mixed across
+ * the categories — laid out the way the app lays them out, and faded at the
+ * bottom so it reads as an example rather than a feed. It comes from
+ * `/api/public/opportunities`, which reads a table with no column for anything
+ * an artist decided.
  *
  * Scout is invite-only, so the call to action is a request rather than a
  * sign-up: a name, an address and why. It creates nothing. The owner reads it
@@ -22,14 +23,6 @@ import { Card, Label } from '../components/ui/Surface'
  */
 
 const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-function closes(o: PublicOpportunity): string | null {
-  if (o.deadline) {
-    const [, m, d] = o.deadline.split('-').map(Number)
-    return `Closes ${MONTH[m - 1]} ${d}`
-  }
-  return o.deadlineNote
-}
 
 const WHAT_IT_DOES: Array<{ title: string; body: string }> = [
   {
@@ -96,7 +89,7 @@ export function LandingPage({ onSignIn }: { onSignIn: () => void }) {
               }}
               className="inline-flex items-center rounded-md border border-line-strong text-body hover:bg-sunken hover:text-ink px-4 py-2 text-sm transition-colors"
             >
-              See what it’s found
+              See an example
             </a>
           </div>
         </section>
@@ -115,7 +108,7 @@ export function LandingPage({ onSignIn }: { onSignIn: () => void }) {
           </div>
         </section>
 
-        <FoundLists />
+        <SamplePreview />
 
         <RequestInvitation />
       </main>
@@ -130,81 +123,134 @@ export function LandingPage({ onSignIn }: { onSignIn: () => void }) {
   )
 }
 
-function FoundLists() {
+const CATEGORY: Record<PublicCategory, { label: string; className: string }> = {
+  festival: { label: 'Festival', className: 'bg-cat-violet-bg text-cat-violet-fg border-cat-violet-line' },
+  showcase: { label: 'Showcase', className: 'bg-cat-sky-bg text-cat-sky-fg border-cat-sky-line' },
+  funding: { label: 'Funding', className: 'bg-cat-teal-bg text-cat-teal-fg border-cat-teal-line' },
+  sync: { label: 'Sync', className: 'bg-cat-orange-bg text-cat-orange-fg border-cat-orange-line' },
+}
+
+function CategoryPill({ category }: { category: PublicCategory }) {
+  const c = CATEGORY[category]
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${c.className}`}>
+      {c.label}
+    </span>
+  )
+}
+
+/**
+ * The fee as the listing stated it — "$1,200 USD" — or a dash. Never "Free":
+ * nothing stated is not the same as nothing charged, and which way a stated
+ * fee flows is not something the catalog claims to know.
+ */
+function feeText(o: PublicOpportunity): string {
+  if (o.feeAmount === null) return '—'
+  const amount = o.feeAmount.toLocaleString('en-CA', { maximumFractionDigits: 2 })
+  return `$${amount}${o.feeCurrency ? ` ${o.feeCurrency}` : ''}`
+}
+
+/** "Nov 7", with the year when it is not this year; the prose note when there is no date. */
+function closesText(o: PublicOpportunity, asOf: string): { text: string; note: boolean } {
+  if (o.deadline) {
+    const [y, m, d] = o.deadline.split('-').map(Number)
+    return { text: `${MONTH[m - 1]} ${d}${String(y) !== asOf.slice(0, 4) ? `, ${y}` : ''}`, note: false }
+  }
+  if (o.deadlineNote) return { text: o.deadlineNote, note: true }
+  return { text: 'Open', note: true }
+}
+
+/**
+ * A few real entries, in a small version of the app's own table — category,
+ * fee and closing date beside each name — faded at the bottom so it reads as
+ * an example of what members see rather than the list itself.
+ */
+function SamplePreview() {
   const listings = useQuery({ queryKey: ['public', 'opportunities'], queryFn: api.publicSite.opportunities })
+  const rows = listings.data?.sample ?? []
+  const asOf = listings.data?.asOf ?? ''
 
   return (
     <section id="found" aria-labelledby="found-title" className="space-y-6 scroll-mt-6">
       <div className="space-y-1">
         <h2 id="found-title" className="text-2xl font-semibold text-ink tracking-tight">
-          Recently found
+          A look inside
         </h2>
         <p className="text-sm text-muted">
-          The latest open calls Scout has gathered, ten in each category. Each links to the organiser’s own page.
+          A sample of real open calls Scout has gathered. Members see the whole list, sorted by what needs them first.
         </p>
       </div>
 
       {listings.isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {PUBLIC_CATEGORIES.map((c) => (
-            <div key={c.id} className="h-64 rounded-xl border border-line bg-surface animate-pulse" />
-          ))}
-        </div>
-      ) : listings.error ? (
-        <p className="text-sm text-muted">The list couldn’t be loaded just now. Try again in a minute.</p>
+        <div className="h-80 rounded-xl border border-line bg-surface animate-pulse" />
+      ) : listings.error || rows.length === 0 ? (
+        <p className="text-sm text-muted">The example couldn’t be loaded just now.</p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {PUBLIC_CATEGORIES.map((c) => (
-            <CategoryList key={c.id} title={c.label} items={listings.data?.categories[c.id] ?? []} sync={c.id === 'sync'} />
-          ))}
+        <div className="relative rounded-xl border border-line bg-surface shadow-raised overflow-hidden" aria-label="Example of Scout’s opportunity list">
+          {/* The window's top bar: enough chrome to say "this is the app". */}
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-line bg-sunken">
+            <div className="flex items-center gap-2">
+              <span className="flex gap-1.5" aria-hidden>
+                <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
+                <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
+                <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
+              </span>
+              <span className="ml-2 text-xs font-medium text-body">Opportunities</span>
+            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wide text-faint">Example</span>
+          </div>
+
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-muted border-b border-line">
+                <th scope="col" className="px-4 py-2 font-medium">Opportunity</th>
+                <th scope="col" className="px-3 py-2 font-medium hidden sm:table-cell">Category</th>
+                <th scope="col" className="px-3 py-2 font-medium hidden sm:table-cell">Fee</th>
+                <th scope="col" className="px-4 py-2 font-medium text-right">Closes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {rows.map((o, i) => {
+                const closes = closesText(o, asOf)
+                const where = [o.organizer && o.organizer !== o.name ? o.organizer : null, o.location].filter(Boolean).join(' · ')
+                return (
+                  <tr key={`${o.name}-${i}`}>
+                    <td className="px-4 py-2.5 align-top">
+                      <p className="font-medium text-ink leading-snug">{o.name}</p>
+                      <p className="text-xs text-muted mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        {/* On a phone the category and fee join this line. */}
+                        <span className="sm:hidden">
+                          <CategoryPill category={o.category} />
+                        </span>
+                        {where && <span>{where}</span>}
+                        <span className="sm:hidden">{feeText(o) !== '—' ? feeText(o) : ''}</span>
+                      </p>
+                    </td>
+                    <td className="px-3 py-2.5 align-top hidden sm:table-cell">
+                      <CategoryPill category={o.category} />
+                    </td>
+                    <td className="px-3 py-2.5 align-top hidden sm:table-cell text-body whitespace-nowrap">{feeText(o)}</td>
+                    <td className={`px-4 py-2.5 align-top text-right ${closes.note ? 'text-xs text-muted' : 'text-body whitespace-nowrap'}`}>
+                      <span className="inline-block max-w-[9rem] sm:max-w-[12rem] truncate align-top" title={closes.text}>
+                        {closes.text}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+
+          {/* The fade: the list keeps going, and this is where the example stops. */}
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-b from-surface/0 via-surface/80 to-surface flex items-end justify-center pb-5"
+            aria-hidden
+          >
+            <span className="text-xs font-medium text-muted">An example — members see the full list</span>
+          </div>
         </div>
       )}
     </section>
-  )
-}
-
-function CategoryList({ title, items, sync }: { title: string; items: PublicOpportunity[]; sync: boolean }) {
-  return (
-    <Card as="section" pad="none" clip>
-      <h3 className="px-4 py-3 text-sm font-semibold text-ink border-b border-line bg-sunken">{title}</h3>
-      {items.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-muted">Nothing new here yet — check back soon.</p>
-      ) : (
-        <ol className="divide-y divide-line">
-          {items.map((o, i) => (
-            <li key={`${o.name}-${i}`} className="px-4 py-2.5">
-              <Row o={o} sync={sync} />
-            </li>
-          ))}
-        </ol>
-      )}
-    </Card>
-  )
-}
-
-function Row({ o, sync }: { o: PublicOpportunity; sync: boolean }) {
-  // A date goes in the right-hand column; prose about the deadline ("rolling
-  // intake") joins the line under the name, where it can wrap without
-  // squeezing the title.
-  const meta = sync
-    ? [o.kind ? o.kind[0].toUpperCase() + o.kind.slice(1) : null]
-    : [o.organizer && o.organizer !== o.name ? o.organizer : null, o.location, o.deadline ? null : o.deadlineNote]
-  const when = sync || !o.deadline ? null : closes(o)
-  const name: ReactNode = o.url ? (
-    <a href={o.url} target="_blank" rel="noopener noreferrer" className="text-ink hover:text-accent underline-offset-2 hover:underline">
-      {o.name}
-    </a>
-  ) : (
-    <span className="text-ink">{o.name}</span>
-  )
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <div className="min-w-0">
-        <p className="text-sm font-medium truncate">{name}</p>
-        {meta.some(Boolean) && <p className="text-xs text-muted line-clamp-2">{meta.filter(Boolean).join(' · ')}</p>}
-      </div>
-      {when && <p className="shrink-0 text-xs text-muted whitespace-nowrap">{when}</p>}
-    </div>
   )
 }
 

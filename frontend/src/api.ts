@@ -2,7 +2,7 @@ import type { CredentialHealth } from '../../shared/credentialHealth'
 import type { FeedbackContext, FeedbackKind } from '../../shared/feedback'
 import type { GoalId, Goals, OnboardingStep, ReachId } from '../../shared/onboarding'
 import type { StagePlot } from '../../shared/stagePlot'
-import type { PublicCategory, PublicOpportunity } from '../../shared/opportunityCatalog'
+import type { PublicOpportunity } from '../../shared/opportunityCatalog'
 import type { InviteRequestStatus } from '../../shared/inviteRequests'
 import { noteError } from './diagnostics'
 import type { NudgePreferences } from '../../shared/nudgeRouting'
@@ -985,7 +985,7 @@ export const api = {
   /** The logged-out landing page. Public routes: no session needed or sent. */
   publicSite: {
     opportunities: () =>
-      apiFetch<{ categories: Record<PublicCategory, PublicOpportunity[]>; asOf: string }>('/public/opportunities'),
+      apiFetch<{ sample: PublicOpportunity[]; asOf: string }>('/public/opportunities'),
     requestInvite: (body: { name: string; email: string; message: string; website?: string }) =>
       apiFetch<{ ok: boolean; message: string }>('/public/invite-requests', { method: 'POST', body: JSON.stringify(body) }),
   },

@@ -663,6 +663,9 @@ export const opportunities = sqliteTable('opportunities', {
   location: text('location'),
   country: text('country'),
   public: integer('public').notNull().default(0),
+  /** The fee the listing states, uninterpreted. Migration 0034. */
+  feeAmount: real('fee_amount'),
+  feeCurrency: text('fee_currency'),
   firstSeenAt: text('first_seen_at').notNull(),
   lastSeenAt: text('last_seen_at').notNull(),
 })

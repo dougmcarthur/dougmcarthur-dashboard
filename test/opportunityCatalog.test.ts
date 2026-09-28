@@ -8,7 +8,7 @@ import {
   fillMissing,
   gigCategory,
   normaliseUrl,
-  publicListing,
+  publicSample,
   publishable,
   type CatalogRow,
 } from '../shared/opportunityCatalog'
@@ -80,12 +80,15 @@ describe('what may be published', () => {
       ...({ status: 'passed', fitRationale: 'pending Doug’s review', notes: 'private' } as object),
     })
     expect(Object.keys(facts).sort()).toEqual(
-      ['category', 'country', 'deadline', 'deadlineNote', 'kind', 'location', 'name', 'organizer', 'url'].sort(),
+      [
+        'category', 'country', 'deadline', 'deadlineNote', 'feeAmount', 'feeCurrency',
+        'kind', 'location', 'name', 'organizer', 'url',
+      ].sort(),
     )
   })
 })
 
-describe('publicListing', () => {
+describe('publicSample', () => {
   const row = (n: number, over: Partial<CatalogRow> = {}): CatalogRow => ({
     id: n,
     category: 'festival',
@@ -97,29 +100,63 @@ describe('publicListing', () => {
     deadlineNote: null,
     location: null,
     country: null,
+    feeAmount: null,
+    feeCurrency: null,
     public: true,
     firstSeenAt: `2026-09-${String(n).padStart(2, '0')}T00:00:00Z`,
     ...over,
   })
 
-  it('shows the ten most recently found per category', () => {
-    const rows = Array.from({ length: 14 }, (_, i) => row(i + 1))
-    const list = publicListing(rows, TODAY).festival
-    expect(list).toHaveLength(10)
-    expect(list[0].name).toBe('F14')
+  it('mixes the categories rather than showing eight of one', () => {
+    const rows = [
+      ...Array.from({ length: 10 }, (_, i) => row(i + 1)),
+      row(20, { category: 'funding' }),
+      row(21, { category: 'showcase' }),
+      row(22, { category: 'sync' }),
+    ]
+    const sample = publicSample(rows, TODAY, 8)
+    expect(sample).toHaveLength(8)
+    expect(new Set(sample.map((o) => o.category))).toEqual(new Set(['festival', 'funding', 'showcase', 'sync']))
+  })
+
+  it('puts entries with a closing date and a known fee first within a category', () => {
+    const sample = publicSample(
+      [row(9), row(1, { deadline: '2026-12-01', feeAmount: 25, feeCurrency: 'CAD' })],
+      TODAY,
+      1,
+    )
+    expect(sample[0].name).toBe('F1')
   })
 
   it('leaves out closed calls and hidden entries', () => {
-    const list = publicListing(
+    const sample = publicSample(
       [row(1, { deadline: '2026-09-01' }), row(2, { public: false }), row(3, { deadline: TODAY })],
       TODAY,
-    ).festival
-    expect(list.map((o) => o.name)).toEqual(['F3'])
+    )
+    expect(sample.map((o) => o.name)).toEqual(['F3'])
   })
 
   it('gives a sync entry no link', () => {
-    const list = publicListing([row(1, { category: 'sync', url: 'https://x.example' })], TODAY).sync
-    expect(list[0].url).toBeNull()
+    expect(publicSample([row(1, { category: 'sync' })], TODAY)[0].url).toBeNull()
+  })
+})
+
+describe('the stated fee', () => {
+  it('carries a stated amount, and never the row’s default currency on its own', () => {
+    expect(factsFromGig({ name: 'F', type: 'festival', feeAmount: 30, feeCurrency: 'CAD' })).toMatchObject({
+      feeAmount: 30,
+      feeCurrency: 'CAD',
+    })
+    // Every artist row defaults its currency to USD, amount or not; zero is
+    // not a stated fee either.
+    expect(factsFromGig({ name: 'F', type: 'festival', feeCurrency: 'USD' })).toMatchObject({ feeAmount: null, feeCurrency: null })
+    expect(factsFromGig({ name: 'F', type: 'festival', feeAmount: 0 })).toMatchObject({ feeAmount: null })
+  })
+
+  it('fills the amount and currency together, from one sighting', () => {
+    const first = factsFromGig({ name: 'F', type: 'festival' })
+    const later = factsFromGig({ name: 'F', type: 'festival', feeAmount: 20, feeCurrency: 'USD' })
+    expect(fillMissing(first, later)).toEqual({ feeAmount: 20, feeCurrency: 'USD' })
   })
 })
 
