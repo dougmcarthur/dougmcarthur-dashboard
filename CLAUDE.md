@@ -1483,7 +1483,15 @@ drops and the layout. The answers are one `tenant_settings` row
 (`stagePlot`), not a new table. `shared/stagePlotClues.ts` reads the
 documents and library for the line-up, members and named gear, with closed
 vocabularies and the quoting sentence, and the survey offers them as
-suggestions — nothing is filled in silently. Printing is the export. Photos,
+suggestions — nothing is filled in silently. Printing is the export.
+The drawing is line art in `pages/artist/stagePlotIcons.tsx` — every
+instrument the survey offers plus amp, wedge, mic, DI, power and in-ears —
+drawn in a 48 box with `currentColor` and non-scaling strokes, so it follows
+the theme and prints as vectors. Each performer is a station: held
+instruments beside them, keyboards and laptops in front, the amp behind, DI
+and power either side. Names only under a station; a role line collided with
+the next one on a front line of three. `stationScale` draws small acts larger
+and the layout moves the front line up to make room. Photos,
 videos and manufacturer spec pages are **not** read: that needs a model and
 a decision about who pays for it.
 

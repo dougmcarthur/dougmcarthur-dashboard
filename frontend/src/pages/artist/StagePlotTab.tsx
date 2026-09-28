@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
 import {
+  INSTRUMENTS,
   STAGE,
   channelCount,
   inputList,
@@ -10,6 +11,7 @@ import {
   performerName,
   performerRole,
   powerDrops,
+  stationScale,
   type Placed,
   type StagePlot,
 } from '../../../../shared/stagePlot'
@@ -18,6 +20,16 @@ import { Button } from '../../components/ui/Button'
 import { Caption, Card, EmptyState } from '../../components/ui/Surface'
 import { shortDate } from '../../format'
 import { StagePlotFlow } from './StagePlotFlow'
+import {
+  AmpDrawing,
+  DiDrawing,
+  Glyph,
+  IemDrawing,
+  InstrumentDrawing,
+  MicDrawing,
+  PowerDrawing,
+  WedgeDrawing,
+} from './stagePlotIcons'
 
 /**
  * The stage plot: the drawing, the input list, and what a tech needs to know
@@ -131,8 +143,8 @@ function PlotView({ plot, onEdit, onReset }: { plot: StagePlot; onEdit: () => vo
             {drops.length} power {drops.length === 1 ? 'drop' : 'drops'}
           </p>
         </div>
-        <StageDiagram placed={placed} />
-        <Legend />
+        <StageDiagram placed={placed} iem={plot.monitors === 'iem' || plot.monitors === 'both'} />
+        <Legend plot={plot} placed={placed} />
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr),minmax(0,2fr)]">
@@ -221,13 +233,14 @@ const SCALE = 10
 const W = STAGE.width * SCALE
 const D = STAGE.depth * SCALE
 
-function StageDiagram({ placed }: { placed: Placed[] }) {
+function StageDiagram({ placed, iem }: { placed: Placed[]; iem: boolean }) {
   let mix = 0
+  const k = stationScale(placed.length)
   return (
     <svg
       viewBox={`-20 -30 ${W + 40} ${D + 90}`}
       role="img"
-      aria-label={`Stage plot showing ${placed.map((p) => p.name).join(', ')}`}
+      aria-label={`Stage plot showing ${placed.map((p) => `${p.name}, ${p.role}`).join('; ')}`}
       className="w-full h-auto"
     >
       {/* The stage, back wall at the top. */}
@@ -246,64 +259,32 @@ function StageDiagram({ placed }: { placed: Placed[] }) {
       </text>
 
       {placed.map((p) => {
+        const wedgeNumber = p.wedge ? ++mix : 0
         const cx = p.x * SCALE
         const cy = p.y * SCALE
-        const wedgeNumber = p.wedge ? ++mix : 0
         return (
           <g key={p.performerId}>
-            {p.drums && (
-              // A kit: kick, snare, toms and two cymbals, around the drummer.
-              <g className="fill-surface stroke-line-strong" strokeWidth={2}>
-                <rect x={cx - 95} y={cy - 55} width={190} height={130} rx={10} strokeDasharray="6 6" className="fill-none stroke-line" />
-                <circle cx={cx} cy={cy + 42} r={30} />
-                <circle cx={cx - 45} cy={cy + 20} r={17} />
-                <circle cx={cx + 45} cy={cy + 20} r={20} />
-                <circle cx={cx - 22} cy={cy - 8} r={14} />
-                <circle cx={cx + 22} cy={cy - 8} r={14} />
-                <circle cx={cx - 75} cy={cy - 30} r={16} className="fill-raised" />
-                <circle cx={cx + 75} cy={cy - 30} r={16} className="fill-raised" />
-              </g>
-            )}
-            {p.amp && (
-              <g>
-                <rect x={cx - 34} y={cy - 92} width={68} height={40} rx={4} className="fill-raised stroke-line-strong" strokeWidth={2} />
-                <text x={cx} y={cy - 67} textAnchor="middle" className="fill-body" fontSize={14}>
-                  Amp
-                </text>
-              </g>
-            )}
-            {p.power && (
-              <g>
-                <rect x={cx + 40} y={cy - 48} width={40} height={24} rx={4} className="fill-warn-bg stroke-warn-line" strokeWidth={1.5} />
-                <text x={cx + 60} y={cy - 31} textAnchor="middle" className="fill-warn-fg" fontSize={13} fontWeight={600}>
-                  AC
-                </text>
-              </g>
-            )}
             {p.wedge && (
               <g>
-                <polygon
-                  points={`${p.wedge.x * SCALE - 32},${p.wedge.y * SCALE + 14} ${p.wedge.x * SCALE + 32},${p.wedge.y * SCALE + 14} ${p.wedge.x * SCALE + 22},${p.wedge.y * SCALE - 10} ${p.wedge.x * SCALE - 22},${p.wedge.y * SCALE - 10}`}
-                  className="fill-raised stroke-line-strong"
-                  strokeWidth={2}
-                />
-                <text x={p.wedge.x * SCALE} y={p.wedge.y * SCALE + 8} textAnchor="middle" className="fill-body" fontSize={13}>
+                <Glyph x={p.wedge.x * SCALE} y={p.wedge.y * SCALE} size={50 * k} className="text-body" title={`Monitor mix ${wedgeNumber}`}>
+                  <WedgeDrawing />
+                </Glyph>
+                <text
+                  x={p.wedge.x * SCALE}
+                  y={p.wedge.y * SCALE + 34 * k}
+                  textAnchor="middle"
+                  className="fill-body"
+                  fontSize={13 * k}
+                  fontWeight={600}
+                >
                   Mix {wedgeNumber}
                 </text>
               </g>
             )}
-            {!p.drums && <circle cx={cx} cy={cy} r={26} className="fill-accent-soft stroke-accent" strokeWidth={2.5} />}
-            {!p.drums && (
-              <text x={cx} y={cy + 7} textAnchor="middle" className="fill-ink" fontSize={20} fontWeight={700}>
-                {p.name.slice(0, 1).toUpperCase()}
-              </text>
-            )}
-            <text x={cx} y={p.drums ? cy + 100 : cy + 50} textAnchor="middle" className="fill-ink" fontSize={17} fontWeight={600}>
-              {p.name}
-            </text>
-            <text x={cx} y={p.drums ? cy + 120 : cy + 70} textAnchor="middle" className="fill-muted" fontSize={13}>
-              {p.role.length > 34 ? `${p.role.slice(0, 33)}…` : p.role}
-            </text>
+            {/* Scaled around its own centre; the layout already made room. */}
+            <g transform={`translate(${cx} ${cy}) scale(${k}) translate(${-cx} ${-cy})`}>
+              <Station p={p} iem={iem} />
+            </g>
           </g>
         )
       })}
@@ -311,21 +292,161 @@ function StageDiagram({ placed }: { placed: Placed[] }) {
   )
 }
 
-function Legend() {
+/**
+ * One performer's spot: the player, what they play and sing into, and what
+ * has to reach them — the amp behind, the DI and the power drop beside.
+ *
+ * Held instruments (a guitar, a fiddle) sit beside the player, angled as they
+ * are worn; instruments that stand in front of the player (a keyboard, a
+ * laptop, hand drums) go downstage of them, with the vocal mic moved to the
+ * side so the two do not stack. The kit is its own drawing, throne upstage.
+ */
+function Station({ p, iem }: { p: Placed; iem: boolean }) {
+  const cx = p.x * SCALE
+  const cy = p.y * SCALE
+  const held = p.instruments.filter((i) => INSTRUMENTS[i].placement === 'held')
+  const inFront = p.instruments.filter((i) => INSTRUMENTS[i].placement === 'front')
+  const sings = p.vocals !== 'none'
+
+  if (p.drums) {
+    const extras = p.instruments.filter((i) => i !== 'drums')
+    return (
+      <g>
+        <rect x={cx - 92} y={cy - 70} width={184} height={150} rx={10} strokeDasharray="6 6" className="fill-none stroke-line" strokeWidth={1.5} />
+        <Glyph x={cx} y={cy + 4} size={150} title="Drum kit">
+          <InstrumentDrawing id="drums" />
+        </Glyph>
+        {sings && (
+          <Glyph x={cx + 70} y={cy - 40} size={32} className="text-body" title="Vocal mic">
+            <MicDrawing />
+          </Glyph>
+        )}
+        {extras.map((id, k) => (
+          <Glyph key={id} x={cx - 118} y={cy - 20 + k * 56} size={50} title={INSTRUMENTS[id].label}>
+            <InstrumentDrawing id={id} />
+          </Glyph>
+        ))}
+        {iem && (
+          <Glyph x={cx - 70} y={cy - 48} size={26} className="text-body" title="In-ear monitors">
+            <IemDrawing />
+          </Glyph>
+        )}
+        <Label x={cx} y={cy + 96} name={p.name} role={p.role} />
+      </g>
+    )
+  }
+
+  // Beside the player, alternating sides, angled as a guitar is worn.
+  const heldAt = (k: number) => {
+    const side = k % 2 === 0 ? 1 : -1
+    const step = Math.floor(k / 2)
+    return { x: cx + side * (44 + step * 34), y: cy + 6, rotate: side * 28 }
+  }
+
   return (
-    <ul className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-3 rounded-full border-2 border-accent bg-accent-soft" aria-hidden /> Performer
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-4 rounded-sm border border-line-strong bg-raised" aria-hidden /> Amp
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-4 rounded-sm border border-warn-line bg-warn-bg" aria-hidden /> Power drop
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-4 border border-line-strong bg-raised [clip-path:polygon(0_100%,100%_100%,85%_0,15%_0)]" aria-hidden /> Monitor wedge
-      </li>
+    <g>
+      {p.amp && (
+        <Glyph x={cx} y={cy - 60} size={50} className="text-body" title="Amp">
+          <AmpDrawing />
+        </Glyph>
+      )}
+      {p.di && (
+        <Glyph x={cx - 60} y={cy - 46} size={38} className="text-body" title="DI">
+          <DiDrawing />
+        </Glyph>
+      )}
+      {p.power && (
+        <Glyph x={cx + 52} y={cy - 46} size={34} className="text-warn-fg" title="Power drop">
+          <PowerDrawing />
+        </Glyph>
+      )}
+      {iem && (
+        <Glyph x={cx - 20} y={cy - 34} size={24} className="text-body" title="In-ear monitors">
+          <IemDrawing />
+        </Glyph>
+      )}
+
+      {held.map((id, k) => {
+        const at = heldAt(k)
+        return (
+          <Glyph key={id} x={at.x} y={at.y} size={56} rotate={at.rotate} title={INSTRUMENTS[id].label}>
+            <InstrumentDrawing id={id} />
+          </Glyph>
+        )
+      })}
+
+      <circle cx={cx} cy={cy} r={20} className="fill-accent-soft stroke-accent" strokeWidth={2.5} />
+      <text x={cx} y={cy + 7} textAnchor="middle" className="fill-ink" fontSize={18} fontWeight={700}>
+        {p.name.slice(0, 1).toUpperCase()}
+      </text>
+
+      {inFront.map((id, k) => (
+        <Glyph
+          key={id}
+          x={cx + (k === 0 ? 0 : k % 2 ? 70 : -70)}
+          y={cy + 42}
+          width={id === 'keys' || id === 'synth' || id === 'pedal_steel' ? 92 : 58}
+          height={58}
+          title={INSTRUMENTS[id].label}
+        >
+          <InstrumentDrawing id={id} />
+        </Glyph>
+      ))}
+
+      {sings && (
+        <Glyph
+          x={inFront.length ? cx + 58 : cx}
+          y={inFront.length ? cy + 22 : cy + 34}
+          size={34}
+          className="text-body"
+          title={p.vocals === 'lead' ? 'Lead vocal mic' : 'Backing vocal mic'}
+        >
+          <MicDrawing />
+        </Glyph>
+      )}
+
+      <Label x={cx} y={cy + (inFront.length ? 86 : sings ? 68 : 48)} name={p.name} role={p.role} />
+    </g>
+  )
+}
+
+/**
+ * The performer's name under their station. Only the name: the drawings say
+ * what they play, and a role line wide enough to read collided with the next
+ * station's on any front line of three. The full role is in the SVG's title
+ * for a screen reader and in the line-up beside the plot.
+ */
+function Label({ x, y, name, role }: { x: number; y: number; name: string; role: string }) {
+  return (
+    <text x={x} y={y} textAnchor="middle" className="fill-ink" fontSize={17} fontWeight={600}>
+      <title>{`${name} — ${role}`}</title>
+      {name.length > 18 ? `${name.slice(0, 17)}…` : name}
+    </text>
+  )
+}
+
+/** A key to the drawing, with the same drawings at icon size, and only what the plot uses. */
+function Legend({ plot, placed }: { plot: StagePlot; placed: Placed[] }) {
+  const items: Array<{ label: string; draw: ReactNode; className?: string }> = []
+  const ids = [...new Set(plot.performers.flatMap((p) => p.instruments))]
+  for (const id of ids) items.push({ label: INSTRUMENTS[id].label, draw: <InstrumentDrawing id={id} /> })
+  if (plot.performers.some((p) => p.vocals !== 'none')) items.push({ label: 'Vocal mic', draw: <MicDrawing />, className: 'text-body' })
+  if (placed.some((p) => p.amp)) items.push({ label: 'Amp', draw: <AmpDrawing />, className: 'text-body' })
+  if (placed.some((p) => p.di)) items.push({ label: 'DI box', draw: <DiDrawing />, className: 'text-body' })
+  if (placed.some((p) => p.power)) items.push({ label: 'Power drop', draw: <PowerDrawing />, className: 'text-warn-fg' })
+  if (placed.some((p) => p.wedge)) items.push({ label: 'Monitor wedge', draw: <WedgeDrawing />, className: 'text-body' })
+  if (plot.monitors === 'iem' || plot.monitors === 'both') items.push({ label: 'In-ear monitors', draw: <IemDrawing />, className: 'text-body' })
+
+  return (
+    <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted">
+      {items.map((it) => (
+        <li key={it.label} className="flex items-center gap-1.5">
+          <svg viewBox="0 0 48 48" className={`h-6 w-6 shrink-0 ${it.className ?? 'text-ink'}`} aria-hidden>
+            {it.draw}
+          </svg>
+          {it.label}
+        </li>
+      ))}
     </ul>
   )
 }

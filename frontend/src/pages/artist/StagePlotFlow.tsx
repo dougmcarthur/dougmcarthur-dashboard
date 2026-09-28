@@ -27,6 +27,7 @@ import {
   Question,
   type FlowOption,
 } from '../../components/flow/QuestionFlow'
+import { InstrumentDrawing, MicDrawing } from './stagePlotIcons'
 
 /**
  * The stage-plot survey: how the artist performs, one question at a time.
@@ -76,8 +77,8 @@ const PLAYBACK_OPTIONS: FlowOption[] = [
 ]
 
 const VOCAL_OPTIONS: FlowOption[] = [
-  { id: 'vocals:lead', label: 'Lead vocals' },
-  { id: 'vocals:backing', label: 'Backing vocals' },
+  { id: 'vocals:lead', label: 'Lead vocals', icon: <MicDrawing /> },
+  { id: 'vocals:backing', label: 'Backing vocals', icon: <MicDrawing /> },
 ]
 
 function screensFor(plot: StagePlot): Screen[] {
@@ -190,7 +191,12 @@ export function StagePlotFlow({
     ...VOCAL_OPTIONS,
     ...INSTRUMENT_IDS.map((id) => {
       const clue = clueFor(id)
-      return { id, label: INSTRUMENTS[id].label, hint: clue ? `Mentioned in ${clue.source}` : undefined }
+      return {
+        id,
+        label: INSTRUMENTS[id].label,
+        hint: clue ? `Mentioned in ${clue.source}` : undefined,
+        icon: <InstrumentDrawing id={id} />,
+      }
     }),
   ]
   const gearOptions: FlowOption[] = clues.gear.map((g) => ({ id: g.item, label: g.item, hint: `From ${g.source}` }))
@@ -387,7 +393,7 @@ export function StagePlotFlow({
             step={who(i)}
             title={plot.act === 'solo' ? 'What do you play and sing?' : `What does ${performerName(p, i)} play and sing?`}
           >
-            Choose everything they use on stage.
+            {plot.act === 'solo' ? 'Choose everything you use on stage.' : 'Choose everything they use on stage.'}
           </Question>
           <OptionList label="Instruments" options={playOptions} selected={selected} onChoose={choose} />
           <Continue onClick={next} hint={<>Press a letter to choose, <Kbd>Enter</Kbd> to continue</>} />

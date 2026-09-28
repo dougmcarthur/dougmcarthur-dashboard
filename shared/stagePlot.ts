@@ -42,6 +42,11 @@ export interface InstrumentSpec {
   power: boolean
   /** Has an amp or cabinet to draw behind the player. */
   amp?: boolean
+  /**
+   * Where it sits on a plot: `held` is played in the hands beside the body
+   * (a guitar), `front` stands in front of the player (a keyboard, a laptop).
+   */
+  placement: 'held' | 'front' | 'kit'
 }
 
 export const INSTRUMENTS = {
@@ -50,6 +55,7 @@ export const INSTRUMENTS = {
     group: 4,
     zone: 'front',
     inputs: [{ label: 'Acoustic gtr', source: 'DI', phantom: true }],
+    placement: 'held',
     power: false,
   },
   electric_guitar: {
@@ -57,6 +63,7 @@ export const INSTRUMENTS = {
     group: 4,
     zone: 'front',
     inputs: [{ label: 'Elec gtr amp', source: 'Mic — SM57 or similar', stand: 'short boom' }],
+    placement: 'held',
     power: true,
     amp: true,
   },
@@ -65,6 +72,7 @@ export const INSTRUMENTS = {
     group: 3,
     zone: 'back',
     inputs: [{ label: 'Bass', source: 'DI' }],
+    placement: 'held',
     power: true,
     amp: true,
   },
@@ -73,6 +81,7 @@ export const INSTRUMENTS = {
     group: 3,
     zone: 'back',
     inputs: [{ label: 'Upright bass', source: 'DI (pickup)', phantom: true }],
+    placement: 'held',
     power: false,
   },
   drums: {
@@ -87,6 +96,7 @@ export const INSTRUMENTS = {
       { label: 'Floor tom', source: 'Mic — clip-on or SM57', stand: 'short boom' },
       { label: 'Overheads', source: 'Mic — condenser pair', stereo: true, phantom: true, stand: 'tall boom' },
     ],
+    placement: 'kit',
     power: false,
   },
   percussion: {
@@ -94,6 +104,7 @@ export const INSTRUMENTS = {
     group: 2,
     zone: 'back',
     inputs: [{ label: 'Perc', source: 'Mic — condenser pair', stereo: true, phantom: true, stand: 'tall boom' }],
+    placement: 'front',
     power: false,
   },
   keys: {
@@ -101,6 +112,7 @@ export const INSTRUMENTS = {
     group: 5,
     zone: 'back',
     inputs: [{ label: 'Keys', source: 'DI', stereo: true }],
+    placement: 'front',
     power: true,
   },
   synth: {
@@ -108,6 +120,7 @@ export const INSTRUMENTS = {
     group: 5,
     zone: 'back',
     inputs: [{ label: 'Synth', source: 'DI', stereo: true }],
+    placement: 'front',
     power: true,
   },
   piano: {
@@ -115,6 +128,7 @@ export const INSTRUMENTS = {
     group: 5,
     zone: 'back',
     inputs: [{ label: 'Piano', source: 'Mic — condenser pair', stereo: true, phantom: true, stand: 'tall boom' }],
+    placement: 'front',
     power: false,
   },
   fiddle: {
@@ -122,6 +136,7 @@ export const INSTRUMENTS = {
     group: 6,
     zone: 'front',
     inputs: [{ label: 'Fiddle', source: 'Mic or pickup DI', phantom: true, stand: 'tall boom' }],
+    placement: 'held',
     power: false,
   },
   cello: {
@@ -129,6 +144,7 @@ export const INSTRUMENTS = {
     group: 6,
     zone: 'front',
     inputs: [{ label: 'Cello', source: 'Mic or pickup DI', phantom: true, stand: 'short boom' }],
+    placement: 'held',
     power: false,
   },
   mandolin: {
@@ -136,6 +152,7 @@ export const INSTRUMENTS = {
     group: 6,
     zone: 'front',
     inputs: [{ label: 'Mandolin', source: 'Mic — small condenser', phantom: true, stand: 'tall boom' }],
+    placement: 'held',
     power: false,
   },
   banjo: {
@@ -143,6 +160,7 @@ export const INSTRUMENTS = {
     group: 6,
     zone: 'front',
     inputs: [{ label: 'Banjo', source: 'Mic — small condenser', phantom: true, stand: 'tall boom' }],
+    placement: 'held',
     power: false,
   },
   pedal_steel: {
@@ -150,6 +168,7 @@ export const INSTRUMENTS = {
     group: 6,
     zone: 'front',
     inputs: [{ label: 'Pedal steel amp', source: 'Mic — SM57 or similar', stand: 'short boom' }],
+    placement: 'front',
     power: true,
     amp: true,
   },
@@ -158,6 +177,7 @@ export const INSTRUMENTS = {
     group: 6,
     zone: 'front',
     inputs: [{ label: 'Harmonica', source: 'Mic — SM58 or harp mic', stand: 'tall boom' }],
+    placement: 'held',
     power: false,
   },
   accordion: {
@@ -165,6 +185,7 @@ export const INSTRUMENTS = {
     group: 6,
     zone: 'front',
     inputs: [{ label: 'Accordion', source: 'Mic or pickup DI', stand: 'tall boom' }],
+    placement: 'held',
     power: false,
   },
   trumpet: {
@@ -172,6 +193,7 @@ export const INSTRUMENTS = {
     group: 7,
     zone: 'front',
     inputs: [{ label: 'Trumpet', source: 'Mic — dynamic', stand: 'tall boom' }],
+    placement: 'held',
     power: false,
   },
   saxophone: {
@@ -179,6 +201,7 @@ export const INSTRUMENTS = {
     group: 7,
     zone: 'front',
     inputs: [{ label: 'Sax', source: 'Mic — dynamic or clip-on', stand: 'tall boom' }],
+    placement: 'held',
     power: false,
   },
   trombone: {
@@ -186,6 +209,7 @@ export const INSTRUMENTS = {
     group: 7,
     zone: 'front',
     inputs: [{ label: 'Trombone', source: 'Mic — dynamic', stand: 'tall boom' }],
+    placement: 'held',
     power: false,
   },
   laptop: {
@@ -193,6 +217,7 @@ export const INSTRUMENTS = {
     group: 8,
     zone: 'back',
     inputs: [{ label: 'Playback', source: 'DI', stereo: true }],
+    placement: 'front',
     power: true,
   },
 } satisfies Record<string, InstrumentSpec>
@@ -405,11 +430,12 @@ export function powerDrops(plot: StagePlot): string[] {
 // ── Layout ───────────────────────────────────────────────────────────────────
 
 /**
- * Stage coordinates: x 0–100 across, y 0–60 deep, y = 0 at the back wall and
- * 60 at the lip. The audience is below the drawing, so the performer's left
+ * Stage coordinates: x 0–100 across, y 0–72 deep, y = 0 at the back wall and
+ * 72 at the lip. Deep enough that a back-line wedge clears a front-line amp:
+ * each station needs an amp behind and a mic, keyboard and wedge in front. The audience is below the drawing, so the performer's left
  * (stage left) is on the right of the page, which is how plots are read.
  */
-export const STAGE = { width: 100, depth: 60 } as const
+export const STAGE = { width: 100, depth: 72 } as const
 
 export interface Placed {
   performerId: string
@@ -422,6 +448,11 @@ export interface Placed {
   power: boolean
   wedge: { x: number; y: number } | null
   drums: boolean
+  /** What to draw at the station. */
+  instruments: InstrumentId[]
+  vocals: Vocals
+  /** Any source on a DI, so the drawing can show the box. */
+  di: boolean
 }
 
 function zoneOf(p: Performer): Zone {
@@ -440,8 +471,19 @@ function spread(n: number, from: number, to: number): number[] {
   return Array.from({ length: n }, (_, i) => from + ((to - from) * i) / (n - 1))
 }
 
+/**
+ * How large each station is drawn. A solo act at band scale is a speck in an
+ * empty room, so few performers draw larger — and the layout accounts for it,
+ * moving the front line up so a bigger station and its wedge still fit.
+ */
+export function stationScale(count: number): number {
+  return count <= 1 ? 1.8 : count === 2 ? 1.5 : count === 3 ? 1.25 : 1
+}
+
 export function layoutStage(plot: StagePlot): Placed[] {
   const wedges = plot.monitors === 'wedges' || plot.monitors === 'both'
+  const scale = stationScale(plot.performers.length)
+  const frontY = 50 - (scale - 1) * 20
   const named = plot.performers.map((p, i) => ({ p, i, zone: zoneOf(p) }))
 
   const drummers = named.filter((n) => n.zone === 'drums')
@@ -466,17 +508,26 @@ export function layoutStage(plot: StagePlot): Placed[] {
       amp: n.p.instruments.some((i) => SPECS[i].amp),
       power: needsPower(n.p),
       drums: isDrums,
-      wedge: wedges ? (isDrums ? { x: x + 15, y: y + 2 } : { x, y: Math.min(STAGE.depth - 3, y + 11) }) : null,
+      instruments: n.p.instruments,
+      vocals: n.p.vocals,
+      di: n.p.instruments.some((i) => SPECS[i].inputs.some((inp) => /\bDI\b/.test(inp.source))),
+      // Downstage of the player, far enough for a mic stand and a keyboard
+      // to sit between them. The kit's goes beside it, on the hi-hat side.
+      wedge: wedges
+        ? isDrums
+          ? { x: x + 16, y: y + 4 }
+          : { x, y: Math.min(STAGE.depth - 4, y + (n.zone === 'front' ? 14 : 12) * scale) }
+        : null,
     })
   }
 
-  spread(drummers.length, 42, 58).forEach((x, k) => place(drummers[k], drummers.length ? x : 50, 16))
+  spread(drummers.length, 42, 58).forEach((x, k) => place(drummers[k], drummers.length ? x : 50, 18))
   // The back line flanks the kit when there is one, and spreads when there
   // is not.
   const backXs = drummers.length
     ? back.map((_, k) => (k % 2 === 0 ? 24 - Math.floor(k / 2) * 12 : 76 + Math.floor(k / 2) * 12))
     : spread(back.length, 25, 75)
-  back.forEach((n, k) => place(n, Math.max(8, Math.min(92, backXs[k])), 22))
+  back.forEach((n, k) => place(n, Math.max(8, Math.min(92, backXs[k])), 25))
   if (lead) {
     // The singer at 50 whatever the count, with the rest split either side —
     // an even front line would otherwise put nobody in the middle.
@@ -484,12 +535,12 @@ export function layoutStage(plot: StagePlot): Placed[] {
     const right = front.slice(front.indexOf(lead) + 1)
     const leftXs = left.length === 1 ? [30] : spread(left.length, 12, 34)
     const rightXs = right.length === 1 ? [70] : spread(right.length, 66, 88)
-    left.forEach((n, k) => place(n, leftXs[k], 40))
-    place(lead, 50, 40)
-    right.forEach((n, k) => place(n, rightXs[k], 40))
+    left.forEach((n, k) => place(n, leftXs[k], frontY))
+    place(lead, 50, frontY)
+    right.forEach((n, k) => place(n, rightXs[k], frontY))
   } else {
     const frontXs = front.length <= 1 ? [50] : spread(front.length, 16, 84)
-    front.forEach((n, k) => place(n, frontXs[k], 40))
+    front.forEach((n, k) => place(n, frontXs[k], frontY))
   }
 
   return out

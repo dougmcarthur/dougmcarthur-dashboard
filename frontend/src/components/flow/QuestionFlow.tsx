@@ -28,6 +28,8 @@ export interface FlowOption {
   label: string
   /** A second line, quieter. */
   hint?: string
+  /** A small drawing beside the label — an instrument, say. */
+  icon?: ReactNode
 }
 
 function isTyping(target: EventTarget | null): boolean {
@@ -273,6 +275,11 @@ export function OptionList({
             >
               {LETTERS[i]}
             </span>
+            {o.icon && (
+              <svg viewBox="0 0 48 48" className="h-7 w-7 shrink-0 text-body" aria-hidden>
+                {o.icon}
+              </svg>
+            )}
             <span className="flex-1 min-w-0">
               {o.label}
               {o.hint && <span className="block text-xs text-muted mt-0.5">{o.hint}</span>}
