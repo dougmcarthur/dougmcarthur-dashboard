@@ -200,12 +200,40 @@ function SamplePreview() {
             <span className="text-[11px] font-medium uppercase tracking-wide text-faint">Example</span>
           </div>
 
-          <table className="w-full text-sm">
+          {/* A phone gets two fixed lines per entry rather than the table: the
+              name and when it closes, then the category, place and fee. Folding
+              the table's columns into a wrapping line put the fee wherever it
+              happened to land. */}
+          <ul className="sm:hidden divide-y divide-line">
+            {rows.map((o, i) => {
+              const closes = closesText(o, asOf)
+              const fee = feeText(o)
+              return (
+                <li key={`${o.name}-${i}`} className="px-4 py-3 space-y-1.5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="font-medium text-sm text-ink truncate min-w-0">{o.name}</p>
+                    <p className={`shrink-0 max-w-[7rem] truncate text-right ${closes.note ? 'text-xs text-muted' : 'text-sm text-body'}`}>
+                      {closes.text}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <CategoryPill category={o.category} />
+                      {o.location && <span className="truncate">{o.location}</span>}
+                    </div>
+                    {fee !== '—' && <span className="shrink-0 text-body tabular-nums">{fee}</span>}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          <table className="hidden sm:table w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-muted border-b border-line">
                 <th scope="col" className="px-4 py-2 font-medium">Opportunity</th>
-                <th scope="col" className="px-3 py-2 font-medium hidden sm:table-cell">Category</th>
-                <th scope="col" className="px-3 py-2 font-medium hidden sm:table-cell">Fee</th>
+                <th scope="col" className="px-3 py-2 font-medium">Category</th>
+                <th scope="col" className="px-3 py-2 font-medium">Fee</th>
                 <th scope="col" className="px-4 py-2 font-medium text-right">Closes</th>
               </tr>
             </thead>
@@ -217,21 +245,14 @@ function SamplePreview() {
                   <tr key={`${o.name}-${i}`}>
                     <td className="px-4 py-2.5 align-top">
                       <p className="font-medium text-ink leading-snug">{o.name}</p>
-                      <p className="text-xs text-muted mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                        {/* On a phone the category and fee join this line. */}
-                        <span className="sm:hidden">
-                          <CategoryPill category={o.category} />
-                        </span>
-                        {where && <span>{where}</span>}
-                        <span className="sm:hidden">{feeText(o) !== '—' ? feeText(o) : ''}</span>
-                      </p>
+                      {where && <p className="text-xs text-muted mt-0.5">{where}</p>}
                     </td>
-                    <td className="px-3 py-2.5 align-top hidden sm:table-cell">
+                    <td className="px-3 py-2.5 align-top">
                       <CategoryPill category={o.category} />
                     </td>
-                    <td className="px-3 py-2.5 align-top hidden sm:table-cell text-body whitespace-nowrap">{feeText(o)}</td>
+                    <td className="px-3 py-2.5 align-top text-body whitespace-nowrap">{feeText(o)}</td>
                     <td className={`px-4 py-2.5 align-top text-right ${closes.note ? 'text-xs text-muted' : 'text-body whitespace-nowrap'}`}>
-                      <span className="inline-block max-w-[9rem] sm:max-w-[12rem] truncate align-top" title={closes.text}>
+                      <span className="inline-block max-w-[12rem] truncate align-top" title={closes.text}>
                         {closes.text}
                       </span>
                     </td>

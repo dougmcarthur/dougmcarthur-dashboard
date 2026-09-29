@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { addDays, snoozeOptions } from '../../../shared/snoozeOptions'
 import type { ReviewItem } from '../api'
 import { localToday, shortDate } from '../format'
@@ -12,6 +12,9 @@ import { localToday, shortDate } from '../format'
  * — an item due in two days has no useful date to defer to, but the person
  * looking at it may still know something the row does not.
  */
+const MENU_WIDTH = 256
+const GUTTER = 16
+
 export function SnoozeMenu({
   item,
   onPick,
@@ -24,6 +27,18 @@ export function SnoozeMenu({
   const [open, setOpen] = useState(false)
   const [custom, setCustom] = useState('')
   const box = useRef<HTMLDivElement>(null)
+  // Where the menu sits relative to its button. It opens leftward-aligned, and
+  // on a phone the button can be far enough right that a 16rem menu ran off
+  // the screen and widened the page, so it is nudged back inside a 16px gutter.
+  const [shift, setShift] = useState(0)
+
+  useLayoutEffect(() => {
+    if (!open || !box.current) return
+    const button = box.current.getBoundingClientRect()
+    const width = Math.min(MENU_WIDTH, window.innerWidth - 2 * GUTTER)
+    const left = Math.max(GUTTER, Math.min(button.left, window.innerWidth - GUTTER - width))
+    setShift(left - button.left)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -69,12 +84,14 @@ export function SnoozeMenu({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-20 w-64 rounded-xl border border-line bg-surface shadow-pop py-1">
+        <div
+          style={{ left: shift, width: `min(${MENU_WIDTH}px, calc(100vw - ${2 * GUTTER}px))` }}
+          className="absolute top-full mt-1 z-20 rounded-xl border border-line bg-surface shadow-pop py-1">
           {options.map((o) => (
             <button
               key={o.date}
               onClick={() => pick(o.date)}
-              className="w-full flex items-baseline justify-between gap-3 px-3 py-1.5 text-left text-xs hover:bg-sunken transition-colors"
+              className="w-full flex items-baseline justify-between gap-3 px-3 py-2.5 sm:py-1.5 text-left text-sm sm:text-xs hover:bg-sunken transition-colors"
             >
               <span className={o.derived ? 'text-ink font-medium' : 'text-body'}>
                 {o.label}
