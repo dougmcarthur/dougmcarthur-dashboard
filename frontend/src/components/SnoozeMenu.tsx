@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { addDays, snoozeOptions } from '../../../shared/snoozeOptions'
 import type { ReviewItem } from '../api'
 import { localToday, shortDate } from '../format'
@@ -30,15 +30,19 @@ export function SnoozeMenu({
   // Where the menu sits relative to its button. It opens leftward-aligned, and
   // on a phone the button can be far enough right that a 16rem menu ran off
   // the screen and widened the page, so it is nudged back inside a 16px gutter.
-  const [shift, setShift] = useState(0)
+  const [spot, setSpot] = useState({ left: 0, width: MENU_WIDTH })
 
-  useLayoutEffect(() => {
-    if (!open || !box.current) return
+  // Measured on the press, before the menu exists: once an overflowing menu
+  // is on screen a phone widens its layout viewport to fit it, and the width
+  // read back is the widened one.
+  const place = () => {
+    if (!box.current) return
     const button = box.current.getBoundingClientRect()
-    const width = Math.min(MENU_WIDTH, window.innerWidth - 2 * GUTTER)
-    const left = Math.max(GUTTER, Math.min(button.left, window.innerWidth - GUTTER - width))
-    setShift(left - button.left)
-  }, [open])
+    const viewport = document.documentElement.clientWidth
+    const width = Math.min(MENU_WIDTH, viewport - 2 * GUTTER)
+    const left = Math.max(GUTTER, Math.min(button.left, viewport - GUTTER - width))
+    setSpot({ left: left - button.left, width })
+  }
 
   useEffect(() => {
     if (!open) return
@@ -70,7 +74,10 @@ export function SnoozeMenu({
   return (
     <div className="relative" ref={box}>
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) place()
+          setOpen((o) => !o)
+        }}
         disabled={disabled}
         aria-expanded={open}
         title="Snooze"
@@ -85,7 +92,7 @@ export function SnoozeMenu({
 
       {open && (
         <div
-          style={{ left: shift, width: `min(${MENU_WIDTH}px, calc(100vw - ${2 * GUTTER}px))` }}
+          style={spot}
           className="absolute top-full mt-1 z-20 rounded-xl border border-line bg-surface shadow-pop py-1">
           {options.map((o) => (
             <button
@@ -112,17 +119,31 @@ export function SnoozeMenu({
               Or pick a date
             </label>
             <div className="flex gap-1.5">
-              <input
-                type="date"
-                value={custom}
-                min={tomorrow}
-                onChange={(e) => setCustom(e.target.value)}
-                className="flex-1 min-w-0 rounded-md border border-line px-2 py-1 text-xs"
-              />
+              {/* Safari on iOS draws an empty date input as a blank bar with no
+                  placeholder, so the hint is laid over it until a date is set —
+                  on iOS only (`-webkit-touch-callout`), because every other
+                  browser draws its own mm/dd/yyyy under it.
+                  16px text on a phone: anything smaller and iOS zooms the page
+                  on focus. */}
+              <div className="relative flex-1 min-w-0">
+                <input
+                  type="date"
+                  aria-label="Snooze until"
+                  value={custom}
+                  min={tomorrow}
+                  onChange={(e) => setCustom(e.target.value)}
+                  className="w-full min-h-10 sm:min-h-0 rounded-md border border-line px-2 py-1 text-base sm:text-xs"
+                />
+                {!custom && (
+                  <span className="hidden [@supports(-webkit-touch-callout:none)]:flex pointer-events-none absolute inset-y-0 left-2 items-center text-sm text-muted">
+                    Choose a date
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => custom && pick(custom)}
                 disabled={!custom || custom <= today}
-                className="text-xs px-2 py-1 rounded-md bg-accent text-accent-fg disabled:opacity-30 transition-colors"
+                className="text-sm sm:text-xs px-3 sm:px-2 py-1 rounded-md bg-accent text-accent-fg disabled:opacity-30 transition-colors"
               >
                 Set
               </button>
