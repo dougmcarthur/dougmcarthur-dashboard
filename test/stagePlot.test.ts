@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   channelCount,
+  channelsFor,
   emptyPlot,
   inputList,
   layoutStage,
@@ -136,5 +137,35 @@ describe('readClues', () => {
   it('finds named gear, and not a maker named on its own', () => {
     expect(clues.gear.map((g) => g.item)).toEqual(['Martin D-28', 'LR Baggs Venue DI', 'Ampeg SVT'])
     expect(readClues([{ source: 'x', text: 'I love Fender.' }]).gear).toEqual([])
+  })
+})
+
+describe('what a solo acoustic act asks for', () => {
+  const solo = (): StagePlot => {
+    const plot = emptyPlot('solo', 1, 'Doug')
+    plot.performers[0] = { ...plot.performers[0], instruments: ['acoustic_guitar'], vocals: 'lead' }
+    plot.monitors = 'iem'
+    return plot
+  }
+
+  it('never asks for phantom power on a pickup', () => {
+    const lines = inputList(solo())
+    expect(lines.find((l) => l.label === 'Acoustic gtr')?.phantom).toBe(false)
+  })
+
+  // A tuner, a pedal or a phone still needs a socket; "nothing needs power"
+  // is the line that gets no cable run.
+  it('still gets a power drop, at the singer', () => {
+    expect(powerDrops(solo())).toEqual(['Doug'])
+    expect(layoutStage(solo())[0].power).toBe(true)
+  })
+
+  it('numbers each source with the channel the input list gives it', () => {
+    const plot = solo()
+    const lines = inputList(plot)
+    expect(channelsFor(lines, 'p1', 'acoustic_guitar')).toBe('1')
+    expect(channelsFor(lines, 'p1', 'vocal')).toBe('2')
+    const kit = band()
+    expect(channelsFor(inputList(kit), 'p4', 'drums')).toBe('1–7')
   })
 })

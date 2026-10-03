@@ -5,13 +5,17 @@ import {
   INSTRUMENTS,
   STAGE,
   channelCount,
+  channelsFor,
   inputList,
+  instrumentSpec,
   layoutStage,
   monitorMixes,
   performerName,
   performerRole,
   powerDrops,
   stationScale,
+  stationSpread,
+  type InputLine,
   type Placed,
   type StagePlot,
 } from '../../../../shared/stagePlot'
@@ -143,7 +147,7 @@ function PlotView({ plot, onEdit, onReset }: { plot: StagePlot; onEdit: () => vo
             {drops.length} power {drops.length === 1 ? 'drop' : 'drops'}
           </p>
         </div>
-        <StageDiagram placed={placed} iem={plot.monitors === 'iem' || plot.monitors === 'both'} />
+        <StageDiagram placed={placed} lines={lines} iem={plot.monitors === 'iem' || plot.monitors === 'both'} />
         <Legend plot={plot} placed={placed} />
       </Card>
 
@@ -169,8 +173,11 @@ function PlotView({ plot, onEdit, onReset }: { plot: StagePlot; onEdit: () => vo
                 <tbody className="divide-y divide-line">
                   {lines.map((l) => (
                     <tr key={`${l.ch}-${l.label}`}>
-                      <td className="px-3 py-2 tabular-nums text-muted whitespace-nowrap">
-                        {l.stereo ? `${l.ch}–${l.ch + 1}` : l.ch}
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {/* The same mark the drawing puts beside the source, so the two can be matched by eye. */}
+                        <span className="inline-flex min-w-6 h-6 px-1.5 items-center justify-center rounded-full border border-ink text-xs font-semibold text-ink tabular-nums">
+                          {l.stereo ? `${l.ch}–${l.ch + 1}` : l.ch}
+                        </span>
                       </td>
                       <td className="px-3 py-2 text-ink">
                         {l.label}
@@ -233,9 +240,10 @@ const SCALE = 10
 const W = STAGE.width * SCALE
 const D = STAGE.depth * SCALE
 
-function StageDiagram({ placed, iem }: { placed: Placed[]; iem: boolean }) {
+function StageDiagram({ placed, lines, iem }: { placed: Placed[]; lines: InputLine[]; iem: boolean }) {
   let mix = 0
   const k = stationScale(placed.length)
+  const sp = stationSpread(placed.length)
   return (
     <svg
       viewBox={`-20 -30 ${W + 40} ${D + 90}`}
@@ -283,12 +291,40 @@ function StageDiagram({ placed, iem }: { placed: Placed[]; iem: boolean }) {
             )}
             {/* Scaled around its own centre; the layout already made room. */}
             <g transform={`translate(${cx} ${cy}) scale(${k}) translate(${-cx} ${-cy})`}>
-              <Station p={p} iem={iem} />
+              <Station p={p} iem={iem} sp={sp} lines={lines} />
             </g>
           </g>
         )
       })}
     </svg>
+  )
+}
+
+/**
+ * A channel number beside a source, matching the Ch column of the input list:
+ * the drawing says where a thing stands and the list says what it is, and the
+ * number is how a tech gets from one to the other.
+ */
+function ChannelMark({ x, y, ch }: { x: number; y: number; ch: string | null }) {
+  if (!ch) return null
+  const w = Math.max(22, ch.length * 8 + 10)
+  return (
+    <g>
+      <title>{`Channel ${ch}`}</title>
+      <rect x={x - w / 2} y={y - 11} width={w} height={22} rx={11} className="fill-surface stroke-ink" strokeWidth={1.5} />
+      <text x={x} y={y + 4.5} textAnchor="middle" className="fill-ink" fontSize={13} fontWeight={700}>
+        {ch}
+      </text>
+    </g>
+  )
+}
+
+/** A word under a piece of gear that carries no channel — "DI", "Power", "Amp". */
+function GearCaption({ x, y, children }: { x: number; y: number; children: ReactNode }) {
+  return (
+    <text x={x} y={y} textAnchor="middle" className="fill-muted" fontSize={11} fontWeight={600} letterSpacing={0.5}>
+      {children}
+    </text>
   )
 }
 
@@ -300,13 +336,24 @@ function StageDiagram({ placed, iem }: { placed: Placed[]; iem: boolean }) {
  * are worn; instruments that stand in front of the player (a keyboard, a
  * laptop, hand drums) go downstage of them, with the vocal mic moved to the
  * side so the two do not stack. The kit is its own drawing, throne upstage.
+ *
+ * `sp` spreads the gear away from the player without enlarging it, so a small
+ * act's station fills its stage instead of huddling in the middle.
  */
-function Station({ p, iem }: { p: Placed; iem: boolean }) {
+function Station({ p, iem, sp, lines }: { p: Placed; iem: boolean; sp: number; lines: InputLine[] }) {
   const cx = p.x * SCALE
   const cy = p.y * SCALE
   const held = p.instruments.filter((i) => INSTRUMENTS[i].placement === 'held')
   const inFront = p.instruments.filter((i) => INSTRUMENTS[i].placement === 'front')
   const sings = p.vocals !== 'none'
+  const ch = (feed: InputLine['feed']) => channelsFor(lines, p.performerId, feed)
+  // An instrument whose input is a mic on its amp is numbered at the amp.
+  const onAmp = (id: (typeof p.instruments)[number]) => {
+    const spec = instrumentSpec(id)
+    return spec?.amp === true && spec.inputs.every((i) => i.source.startsWith('Mic'))
+  }
+  const ampChannels = p.instruments.filter(onAmp).map(ch).filter(Boolean).join(', ') || null
+  const o = (n: number) => n * sp
 
   if (p.drums) {
     const extras = p.instruments.filter((i) => i !== 'drums')
@@ -316,20 +363,35 @@ function Station({ p, iem }: { p: Placed; iem: boolean }) {
         <Glyph x={cx} y={cy + 4} size={150} title="Drum kit">
           <InstrumentDrawing id="drums" />
         </Glyph>
+        <ChannelMark x={cx - 70} y={cy - 56} ch={ch('drums')} />
         {sings && (
-          <Glyph x={cx + 70} y={cy - 40} size={32} className="text-body" title="Vocal mic">
-            <MicDrawing />
-          </Glyph>
+          <>
+            <Glyph x={cx + 70} y={cy - 40} size={32} className="text-body" title="Vocal mic">
+              <MicDrawing />
+            </Glyph>
+            <ChannelMark x={cx + 96} y={cy - 56} ch={ch('vocal')} />
+          </>
         )}
-        {extras.map((id, k) => (
-          <Glyph key={id} x={cx - 118} y={cy - 20 + k * 56} size={50} title={INSTRUMENTS[id].label}>
-            <InstrumentDrawing id={id} />
-          </Glyph>
+        {extras.map((id, n) => (
+          <g key={id}>
+            <Glyph x={cx - 118} y={cy - 20 + n * 56} size={50} title={INSTRUMENTS[id].label}>
+              <InstrumentDrawing id={id} />
+            </Glyph>
+            <ChannelMark x={cx - 146} y={cy - 40 + n * 56} ch={ch(id)} />
+          </g>
         ))}
         {iem && (
-          <Glyph x={cx - 70} y={cy - 48} size={26} className="text-body" title="In-ear monitors">
+          <Glyph x={cx - 30} y={cy - 56} size={26} className="text-body" title="In-ear monitors">
             <IemDrawing />
           </Glyph>
+        )}
+        {p.power && (
+          <g>
+            <Glyph x={cx + 118} y={cy + 30} size={30} className="text-warn-fg" title="Power drop">
+              <PowerDrawing />
+            </Glyph>
+            <GearCaption x={cx + 118} y={cy + 58}>POWER</GearCaption>
+          </g>
         )}
         <Label x={cx} y={cy + 96} name={p.name} role={p.role} />
       </g>
@@ -337,41 +399,56 @@ function Station({ p, iem }: { p: Placed; iem: boolean }) {
   }
 
   // Beside the player, alternating sides, angled as a guitar is worn.
-  const heldAt = (k: number) => {
-    const side = k % 2 === 0 ? 1 : -1
-    const step = Math.floor(k / 2)
-    return { x: cx + side * (44 + step * 34), y: cy + 6, rotate: side * 28 }
+  const heldAt = (n: number) => {
+    const side = n % 2 === 0 ? 1 : -1
+    const step = Math.floor(n / 2)
+    return { x: cx + side * o(44 + step * 34), y: cy + 6, rotate: side * 28 }
   }
+  const micAt = inFront.length ? { x: cx + o(58), y: cy + o(22) } : { x: cx, y: cy + o(34) }
 
   return (
     <g>
       {p.amp && (
-        <Glyph x={cx} y={cy - 60} size={50} className="text-body" title="Amp">
-          <AmpDrawing />
-        </Glyph>
+        <g>
+          <Glyph x={cx} y={cy - o(60)} size={50} className="text-body" title="Amp">
+            <AmpDrawing />
+          </Glyph>
+          {ampChannels ? <ChannelMark x={cx + 36} y={cy - o(60) - 18} ch={ampChannels} /> : <GearCaption x={cx} y={cy - o(60) - 30}>AMP</GearCaption>}
+        </g>
       )}
       {p.di && (
-        <Glyph x={cx - 60} y={cy - 46} size={38} className="text-body" title="DI">
-          <DiDrawing />
-        </Glyph>
+        <g>
+          <Glyph x={cx - o(60)} y={cy - o(46)} size={38} className="text-body" title="DI">
+            <DiDrawing />
+          </Glyph>
+        </g>
       )}
       {p.power && (
-        <Glyph x={cx + 52} y={cy - 46} size={34} className="text-warn-fg" title="Power drop">
-          <PowerDrawing />
-        </Glyph>
+        <g>
+          <Glyph x={cx + o(56)} y={cy - o(46)} size={32} className="text-warn-fg" title="Power drop">
+            <PowerDrawing />
+          </Glyph>
+          <GearCaption x={cx + o(56)} y={cy - o(46) + 28}>POWER</GearCaption>
+        </g>
       )}
       {iem && (
-        <Glyph x={cx - 20} y={cy - 34} size={24} className="text-body" title="In-ear monitors">
-          <IemDrawing />
-        </Glyph>
+        <g>
+          <Glyph x={cx - o(22)} y={cy - o(34)} size={24} className="text-body" title="In-ear monitors">
+            <IemDrawing />
+          </Glyph>
+          {sp > 1 && <GearCaption x={cx - o(22)} y={cy - o(34) + 26}>IEM</GearCaption>}
+        </g>
       )}
 
-      {held.map((id, k) => {
-        const at = heldAt(k)
+      {held.map((id, n) => {
+        const at = heldAt(n)
         return (
-          <Glyph key={id} x={at.x} y={at.y} size={56} rotate={at.rotate} title={INSTRUMENTS[id].label}>
-            <InstrumentDrawing id={id} />
-          </Glyph>
+          <g key={id}>
+            <Glyph x={at.x} y={at.y} size={56} rotate={at.rotate} title={INSTRUMENTS[id].label}>
+              <InstrumentDrawing id={id} />
+            </Glyph>
+            {!onAmp(id) && <ChannelMark x={at.x + (at.x > cx ? 30 : -30)} y={at.y + 30} ch={ch(id)} />}
+          </g>
         )
       })}
 
@@ -380,32 +457,29 @@ function Station({ p, iem }: { p: Placed; iem: boolean }) {
         {p.name.slice(0, 1).toUpperCase()}
       </text>
 
-      {inFront.map((id, k) => (
-        <Glyph
-          key={id}
-          x={cx + (k === 0 ? 0 : k % 2 ? 70 : -70)}
-          y={cy + 42}
-          width={id === 'keys' || id === 'synth' || id === 'pedal_steel' ? 92 : 58}
-          height={58}
-          title={INSTRUMENTS[id].label}
-        >
-          <InstrumentDrawing id={id} />
-        </Glyph>
-      ))}
+      {inFront.map((id, n) => {
+        const x = cx + (n === 0 ? 0 : n % 2 ? o(70) : -o(70))
+        const wide = id === 'keys' || id === 'synth' || id === 'pedal_steel'
+        return (
+          <g key={id}>
+            <Glyph x={x} y={cy + o(42)} width={wide ? 92 : 58} height={58} title={INSTRUMENTS[id].label}>
+              <InstrumentDrawing id={id} />
+            </Glyph>
+            {!onAmp(id) && <ChannelMark x={x - (wide ? 52 : 36)} y={cy + o(42) - 18} ch={ch(id)} />}
+          </g>
+        )
+      })}
 
       {sings && (
-        <Glyph
-          x={inFront.length ? cx + 58 : cx}
-          y={inFront.length ? cy + 22 : cy + 34}
-          size={34}
-          className="text-body"
-          title={p.vocals === 'lead' ? 'Lead vocal mic' : 'Backing vocal mic'}
-        >
-          <MicDrawing />
-        </Glyph>
+        <g>
+          <Glyph x={micAt.x} y={micAt.y} size={34} className="text-body" title={p.vocals === 'lead' ? 'Lead vocal mic' : 'Backing vocal mic'}>
+            <MicDrawing />
+          </Glyph>
+          <ChannelMark x={micAt.x + 26} y={micAt.y + 4} ch={ch('vocal')} />
+        </g>
       )}
 
-      <Label x={cx} y={cy + (inFront.length ? 86 : sings ? 68 : 48)} name={p.name} role={p.role} />
+      <Label x={cx} y={cy + (inFront.length ? o(42) + 46 : sings ? micAt.y - cy + 34 : 48)} name={p.name} role={p.role} />
     </g>
   )
 }

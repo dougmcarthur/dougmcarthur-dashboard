@@ -1479,7 +1479,13 @@ full-screen shell as the welcome questions) asks what a musician knows
 offhand — solo, duo or band, who plays and sings what, named gear, monitors,
 playback — and `shared/stagePlot.ts` derives the rest: the input list in
 console order, stereo pairs, phantom power, stands, monitor mixes, power
-drops and the layout. The answers are one `tenant_settings` row
+drops and the layout. Every source on the drawing carries its channel
+number from the input list (`channelsFor`), so the two can be checked
+against each other. A pickup never asks for phantom power, and every plot
+asks for at least one power drop (`poweredPerformers`) — "nothing needs
+power" is how a solo act arrives to no socket for its tuner. An act of three
+or fewer with no kit stands in one line, and a small act's gear is spread
+(`stationSpread`) rather than only scaled. The answers are one `tenant_settings` row
 (`stagePlot`), not a new table. `shared/stagePlotClues.ts` reads the
 documents and library for the line-up, members and named gear, with closed
 vocabularies and the quoting sentence, and the survey offers them as
@@ -1492,7 +1498,9 @@ instruments beside them, keyboards and laptops in front, the amp behind, DI
 and power either side. Names only under a station; a role line collided with
 the next one on a front line of three. `stationScale` draws small acts larger
 and the layout moves the front line up to make room. Photos,
-videos and manufacturer spec pages are **not** read: that needs a model and
+videos, manufacturer spec pages and PDFs are **not** read — the artist's
+own Manitoba Music stage plot is a PDF whose words are drawn as shapes, so
+even a text extractor finds nothing in it: that needs a model and
 a decision about who pays for it.
 
 **Listing facts live once, in a shared catalog.** `opportunities` (migration

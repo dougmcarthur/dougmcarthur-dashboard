@@ -54,7 +54,10 @@ export const INSTRUMENTS = {
     label: 'Acoustic guitar',
     group: 4,
     zone: 'front',
-    inputs: [{ label: 'Acoustic gtr', source: 'DI', phantom: true }],
+    // A pickup never needs phantom power: a passive one has none to use and
+    // an active one carries its own battery. Whether the DI wants it is the
+    // engineer's call on their own box, not a line on the artist's plot.
+    inputs: [{ label: 'Acoustic gtr', source: 'DI' }],
     placement: 'held',
     power: false,
   },
@@ -80,7 +83,7 @@ export const INSTRUMENTS = {
     label: 'Upright bass',
     group: 3,
     zone: 'back',
-    inputs: [{ label: 'Upright bass', source: 'DI (pickup)', phantom: true }],
+    inputs: [{ label: 'Upright bass', source: 'DI (pickup)' }],
     placement: 'held',
     power: false,
   },
@@ -354,24 +357,37 @@ export interface InputLine {
   stand: string | null
   /** Who it belongs to, by name. */
   who: string
+  /** The performer it belongs to, so the drawing can number it; null for shared playback. */
+  performerId: string | null
+  /** What it is: an instrument, the performer's voice, or shared playback. */
+  feed: InstrumentId | 'vocal' | 'playback'
 }
 
 const VOCAL_GROUP = 9
 
 export function inputList(plot: StagePlot): InputLine[] {
-  type Pending = { group: number; order: number; spec: InputSpec; who: string }
+  type Pending = {
+    group: number
+    order: number
+    spec: InputSpec
+    who: string
+    performerId: string | null
+    feed: InputLine['feed']
+  }
   const pending: Pending[] = []
   let order = 0
   plot.performers.forEach((p, i) => {
     const who = performerName(p, i)
     for (const id of p.instruments) {
       const spec = SPECS[id]
-      for (const input of spec.inputs) pending.push({ group: spec.group, order: order++, spec: input, who })
+      for (const input of spec.inputs) {
+        pending.push({ group: spec.group, order: order++, spec: input, who, performerId: p.id, feed: id })
+      }
     }
   })
   // Playback asked separately, unless somebody already has a laptop on the list.
   if (plot.playback && !plot.performers.some((p) => p.instruments.includes('laptop'))) {
-    pending.push({ group: 8, order: order++, spec: SPECS.laptop.inputs[0], who: 'Playback' })
+    pending.push({ group: 8, order: order++, spec: SPECS.laptop.inputs[0], who: 'Playback', performerId: null, feed: 'playback' })
   }
   // Lead vocals first among the vocals, then backing in stage order.
   plot.performers.forEach((p, i) => {
@@ -386,12 +402,14 @@ export function inputList(plot: StagePlot): InputLine[] {
         stand: 'tall boom',
       },
       who,
+      performerId: p.id,
+      feed: 'vocal',
     })
   })
 
   pending.sort((a, b) => a.group - b.group || a.order - b.order)
   let ch = 1
-  return pending.map(({ spec, who }) => {
+  return pending.map(({ spec, who, performerId, feed }) => {
     const line: InputLine = {
       ch,
       label: spec.label,
@@ -400,10 +418,26 @@ export function inputList(plot: StagePlot): InputLine[] {
       phantom: Boolean(spec.phantom),
       stand: spec.stand ?? null,
       who,
+      performerId,
+      feed,
     }
     ch += spec.stereo ? 2 : 1
     return line
   })
+}
+
+/**
+ * The channel numbers one source takes, as the input list prints them — "3",
+ * "3–4", or "1–7" for a kit — so a number on the drawing can be found in the
+ * list. Null when the source has no line.
+ */
+export function channelsFor(lines: InputLine[], performerId: string | null, feed: InputLine['feed']): string | null {
+  const mine = lines.filter((l) => l.performerId === performerId && l.feed === feed)
+  if (mine.length === 0) return null
+  const first = mine[0].ch
+  const last = mine[mine.length - 1]
+  const end = last.stereo ? last.ch + 1 : last.ch
+  return first === end ? String(first) : `${first}–${end}`
 }
 
 /** Channels the list needs, counting a stereo pair as two. */
@@ -421,8 +455,28 @@ function needsPower(p: Performer): boolean {
   return p.instruments.some((i) => SPECS[i].power)
 }
 
+/**
+ * Who gets a power drop. Every plot asks for at least one: a solo acoustic act
+ * still has a tuner, a pedal, a phone running a set list — and a tech who reads
+ * "nothing needs power" will not run a cable, which is a worse surprise at
+ * soundcheck than one cable nobody used. The extra drop goes to whoever sings
+ * lead, or else the first person on the front line.
+ */
+export function poweredPerformers(plot: StagePlot): Set<string> {
+  const ids = new Set(plot.performers.filter(needsPower).map((p) => p.id))
+  if (ids.size === 0 && plot.performers.length > 0) {
+    const pick =
+      plot.performers.find((p) => p.vocals === 'lead') ??
+      plot.performers.find((p) => !p.instruments.includes('drums')) ??
+      plot.performers[0]
+    ids.add(pick.id)
+  }
+  return ids
+}
+
 export function powerDrops(plot: StagePlot): string[] {
-  const out = plot.performers.map((p, i) => (needsPower(p) ? performerName(p, i) : null)).filter((x): x is string => Boolean(x))
+  const powered = poweredPerformers(plot)
+  const out = plot.performers.map((p, i) => (powered.has(p.id) ? performerName(p, i) : null)).filter((x): x is string => Boolean(x))
   if (plot.playback && !plot.performers.some((p) => p.instruments.includes('laptop'))) out.push('Playback')
   return out
 }
@@ -477,20 +531,38 @@ function spread(n: number, from: number, to: number): number[] {
  * moving the front line up so a bigger station and its wedge still fit.
  */
 export function stationScale(count: number): number {
-  return count <= 1 ? 1.8 : count === 2 ? 1.5 : count === 3 ? 1.25 : 1
+  return count <= 1 ? 1.9 : count === 2 ? 1.5 : count === 3 ? 1.25 : 1
+}
+
+/**
+ * How far a station's gear sits from the player, on top of the scale. Scaling
+ * alone kept a solo act's DI, power and mic stacked against the player in the
+ * middle of an empty stage; a small act has the room to lay its gear out where
+ * it would actually stand, so each piece can be read and numbered.
+ */
+export function stationSpread(count: number): number {
+  return count <= 1 ? 2 : count === 2 ? 1.3 : count === 3 ? 1.1 : 1
 }
 
 export function layoutStage(plot: StagePlot): Placed[] {
   const wedges = plot.monitors === 'wedges' || plot.monitors === 'both'
   const scale = stationScale(plot.performers.length)
-  const frontY = 50 - (scale - 1) * 20
+  const reach = scale * stationSpread(plot.performers.length)
+  // With a wedge downstage the station moves up to make room for it; without
+  // one the player stands downstage, where a solo act actually stands.
+  const frontY = 50 - (reach - 1) * (wedges ? 9 : 3.5)
   const named = plot.performers.map((p, i) => ({ p, i, zone: zoneOf(p) }))
+  const powered = poweredPerformers(plot)
 
   const drummers = named.filter((n) => n.zone === 'drums')
-  const back = named.filter((n) => n.zone === 'back')
+  // Without a kit to build a back line around, an act of three or fewer stands
+  // in one line: a duo split front and back put the keyboard player directly
+  // behind the singer, the two stations drawn on top of each other.
+  const oneLine = drummers.length === 0 && named.length <= 3
+  const back = oneLine ? [] : named.filter((n) => n.zone === 'back')
   // Lead vocal in the middle of the front line, the rest either side in the
   // order they were listed.
-  const frontRaw = named.filter((n) => n.zone === 'front')
+  const frontRaw = oneLine ? named : named.filter((n) => n.zone === 'front')
   const lead = frontRaw.find((n) => n.p.vocals === 'lead')
   const others = frontRaw.filter((n) => n !== lead)
   const front = lead ? [...others.slice(0, Math.floor(others.length / 2)), lead, ...others.slice(Math.floor(others.length / 2))] : others
@@ -506,7 +578,7 @@ export function layoutStage(plot: StagePlot): Placed[] {
       x,
       y,
       amp: n.p.instruments.some((i) => SPECS[i].amp),
-      power: needsPower(n.p),
+      power: powered.has(n.p.id),
       drums: isDrums,
       instruments: n.p.instruments,
       vocals: n.p.vocals,
@@ -516,7 +588,7 @@ export function layoutStage(plot: StagePlot): Placed[] {
       wedge: wedges
         ? isDrums
           ? { x: x + 16, y: y + 4 }
-          : { x, y: Math.min(STAGE.depth - 4, y + (n.zone === 'front' ? 14 : 12) * scale) }
+          : { x, y: Math.min(STAGE.depth - 4 - 2 * scale, y + (n.zone === 'front' ? 14 : 12) * reach) }
         : null,
     })
   }
@@ -528,7 +600,10 @@ export function layoutStage(plot: StagePlot): Placed[] {
     ? back.map((_, k) => (k % 2 === 0 ? 24 - Math.floor(k / 2) * 12 : 76 + Math.floor(k / 2) * 12))
     : spread(back.length, 25, 75)
   back.forEach((n, k) => place(n, Math.max(8, Math.min(92, backXs[k])), 25))
-  if (lead) {
+  if (front.length === 2) {
+    // A pair shares the middle rather than one of them taking it.
+    front.forEach((n, k) => place(n, k === 0 ? 34 : 66, frontY))
+  } else if (lead) {
     // The singer at 50 whatever the count, with the rest split either side —
     // an even front line would otherwise put nobody in the middle.
     const left = front.slice(0, front.indexOf(lead))
