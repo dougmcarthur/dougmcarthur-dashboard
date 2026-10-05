@@ -256,7 +256,17 @@ export interface StagePlot {
   playback: boolean
   /** Anything the sound tech should know, verbatim. */
   notes: string | null
+  /**
+   * Where each person stands, when the artist has arranged it: performer ids
+   * per line, stage right to stage left. Null means the layout decides.
+   */
+  stage?: StageArrangement | null
   updatedAt: string | null
+}
+
+export interface StageArrangement {
+  upstage: string[]
+  downstage: string[]
 }
 
 export const MAX_PERFORMERS = 12
@@ -326,8 +336,17 @@ export function parseStagePlot(raw: string | null | undefined): StagePlot | null
     monitors: MONITORS.includes(o.monitors as Monitors) ? (o.monitors as Monitors) : 'wedges',
     playback: o.playback === true,
     notes: str(o.notes, NOTE_MAX) || null,
+    stage: parseArrangement(o.stage),
     updatedAt: typeof o.updatedAt === 'string' ? o.updatedAt : null,
   }
+}
+
+function parseArrangement(v: unknown): StageArrangement | null {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  const ids = (x: unknown) =>
+    Array.isArray(x) ? x.filter((i): i is string => typeof i === 'string').slice(0, MAX_PERFORMERS) : []
+  return { upstage: ids(o.upstage), downstage: ids(o.downstage) }
 }
 
 /** "Sam" or "Performer 2", never blank on a plot a tech has to read. */
@@ -619,4 +638,34 @@ export function layoutStage(plot: StagePlot): Placed[] {
   }
 
   return out
+}
+
+// ── Arrangement ──────────────────────────────────────────────────────────────
+
+/**
+ * Who stands where, as two lines read stage right to stage left: what the
+ * artist arranged, or what `layoutStage` would place. An arrangement saved
+ * before a performer was added still places them — anybody it does not name
+ * goes where the layout would put them — and an id nobody has any more is
+ * dropped, so editing the line-up never loses a person off the stage.
+ */
+export function stageLines(plot: StagePlot): StageArrangement {
+  const placed = layoutStage(plot)
+  const ids = new Set(plot.performers.map((p) => p.id))
+  // The layout's own split: whoever it put on the most downstage line is the
+  // front line, everybody else — the kit, the back line — is upstage.
+  const frontY = Math.max(...placed.map((p) => p.y))
+  const byX = (a: Placed, b: Placed) => a.x - b.x
+  const auto: StageArrangement = {
+    upstage: placed.filter((p) => frontY - p.y > 0.5).sort(byX).map((p) => p.performerId),
+    downstage: placed.filter((p) => frontY - p.y <= 0.5).sort(byX).map((p) => p.performerId),
+  }
+  const saved = plot.stage
+  if (!saved) return auto
+  const upstage = saved.upstage.filter((id) => ids.has(id))
+  const downstage = saved.downstage.filter((id, k, all) => ids.has(id) && !upstage.includes(id) && all.indexOf(id) === k)
+  const named = new Set([...upstage, ...downstage])
+  for (const id of auto.upstage) if (!named.has(id)) upstage.push(id)
+  for (const id of auto.downstage) if (!named.has(id)) downstage.push(id)
+  return { upstage: [...new Set(upstage)], downstage }
 }

@@ -198,6 +198,20 @@ export function readClues(sources: ClueSource[]): StagePlotClues {
   return clues
 }
 
+/**
+ * Which instrument a piece of named gear belongs to: the instrument it names
+ * ("Taylor 114ce acoustic guitar"), else the one its maker implies (Taylor),
+ * else null — a Fender or a Boss pedal could be anybody's.
+ */
+export function gearInstrument(item: string): InstrumentId | null {
+  const named = instrumentsIn(item)[0]
+  if (named) return named
+  for (const [maker, instrument] of MAKERS) {
+    if (instrument && new RegExp(`\\b${maker.replace(/ /g, '\\s')}\\b`, 'i').test(item)) return instrument
+  }
+  return null
+}
+
 /** How many separate things were found, for "Scout found 5 things". */
 export function clueCount(c: StagePlotClues): number {
   return (c.act ? 1 : 0) + c.members.length + c.instruments.length + c.gear.length

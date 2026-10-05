@@ -1490,7 +1490,17 @@ or fewer with no kit stands in one line, and a small act's gear is spread
 documents and library for the line-up, members and named gear, with closed
 vocabularies and the quoting sentence, and the survey offers them as
 suggestions — nothing is filled in silently. Printing is the export.
-The drawing is line art in `pages/artist/stagePlotIcons.tsx` — every
+**The stage is drawn as cards** (`pages/artist/StageCards.tsx`): each
+performer where they stand, upstage or downstage, read stage right to stage
+left (`stageLines`), with the library's press photo on the artist's own card
+and a row per instrument, voice, other named gear, monitor and power drop
+(`shared/stagePlotCards.ts`). Named gear goes on the instrument its maker or
+words say it belongs to; what cannot be placed is its own row rather than a
+guess. The artist can move people and the arrangement is stored as
+`stage` on the plot — an arrangement that misses somebody still places them.
+Connections are coloured by kind from their own `conn-*` tokens, since the
+categorical tokens are neutral on purpose; the toolbar switches to the
+monochrome print view, and paper is always monochrome. The line art is in `pages/artist/stagePlotIcons.tsx` — every
 instrument the survey offers plus amp, wedge, mic, DI, power and in-ears —
 drawn in a 48 box with `currentColor` and non-scaling strokes, so it follows
 the theme and prints as vectors. Each performer is a station: held
