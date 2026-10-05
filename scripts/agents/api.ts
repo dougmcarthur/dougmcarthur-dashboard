@@ -133,6 +133,31 @@ export const createSyncTarget = (cfg: ApiConfig, body: Record<string, unknown>) 
 export const createPromoDraft = (cfg: ApiConfig, body: Record<string, unknown>) =>
   create(cfg, '/promo', body, String(body.title))
 
+/** Stage plots and tech riders in the artist's library that nobody has read yet. */
+export async function listDocumentsToRead(
+  cfg: ApiConfig,
+): Promise<Array<{ assetId: number; label: string; url: string }>> {
+  const { documents } = await request<{ documents: Array<{ assetId: number; label: string; url: string }> }>(
+    cfg,
+    '/document-readings/pending',
+  )
+  return documents
+}
+
+/** A transcription of one document, filed against the library entry it came from. */
+export async function fileDocumentReading(
+  cfg: ApiConfig,
+  body: { assetId: number; url: string; text: string },
+): Promise<WriteResult> {
+  if (!cfg.apply) {
+    console.log(`  [dry run] would file a reading of document #${body.assetId}`)
+    return { created: false, wouldHave: `reading of #${body.assetId}` }
+  }
+  const { id } = await request<{ id: number }>(cfg, '/document-readings', { method: 'POST', body: JSON.stringify(body) })
+  console.log(`  filed a reading of document #${id}`)
+  return { created: true, id }
+}
+
 /**
  * The run's own heartbeat.
  *

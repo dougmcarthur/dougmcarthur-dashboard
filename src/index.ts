@@ -28,6 +28,7 @@ import profile from './routes/profile'
 import onboarding from './routes/onboarding'
 import feedbackRoute from './routes/feedback'
 import stagePlotRoute from './routes/stagePlot'
+import documentReadings from './routes/documentReadings'
 import publicSite from './routes/publicSite'
 import { runCatalogBackfillOnce } from './lib/catalog'
 import { pruneInviteRequests } from './lib/inviteRequests'
@@ -203,6 +204,7 @@ app.route('/api/profile', profile)
 app.route('/api/onboarding', onboarding)
 app.route('/api/feedback', feedbackRoute)
 app.route('/api/stage-plot', stagePlotRoute)
+app.route('/api/document-readings', documentReadings)
 app.route('/api/connectors/manitoba-music', manitobaMusic)
 app.route('/api/connectors/associations', associationsRoute)
 app.route('/api/connectors', connectors)

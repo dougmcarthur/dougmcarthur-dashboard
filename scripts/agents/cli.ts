@@ -44,6 +44,8 @@ import {
   createGig,
   createPromoDraft,
   createSyncTarget,
+  fileDocumentReading,
+  listDocumentsToRead,
   listGigs,
   listReferenceDocs,
   listSyncTargets,
@@ -144,6 +146,10 @@ async function call(tool: ToolName, cfg: ApiConfig, body: Record<string, unknown
     }
     case 'create_promo_draft':
       return createPromoDraft(cfg, body)
+    case 'list_documents_to_read':
+      return listDocumentsToRead(cfg)
+    case 'file_document_reading':
+      return fileDocumentReading(cfg, body as { assetId: number; url: string; text: string })
   }
 }
 

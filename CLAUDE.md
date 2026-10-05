@@ -1479,7 +1479,13 @@ full-screen shell as the welcome questions) asks what a musician knows
 offhand — solo, duo or band, who plays and sings what, named gear, monitors,
 playback — and `shared/stagePlot.ts` derives the rest: the input list in
 console order, stereo pairs, phantom power, stands, monitor mixes, power
-drops and the layout. The answers are one `tenant_settings` row
+drops and the layout. Every source on the drawing carries its channel
+number from the input list (`channelsFor`), so the two can be checked
+against each other. A pickup never asks for phantom power, and every plot
+asks for at least one power drop (`poweredPerformers`) — "nothing needs
+power" is how a solo act arrives to no socket for its tuner. An act of three
+or fewer with no kit stands in one line, and a small act's gear is spread
+(`stationSpread`) rather than only scaled. The answers are one `tenant_settings` row
 (`stagePlot`), not a new table. `shared/stagePlotClues.ts` reads the
 documents and library for the line-up, members and named gear, with closed
 vocabularies and the quoting sentence, and the survey offers them as
@@ -1491,9 +1497,16 @@ the theme and prints as vectors. Each performer is a station: held
 instruments beside them, keyboards and laptops in front, the amp behind, DI
 and power either side. Names only under a station; a role line collided with
 the next one on a front line of three. `stationScale` draws small acts larger
-and the layout moves the front line up to make room. Photos,
-videos and manufacturer spec pages are **not** read: that needs a model and
-a decision about who pays for it.
+and the layout moves the front line up to make room. **A stage plot PDF is read by a routine, not the Worker.** The artist's
+own Manitoba Music plot is a PDF whose every word is drawn as shapes, so a
+text extractor finds nothing. The `document-reader` routine — on the
+artist's Claude plan, not per-token credit — lists library documents labelled
+as a stage plot, rider or input list (`shared/documentReadings.ts`), opens
+each with Claude Code's file reader and files a transcription; the survey
+treats it as one more clue source, quoted and confirmed like the rest. The
+write is checked against the asset's current file address, so a changed file
+is read again. Photos, videos and manufacturer spec pages are still **not**
+read.
 
 **Listing facts live once, in a shared catalog.** `opportunities` (migration
 0033) holds what is true of a call for everybody — name, page, closing date,

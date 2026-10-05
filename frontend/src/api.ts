@@ -2,6 +2,7 @@ import type { CredentialHealth } from '../../shared/credentialHealth'
 import type { FeedbackContext, FeedbackKind } from '../../shared/feedback'
 import type { GoalId, Goals, OnboardingStep, ReachId } from '../../shared/onboarding'
 import type { StagePlot } from '../../shared/stagePlot'
+import type { DocumentReading } from '../../shared/documentReadings'
 import type { PublicOpportunity } from '../../shared/opportunityCatalog'
 import type { InviteRequestStatus } from '../../shared/inviteRequests'
 import { noteError } from './diagnostics'
@@ -994,6 +995,12 @@ export const api = {
     save: (plot: Omit<StagePlot, 'updatedAt'>) =>
       apiFetch<{ plot: StagePlot | null }>('/stage-plot', { method: 'PUT', body: JSON.stringify(plot) }),
     remove: () => apiFetch<{ plot: null }>('/stage-plot', { method: 'DELETE' }),
+  },
+  documentReadings: {
+    list: () =>
+      apiFetch<{ readings: DocumentReading[]; pending: Array<{ assetId: number; label: string; url: string }> }>(
+        '/document-readings',
+      ),
   },
   feedback: {
     send: (body: { kind: FeedbackKind; message: string; context: FeedbackContext }) =>

@@ -38,6 +38,8 @@ import {
   createGig,
   createPromoDraft,
   createSyncTarget,
+  fileDocumentReading,
+  listDocumentsToRead,
   listGigs,
   listReferenceDocs,
   listSyncTargets,
@@ -48,6 +50,7 @@ import {
 import {
   AGENTS,
   AGENTS_WITH_WEB_SEARCH,
+  ROUTINE_ONLY,
   TOOL_SPECS,
   TOOLS_BY_AGENT,
   isAgentId,
@@ -93,6 +96,14 @@ function toolsFor(agent: AgentId, cfg: ApiConfig, counter: { added: number }) {
       if (result.created) counter.added++
       return JSON.stringify(result)
     },
+    // Wired for completeness; main() refuses the agent that uses them, since
+    // reading a PDF needs a file reader this runner does not have.
+    list_documents_to_read: async () => JSON.stringify(await listDocumentsToRead(cfg)),
+    file_document_reading: async (input) => {
+      const result = await fileDocumentReading(cfg, input as { assetId: number; url: string; text: string })
+      if (result.created) counter.added++
+      return JSON.stringify(result)
+    },
   }
 
   const tools = TOOLS_BY_AGENT[agent].map((name) => {
@@ -127,6 +138,10 @@ async function main(): Promise<void> {
     process.exit(2)
   }
   const agent: AgentId = agentArg
+  if (ROUTINE_ONLY.includes(agent)) {
+    console.error(`${agent} runs as a Claude Code routine only — it reads files this runner cannot open. See docs/agent-routines.md.`)
+    process.exit(2)
+  }
   const apply = flags.includes('--apply')
 
   const token = process.env.SCOUT_API_TOKEN

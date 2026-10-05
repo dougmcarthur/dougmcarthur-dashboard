@@ -34,7 +34,8 @@ Nobody is watching this session while it runs.
    filed when the command failed.
 
 3. Where the prompt says to search the web, use WebSearch. To read a page, use
-   WebFetch.
+   WebFetch. To read a file the prompt names — a PDF in the artist's library —
+   download it with `curl` into `/tmp` and open it with your file reader.
 
 4. Finish — whatever happened, including when something went wrong — with
    exactly one `log_run`, carrying your final report as the summary:
