@@ -50,6 +50,7 @@ export function StagePlotTab() {
   const docs = useQuery({ queryKey: ['referenceDocs'], queryFn: api.referenceDocs.list })
   const library = useQuery({ queryKey: ['artist', '', ''], queryFn: () => api.artist.list() })
   const profile = useQuery({ queryKey: ['profile'], queryFn: api.profile.read })
+  const readings = useQuery({ queryKey: ['document-readings'], queryFn: api.documentReadings.list })
 
   const clues = useMemo(() => {
     const sources: ClueSource[] = [
@@ -57,9 +58,13 @@ export function StagePlotTab() {
       ...(library.data?.items ?? [])
         .filter((a) => !a.archived && (a.kind === 'bio' || a.kind === 'fact' || a.kind === 'document'))
         .map((a) => ({ source: a.label, text: [a.kind === 'document' ? '' : a.value, a.notes].filter(Boolean).join('\n') })),
+      // A stage plot or rider the document reader looked at for us — its
+      // words are drawn, so nothing else can read it.
+      ...(readings.data?.readings ?? []).map((r) => ({ source: r.label, text: r.text })),
     ]
     return readClues(sources)
-  }, [docs.data, library.data])
+  }, [docs.data, library.data, readings.data])
+  const waiting = readings.data?.pending ?? []
 
   const remove = useMutation({
     mutationFn: api.stagePlot.remove,
@@ -85,6 +90,7 @@ export function StagePlotTab() {
               Scout has already found some of the answers in your documents and will suggest them as you go.
             </p>
           )}
+          <WaitingNote waiting={waiting} />
           <Button variant="primary" onClick={() => setSurveying(true)}>
             Start
           </Button>
@@ -92,6 +98,7 @@ export function StagePlotTab() {
       ) : (
         <PlotView
           plot={current}
+          waiting={waiting}
           onEdit={() => setSurveying(true)}
           onReset={() => {
             if (confirm('Start the stage plot over? Your answers will be cleared.')) remove.mutate()
@@ -111,7 +118,35 @@ export function StagePlotTab() {
   )
 }
 
-function PlotView({ plot, onEdit, onReset }: { plot: StagePlot; onEdit: () => void; onReset: () => void }) {
+/**
+ * A stage plot or rider in the library that the document reader has not got
+ * to yet. Said, rather than left out, so "Scout didn't read my plot" has an
+ * answer on the page: it is waiting, and it is read on the next run. Not
+ * "its words are drawn" — that is why a reader exists, not something known
+ * about a file nobody has opened.
+ */
+function WaitingNote({ waiting }: { waiting: Array<{ assetId: number; label: string }> }) {
+  if (waiting.length === 0) return null
+  const names = waiting.map((w) => `“${w.label}”`).join(', ')
+  return (
+    <p className="text-sm text-muted max-w-prose print:hidden">
+      {names} {waiting.length === 1 ? 'is' : 'are'} waiting for the document reader, which looks at stage plots and
+      riders on its next run. What it finds is offered here as suggestions.
+    </p>
+  )
+}
+
+function PlotView({
+  plot,
+  waiting,
+  onEdit,
+  onReset,
+}: {
+  plot: StagePlot
+  waiting: Array<{ assetId: number; label: string }>
+  onEdit: () => void
+  onReset: () => void
+}) {
   const lines = inputList(plot)
   const placed = layoutStage(plot)
   const mixes = monitorMixes(plot)
@@ -227,6 +262,8 @@ function PlotView({ plot, onEdit, onReset }: { plot: StagePlot; onEdit: () => vo
           </Card>
         </div>
       </div>
+
+      <WaitingNote waiting={waiting} />
 
       <p className="text-xs text-faint print:hidden">
         Inputs are the usual choice for each instrument. If your rig is different, say so in the notes or the gear

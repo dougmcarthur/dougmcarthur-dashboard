@@ -1497,11 +1497,16 @@ the theme and prints as vectors. Each performer is a station: held
 instruments beside them, keyboards and laptops in front, the amp behind, DI
 and power either side. Names only under a station; a role line collided with
 the next one on a front line of three. `stationScale` draws small acts larger
-and the layout moves the front line up to make room. Photos,
-videos, manufacturer spec pages and PDFs are **not** read — the artist's
-own Manitoba Music stage plot is a PDF whose words are drawn as shapes, so
-even a text extractor finds nothing in it: that needs a model and
-a decision about who pays for it.
+and the layout moves the front line up to make room. **A stage plot PDF is read by a routine, not the Worker.** The artist's
+own Manitoba Music plot is a PDF whose every word is drawn as shapes, so a
+text extractor finds nothing. The `document-reader` routine — on the
+artist's Claude plan, not per-token credit — lists library documents labelled
+as a stage plot, rider or input list (`shared/documentReadings.ts`), opens
+each with Claude Code's file reader and files a transcription; the survey
+treats it as one more clue source, quoted and confirmed like the rest. The
+write is checked against the asset's current file address, so a changed file
+is read again. Photos, videos and manufacturer spec pages are still **not**
+read.
 
 **Listing facts live once, in a shared catalog.** `opportunities` (migration
 0033) holds what is true of a call for everybody — name, page, closing date,

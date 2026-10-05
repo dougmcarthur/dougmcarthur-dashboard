@@ -140,6 +140,7 @@ default branch, and migration 0022 applied, because that is where
    | `gig-festival-scan` | Mondays, 7am Winnipeg |
    | `sync-pitch-research` | Wednesdays, 7am Winnipeg |
    | `monthly-promo-checkin` | The 1st, 7am Winnipeg |
+   | `document-reader` | Fridays, 7am Winnipeg |
 
    **Model: Sonnet 5**, to spend less of the plan's allowance. If a run shows
    it struggling to parse things — `cli.ts` refusing its input again and
@@ -147,6 +148,15 @@ default branch, and migration 0022 applied, because that is where
    page, a report that contradicts what it filed — move that routine to
    Opus 5. The cost of a wrong row is a missed date, which is worth more than
    the allowance.
+
+   `document-reader` does no research. It asks Scout which stage plots and
+   tech riders in the library nobody has read (`list_documents_to_read`),
+   downloads each with `curl` and opens it with Claude Code's file reader —
+   which looks at the page, so a PDF whose words are drawn as shapes reads
+   fine — and files a plain-text transcription (`file_document_reading`).
+   Scout offers that text to the stage-plot survey as suggestions. It is
+   routine-only: `run.ts` cannot hand the model a file and refuses it. A week
+   with nothing new to read is one list call and a `log_run`.
 
 4. **Check one.** *Run now* on the routine, then read the run's transcript:
    a green status only means the session started and exited. A new row on

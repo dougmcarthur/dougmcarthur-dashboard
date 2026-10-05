@@ -16,11 +16,12 @@
 
 import { humanise } from './humanise'
 
-/** The three that exist today. Adding one here is a nicety, not a requirement. */
+/** The four that exist today. Adding one here is a nicety, not a requirement. */
 export const TASK_LABELS: Record<string, string> = {
   'gig-festival-scan': 'Gig research',
   'sync-pitch-research': 'Sync licensing research',
   'monthly-promo-checkin': 'Monthly promo check-in',
+  'document-reader': 'Document reader',
 }
 
 /**

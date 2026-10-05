@@ -12,12 +12,14 @@ import {
   listSyncTargets,
   logRun,
   resolveBaseUrl,
+  fileDocumentReading,
+  listDocumentsToRead,
   type ApiConfig,
 } from '../scripts/agents/api'
 import { TOOL_SPECS, fieldLines, inputProblem } from '../scripts/agents/tools'
 
 /**
- * An issued agent token reaches seven routes and nothing else.
+ * An issued agent token reaches nine routes and nothing else.
  *
  * The routines that hold one are Claude Code sessions with a shell, and the
  * proxy attaches their credential to any request for the host — so the list in
@@ -47,6 +49,8 @@ describe('what an issued agent token may call', () => {
       ['GET', '/api/artist'],
       ['POST', '/api/backfill/notes'],
       ['GET', '/api/admin/artists'],
+      ['GET', '/api/document-readings'],
+      ['POST', '/api/document-readings/pending'],
       ['GET', '/api//gigs'],
     ]
     for (const [method, path] of refused) {
@@ -91,8 +95,10 @@ describe('the agent runners ask only for what the Worker allows', () => {
     await createSyncTarget(cfg, { name: 'x' })
     await createPromoDraft(cfg, { title: 'x' })
     await logRun(cfg, { taskId: 'gig-festival-scan', status: 'ok', summary: 's', itemsAdded: 0 })
+    await listDocumentsToRead(cfg).catch(() => {})
+    await fileDocumentReading(cfg, { assetId: 1, url: 'https://x.test/plot.pdf', text: 't' })
 
-    expect(seen).toHaveLength(7)
+    expect(seen).toHaveLength(9)
     for (const { method, path } of seen) expect(agentMayCall(method, path), `${method} ${path}`).toBe(true)
   })
 
