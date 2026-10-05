@@ -9,6 +9,8 @@ import {
   parseStagePlot,
   performerRole,
   powerDrops,
+  performerPhoto,
+  NO_PHOTO,
   stageLines,
   type StagePlot,
 } from '../shared/stagePlot'
@@ -214,5 +216,31 @@ describe('the stage as cards', () => {
     const plot = band()
     plot.stage = { upstage: ['p4', 'p3'], downstage: ['p1', 'p2'] }
     expect(parseStagePlot(JSON.stringify(plot))?.stage).toEqual(plot.stage)
+  })
+})
+
+describe('a photo on each card', () => {
+  const press = { photo: 'https://img.example/doug.jpg', ownName: 'Sam' }
+
+  it("puts the press photo on the artist's own card only, until somebody chooses", () => {
+    const plot = band()
+    expect(plot.performers.map((_, i) => performerPhoto(plot, i, press))).toEqual([press.photo, null, null, null])
+  })
+
+  it('uses the photo chosen for each member, and honours "no photo"', () => {
+    const plot = band()
+    plot.performers[1].photo = 'https://img.example/jen.jpg'
+    plot.performers[0].photo = NO_PHOTO
+    expect(performerPhoto(plot, 1, press)).toBe('https://img.example/jen.jpg')
+    expect(performerPhoto(plot, 0, press)).toBeNull()
+  })
+
+  it('keeps a choice it can store and drops one it cannot', () => {
+    const plot = band()
+    plot.performers[1].photo = 'https://img.example/jen.jpg'
+    plot.performers[2].photo = 'javascript:alert(1)'
+    const back = parseStagePlot(JSON.stringify(plot))!
+    expect(back.performers[1].photo).toBe('https://img.example/jen.jpg')
+    expect(back.performers[2].photo).toBeUndefined()
   })
 })

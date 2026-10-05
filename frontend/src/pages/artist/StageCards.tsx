@@ -1,5 +1,6 @@
-import { useState, type DragEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import {
+  NO_PHOTO,
   performerName,
   performerRole,
   stageLines,
@@ -189,6 +190,116 @@ function Avatar({ name, photo }: { name: string; photo: string | null }) {
   return <Thumb src={photo} alt={name} className="h-14 w-14 shrink-0 rounded-lg object-cover" fallback={initial} />
 }
 
+export interface LibraryPhoto {
+  url: string
+  label: string
+}
+
+/**
+ * The card's picture, pressable to choose another: any photo in the library,
+ * no photo, or Scout's choice. The library is the only source — a photo that
+ * is not there yet is added on the Library tab, where its credit is asked for.
+ */
+function PhotoPicker({
+  name,
+  photo,
+  chosen,
+  photos,
+  onChoose,
+  busy,
+}: {
+  name: string
+  photo: string | null
+  /** What is stored: a URL, 'none', or nothing for Scout's choice. */
+  chosen: string | null | undefined
+  photos: LibraryPhoto[]
+  onChoose: (choice: string | null) => void
+  busy: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false)
+    }
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [open])
+
+  const pick = (choice: string | null) => {
+    setOpen(false)
+    onChoose(choice)
+  }
+  const option = (selected: boolean) =>
+    `rounded-lg border p-1 text-left transition-colors ${selected ? 'border-accent ring-1 ring-accent' : 'border-line hover:border-line-strong'}`
+
+  return (
+    <div className="relative shrink-0" ref={box}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={busy}
+        aria-expanded={open}
+        aria-label={`Choose a photo for ${name}`}
+        title="Choose a photo"
+        className="group relative block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
+      >
+        <Avatar name={name} photo={photo} />
+        {/* Always shown, not revealed on hover: a phone has no hover. */}
+        <span
+          aria-hidden
+          className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full border border-line-strong bg-surface text-muted group-hover:text-ink print:hidden"
+        >
+          <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+            <path d="M2 5.5h2.5L6 3.5h4l1.5 2H14v7H2z" />
+            <circle cx="8" cy="9" r="2.2" />
+          </svg>
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-3 shadow-pop space-y-2 print:hidden">
+          <p className="text-xs font-medium text-ink">Photo for {name}</p>
+          {photos.length === 0 ? (
+            <p className="text-xs text-muted leading-relaxed">
+              There are no photos in your library yet. Add one on the Library tab and it will be offered here.
+            </p>
+          ) : (
+            <ul className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto">
+              {photos.map((ph) => (
+                <li key={ph.url}>
+                  <button type="button" onClick={() => pick(ph.url)} className={`w-full ${option(chosen === ph.url)}`} title={ph.label}>
+                    <Thumb
+                      src={ph.url}
+                      alt={ph.label}
+                      className="aspect-square w-full rounded-md object-cover"
+                      fallback={<span className="grid aspect-square w-full place-items-center rounded-md bg-sunken text-[10px] text-muted">Can’t load</span>}
+                    />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            <Button variant={chosen === NO_PHOTO ? 'primary' : 'neutral'} size="sm" onClick={() => pick(NO_PHOTO)}>
+              No photo
+            </Button>
+            <Button variant={!chosen ? 'primary' : 'neutral'} size="sm" onClick={() => pick(null)}>
+              Let Scout choose
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Card({
   p,
   index,
@@ -201,11 +312,17 @@ function Card({
   arranging,
   move,
   onDragStart,
+  photos,
+  onChoosePhoto,
+  choosing,
 }: {
   p: Performer
   index: number
   rows: CardRow[]
   photo: string | null
+  photos: LibraryPhoto[]
+  onChoosePhoto: (choice: string | null) => void
+  choosing: boolean
   view: PlotViewOptions
   focus: Connection | null
   highlighted: boolean
@@ -226,7 +343,7 @@ function Card({
       } ${arranging ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
       <header className="flex items-center gap-3 p-3">
-        <Avatar name={name} photo={photo} />
+        <PhotoPicker name={name} photo={photo} chosen={p.photo} photos={photos} onChoose={onChoosePhoto} busy={choosing} />
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-ink leading-tight truncate">{name}</h3>
           <p className="text-xs text-muted leading-snug">{performerRole(p)}</p>
@@ -273,7 +390,13 @@ export function StageCards({
   onSaveArrangement,
   onCancelArrangement,
   saving,
+  photos,
+  onChoosePhoto,
+  choosingPhoto,
 }: {
+  photos: LibraryPhoto[]
+  onChoosePhoto: (performerId: string, choice: string | null) => void
+  choosingPhoto: boolean
   plot: StagePlot
   lines: InputLine[]
   view: PlotViewOptions
@@ -352,6 +475,9 @@ export function StageCards({
                 index={i}
                 rows={cardRows(plot, lines, p, mixOf(id))}
                 photo={photoFor(p, i)}
+                photos={photos}
+                onChoosePhoto={(choice) => onChoosePhoto(id, choice)}
+                choosing={choosingPhoto}
                 view={view}
                 focus={focus}
                 highlighted={hovered === id}

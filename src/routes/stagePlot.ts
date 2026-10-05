@@ -13,7 +13,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { tenantOf, type AppEnv } from '../context'
 import { clearTenantSetting, readTenantSetting, writeTenantSetting } from '../lib/nudgeSettings'
-import { INSTRUMENT_IDS, MAX_GEAR, MAX_PERFORMERS, NOTE_MAX, parseStagePlot } from '../../shared/stagePlot'
+import { INSTRUMENT_IDS, isPhotoChoice, MAX_GEAR, MAX_PERFORMERS, NOTE_MAX, parseStagePlot } from '../../shared/stagePlot'
 
 export const STAGE_PLOT_KEY = 'stagePlot'
 
@@ -27,6 +27,8 @@ const PlotSchema = z.object({
         instruments: z.array(z.enum(INSTRUMENT_IDS as [string, ...string[]])).max(INSTRUMENT_IDS.length),
         vocals: z.enum(['lead', 'backing', 'none']),
         gear: z.array(z.string().max(120)).max(MAX_GEAR),
+        // A library photo's address, 'none', or nothing for Scout's choice.
+        photo: z.string().refine(isPhotoChoice, 'A photo must be an https address.').nullable().optional(),
       }),
     )
     .min(1)

@@ -1492,8 +1492,9 @@ vocabularies and the quoting sentence, and the survey offers them as
 suggestions — nothing is filled in silently. Printing is the export.
 **The stage is drawn as cards** (`pages/artist/StageCards.tsx`): each
 performer where they stand, upstage or downstage, read stage right to stage
-left (`stageLines`), with the library's press photo on the artist's own card
-and a row per instrument, voice, other named gear, monitor and power drop
+left (`stageLines`), with a photo per card — any library photo the artist picks for that
+person, "no photo", or by default the press photo on the artist's own card
+only (`performerPhoto`) — and a row per instrument, voice, other named gear, monitor and power drop
 (`shared/stagePlotCards.ts`). Named gear goes on the instrument its maker or
 words say it belongs to; what cannot be placed is its own row rather than a
 guess. The artist can move people and the arrangement is stored as
