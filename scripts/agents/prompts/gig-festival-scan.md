@@ -166,6 +166,25 @@ says "rolling" or "TBC" or gives a month with no day, leave `deadline` empty
 and put the page's own words in `deadlineNote`. Do not convert prose into a
 date you cannot defend.
 
+`opensAt` follows the same rule, and it matters more than it looks, because it
+is the date Scout acts on. You never need to come back to a row to collect its
+form: for a gig the artist has said yes to, Scout goes back by itself — from
+the day the window opens it reads the gig's page every day for two weeks, then
+weekly, follows the Apply link to the form, and stages the questions. (With no
+`opensAt` it looks weekly.) What it needs from you is to be pointed at the right
+page:
+
+- File `opensAt` whenever the page states the day. A month — "check back in
+  September" — is not a day: leave `opensAt` empty and put the words in
+  `deadlineNote`.
+- `url` is the page the Apply link will appear on: the festival's artist or
+  performer page. Not its home page — Scout follows one link from the page it is
+  given, and the home page is two clicks from the form.
+- `applicationUrl` is only for a form you have opened and seen ask for an
+  application. Never guess one, and never file a newsletter or contact form
+  there. When the window has not opened there is no form yet, so leave it
+  empty.
+
 ## Ending the run
 
 When you have worked the sources you can, stop and write a short report as

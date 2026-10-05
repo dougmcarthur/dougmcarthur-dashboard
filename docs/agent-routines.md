@@ -63,6 +63,22 @@ reads festival pages written by strangers.
    under `--use-env-proxy` when a proxy is configured, so no session has to go
    looking.
 
+## Going back for a form is not an agent's job
+
+An agent files an opportunity when it finds one, which is often before its
+window opens, and it does not return to a row to collect the form. Scout does
+that itself on the daily tick (`src/lib/formRevisit.ts`): for a gig the artist
+has said yes to, from the day `opens_at` arrives, it re-reads the gig's page,
+follows the Apply link and stages the questions. A routine searching the web for
+a form would cost plan allowance, need a token that can write an address into a
+gig, and leave nothing behind if a run crashed.
+
+What that asks of the agents is in `gig-festival-scan.md`: file `opensAt` when a
+page states a day, leave it empty for a month, and point `url` at the page the
+Apply link is on rather than the home page. The route list above is unchanged —
+nothing here widened what a token may do. See
+[application-prep-plan.md](./application-prep-plan.md#going-back-to-a-form-that-was-not-there-the-first-time).
+
 ## What is weaker than in CI, said plainly
 
 - **The heartbeat is the agent's job.** `run.ts` posts it in a `finally` that a

@@ -57,8 +57,9 @@ website and the press photos are still unread.)
   (`src/routes/auth.ts`). This replaced Cloudflare Access, which emailed a
   one-time PIN; email is now only how you *add* a passkey. See
   [`docs/passkey-login.md`](docs/passkey-login.md).
-- **Integrations** — Google Calendar (three kinds of entry, reconciled against
-  a gig's state — see [The gig pipeline](#the-gig-pipeline)), Gmail
+- **Integrations** — Google Calendar and Tasks (booked shows on the calendar,
+  deadlines and openings as tasks, reconciled against a gig's state — see
+  [The gig pipeline](#the-gig-pipeline)), Gmail
   (`readonly`, reconciling sent pitches against sync targets and reading
   organisers' replies to applications), and Cloudflare
   Email Service for the weekly digest. All degrade gracefully when their
@@ -167,11 +168,22 @@ fails if either starts naming statuses inline again.
 
 ### What the calendar is allowed to say
 
-Three kinds of entry, and only the last is a gig:
+A calendar entry is a claim that **you have to be somewhere**, so by default the
+calendar carries one thing and the work goes to Google Tasks
+(`shared/nudgeRouting.ts`, [`docs/nudge-routing.md`](docs/nudge-routing.md)):
 
-1. **`Applications open — {name}`** on `opens_at`
-2. **`Apply by — {name}`** on the deadline, and again 7 days ahead
-3. **`{name}`** on the performance dates — written **only** at `booked`
+| Reminder | Goes to, by default |
+| --- | --- |
+| **`{name}`** on the performance dates — written **only** at `booked` | Calendar |
+| **`Applications open — {name}`**, due the day after `opens_at` | Tasks |
+| **`Apply by — {name}`** on the deadline, and again 7 days ahead | Tasks |
+| A reply you owe an organiser | Tasks |
+
+Each kind has its own destination setting, validated against what that kind can
+be — a show cannot become a task and a reply cannot become a calendar entry. The
+two window reminders can still be sent to the calendar, to both, or to neither.
+The two surfaces are independent: a reminder routed to Tasks is not written
+until Tasks is connected, and that never stops the calendar writing.
 
 Entries are reconciled against the row's resulting state rather than fired by
 transitions, because a transition handler missed rows that arrived already
@@ -190,6 +202,13 @@ Once a gig is `shortlisted`, its row on the Gigs screen carries an application
 panel: the questions the form actually asks, with an answer staged against each
 from the artist database, a checklist of what has to be attached, and — for
 opportunities submitted by mail — a draft email.
+
+**Scout goes back for the form.** Agents file an opportunity when they find it,
+often before its window opens. For a gig you have said yes to, the daily tick
+reads its page again — every day for two weeks from `opens_at`, then weekly; weekly
+throughout when there is no date — follows the Apply link to the form, stages the
+questions and rings the bell. It never changes the gig's status. See
+[`docs/application-prep-plan.md`](docs/application-prep-plan.md#going-back-to-a-form-that-was-not-there-the-first-time).
 
 **It drafts; it never submits.** An application filed by automation is a good
 way to be blacklisted, so the output is text you copy into somebody else's

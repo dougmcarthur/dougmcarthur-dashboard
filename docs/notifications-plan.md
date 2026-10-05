@@ -182,10 +182,17 @@ back. An event already happened and has nothing to return and tell you.
 dismiss then act on exactly the rows that were on screen when they were
 clicked, rather than on whatever the group has since become.
 
-**Nothing writes `reconcile` events yet.** Reconciling is something you start
-by clicking a button and then watch happen, so a notification saying it
-happened would be telling you what you just did. The kind stays defined for
-when a background reconciler exists.
+**`reconcile` events are written by the things that happen without you.** This
+paragraph used to say nothing wrote them, on the reasoning that reconciling is
+something you start with a button and then watch, so a notification would be
+telling you what you just did. Background reconcilers have since arrived, and
+three write them: the reply scan on the cron (`src/routes/replies.ts`, "3
+replies found in your mail"), the one-shot notes backfill (`src/routes/backfill.ts`),
+and a new artist joining through an invitation (`src/routes/auth.ts`, which goes
+to the owner). The reasoning stands for the button — a manual run does not
+announce itself — and `automation` is for scheduled research and scans that read
+something outside Scout: agent runs, profile re-reads, and the nightly look at
+application forms.
 
 **The pruning job reuses the feed builder** rather than deriving its own idea
 of which marks are live. A second definition would drift, and pruning against
