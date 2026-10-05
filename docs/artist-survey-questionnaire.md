@@ -4,6 +4,10 @@
 questionnaire, the reasoning behind it, and what we would compute from the
 answers, written before any code so it can be argued with cheaply.
 
+*Revised the same day: E2 and E3 were reworded, and A8 added, after comparing
+them with the Manitoba Arts Council's and Arts Nova Scotia's identification forms.
+See the end of section 8 for what was and was not found.*
+
 Decided already: it lives on Scout's own Worker, launches in English and is
 stored so French is a drop-in, goes first to the Manitoba Music network, and is
 fully anonymous. See the open decisions at the end.
@@ -162,6 +166,15 @@ None · 1 to 5 · 6 to 15 · 16 to 40 · More than 40
 **A7. Who helps you find or apply for opportunities?** · multiple choice · R
 A manager · A booking agent · A label or publisher · A publicist · A bandmate or
 friend · *No one, I do it myself* (exclusive, F) · Other (please specify) (F)
+
+**A8. What language are most of your songs or lyrics in?** · single choice · F
+English · French · An Indigenous language · Another language (please specify) ·
+About equally in more than one · Mostly instrumental
+
+A8 is here because the language the music is in bears on which festivals and
+programmes are open to an artist, which is a behaviour and not an identity, and it
+is far less sensitive to ask. It replaces the official-language-minority item the
+first draft had in E3.
 
 ### B. What you did recently
 
@@ -338,26 +351,72 @@ silently (section 5).
 
 > *The last few questions are optional. They help us see whether artists in
 > different situations weigh things differently, and who this survey did and did
-> not reach. Skip any you would rather not answer.*
+> not reach. We never show one person's answers, and we do not report on any group
+> of fewer than 10 people. Skip any you would rather not answer.*
 
 **E1. What is your age?** · single choice · F
 Under 25 · 25 to 34 · 35 to 44 · 45 to 54 · 55 to 64 · 65 or older · *Prefer not to say*
 
 **E2. What is your gender?** · single choice · F
-Woman · Man · Non-binary or another gender · *Prefer not to say*
+Woman · Man · Non-binary · Prefer to self-describe *(with an optional text box)* ·
+*Prefer not to say*
+
+Self-description is its own option rather than part of "another gender" because
+the Canada Council's review of demographic data collection warns against putting
+everyone outside the first few categories into an "Other" box. "Woman" and "Man"
+are gender terms; the Manitoba Arts Council's form says Female and Male under the
+heading Gender, and we prefer the former because the question is about gender.
 
 **E3. Do any of these describe you? Select all that apply.** · multiple choice ·
-F · *We ask because what matters when choosing opportunities may differ between
-artists in different situations, and we would rather check than assume.*
-First Nations, Métis or Inuit · Racialized, or a person of colour · Deaf, hard of
-hearing, or living with a disability · 2SLGBTQIA+ · An official-language minority
-(French outside Quebec, or English in Quebec) · New to Canada (arrived in the last
-10 years) · *None of these* (exclusive) · *Prefer not to say* (exclusive)
+F (the order below, not randomised: this is not a list of preferences, and the
+order is the one the Manitoba Arts Council's form uses, which Manitoba artists
+have already met)
 
-The wording of E3 is a starting point and should be read by people from these
-communities before launch. The categories follow the federal employment-equity
-groups plus official-language minority and newcomer status, but a list copied from
-a form is not the same as one that has been asked about.
+- Indigenous (First Nations, Métis or Inuit)
+- Francophone
+- Black and/or a person of colour
+- D/deaf, deafened or hard of hearing
+- Living with a disability (physical, mental or intellectual)
+- Two-Spirit, lesbian, gay, bisexual, transgender, queer, or part of the 2SLGBTQ+
+  community in another way
+- New to Canada (arrived in the last 10 years)
+- Part of another community that faces barriers in the music industry
+- *None of these* (exclusive)
+- *Prefer not to say* (exclusive)
+
+**Where the wording comes from.** Each item follows the Manitoba Arts Council's
+2026 voluntary identification section where it has a counterpart, because that is
+the language Manitoba artists have already seen on a form, and the guidance we
+checked recommends established wording over invented wording. Changes from the
+first draft, and why:
+
+- **Deaf and disability are two items, not one.** The first draft joined two
+  communities in one option, which broke the one-idea-per-item rule in section 2.
+  Both the Manitoba Arts Council and Arts Nova Scotia keep them apart.
+- **"2SLGBTQ+" is spelled out.** An acronym on its own is the jargon section 2
+  rules out, and the Manitoba form spells the community out in full.
+- **"Black and/or a person of colour"** replaces "Racialized, or a person of
+  colour": it is the Manitoba form's wording, and it names Black artists directly
+  rather than leaving them to infer they are included.
+- **"Francophone" replaces "official-language minority".** The old wording was
+  federal jargon, and the Manitoba form asks about Francophone identity instead.
+  What actually bears on opportunities is the language the music is in, which is
+  now a question of its own (A8) and not an identity item.
+- **A catch-all with no text box.** "Part of another community…" gives people who
+  fit none of the above a way to say so, without the "Other" box the Canada
+  Council review warns about. It has no free text on purpose: a typed description
+  of a small community is the likeliest way for an anonymous answer to point at a
+  person. The one open question (E5) is still there for anyone who wants to say
+  more.
+- **"None of these" and "Prefer not to say" are both kept.** They mean different
+  things, "this does not apply to me" and "I would rather not say", and the Manitoba
+  form cannot tell them apart because a blank could be either.
+
+**Not settled.** The ten-year window on "New to Canada" is my guess; none of the
+sources checked asks it, so no published definition is being followed. Neither is
+any wording final: the Canada Council's review says terminology moves and should
+be revisited every few years, and asks that members of the communities named help
+design the questions. Section 7 builds that into the read-through.
 
 **E4. About how much did you earn from all your music work in the last 12 months,
 before expenses?** *Include performing, teaching music, royalties, grants and
@@ -398,13 +457,21 @@ as phone or computer.
 
 **Re-identification is the real privacy risk here, not a name.** Someone in
 their fifties, from a small community, who plays a rare genre and earns over
-$50,000 can be picked out of a small network without a name anywhere. So: personal items are
-optional, categories are coarse, raw responses are never published or shared,
-and any published figure for a group of fewer than **10** respondents is
-suppressed. Treat the optional identity items as sensitive even though no name
-is attached. A short read by someone qualified in privacy law (PIPEDA, and
-Quebec's Law 25 once there are Quebec respondents) before launch is cheap and
-worth it; this document is not that.
+$50,000 can be picked out of a small network without a name anywhere. So: personal
+items are optional, categories are coarse, raw responses are never published or
+shared, and any published figure for a group of fewer than **10** respondents is
+suppressed. Treat the optional identity items as sensitive even though no name is
+attached.
+
+**Free text is where an identifying detail is likeliest to slip in**, which is why
+the community catch-all in E3 has no text box, and why the text that does exist
+(E5, the "please specify" boxes, and the optional gender self-description in E2) is
+read by hand, and anything that points at a person is removed before results are
+shared.
+
+A short read by someone qualified in privacy law (PIPEDA, and Quebec's Law 25 once
+there are Quebec respondents) before launch is cheap and worth it; this document
+is not that.
 
 ## 5. Protecting quality without identifying anyone
 
@@ -470,6 +537,13 @@ has to be stored with its score.
   what each question means to you, answer, and say what you would have wanted to
   pick instead. About 15 minutes each. Confusing wording found here costs nothing;
   found in the data it costs the first wave.
+- **The read-through is also where E2 and E3 get checked, by the people they
+  ask about.** Choose readers so that several of the communities named in E3 are
+  represented, and ask them specifically whether anything is missing, mislabelled
+  or uncomfortable. The Canada Council's review asks for exactly this, and says no
+  wording is ever final. Ask Manitoba Music, which has its own Equity &
+  Accountability Policy, to look at the terminology too: the members it serves
+  are the ones who will read it.
 - **How many.** For a comparison design the usual rule of thumb is
   n × tasks × alternatives ÷ largest number of levels ≥ 500. With 8 tasks, 2
   alternatives and 4 levels that is **about 125 completed responses** for the
@@ -509,6 +583,45 @@ opportunities to apply for. That is what this survey adds.
 association member surveys (Manitoba Music, Music BC, Music Alberta); and anything
 on how artists weigh application fees and travel costs specifically.
 
+### How the wording of E2 and E3 was checked
+
+Read, 2026-10-05:
+- **Manitoba Arts Council**, the 2026 voluntary identification section of its
+  grant application form, plus its 2017 explanation of why artists are asked.
+  The closest thing to the wording a Manitoba artist has already answered.
+- **Arts Nova Scotia**, the 2019 self-identification form for its equity funding
+  programme. It ties the answers to eligibility for a targeted programme, which a
+  survey does not, and it has no "prefer not to say".
+- **The Canada Council for the Arts' review of collecting demographic data**
+  (Hill Strategies, an excerpt, 2021): self-identification, select-all with a
+  self-description, avoiding "othering", consulting the communities asked about,
+  and a short privacy FAQ.
+- **MusicNL's 2020 diversity and inclusion survey results** (a provincial music
+  association). Results only: it shows that sexual orientation, a transgender
+  question and gender identity were asked, but not how, and it reports nothing on
+  race or disability.
+- **A 2025 article on inclusive demographic questions** (Canview), through a
+  fetched summary: select-all for ethnicity, self-describe and "prefer not to
+  answer" for gender.
+- **Manitoba Music's Equity & Accountability Policy**, from a screenshot of the
+  page supplied by Doug. (The site refuses requests from Claude's tools; see
+  below.) It names Indigenous Peoples, Black People, People of Colour and LGBTQ2S,
+  "and the people who exist at those intersections", and lists ability and mental
+  health among its concerns. E3's wording is consistent with it. Two small
+  differences: it writes LGBTQ2S where the Manitoba Arts Council writes 2SLGBTQ+,
+  which is why E3 spells the community out instead of relying on an acronym, and
+  it capitalises People and Peoples. It describes no member survey and asks for no
+  demographic information.
+
+Not found or not read, so none of this should be treated as checked:
+- **No music association's own questionnaire wording.** The Canadian Music Centre
+  BC's equity survey and Sask Music's economic survey did not show their
+  demographic questions in anything that could be opened, and MusicNL published
+  results without the questions.
+- **The Diversity Institute and Music Canada study** (624 respondents) is the
+  likeliest published instrument from the music industry itself. Its report was too
+  large to read here, and it should be asked for directly.
+
 ## 9. Decisions for you
 
 1. **Length.** The honest estimate is **10 to 12 minutes**, longer than the 8 I
@@ -522,7 +635,11 @@ on how artists weigh application fees and travel costs specifically.
 4. **Optional personal questions** (E1 to E4). Is asking these in an anonymous
    survey to a small network acceptable to you, given the re-identification risk in
    section 4? Dropping E3 is the cheap way to lower that risk, at the cost of not
-   seeing equity differences.
+   seeing equity differences. E2 and E3 were reworded after comparing them with the
+   Manitoba Arts Council's form (see the end of section 8); two things are yours to
+   confirm: whether **A8 (language of the songs) is enough** in place of an
+   official-language item, and what the **window on "New to Canada"** should be,
+   since I picked ten years without a source.
 5. **Saved as you go.** Keeping partial answers lets us see where people drop out,
    and the notice says so. The alternative is to keep nothing until someone
    finishes. Which would you rather tell your members?
