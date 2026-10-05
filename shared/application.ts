@@ -65,12 +65,40 @@ export interface ApplicationField {
   updatedAt: string
 }
 
-/** Whether the form behind this gig has been read, and if not, why. */
-export type PrepStatus = 'unread' | 'ready' | 'blocked' | 'failed'
+/**
+ * Whether the form behind this gig has been read, and if not, why. The four
+ * ways of not having it want opposite responses:
+ *
+ * - `blocked` — it was found, and it is behind a login or drawn by JavaScript.
+ *   Nothing is broken; it is filled in by hand, and retrying changes nothing.
+ * - `failed` — the page could not be reached. Worth another go.
+ * - `not_found` — the page was reached and has no application on it. That is
+ *   what an unopened window looks like, so it is worth looking again later.
+ * - `unread` — nobody has looked.
+ *
+ * `not_found` used to be stored as `blocked`, which told the artist nothing
+ * would happen about a window that had simply not opened yet.
+ */
+export type PrepStatus = 'unread' | 'ready' | 'blocked' | 'failed' | 'not_found'
+
+/** What the reader says about a page with no application on it. */
+export const NO_FORM_NOTE = 'No form fields were found on the page'
 
 export function normalisePrepStatus(raw: string | null | undefined): PrepStatus {
   const v = (raw ?? '').trim().toLowerCase()
-  return v === 'ready' || v === 'blocked' || v === 'failed' ? v : 'unread'
+  return v === 'ready' || v === 'blocked' || v === 'failed' || v === 'not_found' ? v : 'unread'
+}
+
+/**
+ * The status a stored row means, reading a row from before `not_found`
+ * existed as the fact it recorded: `blocked` with the no-form note. Nothing
+ * rewrites those rows — the next read of the form replaces them — so the
+ * reading is done here, the same "read both spellings" move
+ * `normaliseGigStatus` makes.
+ */
+export function prepStateOf(status: string | null | undefined, note: string | null | undefined): PrepStatus {
+  const state = normalisePrepStatus(status)
+  return state === 'blocked' && (note ?? '').startsWith(NO_FORM_NOTE) ? 'not_found' : state
 }
 
 // ── What is wrong with one answer ─────────────────────────────────────────────
@@ -407,7 +435,7 @@ export function buildApplication(input: {
 
   return {
     gigId,
-    prepStatus: normalisePrepStatus(input.prepStatus),
+    prepStatus: prepStateOf(input.prepStatus, input.prepNote),
     prepNote: input.prepNote ?? null,
     prepCheckedAt: input.prepCheckedAt ?? null,
     fields: prepared,

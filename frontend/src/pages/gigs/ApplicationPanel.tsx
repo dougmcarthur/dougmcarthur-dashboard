@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Application, type PreparedField, type ChecklistItem } from '../../api'
 import { kindByKey } from '../../../../shared/questionKinds'
+import { gigStage } from '../../../../shared/gigStage'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea, Select } from '../../components/ui/Field'
 import { Caption } from '../../components/ui/Surface'
@@ -278,6 +279,14 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
             <span className="block text-xs text-muted mt-1">
               Nothing is broken — this one is filled in by hand. The materials list below still
               applies.
+            </span>
+          )}
+          {data.prepStatus === 'not_found' && (
+            <span className="block text-xs text-muted mt-1">
+              {/* Only the stage the nightly look covers: promising it elsewhere would be false. */}
+              {gigStage(data.gig.status) === 'in_progress'
+                ? 'Nothing is wrong — it may not have opened yet. Scout looks again on its own: every day once applications open, every week until then. Or paste the form’s address above.'
+                : 'It may not have opened yet. Paste the form’s address above once you have it.'}
             </span>
           )}
         </p>

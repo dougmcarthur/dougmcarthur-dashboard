@@ -162,10 +162,16 @@ the Shows panel: a show marked "not on Manitoba Music" could send a member
 straight to where they add an event, once that page's address is known —
 it sits behind the member login, so it has not been checked.
 
-**Not built: re-reading on a schedule.** The profile is read when the artist
-opens the panel. A weekly re-read would compare against the library and raise
-a bell condition — "your Manitoba Music profile has 3 things Scout does not"
-— which is the scan below, pointed at one page.
+**Built: re-reading on a schedule.** This section said it was not, and it is.
+`scanProfiles` (`src/routes/associations.ts`) runs on the daily housekeeping
+tick for every connected association profile, and raises an `automation` bell
+event when something has appeared that is not in the library — daily rather
+than the weekly this proposed, and an event rather than a condition, because
+"three new things since Tuesday" is not recoverable from today's state. It
+announces each item once, writes nothing to the library, and its first read
+after connecting is silent (`shared/profileScan.ts`). What is **still not built**
+is the wider scan below: the `artist-profile-scan` routine and its findings
+inbox.
 
 ## 4. The artist scan
 

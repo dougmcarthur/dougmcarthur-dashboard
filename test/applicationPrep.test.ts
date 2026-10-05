@@ -68,12 +68,14 @@ describe('reading an application form', () => {
     expect(out.note).toContain('403')
   })
 
-  it('reports a page with no fields as blocked rather than as an empty form', async () => {
+  it('reports a page with no fields as not found, not as an empty form and not as a wall', async () => {
+    // "Blocked" says nothing will happen and it is filled in by hand. A page
+    // with no application on it says the opposite: it may not have opened yet.
     const out = await readApplicationForm(
       'https://example.com/news',
       respond('<html><body><h1>Applications open in March</h1></body></html>'),
     )
-    expect(out.status).toBe('blocked')
+    expect(out.status).toBe('not_found')
     expect(out.fields).toEqual([])
   })
 
@@ -147,7 +149,7 @@ describe('finding the form behind the page it was given', () => {
       [hop]: '<a href="https://fest.example/really-apply">Apply now</a><p>Applications open in March.</p>',
     })
     const out = await readApplicationForm('https://fest.example/artists', fetchImpl)
-    expect(out.status).toBe('blocked')
+    expect(out.status).toBe('not_found')
     expect(seen).toEqual(['https://fest.example/artists', hop])
   })
 
@@ -158,7 +160,7 @@ describe('finding the form behind the page it was given', () => {
       [dead]: '<html><body><p>Applications open in March.</p></body></html>',
     })
     const out = await readApplicationForm('https://fest.example/artists', fetchImpl)
-    expect(out.status).toBe('blocked')
+    expect(out.status).toBe('not_found')
     expect(out.url).toBe('https://fest.example/artists')
     expect(out.note).toContain('No form fields were found')
     expect(out.note).toContain(dead)
@@ -183,7 +185,7 @@ describe('finding the form behind the page it was given', () => {
         <a href="https://other.festivalpro.com/form/BBB/0">Apply now</a>`,
     })
     const out = await readApplicationForm('https://fest.example/artists', fetchImpl)
-    expect(out.status).toBe('blocked')
+    expect(out.status).toBe('not_found')
     expect(out.note).toContain('more than one possible form')
     expect(out.note).toContain('fest.festivalpro.com')
     expect(out.note).toContain('other.festivalpro.com')
@@ -204,7 +206,7 @@ describe('finding the form behind the page it was given', () => {
       'https://fest.example/artists': '<a href="https://forms.example/missing">Apply now</a>',
     })
     const out = await readApplicationForm('https://fest.example/artists', fetchImpl)
-    expect(out.status).toBe('blocked')
+    expect(out.status).toBe('not_found')
     expect(out.url).toBe('https://fest.example/artists')
     expect(out.note).toContain('404')
   })

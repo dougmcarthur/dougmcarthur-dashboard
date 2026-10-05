@@ -855,10 +855,13 @@ legality.
 
 **The opening task is due a day late on purpose.** A form that was not
 accepting applications yesterday has no fields to read until it is, so on the
-morning a window opens the prep agent has not scraped it and
-`ApplicationPanel` has nothing staged — a task due that morning sends you to
-an empty panel. `openingLeadDays` is a preference rather than a constant
-because the agents' cadence lives outside this repo.
+morning a window opens nothing has read it and `ApplicationPanel` has nothing
+staged — a task due that morning sends you to an empty panel. The daily tick
+reads it at 3am (`revisitForms`, below), so a form that opens during the day is
+read the night after. `openingLeadDays` is a preference because that cadence
+belongs to the deployment. This paragraph used to credit "the prep agent" and
+"the overnight run", which did not exist: only the button ever read a form, and
+for a while the task did send you to an empty panel.
 
 **Four of the five nudges follow from an edit and one does not.** An
 application crosses `NO_REPLY_DAYS` because *time passed*, and nothing writes
@@ -1199,10 +1202,53 @@ field problem rated `danger` with nothing else wrong. An empty box is at least
 honest about being empty.
 
 **A login wall is a fact about the opportunity, not an error.** `prep_status`
-splits `blocked` (Submittable, a JavaScript-rendered Typeform, a page with no
-form on it — retrying is pointless, this one is filled in by hand) from `failed`
-(a timeout, a 403 — worth another go, and the HTTP status is kept because 403
-and 404 are different stories).
+has three ways of not having the form. `blocked` is a form that was found and is
+behind an account or drawn by JavaScript (Submittable, a Typeform) — retrying is
+pointless, this one is filled in by hand. `failed` is a timeout or a 403 — worth
+another go, and the HTTP status is kept because 403 and 404 are different
+stories. `not_found` is a page with no application on it, which is what a window
+that has not opened looks like. It was `blocked` until it was split out, and
+that told the artist nothing would happen about a form that was only not up yet;
+`prepStateOf` still reads an old `blocked` row with the no-form note as
+`not_found`, and the next read replaces it.
+
+**Scout goes back for the form, and the research agents do not.**
+`revisitForms` (`src/lib/formRevisit.ts`, the rule in `shared/formRevisit.ts`)
+runs on the daily tick, per tenant, ahead of the reminder reconcile. Agents file
+a gig when they find it — often before its window opens, as Canmore's "check
+back in September" row did — and nothing went back until the button was pressed.
+Only **In progress** gigs are looked at, since an agent files far more than
+anyone decides on. The trigger is `opens_at`: not before it, daily for fourteen
+days, then weekly. **No date means weekly, not never** — agents file `opens_at`
+only for a stated day, and a month is not one, so most gigs have nothing to
+trigger on. It stops at the deadline, leaves a read form and a `blocked` one
+alone (looking again at a login wall changes nothing), and retries a `failed`
+read the next day. A few gigs a night, one at a time, oldest look first.
+
+**The revisit never moves a status and never touches `updated_at`.** That is
+`requested` on `prepareApplication`, the function the route and the cron share:
+only the button may start an application (`shortlisted` → `preparing`) or count
+as an edit. You said yes; you did not start, and a gig changing stage because a
+form went live overnight is Scout deciding something that is yours.
+`updated_at` moving would wake every snooze in the table. `test/formRevisitRun.test.ts`
+runs it against the production schema and fails on either.
+
+**It says what it found, because "went back" is only a promise you can rely on
+if you can see it happen** — the agents stopped for a month in August and nobody
+knew. One bell event when a form is read (linking to `#gigs/<id>`, which opens
+that row), one when a form is found but must be filled in by hand, and one — for
+a *dated* window only — when a week on there is still no form. Silence is right
+for the rest: no news from an undated window is the expected answer.
+
+**Why a cron and not a research routine.** A routine could search the web for a
+form the listing does not link to. It would cost plan allowance, need an agent
+token that can write an address into a gig (none of the seven routes does), and
+leave nothing behind when a run crashed — the heartbeat is the agent's job. The
+cron is free and cannot be skipped. What it cannot reach — a form the listing
+does not link to, and a `ready` read that was really a newsletter box from before
+the reader learned the difference — it leaves for the button, and says so. The
+agents' part is in their prompt: file `opensAt` for a stated day, and point `url`
+at the page the Apply link is on, not the home page.
 
 **The address on a listing is usually the page that announces the form, not the
 form.** `readApplicationForm` follows **one** Apply link when the page it was

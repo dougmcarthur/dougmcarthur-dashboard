@@ -79,12 +79,25 @@ export const TOOL_SPECS = {
       properties: {
         name: { type: 'string', description: 'The festival, venue or programme name' },
         type: { type: 'string', description: 'festival, showcase, conference, venue, residency, grant, other' },
-        url: { type: 'string', description: 'The listing page' },
-        applicationUrl: { type: 'string', description: 'The form itself, when it differs from the listing' },
+        url: {
+          type: 'string',
+          description: 'The page the Apply link is on or will appear on — the artist page, not the home page',
+        },
+        applicationUrl: {
+          type: 'string',
+          description:
+            'The form itself, only one you have opened and seen ask for an application. Omit when ' +
+            'the window has not opened',
+        },
         organizer: { type: 'string' },
         deadline: { type: 'string', description: 'ISO date when one is stated; omit if the page gives prose' },
         deadlineNote: { type: 'string', description: 'The deadline exactly as the page words it' },
-        opensAt: { type: 'string', description: 'ISO date a submission window opens' },
+        opensAt: {
+          type: 'string',
+          description:
+            'ISO date a submission window opens — only a stated day, since this is the date Scout goes ' +
+            'back and reads the form. Omit when the page gives only a month',
+        },
         location: { type: 'string' },
         country: { type: 'string', description: 'CA, US or other — the codes the rows on file use' },
         paid: { type: 'boolean', description: 'True when entry costs money' },

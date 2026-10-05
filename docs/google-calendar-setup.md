@@ -18,13 +18,18 @@ would take every event with it, and "disconnect" is not the same request as
 
 ## What lands in it
 
-Three entries per gig, and only the last is a gig — see `src/lib/gigCalendar.ts`:
+**By default, one thing: a confirmed show.** A calendar entry says you have to be
+somewhere, and a submission deadline is work rather than a place, so the window
+reminders went to Google Tasks when the two were split (see
+[nudge-routing.md](./nudge-routing.md)). This table is the full set of what
+`src/lib/gigCalendar.ts` can write, and the first two only land here if the
+artist chooses Calendar or Both for that reminder under Settings:
 
-| entry | when | reminder |
-| --- | --- | --- |
-| Applications open — *name* | `opens_at`, while the row is still being decided | on the day |
-| Apply by — *name* | the deadline, when it is a real date | a week ahead |
-| *name* | the performance span, once it is booked | a day ahead |
+| entry | when | reminder | on the calendar |
+| --- | --- | --- | --- |
+| *name* | the performance span, once it is booked | a day ahead | **by default** |
+| Apply by — *name* | the deadline, when it is a real date | a week ahead | if chosen |
+| Applications open — *name* | `opens_at`, while the row is still being decided | on the day | if chosen |
 
 A deadline that is prose rather than a date gets no entry, because
 `splitDeadline` returns null rather than guessing. A half-filled or backwards

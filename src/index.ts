@@ -47,6 +47,7 @@ import { gigOpportunities } from './db/schema'
 import { scoped, type TenantId } from './db/scope'
 import { readGigs } from './db/gigRows'
 import { reconcileAllGigs, type GigRow } from './lib/gigNudges'
+import { revisitForms } from './lib/formRevisit'
 import { readNudgePreferences } from './lib/nudgeSettings'
 import type { RootEnv } from './context'
 import { originAllowed, relyingParty } from '../shared/auth'
@@ -396,6 +397,28 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
     await runCredentialChecks(env, new Date())
   } catch (err) {
     console.error('credential check failed:', err)
+  }
+
+  // Go back to the application forms that were not there the first time.
+  //
+  // A research agent files a festival when it finds it, which is often before
+  // the window opens, and nothing else would ever look again. Per tenant, one
+  // gig after another and a few a night, for the reasons `revisitForms` gives;
+  // and *before* the reminder reconcile below, so the "applications open" task
+  // that reconcile writes points at a panel that has already been filled in.
+  // See shared/formRevisit.ts for which gigs, and when.
+  for (const tenant of tenants) {
+    try {
+      const run = await revisitForms(env, tenant, today)
+      if (run.read) {
+        console.log(
+          `form revisit for ${tenant}: ${run.read} read of ${run.due} due — ${run.opened} opened, ` +
+            `${run.needsYou} need you, ${run.stillMissing} not found`,
+        )
+      }
+    } catch (err) {
+      console.error('form revisit failed:', err)
+    }
   }
 
   // Bring each artist's calendar and task list back into line with their rows.

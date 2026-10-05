@@ -10,6 +10,8 @@
 // Anything behind a login, or rendered entirely by JavaScript, is reported as
 // blocked instead of guessed at.
 
+import { NO_FORM_NOTE } from '../../shared/application'
+
 export interface ParsedField {
   fieldKey: string
   label: string
@@ -598,8 +600,7 @@ export function parseHtmlForm(html: string, url: string): ParsedForm {
       title,
       source: 'html',
       loginRequired: false,
-      blockedReason:
-        'No form fields were found on the page — the application may open later, be a PDF, or be submitted by email.',
+      blockedReason: `${NO_FORM_NOTE} — the application may open later, be a PDF, or be submitted by email.`,
       blockedKind: 'no-fields',
       fields: [],
     }

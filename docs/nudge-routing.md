@@ -47,14 +47,20 @@ writer refuses.
 The task for "applications are open" is due `opens_at + 1`, not `opens_at`.
 
 A form that was not accepting applications yesterday usually has no fields to
-read until it is. So on the morning a window opens, the prep agent has not
-scraped it yet and `ApplicationPanel` has nothing staged — a task due that
-morning sends you to an empty panel, which is worse than no task. A day later
-the overnight run has been and there is something to work from.
+read until it is. So on the morning a window opens, nothing has read it yet and
+`ApplicationPanel` has nothing staged — a task due that morning sends you to an
+empty panel, which is worse than no task. The daily tick reads it
+(`src/lib/formRevisit.ts`, and see [Going back to a form](./application-prep-plan.md#going-back-to-a-form-that-was-not-there-the-first-time)),
+and it runs at 3am, so a form that opens during the day is read the night
+after. A day later there is something to work from.
+
+This paragraph used to credit "the prep agent" and "the overnight run", which
+did not exist: the only thing that read a form was the button. The task's day
+of grace was written for a job nobody had built, and for a while it sent you to
+an empty panel exactly as described. The revisit is that job.
 
 It is a preference (`openingLeadDays`, 0–14) rather than a constant because the
-agents' cadence lives outside this repo: a deployment running them hourly wants
-zero.
+cadence belongs to the deployment: one whose tick ran hourly would want zero.
 
 ## The daily reconcile
 

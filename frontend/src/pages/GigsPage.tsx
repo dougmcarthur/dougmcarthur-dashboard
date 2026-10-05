@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   useReactTable,
@@ -74,11 +74,25 @@ function FitScore({ score }: { score: number | null }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export function GigsPage() {
+/**
+ * `initialOpen` is the route's argument: `#gigs/12` is the Gigs page with that
+ * row already open, which is what a notification about one gig links to — the
+ * alternative is a bell item that drops you on a table to find it again.
+ */
+export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }) {
   const qc = useQueryClient()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const [expanded, setExpanded] = useState<Set<number>>(
+    () => new Set(initialOpen && /^\d+$/.test(initialOpen) ? [Number(initialOpen)] : []),
+  )
+  // The page can already be on screen when the link is followed, in which case
+  // nothing remounts and the state above never sees the new argument.
+  useEffect(() => {
+    if (initialOpen && /^\d+$/.test(initialOpen)) {
+      setExpanded((prev) => new Set(prev).add(Number(initialOpen)))
+    }
+  }, [initialOpen])
   const [editingId, setEditingId] = useState<number | null>(null)
   // Four stages, not fourteen statuses: see shared/gigStage.ts. The route
   // maps a stage to the stored statuses in it.

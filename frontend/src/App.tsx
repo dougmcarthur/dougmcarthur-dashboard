@@ -39,7 +39,7 @@ export default function App() {
       <ErrorBoundary label="Page error">
         {page === 'overview' && <OverviewPage onNav={navigate} />}
         {page === 'review' && <ReviewPage initialFilter={arg} />}
-        {page === 'gigs' && <GigsPage />}
+        {page === 'gigs' && <GigsPage initialOpen={arg} />}
         {page === 'artist' && <ArtistPage initialTab={arg} />}
         {page === 'sync' && <SyncPage />}
         {page === 'promo' && <PromoDraftsPage />}

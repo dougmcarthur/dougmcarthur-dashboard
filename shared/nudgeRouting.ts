@@ -107,14 +107,14 @@ export const DESTINATION_LABELS: Record<Destination, string> = {
  *
  * Not zero, and the reason is a real one rather than a rounding. A form that
  * was not accepting applications yesterday usually has no fields to read
- * until it is — so on the morning a window opens, the agent has not yet
- * scraped it and `ApplicationPanel` has nothing staged. A task due that same
- * morning sends you to an empty panel. A day later the overnight run has been
- * and the prep is there to work from.
+ * until it is — so on the morning a window opens, nothing has read it yet and
+ * `ApplicationPanel` has nothing staged. A task due that same morning sends you
+ * to an empty panel. The daily tick reads the form (`src/lib/formRevisit.ts`),
+ * and it runs at 3am, so a form that opens during the day is read the night
+ * after — a day later the prep is there to work from.
  *
- * It is a preference rather than a constant because the agents' cadence is
- * outside this repo: a deployment running them hourly wants zero, and one
- * running them weekly wants more.
+ * It is a preference rather than a constant because that cadence is the
+ * deployment's: one whose tick ran hourly would want zero.
  */
 export const DEFAULT_OPENING_LEAD_DAYS = 1
 

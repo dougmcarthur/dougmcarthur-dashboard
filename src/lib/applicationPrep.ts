@@ -16,7 +16,7 @@ import {
   type BlockedKind,
   type ParsedField,
 } from './formParser'
-import type { PrepStatus } from '../../shared/application'
+import { NO_FORM_NOTE, type PrepStatus } from '../../shared/application'
 
 export interface PrepOutcome {
   status: PrepStatus
@@ -107,17 +107,20 @@ async function readPage(url: string, fetchImpl: typeof fetch, mayFollow: boolean
   const parsed = parseApplicationForm(html, landed)
 
   if (parsed.blockedReason || parsed.fields.length === 0) {
-    const blocked: PrepOutcome = {
-      status: 'blocked',
-      note: parsed.blockedReason ?? 'No form fields were found on the page.',
+    const kind = parsed.blockedKind ?? 'no-fields'
+    // A page with no application on it is not a wall: it is what a window that
+    // has not opened looks like, and it is the one outcome worth coming back to.
+    const unresolved: PrepOutcome = {
+      status: kind === 'no-fields' ? 'not_found' : 'blocked',
+      note: parsed.blockedReason ?? `${NO_FORM_NOTE}.`,
       title: parsed.title,
       fields: [],
       url: landed,
-      blockedKind: parsed.blockedKind ?? 'no-fields',
+      blockedKind: kind,
     }
-    return mayFollow && blocked.blockedKind === 'no-fields'
-      ? ((await followApplyLink(html, landed, blocked, fetchImpl)) ?? blocked)
-      : blocked
+    return mayFollow && kind === 'no-fields'
+      ? ((await followApplyLink(html, landed, unresolved, fetchImpl)) ?? unresolved)
+      : unresolved
   }
 
   return { status: 'ready', note: null, title: parsed.title, fields: parsed.fields, url: landed }
