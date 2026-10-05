@@ -104,6 +104,8 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   snoozedAt: text('snoozed_at'), // when the snooze was set — see migration 0004
   discoveredAt: text('discovered_at').notNull(),
   updatedAt: text('updated_at').notNull(),
+  /** The shared catalog entry for this listing. See migration 0033. */
+  opportunityId: integer('opportunity_id'),
 })
 
 export const syncTargets = sqliteTable('sync_targets', {
@@ -124,6 +126,8 @@ export const syncTargets = sqliteTable('sync_targets', {
   discoveredAt: text('discovered_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   reconciledAt: text('reconciled_at'),
+  /** The shared catalog entry, for organisations. See migration 0033. */
+  opportunityId: integer('opportunity_id'),
 })
 
 export const promoDrafts = sqliteTable('promo_drafts', {
@@ -620,3 +624,64 @@ export type UserRow = typeof users.$inferSelect
 export type InviteRow = typeof invites.$inferSelect
 export type UsageDailyRow = typeof usageDaily.$inferSelect
 export type AgentTokenRow = typeof agentTokens.$inferSelect
+
+/**
+ * Feedback sent from the app to whoever runs it. See migration 0032.
+ *
+ * Not a scoped table: it is a message to the platform rather than the artist's
+ * work, read on the oversight surface, and deleted by tenant removal by name.
+ */
+export const feedback = sqliteTable('feedback', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: text('tenant_id').notNull(),
+  userId: text('user_id'),
+  /** broken | idea | question — see shared/feedback.ts. */
+  kind: text('kind').notNull(),
+  message: text('message').notNull(),
+  /** JSON the sender was shown before sending. */
+  context: text('context').notNull(),
+  createdAt: text('created_at').notNull(),
+  readAt: text('read_at'),
+})
+
+export type FeedbackRow = typeof feedback.$inferSelect
+
+/**
+ * The shared opportunity catalog. See migration 0033 and
+ * shared/opportunityCatalog.ts. No tenant: its facts belong to nobody.
+ */
+export const opportunities = sqliteTable('opportunities', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  catalogKey: text('catalog_key').notNull(),
+  category: text('category').notNull(),
+  name: text('name').notNull(),
+  organizer: text('organizer'),
+  kind: text('kind'),
+  url: text('url'),
+  deadline: text('deadline'),
+  deadlineNote: text('deadline_note'),
+  location: text('location'),
+  country: text('country'),
+  public: integer('public').notNull().default(0),
+  /** The fee the listing states, uninterpreted. Migration 0034. */
+  feeAmount: real('fee_amount'),
+  feeCurrency: text('fee_currency'),
+  firstSeenAt: text('first_seen_at').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
+})
+
+/** "Request an invitation", from the logged-out landing page. Migration 0033. */
+export const inviteRequests = sqliteTable('invite_requests', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  email: text('email').notNull(),
+  message: text('message').notNull(),
+  requesterHash: text('requester_hash'),
+  /** new | invited | declined */
+  status: text('status').notNull().default('new'),
+  createdAt: text('created_at').notNull(),
+  handledAt: text('handled_at'),
+})
+
+export type OpportunityRow = typeof opportunities.$inferSelect
+export type InviteRequestRow = typeof inviteRequests.$inferSelect

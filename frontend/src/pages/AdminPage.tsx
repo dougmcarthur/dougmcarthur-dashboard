@@ -5,6 +5,9 @@ import { withConfirmation } from '../confirmIdentity'
 import { Button } from '../components/ui/Button'
 import { Disclosure } from '../components/ui/Disclosure'
 import { InvitesPanel } from '../components/InvitesPanel'
+import { FeedbackInbox } from '../components/FeedbackInbox'
+import { InviteRequestsPanel } from '../components/InviteRequestsPanel'
+import { PublicListingsPanel } from '../components/PublicListingsPanel'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from '../components/ui/Explainer'
 import { Card } from '../components/ui/Surface'
@@ -24,8 +27,14 @@ import { Card } from '../components/ui/Surface'
  * row. See src/lib/usage.ts.
  */
 export function AdminPage() {
+  const qc = useQueryClient()
   const artists = useQuery({ queryKey: ['admin', 'artists'], queryFn: api.admin.artists })
   const health = useQuery({ queryKey: ['admin', 'health'], queryFn: api.admin.health })
+  const [prefill, setPrefill] = useState<{ email: string; name: string; nonce: number; requestId: number } | null>(null)
+  const closeRequest = useMutation({
+    mutationFn: (id: number) => api.admin.setInviteRequest(id, 'invited'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'invite-requests'] }),
+  })
 
   if (artists.isLoading) {
     return <div className="h-40 bg-sunken rounded-xl animate-pulse" />
@@ -77,7 +86,30 @@ export function AdminPage() {
 
       <hr className="border-line" />
 
-      <InvitesPanel />
+      <InviteRequestsPanel
+        onInvite={(r) => setPrefill({ email: r.email, name: r.name, nonce: Date.now(), requestId: r.id })}
+      />
+
+      <hr className="border-line" />
+
+      <InvitesPanel
+        prefill={prefill}
+        onIssued={(email) => {
+          // Close the request this invitation answers, if it came from one.
+          if (prefill && prefill.email.toLowerCase() === email.toLowerCase()) {
+            closeRequest.mutate(prefill.requestId)
+            setPrefill(null)
+          }
+        }}
+      />
+
+      <hr className="border-line" />
+
+      <FeedbackInbox />
+
+      <hr className="border-line" />
+
+      <PublicListingsPanel />
     </div>
   )
 }

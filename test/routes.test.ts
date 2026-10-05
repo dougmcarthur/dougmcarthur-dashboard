@@ -58,6 +58,73 @@ describe('API route registration', () => {
   // With no Gmail secrets the reconcile preview returns 503 ("Gmail not
   // configured") *before* touching the DB — reaching that proves the
   // reconcile router handled the request.
+  // Feedback is a person's message. The legacy platform token resolves to an
+  // agent, and an agent has nothing to say here.
+  it('POST /api/feedback refuses an agent', async () => {
+    const res = await request('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kind: 'idea',
+        message: 'hello',
+        context: {
+          page: 'overview', section: null, trail: [], errors: [], build: 'dev',
+          viewport: '1×1', theme: 'light', timeZone: 'UTC', browser: 'Chrome on Linux',
+        },
+      }),
+    })
+    expect(res.status).toBe(403)
+  })
+
+  // Public, so no credential — and still validated before anything is stored.
+  it('POST /api/public/invite-requests answers without a session and refuses a bad address', async () => {
+    const res = await app.request(
+      '/api/public/invite-requests',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Sam', email: 'not-an-address', message: 'I play fiddle and want to apply more.' }),
+      },
+      emptyEnv,
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('POST /api/public/invite-requests gives a bot the ordinary answer and stores nothing', async () => {
+    const res = await app.request(
+      '/api/public/invite-requests',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Bot', email: 'bot@example.com', message: 'Buy cheap things now please', website: 'x' }),
+      },
+      emptyEnv,
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it('PUT /api/stage-plot refuses an instrument it does not know', async () => {
+    const res = await request('/api/stage-plot', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        act: 'solo',
+        performers: [{ id: 'p1', name: 'Sam', instruments: ['theremin'], vocals: 'lead', gear: [] }],
+        monitors: 'wedges', playback: false, notes: null,
+      }),
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('PUT /api/onboarding/goals refuses a goal it does not know', async () => {
+    const res = await request('/api/onboarding/goals', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goals: ['world-domination'], reach: [] }),
+    })
+    expect(res.status).toBe(400)
+  })
+
   it('GET /api/sync/reconcile resolves to the reconcile router', async () => {
     const res = await request('/api/sync/reconcile', {}, emptyEnv)
     expect(res.status).toBe(503)
@@ -478,6 +545,9 @@ describe('API authentication', () => {
       '/api/replies',
       '/api/notifications',
       '/api/digest',
+      '/api/onboarding',
+      '/api/feedback',
+      '/api/stage-plot',
     ]
     for (const path of paths) {
       const res = await app.request(path, {}, env)

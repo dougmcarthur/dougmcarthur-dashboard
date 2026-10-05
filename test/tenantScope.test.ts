@@ -233,11 +233,12 @@ describe('tenant scoping', () => {
     for (const m of schema.matchAll(/export const (\w+) = sqliteTable\(([\s\S]*?)\n\}\)/g)) {
       if (/\btext\('tenant_id'\)/.test(m[2])) declared.add(m[1])
     }
-    // `users`, `usageDaily`, `agentTokens` and `epkShares` carry the column
-    // without being domain tables: an account row, a rollup and two credentials. They are named
+    // `users`, `usageDaily`, `agentTokens`, `epkShares` and `feedback` carry the
+    // column without being domain tables: an account row, a rollup, two
+    // credentials, and a message addressed to the owner. They are named
     // here rather than left to a comment, so adding a fifteenth domain table
     // and forgetting `SCOPED_TABLES` fails instead of passing.
-    const notDomain = new Set(['users', 'usageDaily', 'agentTokens', 'epkShares'])
+    const notDomain = new Set(['users', 'usageDaily', 'agentTokens', 'epkShares', 'feedback'])
     const expected = [...declared].filter((name) => !notDomain.has(name)).sort()
 
     expect(expected).toEqual([...SCOPED_TABLES].sort())

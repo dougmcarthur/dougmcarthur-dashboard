@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type InviteSummary } from '../api'
 import { withConfirmation } from '../confirmIdentity'
@@ -23,12 +23,31 @@ import { Card } from './ui/Surface'
  * The link is still shown once either way, because copying it is the fallback
  * that always works — and a send that failed must not cost the invitation.
  */
-export function InvitesPanel() {
+export function InvitesPanel({
+  prefill,
+  onIssued,
+}: {
+  /**
+   * An invitation request to answer: fills the form, never sends it. The
+   * owner still presses Create and touches the passkey. `nonce` makes a second
+   * click on the same request refill a form that was edited since.
+   */
+  prefill?: { email: string; name: string; nonce: number } | null
+  /** Told which address an invitation was issued to, so a request can be closed. */
+  onIssued?: (email: string) => void
+} = {}) {
   const qc = useQueryClient()
   const invites = useQuery({ queryKey: ['admin', 'invites'], queryFn: api.admin.invites })
 
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
+  const formRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!prefill) return
+    setEmail(prefill.email)
+    setName(prefill.name)
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [prefill])
   const [error, setError] = useState<string | null>(null)
   const [mailIt, setMailIt] = useState(true)
   const [link, setLink] = useState<{ url: string; email: string; mailed: boolean; mailError: string | null } | null>(null)
@@ -54,6 +73,7 @@ export function InvitesPanel() {
         mailed: issued.mailed,
         mailError: issued.mailError,
       })
+      onIssued?.(email.trim())
       setEmail('')
       setName('')
       qc.invalidateQueries({ queryKey: ['admin', 'invites'] })
@@ -91,7 +111,7 @@ export function InvitesPanel() {
       </header>
 
       <Card className="space-y-3">
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div ref={formRef} className="grid gap-2 sm:grid-cols-2">
           <label className="block">
             <span className="text-xs font-medium text-body">Their email</span>
             <input
@@ -125,13 +145,24 @@ export function InvitesPanel() {
           </label>
         )}
 
-        <Button
-          variant="primary"
-          onClick={() => issue.mutate()}
-          disabled={issue.isPending || !email.trim()}
-        >
-          {issue.isPending ? 'Confirming…' : 'Create an invitation'}
-        </Button>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Button
+            variant="primary"
+            onClick={() => issue.mutate()}
+            disabled={issue.isPending || !email.trim()}
+          >
+            {issue.isPending ? 'Waiting for your passkey…' : 'Create an invitation'}
+          </Button>
+          {/* Said before the prompt rather than discovered in it. An
+              invitation creates an account, so it is the "changes who can get
+              in" rule — and an operating-system dialog appearing unannounced
+              after pressing Create reads as something having gone wrong. Not
+              behind the Explainer toggle: it is what is about to happen, not
+              background. */}
+          <span className="text-xs text-muted">
+            Asks for your passkey first, unless you confirmed it in the last fifteen minutes.
+          </span>
+        </div>
 
         {error && <p className="text-sm text-danger-fg">{error}</p>}
 

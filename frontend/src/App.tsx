@@ -11,10 +11,22 @@ import { SyncPage } from './pages/SyncPage'
 import { PromoDraftsPage } from './pages/PromoDraftsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { TaskRunsPage } from './pages/TaskRunsPage'
+import { HelpPage } from './pages/HelpPage'
+import { useEffect } from 'react'
+import { notePage } from './diagnostics'
 
 export default function App() {
   const [page, navigate, arg] = useHashRoute('overview')
   const session = useSession()
+
+  // The feedback form's "before that" trail. In memory only; see diagnostics.ts.
+  useEffect(() => notePage(window.location.hash), [page, arg])
+
+  // The signed-out routes, opened while signed in, mean the Overview.
+  useEffect(() => {
+    if (page === 'welcome' || page === 'signin') navigate('overview')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
 
   /**
    * Two surfaces, and the app renders one of them.
@@ -45,6 +57,7 @@ export default function App() {
         {page === 'promo' && <PromoDraftsPage />}
         {page === 'runs' && <TaskRunsPage />}
         {page === 'settings' && <SettingsPage initialTab={arg} />}
+        {page === 'help' && <HelpPage />}
       </ErrorBoundary>
     </Layout>
   )

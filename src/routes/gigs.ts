@@ -9,6 +9,7 @@ import { gigStatusColumns, readGig, readGigs } from '../db/gigRows'
 import { tenantOf, type AppEnv } from '../context'
 import { syncGigNudges, removeGigNudges, type GigRow } from '../lib/gigNudges'
 import { readNudgePreferences } from '../lib/nudgeSettings'
+import { linkGig } from '../lib/catalog'
 import {
   normaliseGigStatus,
   isGigSettled,
@@ -159,6 +160,12 @@ gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
       updatedAt: ts,
     }))
     .returning({ id: gigOpportunities.id })
+
+  // Into the shared catalog, and linked. Best-effort: a catalog failure never
+  // costs the artist the row they just filed. See src/lib/catalog.ts.
+  // Published by default only when a research agent filed it: a row typed in
+  // by the artist may be a private arrangement.
+  await linkGig(c.env, tenantOf(c), { ...b, id: result[0].id, url: b.url || null }, ts, c.get('actor').kind === 'agent')
 
   return c.json({ id: result[0].id }, 201)
 })

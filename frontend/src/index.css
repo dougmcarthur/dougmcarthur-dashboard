@@ -93,6 +93,15 @@
   --c-cat-orange-bg: 29 31 27; --c-cat-orange-line: 40 43 38; --c-cat-orange-fg: 138 144 131;
   --c-cat-rose-bg: 29 31 27;   --c-cat-rose-line: 40 43 38;   --c-cat-rose-fg: 138 144 131;
 
+  /* Connection colours on the stage plot, the one place a kind *is* coloured:
+     telling a DI from a mic across a table is the job. Screen only — the
+     printed sheet is monochrome (StageCards.tsx). */
+  --c-conn-mic-fg: 183 160 240;   --c-conn-mic-bg: 40 34 58;
+  --c-conn-di-fg: 125 190 240;    --c-conn-di-bg: 26 40 54;
+  --c-conn-wedge-fg: 110 210 190; --c-conn-wedge-bg: 22 48 44;
+  --c-conn-iem-fg: 240 140 170;   --c-conn-iem-bg: 56 30 40;
+  --c-conn-power-fg: 240 170 90;  --c-conn-power-bg: 56 40 22;
+
   /* What a modal lays over the page: a tint that dims it, never a wash that
      hides it. Dark in both themes, so the page recedes rather than fading to
      white. How strong it is belongs to the class's alpha, not to this value. */
@@ -160,6 +169,11 @@
   --c-cat-teal-bg: 247 248 245;   --c-cat-teal-line: 223 226 219;   --c-cat-teal-fg: 95 102 89;
   --c-cat-orange-bg: 247 248 245; --c-cat-orange-line: 223 226 219; --c-cat-orange-fg: 95 102 89;
   --c-cat-rose-bg: 247 248 245;   --c-cat-rose-line: 223 226 219;   --c-cat-rose-fg: 95 102 89;
+  --c-conn-mic-fg: 106 76 196;    --c-conn-mic-bg: 241 236 252;
+  --c-conn-di-fg: 30 110 170;     --c-conn-di-bg: 232 243 251;
+  --c-conn-wedge-fg: 18 130 112;  --c-conn-wedge-bg: 228 246 242;
+  --c-conn-iem-fg: 180 50 90;     --c-conn-iem-bg: 252 236 241;
+  --c-conn-power-fg: 176 96 20;   --c-conn-power-bg: 253 241 228;
 
   --c-scrim: 20 23 18;
 
@@ -324,3 +338,33 @@
   transition-duration: 0.001ms !important;
   scroll-behavior: auto !important;
 }
+
+/*
+ * Printing is how a stage plot or an EPK becomes a PDF, and paper is white.
+ * The dark theme's pale text would print as near-invisible grey on it, so a
+ * printout always uses the light palette's surfaces, lines and text.
+ */
+@media print {
+  :root {
+    color-scheme: light;
+    --c-canvas: 255 255 255;
+    --c-surface: 255 255 255;
+    --c-raised: 247 248 245;
+    --c-sunken: 238 240 235;
+    --c-line: 223 226 219;
+    --c-line-strong: 160 166 155;
+    --c-ink: 20 23 18;
+    --c-body: 45 49 42;
+    --c-muted: 80 86 75;
+    --c-faint: 110 116 104;
+    --c-accent: 53 112 61;
+    --c-accent-soft: 234 242 234;
+    --c-warn-bg: 253 243 240;
+    --c-warn-line: 236 201 188;
+    --c-warn-fg: 164 67 47;
+  }
+  body {
+    background: white;
+  }
+}
+

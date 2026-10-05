@@ -25,6 +25,13 @@ import gmailDrafts from './routes/gmailDrafts'
 import agentTokens from './routes/agentTokens'
 import admin from './routes/admin'
 import profile from './routes/profile'
+import onboarding from './routes/onboarding'
+import feedbackRoute from './routes/feedback'
+import stagePlotRoute from './routes/stagePlot'
+import documentReadings from './routes/documentReadings'
+import publicSite from './routes/publicSite'
+import { runCatalogBackfillOnce } from './lib/catalog'
+import { pruneInviteRequests } from './lib/inviteRequests'
 import connectors from './routes/connectors'
 import manitobaMusic from './routes/manitobaMusic'
 import associationsRoute, { scanProfiles } from './routes/associations'
@@ -195,6 +202,10 @@ app.route('/api/auth', auth)
 app.route('/api/gmail', gmailDrafts)
 app.route('/api/agent-tokens', agentTokens)
 app.route('/api/profile', profile)
+app.route('/api/onboarding', onboarding)
+app.route('/api/feedback', feedbackRoute)
+app.route('/api/stage-plot', stagePlotRoute)
+app.route('/api/document-readings', documentReadings)
 app.route('/api/connectors/manitoba-music', manitobaMusic)
 app.route('/api/connectors/associations', associationsRoute)
 app.route('/api/connectors', connectors)
@@ -203,6 +214,9 @@ app.route('/api/epk', epkRoute)
 app.route('/api/drive', driveRoute)
 app.route('/api/google', googleAccounts)
 app.route('/api/public', publicEpk)
+// The logged-out landing page: the catalog's recent listings and the
+// invitation request form. Public under the same prefix; see publicSite.ts.
+app.route('/api/public', publicSite)
 // The oversight surface. See ADMIN_API_PREFIX above for what the middleware
 // does with it, in both directions.
 app.route('/api/admin', admin)
@@ -376,6 +390,10 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
   // correctness matter — every one of them is checked against the clock when
   // it is read — so this only stops three tables growing without limit.
   await pruneAuth(env)
+
+  // Invitation requests are a stranger's name and address. Kept long enough to
+  // answer, and no longer — the landing page says as much.
+  await pruneInviteRequests(env, new Date())
 
   // Ask Google whether the stored credentials are still accepted.
   //
@@ -574,6 +592,10 @@ async function runScheduled(env: Env): Promise<void> {
     // One-shot, and it un-arms itself. See runNotesBackfillOnce.
     runNotesBackfillOnce(env, tenants).catch((err) => {
       console.error('notes backfill failed:', err)
+    }),
+    // One-shot too: links every row that predates the shared catalog.
+    runCatalogBackfillOnce(env, tenants).catch((err) => {
+      console.error('catalog backfill failed:', err)
     }),
     owner
       ? runReplyScanIfDue(env, owner).catch((err) => {

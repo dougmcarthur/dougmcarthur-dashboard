@@ -86,6 +86,19 @@ nothing here widened what a token may do. See
   run. A schedule that *stops* is still caught — `taskCadence` raises a
   critical once it has been quiet longer than its own habit — but a single
   missed run is invisible.
+- **A routine can fail before it ever reaches `cli.ts`, and that failure looks
+  identical to a quiet week.** On 2026-09-28 the `gig-festival-scan` routine
+  fired and found every Bash call refused: Claude Code's own tool-permission
+  classifier reported itself overloaded for the whole session, which also
+  blocked spawning a subagent to retry and scheduling a later wakeup. Nothing
+  in the repository caused it and nothing in the repository could catch it —
+  `log_run` never ran, so there is no `failed` row, just an absence, same as
+  the August 2026 stoppage this whole setup exists to notice. `taskCadence`
+  still catches a *pattern* of this, but not the first missed run. If a
+  routine is down and a sweep cannot wait for the next scheduled fire, trigger
+  `.github/workflows/agents.yml` by hand from the Actions tab instead — it
+  runs through the Claude API rather than through this session's tool
+  classifier, so it does not share the failure.
 - **What a routine can read, an injected routine could send elsewhere.** The
   environment needs full network access to read festival pages, so the gig
   list and reference documents it reads could be passed to another host by a
@@ -143,6 +156,7 @@ default branch, and migration 0022 applied, because that is where
    | `gig-festival-scan` | Mondays, 7am Winnipeg |
    | `sync-pitch-research` | Wednesdays, 7am Winnipeg |
    | `monthly-promo-checkin` | The 1st, 7am Winnipeg |
+   | `document-reader` | Fridays, 7am Winnipeg |
 
    **Model: Sonnet 5**, to spend less of the plan's allowance. If a run shows
    it struggling to parse things — `cli.ts` refusing its input again and
@@ -150,6 +164,15 @@ default branch, and migration 0022 applied, because that is where
    page, a report that contradicts what it filed — move that routine to
    Opus 5. The cost of a wrong row is a missed date, which is worth more than
    the allowance.
+
+   `document-reader` does no research. It asks Scout which stage plots and
+   tech riders in the library nobody has read (`list_documents_to_read`),
+   downloads each with `curl` and opens it with Claude Code's file reader —
+   which looks at the page, so a PDF whose words are drawn as shapes reads
+   fine — and files a plain-text transcription (`file_document_reading`).
+   Scout offers that text to the stage-plot survey as suggestions. It is
+   routine-only: `run.ts` cannot hand the model a file and refuses it. A week
+   with nothing new to read is one list call and a `log_run`.
 
 4. **Check one.** *Run now* on the routine, then read the run's transcript:
    a green status only means the session started and exited. A new row on

@@ -27,7 +27,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { asc, desc, eq, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
-import { tenants, usageDaily, users } from '../db/schema'
+import { feedback, inviteRequests, opportunities, tenants, usageDaily, users } from '../db/schema'
 import { asTenantId } from '../db/scope'
 import { adminOf, type AdminEnv } from '../context'
 import { elevationState } from '../../shared/auth'
@@ -37,6 +37,7 @@ import { mailerConfigured, sendMail, senderIdentity } from '../lib/mailer'
 import { inviteEmail } from '../lib/authMail'
 import { readTenantHealth } from '../lib/tenantHealth'
 import { MEASURED_FIELDS } from '../lib/usage'
+import { isFeedbackKind } from '../../shared/feedback'
 
 const admin = new Hono<AdminEnv>()
 
@@ -175,6 +176,125 @@ admin.get('/health', async (c) => c.json(await readTenantHealth(c.env)))
  * The token is not here and cannot be. It is stored hashed, and a screen that
  * could re-show a working invitation would be a screen that leaks one.
  */
+/**
+ * What artists sent from the app's feedback form, newest first.
+ *
+ * A message addressed to the owner, so reading it here breaks nothing the
+ * surface promises: it is what the sender wrote and the context they were
+ * shown before sending, not a read of their work. Capped, because this is an
+ * inbox rather than an archive.
+ */
+admin.get('/feedback', async (c) => {
+  const db = getDb(c.env.DB)
+  const [rows, tenantRows] = await Promise.all([
+    db.select().from(feedback).orderBy(desc(feedback.createdAt)).limit(100),
+    db.select().from(tenants),
+  ])
+  const names = new Map(tenantRows.map((t) => [t.id, t.displayName]))
+  return c.json({
+    items: rows.map((row) => {
+      let context: unknown = null
+      try {
+        context = JSON.parse(row.context)
+      } catch {
+        // Stored by this Worker from a validated body, so this should not
+        // happen; a row that cannot be read still shows its message.
+      }
+      return {
+        id: row.id,
+        from: names.get(row.tenantId) ?? null,
+        kind: isFeedbackKind(row.kind) ? row.kind : 'idea',
+        message: row.message,
+        context,
+        createdAt: row.createdAt,
+        readAt: row.readAt,
+      }
+    }),
+  })
+})
+
+admin.post('/feedback/:id/read', async (c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) return c.json({ error: 'not found' }, 404)
+  await getDb(c.env.DB)
+    .update(feedback)
+    .set({ readAt: new Date().toISOString() })
+    .where(eq(feedback.id, id))
+  return c.json({ ok: true })
+})
+
+/**
+ * Requests for an invitation from the landing page, newest first. A stranger's
+ * name, address and reason; nothing here grants anything. Issuing an
+ * invitation is still `POST /invites`, behind a passkey touch, and the owner
+ * types or confirms the address there.
+ */
+admin.get('/invite-requests', async (c) => {
+  const rows = await getDb(c.env.DB)
+    .select({
+      id: inviteRequests.id,
+      name: inviteRequests.name,
+      email: inviteRequests.email,
+      message: inviteRequests.message,
+      status: inviteRequests.status,
+      createdAt: inviteRequests.createdAt,
+      handledAt: inviteRequests.handledAt,
+    })
+    .from(inviteRequests)
+    .orderBy(desc(inviteRequests.createdAt))
+    .limit(200)
+  return c.json({ items: rows })
+})
+
+admin.patch(
+  '/invite-requests/:id',
+  zValidator('json', z.object({ status: z.enum(['new', 'invited', 'declined']) })),
+  async (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isInteger(id)) return c.json({ error: 'not found' }, 404)
+    const { status } = c.req.valid('json')
+    await getDb(c.env.DB)
+      .update(inviteRequests)
+      .set({ status, handledAt: status === 'new' ? null : new Date().toISOString() })
+      .where(eq(inviteRequests.id, id))
+    return c.json({ ok: true })
+  },
+)
+
+/**
+ * The shared catalog, as the landing page will show it, with the switch that
+ * takes an entry off it. Reads the catalog only — listing facts that belong to
+ * nobody — so nothing here reaches an artist's rows.
+ */
+admin.get('/listings', async (c) => {
+  const rows = await getDb(c.env.DB)
+    .select({
+      id: opportunities.id,
+      category: opportunities.category,
+      name: opportunities.name,
+      organizer: opportunities.organizer,
+      url: opportunities.url,
+      deadline: opportunities.deadline,
+      location: opportunities.location,
+      public: opportunities.public,
+      firstSeenAt: opportunities.firstSeenAt,
+    })
+    .from(opportunities)
+    .orderBy(desc(opportunities.firstSeenAt))
+    .limit(100)
+  return c.json({ items: rows.map((r) => ({ ...r, public: r.public === 1 })) })
+})
+
+admin.patch('/listings/:id', zValidator('json', z.object({ public: z.boolean() })), async (c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) return c.json({ error: 'not found' }, 404)
+  await getDb(c.env.DB)
+    .update(opportunities)
+    .set({ public: c.req.valid('json').public ? 1 : 0 })
+    .where(eq(opportunities.id, id))
+  return c.json({ ok: true })
+})
+
 admin.get('/invites', async (c) => {
   const rows = await listInvites(c.env)
   return c.json({

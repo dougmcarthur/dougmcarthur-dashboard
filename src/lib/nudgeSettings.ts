@@ -69,3 +69,18 @@ export async function writeTenantSetting(
   await db.delete(tenantSettings).where(scoped(tenantSettings, tenant, eq(tenantSettings.key, key)))
   await db.insert(tenantSettings).values(withTenant(tenant, { key, value, updatedAt }))
 }
+
+/** One tenant setting, or null when nothing is stored. */
+export async function readTenantSetting(env: Env, tenant: TenantId, key: string): Promise<string | null> {
+  const row = await getDb(env.DB)
+    .select()
+    .from(tenantSettings)
+    .where(scoped(tenantSettings, tenant, eq(tenantSettings.key, key)))
+    .get()
+  return row?.value ?? null
+}
+
+/** Remove one tenant setting. Nothing to remove is not an error. */
+export async function clearTenantSetting(env: Env, tenant: TenantId, key: string): Promise<void> {
+  await getDb(env.DB).delete(tenantSettings).where(scoped(tenantSettings, tenant, eq(tenantSettings.key, key)))
+}

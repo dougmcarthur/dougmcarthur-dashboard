@@ -28,6 +28,10 @@ export const AGENT_ROUTES = [
   { method: 'POST', path: '/api/sync' },
   { method: 'POST', path: '/api/promo' },
   { method: 'POST', path: '/api/task-runs' },
+  // The document reader: what is waiting, and a transcription of one file.
+  // The write is checked against the artist's own library by the route.
+  { method: 'GET', path: '/api/document-readings/pending' },
+  { method: 'POST', path: '/api/document-readings' },
 ] as const
 
 export function agentMayCall(method: string, pathname: string): boolean {

@@ -13,9 +13,17 @@
  * gets called. The smallest surface that can do the job.
  */
 
-export type AgentId = 'gig-festival-scan' | 'sync-pitch-research' | 'monthly-promo-checkin'
+export type AgentId = 'gig-festival-scan' | 'sync-pitch-research' | 'monthly-promo-checkin' | 'document-reader'
 
-export const AGENTS: AgentId[] = ['gig-festival-scan', 'sync-pitch-research', 'monthly-promo-checkin']
+export const AGENTS: AgentId[] = ['gig-festival-scan', 'sync-pitch-research', 'monthly-promo-checkin', 'document-reader']
+
+/**
+ * Agents only a Claude Code routine can run. The document reader opens a PDF
+ * with the session's own file reader, which looks at the page; `run.ts` has
+ * no way to hand the model a file, and a reader that cannot see would file
+ * nothing and log `ok`.
+ */
+export const ROUTINE_ONLY: readonly AgentId[] = ['document-reader']
 
 export function isAgentId(value: string): value is AgentId {
   return (AGENTS as string[]).includes(value)
@@ -28,6 +36,8 @@ export type ToolName =
   | 'create_gig_opportunity'
   | 'create_sync_target'
   | 'create_promo_draft'
+  | 'list_documents_to_read'
+  | 'file_document_reading'
 
 interface FieldSchema {
   readonly type: 'string' | 'number' | 'boolean'
@@ -147,6 +157,34 @@ export const TOOL_SPECS = {
       additionalProperties: false,
     },
   },
+  list_documents_to_read: {
+    name: 'list_documents_to_read',
+    description:
+      "Stage plots and tech riders in the artist's library that have not been read yet, as " +
+      'assetId, label and the file address. An empty list means there is nothing to do.',
+    inputSchema: NO_INPUT,
+  },
+  file_document_reading: {
+    name: 'file_document_reading',
+    description:
+      'File what one document says, as plain text, against the library entry it came from. ' +
+      'Scout offers it to the artist as suggestions for their stage plot; nothing is changed without them.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        assetId: { type: 'number', description: 'The assetId list_documents_to_read gave' },
+        url: { type: 'string', description: 'The file address list_documents_to_read gave, unchanged' },
+        text: {
+          type: 'string',
+          description:
+            'Everything the document says and shows, as plain sentences: every written word, the input ' +
+            'list line by line, and each thing drawn on the stage named in words. Up to 6,000 characters.',
+        },
+      },
+      required: ['assetId', 'url', 'text'],
+      additionalProperties: false,
+    },
+  },
 } as const satisfies Record<ToolName, ToolSpec>
 
 export const TOOLS_BY_AGENT: Record<AgentId, readonly ToolName[]> = {
@@ -158,6 +196,7 @@ export const TOOLS_BY_AGENT: Record<AgentId, readonly ToolName[]> = {
     'list_existing_sync_targets',
     'create_promo_draft',
   ],
+  'document-reader': ['list_documents_to_read', 'file_document_reading'],
 }
 
 /** The two that research the open web. The promo check-in drafts from what is on file. */
