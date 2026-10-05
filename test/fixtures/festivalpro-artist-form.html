@@ -1,0 +1,2182 @@
+<html><head><title>Canmore Folk Music Festival</title></head><body>
+<SELECT NAME="LANGUAGE" CLASS="form-select w-auto"  id=ibLanguageOption onChange=changeLanguage(this.value)><OPTION VALUE="" SELECTED id=langopt1>English</OPTION><OPTION VALUE="XXX" id=langopt2></OPTION></SELECT>
+<FORM METHOD="POST" ACTION="https://canmorefolkfest.festivalpro.com/?bookEvent1" ENCTYPE="multipart/form-data" NAME=ifields ID="ifields" target="_self">
+<INPUT TYPE=HIDDEN NAME=CAPTCHA ID=captcha>
+<INPUT TYPE="HIDDEN" NAME="EVENTID" VALUE="5048">
+<INPUT TYPE="HIDDEN" NAME="OFFSET"  id=offset>
+<INPUT TYPE="HIDDEN" NAME="EID">
+<INPUT TYPE="HIDDEN" NAME="ENCSTR">
+<INPUT TYPE="HIDDEN" NAME="BOOKINGCODE">
+<INPUT TYPE="HIDDEN" NAME="BOOKINGID" VALUE="x">
+<INPUT TYPE="HIDDEN" NAME="POPUP">
+<INPUT TYPE="HIDDEN" NAME="LT" VALUE="1791233298">
+<INPUT TYPE="HIDDEN" NAME="ICONTACTID">
+<INPUT TYPE="HIDDEN" NAME="TOTAL_ATTACHMENT" VALUE="1">
+<div class=formRowDescription>
+<p class=formPageText>
+<div class="eventTitle"><br /><hr /><center>
+<h1>ARTIST APPLICATION</h1>
+</center><hr /></div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<h1>ARTIST APPLICATION FORM</h1>
+<p><span>Thank you for your interest in performing at the Canmore Folk Music Festival. Our festival is dedicated to showcasing diverse talent and creating an unforgettable experience for our audience. </span>We will make sure we listen to every submission we get, but considering the huge number of acts that apply we will not be able to get back to everyone and apologise if you do not hear from us.</p>
+<p><span><strong>We are currently accepting applications for both our winter and summer festivals.</strong></span><span></span></p>
+<p><span><strong>The Warm Up: February 12-13, 2027. </strong></span><span>The Warm Up presents 20-30 artists with a strong focus on Alberta and Bow Valley artists of all genres.</span></p>
+<p><span><strong>Canmore Folk Festival Dates:</strong></span><span> </span><span><strong>July 31 to August 2, 2027. </strong></span><span>The Canmore Folk Festival presents 50+ artists from around the world with a focus on diverse, innovative and high quality programming. We have a mandate to support Canadian artists and expect all artists to participate in collaborative sessions. We provide performance opportunities for established to emerging artists in a variety of genres.<br /><br /><strong>Application intake will close December 1st.&nbsp;</strong><br /></span><span></span></p>
+<p><span>We will review all submissions after the deadline and reach out to selected artists in the coming months. Due to the high number of submissions only selected artists will be contacted but we thank you for taking the time to apply.<br /></span></p>
+<h2>ABOUT YOU</h2>
+<p>Please fill in all the fields</p>
+</p>
+<p class=formPageDescription>
+</p>
+</div>
+<div class="row eventAtrRow">
+<script>
+var prevo = {};
+function getAccountData(pass){
+email = $("#ibNameField").val();
+console.log("1");
+$.get("https://canmorefolkfest.festivalpro.com/?getPreviousOrders&EMAIL=" + email + "&PASSWORD="+pass + "&EVENTID=5048",function( data ) {
+console.log("1");
+if (data != ""){
+console.log("2");
+var res = data.split("\n");
+for (i = 0; i < res.length-1; i++){
+console.log("34");
+var line = res[i].split(",");
+console.log(line[0]  + " = " + line[1]);
+prevo[line[0]] = line[1];
+};
+};
+});
+};
+function postcodeSearch(postcode){
+$.get("https://canmorefolkfest.festivalpro.com/?lookupPostcode&SILENT=TRUE&POSTCODE="+postcode,function( data ) {
+if (data != ""){
+openPopupData("Select Address",data);
+};
+});
+};
+function showLogin(){
+isLoginEnabled = true;
+$("#ibLoginComment").show();
+$("#ibLoginInput").show();
+$("#ibLoginCommentNewLine").show();
+$("#ibEmailConfirmationInput").hide();
+$("#ibAddressClear").hide();
+$("#ibAddress1Input").hide();
+$("#ibPostcodeInput").hide();
+$("#ibAddress2Input").hide();
+$("#ibAddress3Input").hide();
+$("#ibAddress4Input").hide();
+$("#ibCountryInput").hide();
+$("#ibNameInput").hide();
+$("#ibSurnameInput").hide();
+$("#ibCompanyNameInput").hide();
+$("#ibPhoneInput").hide();
+$("#ibMobileInput").hide();
+// hide the new format rows
+$(".formFieldType31").hide();
+$(".formFieldType32").hide();
+$(".formFieldType33").hide();
+$(".formFieldType34").hide();
+$(".formFieldType35").hide();
+$(".formFieldType36").hide();
+$(".formFieldType37").hide();
+$(".formFieldType38").hide();
+$(".formFieldType39").hide();
+$(".formFieldType41").hide();
+$(".formFieldType42").hide();
+$(".formFieldType43").hide();
+$.ajax({
+url: "https://canmorefolkfest.festivalpro.com/?forgottenPassword&FORM=TRUE&EVENTID=5048&EVENT=TRUE&POPUP=TRUE&EMAIL="+ $('#ibNameField').val(),
+type: 'GET'
+});
+};
+function hideLogin(){
+isLoginEnabled = true;
+$("#ibLoginComment").hide();
+$("#ibLoginInput").hide();
+$("#ibEmailConfirmationInput").show();
+$("#ibLoginCommentNewLine").hide();
+$("#ibAddressClear").show();
+$("#ibAddress1Input").show();
+$("#ibPostcodeInput").show();
+$("#ibAddress2Input").show();
+$("#ibAddress3Input").show();
+$("#ibAddress4Input").show();
+$("#ibCountryInput").show();
+$("#ibNameInput").show();
+$("#ibSurnameInput").show();
+$("#ibMobileInput").show();
+$("#ibCompanyNameInput").show();
+$("#ibPhoneInput").show();
+$("#ibPasswordField").val("");
+// hide the new format rows
+$(".formFieldType31").show();
+$(".formFieldType32").show();
+$(".formFieldType33").show();
+$(".formFieldType34").show();
+$(".formFieldType35").show();
+$(".formFieldType36").show();
+$(".formFieldType37").show();
+$(".formFieldType38").show();
+$(".formFieldType39").show();
+$(".formFieldType41").show();
+$(".formFieldType42").show();
+$(".formFieldType43").show();
+};
+function checkAccount(email){
+return(1);
+$.get("https://canmorefolkfest.festivalpro.com/?lookupAccount&SILENT=TRUE&EVENTID=5048&EMAIL="+email,function( data ) {
+if (data == "OK"){
+// account exists for the email address
+showLogin();
+}
+else {
+hideLogin();
+};
+});
+};
+</script>
+<script>
+$(document).ready(function(){
+});
+</script>
+<script LANGUAGE="JavaScript" SRC="https://canmorefolkfest.festivalpro.com/javascript/ajaxPopupCode.js"></script>
+<script LANGUAGE="JavaScript" SRC="https://canmorefolkfest.festivalpro.com/javascript/ajaxWindows.js"></script>
+<script LANGUAGE="JavaScript" SRC="https://canmorefolkfest.festivalpro.com/javascript/ajaxAddressShow.js"></script>
+<div id=popup style="display: none"><br><br><img src=https://canmorefolkfest.festivalpro.com/images/spinner.gif><br><br><br></div>
+</div>
+<div class=attributeDivider>
+</div>
+
+<script>
+
+// This should be deprecated
+function decCounter(th){
+var $input = $(th).parent().find('input.counter');
+var id = $input.attr('id');
+if (id.indexOf("-") > 0){
+id = id.substr(id.indexOf("-")+1);
+};
+var count = parseInt($input.val());
+//console.log(id + " " + count + " " + mincounter[id]);
+if (count > mincounter[id]){
+$input.val(count - 1);
+$input.change();
+};
+return false;
+};
+function incCounter(th){
+var $input = $(th).parent().find('input.counter');
+var id = $input.attr('id');
+var count = parseInt($input.val());
+// id might have some stupid items
+if (id.indexOf("-") > 0){
+id = id.substr(id.indexOf("-")+1);
+};
+if (count < maxcounter[id]){
+$input.val(count + 1);
+$input.change();
+};
+return false;
+};
+
+
+var ib_offset = {}; // should always be the max items possible from the web
+var ib_max = {}; // records maximum allowed for the group, checks done in server backend as well! Dont' try and circumvent this. Yes you reading this!
+var filesizemax = {};
+var alerted = false;
+
+
+function checkTag(Tag,Section,Ptr){
+
+endptr = Section.indexOf(">",Ptr);
+startptr = Section.lastIndexOf("<",Ptr);
+if (Section.indexOf(Tag,startptr) < endptr && Section.indexOf(Tag,startptr) > 0){
+return(true);
+};
+
+return(false);
+
+};
+
+function duplicateSection(row_idd,field_type){
+var patid = row_idd.substring(3);
+var datefield = false;
+var datetimefield = true;
+var prefix = "";
+
+console.log("entering duplicateSection");
+if (ib_max[patid] < 1){
+Swal.fire({
+icon: "error",
+title: "No more fields allowed.",
+text: '',
+footer: ''
+});
+//alert("No more allowed");
+return;
+};
+ib_max[patid]--;
+$("#MAXIDD"+patid).val(patid);
+
+// get next prefix index. This should check the form and find the next available not just +1
+// offset needs to be calculated dynamically based on what's in page
+var dyn_idx = "";
+
+if ($("input[name="+ patid+"-EXISTS]" ).val() != undefined){
+// if the first one (XXX-EXISTS) doesn't exist, then create that one, no prefix
+dyn_idx = "1";
+console.log("input[name="+ dyn_idx+"-"+patid+"-EXISTS]");
+while ($("input[name="+ dyn_idx+"-"+patid+"-EXISTS]" ).val() != "" && $("input[name="+ dyn_idx+"-"+patid+"-EXISTS]" ).val() != undefined){
+dyn_idx++;
+};
+prefix = dyn_idx+"-";
+}
+else {
+dyn_idx = "0";
+};
+
+console.log("maybe Assigning " + patid + " offset to " + dyn_idx + " current value " + ib_offset[patid]);
+
+if (ib_offset[patid] < dyn_idx){
+ib_offset[patid] = dyn_idx;
+console.log("Assigning " + patid + " offset to " + dyn_idx);
+};
+
+var hidden_str = "<inp" + "ut type=hidden value=\"true\" name=" + prefix + patid + "-EXISTS>";
+console.log("new prefix" + prefix);
+
+// gets the section that needs to be duplicated, the first one
+var section = $('#ROW'+patid).html();
+
+// find any dateoption fields and trigger the increment and count
+
+
+// let's find out if there is a X-PATTRIBUTEID, if so remove it
+var namestart = section.indexOf("name=\"");
+if (namestart > 0 && field_type != "56"){
+namestart += 6;
+var nameend = section.indexOf("\"",namestart);
+var namefield = section.substr(namestart,nameend-namestart);
+//console.log(namefield);
+if (namefield.indexOf("-") > 0){
+namefieldnew = namefield.substr(namefield.indexOf("-")+1);
+section = section.replace(new RegExp(namefield, 'g'),namefieldnew);
+};
+}
+
+// replace A links (for files)
+section = section.replace(/<a.*<\/a>/ig, "");
+
+section = section.replace(/selected=\"\"/ig, "");
+
+//console.log(section);
+if (section.indexOf("div id=\"noedit") > 0){
+var ss1 = section.indexOf("div id=\"noedit");
+var ss2 = section.indexOf("NOEDITLEAVEHER",ss1);
+console.log(ss1 + " " + ss2);
+if (ss1 > 1 && ss2 > 0){
+section = section.substring(1,ss1-1) + section.substring(ss2+19);
+};
+section = section.replace(/readonly=\"readonly\"/ig, "");
+};
+
+if (section.indexOf("hasDatepicker") > 0){
+// strip out script tag
+section = section.replace(new RegExp( "\\n", "g" ),"");
+section = section.replace(/<script>([^script])*<\/script>/ig,"");
+section = section.replace(/hasDatepicker/ig,"");
+datefield = true;
+// strip out script tag
+};
+
+var parser = new DOMParser();
+var sectiondoc = parser.parseFromString(section, 'text/html');
+var selectElements = sectiondoc.querySelectorAll('select'); // this selects only first select !!!!!!
+var choicesEl = sectiondoc.querySelectorAll('.choices')
+
+var choicecount = 0;
+selectElements.forEach((selectElement) => {
+var allClasses = selectElement.classList;
+allClasses.remove("choices__input");
+selectElement.removeAttribute('data-choice'); // !!!!
+selectElement.removeAttribute('hidden'); // !!!!
+
+if (selectElement.multiple){
+// remove surrounding markup and add only select multiple element that will be later initialized with Choices
+choicesEl[choicecount].replaceWith(selectElement)
+choicecount++;
+}
+});
+
+var checkboxInputs = sectiondoc.querySelectorAll('.form-check.form-switch .form-check-input');
+checkboxInputs.forEach((checkboxInput) => {
+newID = prefix + checkboxInput.getAttribute('id');
+checkboxInput.setAttribute('id', newID) // add prefx to id
+//var chLabel = doc.querySelector('.form-check.form-switch .form-check-label').setAttribute('for', newID)
+checkboxInput.nextSibling.setAttribute('for', newID)
+
+});
+// Yes/No checkbox
+/*
+if(yesNoCheckbox){
+yesNoCheckbox.forEach((yesno) => {
+newID = prefix + checkboxInput.getAttribute('id');
+checkboxInput.setAttribute('id', newID) // add prefx to id
+
+var chLabel = doc.querySelector('.form-check.form-switch .form-check-label').setAttribute('for', newID)
+});
+}
+*/
+section = sectiondoc.body.innerHTML
+
+//console.log(section);
+// strips name to add prefix
+var xp = section.indexOf("name=");
+while (xp > 0){
+// add NAME=1-326 or NAME=1-326-SURNAME prefix the id on certain types (multiple/contact)
+// add NAME=1-S326
+xp += 6;
+var xpp = section.indexOf('"',xp); // end of name="XXXXX" <----
+// find out the start of the tag
+if ((section[xp] == "S" || section[xp] == "E")){
+
+var newsection=section.substring(0,xp+1) + prefix + section.substring(xp+1,xpp) + "\"" + section.substring(xpp+1,section.length);
+section = newsection;
+xp = section.indexOf("name=",xp+5);
+
+}
+else {
+var newsection=section.substring(0,xp) + prefix + section.substring(xp,xpp) + "\"" + section.substring(xpp+1,section.length);
+
+section = newsection;
+
+
+
+
+xp = section.indexOf("name=",xp+5);
+};
+}
+
+// remove value = part
+// Ignore for Radio or checkbox or YESNO
+// remove value= part for textboxes etc
+xp = section.indexOf("value=");
+while (xp > 0){
+if (section.substr(xp-8,6) != "EXISTS" && !checkTag('EXISTS',section,xp) && !checkTag('option ',section,xp) && !checkTag('type="RADIO"',section,xp) && !checkTag('type="CHECKBOX"',section,xp) && !checkTag('class="noerase"',section,xp)){
+ctrexists = false;
+if (checkTag("counter",section,xp)){
+ctrexists = true;
+};
+xpp = section.indexOf('"',xp+7);
+newsection = section.substr(0,xp);
+if (ctrexists){
+newsection += " value='0' ";
+};
+newsection += section.substring(xpp+1,section.length);
+section = newsection;
+};
+xp = section.indexOf("value=",xp+5);
+};
+
+// removes checked
+section = section.replace(/checked(="")/ig, "");
+//section = section.replace('-OPTION">', '-OPTION"><option value="">Select an option</option>');
+
+// Start / end date range needs to be difference
+var datefields = [];
+var dateids = []; // used to get original date ids of fields
+var datetypes = [];
+
+xp = section.indexOf("id=");
+while (xp > 0){
+xp+=4;
+xpp = section.indexOf('"',xp);
+if (checkTag('ibFormDateTime',section,xp-4)){
+var did = section.substring(xp,xpp);
+newsection = section.substr(0,xp) + prefix+did+ "\""+section.substring(xpp+1,section.length);
+section = newsection;
+datefields.push(prefix+did);
+datetypes.push('DT');
+dateids.push(did);
+}
+else if (checkTag('ibFormDate',section,xp)){
+var did = section.substring(xp,xpp);
+newsection = section.substr(0,xp) + prefix+did+ "\""+section.substring(xpp+1,section.length);
+section = newsection;
+datefields.push(prefix+did);
+datetypes.push('D');
+dateids.push(did);
+}
+else if (checkTag('id=\"S',section,xp)){
+var did = section.substring(xp+1,xpp);
+newsection = section.substr(0,xp) + "S"+prefix+did+ "\""+section.substring(xpp+1,section.length);
+section = newsection;
+datefields.push("S"+prefix+did);
+if (checkTag('ibFormStartEndDateTime',section,xp-4)){
+datetypes.push('DT');
+}
+else {
+datetypes.push('D');
+};
+dateids.push("S"+did);
+}
+else if (checkTag('id=\"E',section,xp)){
+var did = section.substring(xp+1,xpp);
+newsection = section.substr(0,xp) + "E"+prefix+did+ "\""+section.substring(xpp+1,section.length);
+section = newsection;
+datefields.push("E"+prefix+did);
+if (checkTag('ibFormStartEndDateTime',section,xp-4)){
+datetypes.push('DT');
+}
+else {
+datetypes.push('D');
+};
+dateids.push("E"+did); // used to get original date settings of the field
+}
+else if (checkTag('counter',section,xp)){
+var did = section.substring(xp,xpp);
+newsection = section.substr(0,xp) + prefix+did+ "\""+section.substring(xpp+1,section.length);
+section = newsection;
+};
+xp = section.indexOf("id=",xp+5);
+};
+
+xp = section.indexOf("<text" + "area");
+count = 0;
+while (xp > 0 && count < 200){
+count++;
+xpp = section.indexOf('>',xp); // end of textarea tag
+if (xpp > 0){
+textareaend = section.indexOf('</textarea',xp);
+newsection = section.substr(0,xpp+1) + section.substring(textareaend,section.length);
+section=newsection;
+};
+xp = section.indexOf("<text" + "area",xp+5);
+}
+
+var insertbefore = "#addAnother"+patid;
+
+var removestr = "<div  class='removeButton ibRemoveButton mb-1'><A class='btn btn-outline-danger btn-sm' onClick='removeBlock("+patid+","+(dyn_idx)+")'> <i class='bi bi-trash me-2'></i> Remove</A></div>";
+if (field_type == "10"){
+removestr = "";
+};
+
+
+// NEW CODE (disabled for now) =======================
+//$(insertbefore).before(`<div class="customRow${patid}  ibFormGroupNew px-4 pb-4 border shadow mt-2 rounded ibFieldID${patid}" id="ROW${patid}_${dyn_idx}">${section}${removestr}${hidden_str}</div><div class="clear"></div>`);
+
+// OLD code buggy with contact collect + CSV/XLT contact upload when Add Another
+$(insertbefore).before("<div class='customRow"+ patid+" ibFormGroupNew px-4 pb-4 border shadow mt-2 rounded ibFieldID"+ patid+"' id=ROW" +patid+ "_" + dyn_idx + ">"+section+ removestr + hidden_str + "</div><div class=clear></div>");
+
+
+
+var newmultiples = $("#ROW" +patid+ "_" + dyn_idx ).find('select[multiple]')
+console.log('newmultiples', newmultiples)
+console.log('row', "#ROW" +patid+ "_" + dyn_idx)
+if(newmultiples.length > 0){
+
+$.each(newmultiples, (i, ms) => {
+
+console.log($(ms))
+new Choices($(ms)[0], {
+placeholderValue: "Select one or more",
+searchPlaceholderValue: "Type to filter",
+allowHTML: false,
+removeItemButton: true,
+shouldSort: false
+})
+})
+}
+
+// activcate the triggers on date option fields
+var dateoptstart = section.indexOf("ibDateOption");
+
+//console.log(section)
+
+while (dateoptstart > 0 && false){
+var dateoptid = section.substr(dateoptstart+12, section.indexOf("\"",dateoptstart+12)-(dateoptstart+12));
+//console.log("^"+dateoptid+"^");
+var num = Number(+dateoptid);
+if (typeof(num) == "number"){
+//console.log("^"+dateoptid+"^ number");
+activateDateOptionCounter(num);
+};
+dateoptstart = section.indexOf("ibDateOption",dateoptstart+5);
+};
+// if any date field activate them
+
+for (var i = 0; i < datefields.length; i++) {
+debugger
+var id = datefields[i];
+var orig_id = dateids[i];
+console.log('orig_id', orig_id)
+
+if (datetypes[i] == "DT" || datetypes[i] == "D"){
+var tp = true;
+var format = 'm/d/Y';
+var hours12f = true;
+if (datetypes[i] == "D"){
+tp = false;
+}
+else {
+format = format + ' g:i A';
+};
+
+//console.log(dateSettings["HOURS12"+orig_id]);
+//console.log("15 step");
+
+// [Added by Dejan]: since we are in this loop already, let's add the missing `hasDatepicker` to each date field
+$("#"+id).addClass('hasDatepicker')
+debugger;
+// ./ END [Added by Dejan]:
+
+console.log('default date', dateSettings['DEFAULTDATES' + orig_id])
+
+$("#"+id).datetimepicker({
+defaultDate: dateSettings['DEFAULTDATES' + orig_id], // [Added by Dejan]: fixing default date on new date fields
+numberOfMonths: 2,
+format: format,
+timepicker: dateSettings["TIMEPICKER"+orig_id],
+beforeShowDay: dateSettings['DATEHIGHLIGHT' + orig_id], // [Added by Dejan]: fix allowed dates when duplicating group
+//beforeShowDay: dateSettings['DATEHIGHLIGHT' + orig_id], // [Added by Dejan]: fix allowed dates when duplicating group
+mouseWheel: false,
+timepicker: tp,
+hours12 : hours12f,
+dayOfWeekStart: 1,
+scrollMonth : false,
+scrollInput : false,
+step: 15
+});
+
+if (id.indexOf("S") == 0){
+$("#"+id).change(function() {
+var iid = id.substr(1);
+var eid = "E" + iid;
+$("#" + eid).val($("#S"+iid).val());
+});
+};
+}
+};
+
+// now we've done all of this find all -OPTION fields
+alerted = false;
+
+console.log("PROCESS OPTIONS...");
+$("select[name*='-OPTION']" ).each(function(){
+// check it just has a 222-OPTION and not 44-555-OPTION
+const words = this.name.split('-');
+//console.log(words.length + " " + this.name);
+if (words.length == 2){
+// only the xxx-OPTION tags
+//$(this).prop('selectedIndex', -1);
+console.log("selected value before sending: " + $(this).val());
+updateDependencyQuantities(this.name);
+} else {
+console.log("else : " + $(this).val());
+//$(this).prop('selectedIndex', -1);
+};
+});
+};
+
+
+
+function removeBlock(PAttributeID,JP){
+
+var suffix = PAttributeID;
+suffix += "_" + JP;
+
+$("#ROW"+suffix).html('');
+$("#REMOVE"+suffix).html('');
+$("#ROW"+suffix).remove();
+ib_max[PAttributeID]++;
+//ib_offset[PAttributeID]--;
+console.log(JSON.stringify(ib_offset));
+};
+
+</script>
+<script src=https://canmorefolkfest.festivalpro.com/javascript2/jstz.main.js></script>
+<script src=https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/1.0.40/jquery.csv.js></script>
+<script type="text/javascript" src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+.ibpadDateSelector {
+margin-top: 0.25rem !important;
+display: flex;
+gap: 0.5rem !important;
+margin-bottom: 0.5rem !important;
+}
+.icon-tabler-chevron-right{
+transition: transform 0.3s;
+}
+</style>
+<script>
+var mincounter = {};
+var maxcounter = {};
+// This should be deprecated
+function decCounter(th){
+var $input = $(th).parent().find('input.counter');
+var id = $input.attr('id');
+if (id.indexOf("-") > 0){
+id = id.substr(id.indexOf("-")+1);
+};
+var count = parseInt($input.val());
+//console.log(id + " " + count + " " + mincounter[id]);
+if (count > mincounter[id]){
+$input.val(count - 1);
+$input.change();
+};
+return false;
+};
+function incCounter(th){
+var $input = $(th).parent().find('input.counter');
+var id = $input.attr('id');
+var count = parseInt($input.val());
+// id might have some stupid items
+if (id.indexOf("-") > 0){
+id = id.substr(id.indexOf("-")+1);
+};
+if (count < maxcounter[id]){
+$input.val(count + 1);
+$input.change();
+};
+return false;
+};
+$(window).on('load', function () {
+//	dynamicScript();
+});
+var globaldays = {};
+var paddesc = {};
+var globaltimes = {};
+var maxDateOption = {};
+var globalmax = {};
+var globalremaining = {};
+var globalfee = {};
+var globaldescription  = {};
+var multiplebooking = true;
+var multiple = {};
+var dependencies = {};
+var timeslots = {};
+function updatePAD(id){
+console.log('updatePAD', id);
+console.log($(id).val())
+const valuesSelected = Array.isArray($(id).val()) ? $(id).val() : [$(id).val()];
+const attr = $(id).attr('name')
+var newattr = attr.replace('-DAYPAD','-PAD');
+console.log("MULTIPLE"+multiple[newattr.replace('-PAD','')]);
+//console.log(attr, valuesSelected.join(','));
+//console.log("CURRENT" + $('#x' + newattr).val());
+let previous = ($('#xs' + attr).val() || '').split(',');
+console.log('Previous:', previous);
+//const current = $(id).val() || [];
+const current = Array.isArray($(id).val()) ? $(id).val() : ($(id).val() ? [$(id).val()] : []);
+const added = current.filter(v => !previous.includes(v));
+const removed = previous.filter(v => !current.includes(v));
+let existing = ($('#x' + newattr).val() || '').split(',');
+if (!multiple[newattr.replace('-PAD','')]){
+// if it's not a multiple then we just want to take the first value and ignore the rest
+$('#x' + newattr).val($(id).val());
+$('#xs' + attr).val("");
+console.log('Final value for', newattr, ':', $('#x' + newattr).val());
+}
+else {
+if (added.length){
+console.log('Added:', added);
+// join added and append to existing array, then convert to string and assign back to newattr
+existing = existing.concat(added);
+$('#x' + newattr).val(existing.join(','));
+$('#xs' + attr).val(valuesSelected.join(','));
+console.log('Final value for', newattr, ':', $('#x' + newattr).val());
+}
+if (removed.length) {
+console.log('Removed:', removed);
+// remove removed from the existing array and make sure no blanks in the array, convert to a string and assign back to newattr
+existing = existing.filter(v => !removed.includes(v) && v !== '');
+if (!multiple[newattr.replace('-PAD','')]){
+existing = [];
+}
+$('#x' + newattr).val(existing.join(','));
+$('#xs' + attr).val(valuesSelected.join(','));
+console.log('Final value for', newattr, ':', $('#x' + newattr).val());
+}
+console.log('Final value for', newattr, ':', $('#x' + newattr).val());
+};
+updateSelectedPAD(newattr.replace('-PAD',''));
+};
+function updateSelectedPAD(id){
+var selected = "";
+console.log("updateSelected x"+id);
+var cvalue = "";
+if ($('#x' + id+"-PAD").val() != undefined && $('#x' + id+"-PAD").val() != ""){
+cvalue = $('#x' + id+"-PAD").val();
+};
+if ($('#' + id+"-PAD").val() != undefined && $('#' + id+"-PAD").val() != ""){
+cvalue = $('#' + id+"-PAD").val();
+};
+console.log(cvalue);
+console.log("ID:" + id + " VAL" + $('#x' + id+"-PAD").val());
+if (cvalue != ""){
+cvalue.split(',').forEach(function(value){
+if (value && paddesc[value] != undefined){
+// Do something with each non-empty value
+//selected += paddesc[value] + "<br>";
+selected += `
+<div class="d-flex flex-column">
+<div class="cursor-default  form-selectgroup-label p-3">
+<div class="form-selectgroup-label-content d-flex gap-2 justify-content-between">
+${paddesc[value]}
+</div>
+</div>
+</div>
+`
+//console.log('paddesc[value]', paddesc[value])
+}
+});
+};
+//console.log("padSelected" + id + " " + selected);
+$("#padSelected" + id).html(selected);
+};
+function activateDateOptionCounter(linkifield){
+//$(".ibDateOption"+linkifield).on("change",function (obj){
+$(document).on("click", ".ibDateOption"+linkifield, function(){
+//var cdo = "currentDateOption"+linkifield;
+var cdo = $("#current"+linkifield).html();
+var mdo = maxDateOption[linkifield];
+if (this.checked){
+cdo++;
+}
+else {
+cdo--;
+};
+if (cdo > mdo){
+if (this.checked){
+selectError = true;
+//alert("You have allocated more than you are allowed. Current:" + cdo + " Max:" + mdo);
+Swal.fire({
+toast: true,
+position: "bottom",
+icon: "error",
+html: 'You have allocated more than you are allowed. <br><strong>Current: ' + cdo + '</strong><br> <strong>Max: ' + mdo + '</strong>',
+showConfirmButton: false,
+timer: 5000
+});
+this.checked = false;
+return(0);
+};
+}
+$("#current"+linkifield).html(cdo);
+$(window).trigger('check_max_checked_options')
+});
+};
+// count how many there are, this is checked in the code after
+function calculateCurrentQuantity(pat){
+console.log("calculateCurrentQuantity" + pat);
+var total = 0;
+$(".ibDateOption"+pat).each(function(i,obj){
+if (obj.checked){
+total++;
+};
+});
+$("#current"+pat).html(total);
+};
+function valueInSelect(id,val){
+// console.log("checking " + id + " is " + val);
+var ret = false;
+$("select[name='" + id + "'] :selected").each(function() {
+// console.log(this.value + " == " + val);
+if (this.value == val){
+ret = true;
+return(false);
+}
+});
+return(ret);
+};
+function updateDependencyQuantities(name){
+//  get all the values for the option and update quantities
+origname = name;
+//// console.log(`Selected value of select[name="${origname}"]: ${$(`select[name="${origname}"]`).val()}`);
+patid = name.replace('-OPTION','');
+//// console.log("origname: " + origname);
+//// console.log("patid.indexOf: " + patid.indexOf('-'));
+if (patid.indexOf('-') > 0){
+name = name.substring(name.indexOf('-')+1);
+patid = patid.substring(patid.indexOf('-')+1);
+};
+// copy MAX map to normal
+var newMap = new Map;
+eval("for (var i in mapMAX"+patid+"){newMap[i] = mapMAX"+patid+"[i];}");
+$("select[name*='" + name + "']").each(function () {
+// console.log("-----------------");
+if (this.value != "") {
+var optionValue = this.value;
+var currentMapValue = eval("newMap[" + optionValue + "]");
+// console.log("id of option : " + optionValue);
+// console.log("allocated space: " + eval("map" + patid)[this.value]);
+// console.log("available space: " + currentMapValue);
+if (currentMapValue <= 0) {
+// Find the next available option with available space
+var nextOptionValue = findNextAvailableOptionValue(newMap);
+// Select the next available option
+if (nextOptionValue != ""){
+$(this).val(nextOptionValue);
+//alert('You have reached the maximum allocation for this option. The next available option is selected instead');
+// console.log("Selected next available option: " + nextOptionValue);
+// Update newMap and display
+newMap[nextOptionValue]--;
+$('#DEP' + nextOptionValue).text(newMap[nextOptionValue]);
+} else {
+//alert('You have used all your allocated quota');
+//this is usefull when changing to something that already is full, but it also gets triggered when add new because it comes with pre-selected option that might be full
+};
+} else {
+eval("newMap[" + optionValue + "]--");
+$('#DEP' + optionValue).text(newMap[optionValue]);
+}
+};
+});
+function findNextAvailableOptionValue(newMap) {
+for (var optionValue in newMap) {
+if (newMap.hasOwnProperty(optionValue) && newMap[optionValue] > 0) {
+return optionValue;
+}
+}
+return ""; // Return an empty string if no available options
+}
+for (var i in newMap){
+$('#DEP'+i).text(newMap[i]);
+}
+//eval("for (var i in map"+patid+"){$('#DEP'+i).text(map"+patid+"[i]);}");
+//eval("for (var i in map"+patid+"){if (map"+patid+"[i] < 0) {alert('ERROR NOT ENOUGH');$('select[name="+origname+"]').val('');};}");
+for (var i in newMap){
+if (newMap[i] < 0){
+//// console.log("patid: " + patid);
+//// console.log("newMap[i]: " + newMap[i]);
+//// console.log("eval:" + eval("mapMAX"+patid+"[i]"));
+//// console.log("");
+$('#DEP'+i).html("<font color=red class=ibError>"+newMap[i] + " / " + eval("mapMAX"+patid+"[i]")+"</font>");
+if (alerted == false){
+alert('Error in the number of items');
+alerted = true;
+};
+//// console.log("eval less than 0:" + origname);
+//$("select[name="+origname+"]").val('');
+}
+else {
+//// console.log("eval more than 0:" + origname);
+$('#DEP'+i).text(newMap[i] + " / " + eval("mapMAX"+patid+"[i]"));
+};
+}
+};
+function showPADDescription(field,id){
+if (globaldescription[id] != "" && globaldescription[id] != undefined){
+//// console.log(field + "-DESCRIPTION");
+Swal.fire({
+title: "",
+icon: null,
+html: globaldescription[id],
+showCloseButton: true,
+//showCancelButton: true,
+focusConfirm: false,
+});
+//$("#"+field+"-DESCRIPTION").html(globaldescription[id]);
+};
+};
+function PricingData(currency,days,times,max,fee,type,name,description) {
+this.currency = currency;
+this.days=days;
+this.times=times;
+this.max=max;
+this.fee=fee;
+this.type=type;
+this.name=name;
+this.description=description;
+}
+function deleteFile(fileid){
+var bookingid = $("input[name=BOOKINGID]").val();
+$.get("https://canmorefolkfest.festivalpro.com/?deleteFormFile&FILEID="+fileid+"&BOOKINGID="+bookingid, function( data ) {
+if (data == "TRUE"){
+$("#ibFormFileName"+fileid).hide();
+$("#ibFormFileLink"+fileid).hide();
+Swal.fire({
+toast: true,
+position: "bottom",
+icon: "success",
+text: 'File deleted',
+showConfirmButton: false,
+timer: 4000,
+timerProgressBar: true
+});
+}
+});
+};
+function initGlobal(Field){
+// reset all globals with Field as a Prefix
+for (var key in globaldays) {
+if (key.indexOf(Field) == 0){
+delete globaldays[key];
+};
+}
+for (var key in globaltimes) {
+if (key.indexOf(Field) == 0){
+delete globaltimes[key];
+};
+}
+for (var key in globalremaining) {
+if (key.indexOf(Field) == 0){
+delete globalremaining[key];
+};
+}
+for (var key in globalmax) {
+if (key.indexOf(Field) == 0){
+delete globalmax[key];
+};
+}
+};
+function showPAD(Number,FieldName){
+// show date field
+//// console.log(Number + " Number");
+if (Number > 0 || Number == "-1"){
+// -1 used to simply get the data but not show any date picker
+if (Number != "-1"){
+$("#"+FieldName+"-DATE").show();
+};
+// initialise date based on number
+$.ajax({
+type: "GET",
+url: "https://canmorefolkfest.festivalpro.com/?checkPAD&PATTRIBUTEID="+FieldName+"&BOOKINGID=gJSYqnUIqzjmHeEjwOebSXqnlqVCeu",
+success: function(Result){ populateDate(Result, Number); }
+});
+}
+else {
+//// console.log("ERasing ... xxx");
+$("#"+FieldName+"-DATE").datetimepicker('destroy');
+$("#"+FieldName+"-DATE").val("");
+$("#"+FieldName+"-PAD").val("");
+$("#"+FieldName+"-TIME").html("");
+};
+};
+var populateDate = function(Result, callerNumber){
+lines = Result.split("INTRALINE");
+//console.log('lines', lines)
+var fieldName = lines[0];
+var oldestdate;
+var daysin = {};
+var today = new Date();
+initGlobal(fieldName);
+for (i = 1; i < lines.length-1; i++){
+// add entries to global array, then setup the date object the days
+// date,padid,start,end,currency,price,remaining,maxbooking,fee,starttime,endtime,name,descexists,type
+attr = lines[i].split("INTRASW");
+globaldays[fieldName+"-"+attr[0]] = 1;
+daysin[attr[0]] = 1;
+currentDate = new Date(attr[2]*1000);
+if (oldestdate == undefined || currentDate < oldestdate){
+oldestdate = currentDate;
+};
+if (globaltimes[fieldName+"-"+attr[0]] == undefined){
+globaltimes[fieldName+"-"+attr[0]] = "";
+globalmax[fieldName+"-"+attr[0]] = 0;
+globalremaining[fieldName+"-"+attr[0]] = 0;
+}
+globaltimes[fieldName+"-"+attr[0]] += attr[1]+"INTRASW"+attr[2]+"INTRASW"+attr[3]+"INTRASW"+attr[4] + "INTRASW" + attr[5] + "INTRASW" + attr[6]+ "INTRASW" + attr[7] + "INTRASW" + attr[8] + "INTRASW" + attr[9] + "INTRASW" + attr[10] + "INTRASW" + attr[11] + "INTRASW" + attr[12] + "INTRASW" + attr[13] + "INTRASW" + attr[14] + "INTRALINE";
+globalmax[fieldName+"-"+attr[0]] += parseInt(attr[7]); // PATTRIBUTEID-DATE as index
+if (parseInt(attr[6]) >= 0){
+globalremaining[fieldName+"-"+attr[0]] += parseInt(attr[6]);
+};
+globalfee[fieldName+"-"+attr[0]] += parseInt(attr[8]);
+globaldescription[attr[1]] = attr[14];
+//// console.log(fieldName+"-"+attr[0]);
+if (attr[10] != attr[9]){
+paddesc[attr[1]] = `
+<div class="fw-bold">${attr[11]}</div>
+<div class="p-2 border bg-body rounded text-start">
+<div class="text-secondary">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-calendar-event"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12" /><path d="M16 3l0 4" /><path d="M8 3l0 4" /><path d="M4 11l16 0" /><path d="M8 15h2v2h-2l0 -2" /></svg>
+${new Date(attr[2] * 1000).toLocaleDateString(navigator.language, {
+weekday: 'short',
+day: '2-digit',
+month: 'short'
+})}
+</div>`;
+if (attr[10] != attr[9]){
+paddesc[attr[1]] += `<div class="text-secondary">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-clock-hour-4"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 12l3 2" /><path d="M12 7v5" /></svg>
+${new Date(attr[2] * 1000).toLocaleTimeString(undefined, {
+hour: 'numeric',
+minute: '2-digit',
+hour12: true
+})}
+</div>
+`;
+};
+paddesc[attr[1]] += ` </div>`;
+};
+var np = new PricingData(1,"",parseInt(attr[4]),attr[7],parseInt(attr[8]),parseInt(attr[13]),attr[11],attr[12]);
+timeslots[fieldName+"-"+attr[0]] = np;
+};
+var storeddate = $("#"+fieldName+"-DATE").val();
+//if (storeddate == "" && Object.keys(daysin).length == 1){
+if (Object.keys(daysin).length == 1 && $("#"+fieldName).val() == ""){
+return(1);
+}
+else if (Object.keys(daysin).length == 1){
+// we only have 1 day, so let's select it, only if no counter?
+const firstValue = Object.keys(daysin)[0];
+storeddate = firstValue;
+// no need to show calendar
+$("#"+fieldName+"-DATE").hide();
+showPADTimes(fieldName,storeddate,true);
+return(0);
+};
+// stored date needs to be converted to unix and compared with now/1000
+if (storeddate != "" && date2Unix(storeddate) > Date.now()/1000){
+// not sure what this bit does?
+//alert(storeddate + " " + today);
+var bits1 = storeddate.split(" ");
+var dbits = bits1[0].split("/");
+//oldestdate = new Date(dbits[2],dbits[1]-1,dbits[0]);
+}
+else {
+// erase the date field
+// console.log("ERasing ...");
+$("#"+fieldName+"-DATE").val('');
+$("#"+fieldName+"-PAD").val("");
+$("#"+fieldName+"-TIME").html("");
+};
+if (callerNumber != "-1") $("#"+fieldName+"-DATE").datetimepicker({
+numberOfMonths: 1,
+format: "m/d/Y g:i A",
+timepicker: false,
+dayOfWeekStart: 1,
+startDate: oldestdate,
+mouseWheel: false,
+scrollMonth : false,
+hours12 : true,
+scrollInput : false,
+inline: true,
+beforeShowDay: function (date){
+return (datePickerDays(fieldName,date));
+},
+onSelectDate: function(ct,$i){
+var dateSelected = $i.val();
+// console.log(dateSelected);
+showPADTimes(fieldName,dateSelected,false);
+}
+});
+// this code helps on a page load to show time slots
+if (storeddate != ""){
+showPADTimes(fieldName,storeddate,false);
+updateSelectedPAD(fieldName);
+};
+/*
+console.log('globaldays', globaldays);
+console.log('globaltimes', globaltimes);
+console.log('globalmax', globalmax);
+console.log('globalremaining', globalremaining);
+console.log('storeddate', storeddate);
+*/
+};
+var datePickerDays = function(fieldName,currentDateTime) {
+// 'this' is jquery object datetimepicker
+var numselected = $("select[name='" + fieldName +"']").val();
+if (currentDateTime == null){
+return([true, 'datehighlight2', 'tex']);
+};
+var options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+//var datestring = currentDateTime.getDate()+"/"+(currentDateTime.getMonth()+1)+"/"+currentDateTime.getFullYear();
+var datestring = currentDateTime.toLocaleDateString("en-US",options);
+datestring = datestring.substring(datestring.indexOf(" "));
+if (globaldays[fieldName+"-"+datestring] == undefined){
+return([true, 'datehighlight2', 'tex']);
+};
+var ratio = Math.round(((globalremaining[fieldName+"-"+datestring]/globalmax[fieldName+"-"+datestring]*100)/25))
+if (parseInt(globalremaining[fieldName+"-"+datestring])-numselected < 0){
+// console.log(globalremaining[fieldName+"-"+datestring]);
+return([true, 'ibdatehighlightsoldout', 'tooltip text']);
+};
+if (globaldays[fieldName+"-"+datestring] == 1){
+// can return different styles based on availability
+return([true, 'ibdatehighlight'+ratio, '']);
+}
+else {
+return([true, 'ibdatehighlight', '']);
+};
+};
+function showPADTimes(Name,DateT,showDate){
+if (DateT == undefined){
+return("");
+};
+// get timezone
+var tzj = jstz.determine();
+var tz = tzj.timezoneOffset();
+if ($("input[name='TZ"+Name+"']").val() != undefined){
+console.log("hidden timezone found");
+// this code will display the date in our TIMEZONE which is always GMT
+// hidden input exists
+// assign timezone to it
+tz = 0; //  not sure if this is good, it'll display in their timezone. Not good if you're booking for a theatre ticket in another country!
+$("input[name='TZ"+Name+"']").val(tz);
+}
+else if ($("select[name='TZ"+Name+"']").val() != undefined){
+// this code will display the date in their TIMEZONE
+// find difference between select and their timezone, use that as offset
+//alert(tz + " " + $("select[name='TZ"+Name+"']").val());
+tz = ($("select[name='TZ"+Name+"']").val())-(tz/60*-1); // hours?
+tz = tz*60;
+}
+DateT = DateT.split(' ')[0];
+var tickets_requested = $("select[name='" + Name+"']").val();
+if (globalremaining[Name+"-"+DateT] == undefined || globalremaining[Name+"-"+DateT] == "0"){
+// console.log("returning now no data for this date " + DateT);
+$("#"+Name+"-TIME").html("");
+return;
+};
+var options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+var tt = date2Unix(DateT);
+var daySelect = new Date(tt*1000);
+var nextDate = new Date(parseInt(tt*1000+24*3600*1000));
+var prevDate = new Date(parseInt(tt*1000-24*3600*1000));
+var nextDay = nextDate.toLocaleDateString("en-US",options);
+var prevDay = prevDate.toLocaleDateString("en-US",options);
+var times = [];
+if (times.length > 0){
+times = times.concat(globaltimes[Name+"-"+DateT].split("INTRALINE"));
+}
+else {
+times = globaltimes[Name+"-"+DateT].split("INTRALINE");
+};
+var dropdown = eval("if (typeof subtype"+Name + " != 'undefined'){ 1}");
+if (dropdown){
+// dropdown box of timeslots
+var html = "<SEL" + "ECT NAME="+Name+"-DAYPAD";
+html += " class=\"form-control\" onChange=updatePAD(this); ";
+if (multiple[Name]){
+html += " MULTIPLE>";
+}
+else {
+html += "><OPTION VALUE=''> Select\n ";
+};
+var padsselected = "";
+var singleselected = false;
+for (i = 0; i < times.length-1; i++){
+if (times[i] == ""){
+continue;
+};
+var fields = times[i].split("INTRASW");
+var extra = "";
+//if (multiple[Name] && exists($("input[name='" + Name + "-PAD']").val(),fields[0])){
+// does matter as if it's not a multiple then only show one item
+if ((!singleselected || multiple[Name] ) && exists($("input[name='" + Name + "-PAD']").val(),fields[0])){
+singleselected = true;
+extra += " SELECTED ";
+padsselected += fields[0] + ",";
+};
+var cost= "",fee = "",namingconvention;
+//if (timeslots[Name+"-"+DateT].type == "1"){
+if (fields[12] == "1"){
+namingconvention = "places";
+cost = parseFloat(fields[4].replace(/[^\d.-]/g,''))*parseFloat(fields[5]);
+fee = parseFloat(fields[7].replace(/[^\d.-]/g,''))*parseFloat(fields[5]);
+}
+//else if (timeslots[Name+"-"+DateT].type == "0"){
+else if (fields[12] == "0"){
+namingconvention = "remaining";
+cost = fields[4];
+fee = fields[7];
+}
+else {
+namingconvention = "";
+cost = fields[4];
+fee = fields[7];
+};
+html += "<option ";
+html += extra;
+// console.log("----");
+if (parseInt(fields[5]) < parseInt(tickets_requested)){
+html += "disabled";
+}
+html += " value=" + fields[0] + ">";
+if (fields.length> 10 && fields[10] != ''){
+html += fields[10] + " - ";
+};
+if (fields[1] != fields[2]){
+if (showDate){
+html += unixtimeToDate(tz,fields[1]) + " ";
+};
+html += fields[8] + " - " + fields[9];
+};
+if (namingconvention != ""){
+html += " (" + fields[5] + " ";
+html += namingconvention;
+html += ")";
+};
+if (cost != "0.00"){
+html += " - " + fields[3]+ cost;
+if (fee != "0.00"){
+html += " (Fee " + fee +")";
+};
+};
+html += "</option>";
+};
+html += "</SELECT>";
+html += "<INP" + "UT TYPE=HIDDEN id=xs"+Name+"-DAYPAD NAME=xs"+Name+"-DAYPAD VALUE='"+padsselected+"'>";
+// DAY PAD is the items selected on a single day
+// PAD is the total items selected across all days, this is what gets submitted with the form
+// console.log(html);
+$("#"+Name+"-TIME").html(html);
+activatePageMultiselects()
+}
+else {
+// get first entry to see what type it is
+var fields = times[0].split("INTRASW");
+var html = '<A NAME='+Name+'PAD></A>';
+html += '<ul class="list-group list-group-horizontal-md">';
+if (fields[2] - fields[1] > 24*60*60){
+html += "<div class='selectTime'>Select the time you require below:</div>";
+};
+// console.log('times', times)
+//html += "<INP" + "UT TYPE=HIDDEN NAME=" + Name + "-PAD>";
+// global map may have data OR do we auto unselect in the case where only one booking allowed
+//$("input[name='" + Name + "-PAD'").val(globaldata[Name+"-PAD"]);
+// padid,start/end/price/remaining
+var currentday = "";
+var showcount = 0;
+for (i = 0; i < times.length-1; i++){
+if(showcount !== 0 && showcount % 6  === 0){
+html += '</ul>';
+html += '<ul class="list-group list-group-horizontal-md">';
+}
+/** TODO: COMMENTED for now: disabling slot for clicking on it when there are no tickets left is getting false positives
+if(fields[5] == 0){ // no cickets left
+html += '<li class="ibpadTime list-group-item list-group-item-action p-2 flex-fill disabled">';
+}else{
+html += '<li class="ibpadTime list-group-item list-group-item-action p-2 flex-fill">';
+}
+console.log('fields', fields[5], fields)
+console.log('times', times)
+*/
+if (times[i] == ""){
+continue;
+};
+var fields = times[i].split("INTRASW");
+var extra = "";
+// console.log('times[i]', times[i]);
+// console.log('fields', fields);
+html += '<li class="ibpadTime list-group-item list-group-item-action p-2 flex-fill">';
+showcount++;
+if (multiple[Name] && exists($("input[name='" + Name + "-PAD']").val(),fields[0])){
+extra += "Selected";
+};
+var cost= "",fee = "",namingconvention = "";
+//if (timeslots[Name+"-"+DateT].type == "1"){
+//else if (timeslots[Name+"-"+DateT].type == "0"){
+if (fields[12] == "1"){
+namingconvention = "places";
+cost = parseFloat(fields[4].replace(/[^\d.-]/g,''))*parseFloat(fields[5]);
+fee = parseFloat(fields[7].replace(/[^\d.-]/g,''))*parseFloat(fields[5]);
+}
+else if (fields[12] == "0"){
+namingconvention = "remaining";
+cost = fields[4];
+fee = fields[7];
+}
+else {
+namingconvention = "";
+cost = fields[4];
+fee = fields[7];
+};
+if (parseInt(fields[5]) < parseInt(tickets_requested)){
+html += "<div class=ibpadTimeSoldOut id=PAD"+ Name + "-" + fields[0] + ">";
+if (fields.length> 10){
+html += "<div class=ibpadName><strong>" + fields[10] + "</strong></div>";
+};
+html += "<div class=ibpadTimeTime> ";
+if (showDate && fields[1] != '0'){
+html += unixtimeToDate(tz,fields[1]) + " ";
+};
+if (fields[1] != '0'){
+html += fields[8] + " - " + fields[9];
+};
+html += "</div>";
+if (namingconvention != ""){
+html += '<p class="ibpadRemain mb-0"> ';
+html += `
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-ticket text-danger"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 5l0 2" /><path d="M15 11l0 2" /><path d="M15 17l0 2" /><path d="M5 5h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-3a2 2 0 0 0 0 -4v-3a2 2 0 0 1 2 -2" /></svg>
+<span class="status status-pink">
+<span class="status-dot status-dot-animated"></span>
+${fields[5]} ${namingconvention}
+</span>`
+//html += " <span class='fw-bold'>(" + fields[5] + " ";
+//html += namingconvention;
+//html += ")</span>	";
+html += "</p>";
+};
+if (cost != "0.00"){
+html += '<p class="ibpadPrice mb-0 text-primary"><i class="bi bi-cash"></i>  ' + fields[3] + cost;
+if (fee != "0.00"){
+html += " (Fee " + fee +")";
+};
+};
+}
+else {
+if(fields[5] == 0){
+html += "<div class='ibpadTime h-100'" + extra + " id=PAD"+ Name + "-" + fields[0] +">"; // no tickets left
+}else{
+html += "<div class='ibpadTime h-100'" + extra + " id=PAD"+ Name + "-" + fields[0] +" onMouseUp=selectPADTime(" + Name + ","+ fields[0] + ",true)>";
+}
+//console.log(fields[7] + " " + fields[8] + fields[9]);
+if (fields[13] != ""){
+html += '<p class="mb-0 text-end"><button type="button" class="btn btn-light btn-sm" onClick=showPADDescription('+ Name +',' + fields[0] + ')><i class="bi bi-info-circle"></i></button></p>';
+};
+if (fields.length> 10){
+html += '<p class="ibpadName mb-0"><strong>' + fields[10] + "</strong></p>";
+};
+if (showDate && fields[1] != '0'){
+html += '<p class=ibpadTimeDate>' +unixtimeToDate(tz,fields[1]) + "</p>";
+};
+if (fields[1] != '0' && fields[2] != '0'){
+html += '<p class="ibpadTimeTime text-success mb-0"> <i class="bi bi-alarm"></i> ';
+html += fields[8] + " - " + fields[9] + "</p>";
+};
+var remainingTextColor = 'success';
+if(fields[5] == 1){
+// last ticket
+remainingTextColor = 'orange';
+}
+if(fields[5] == 0){
+// no tickets ticket
+remainingTextColor = 'danger';
+}
+if (namingconvention != ""){
+html += '<p class="ibpadRemain text-'+ remainingTextColor +' mb-0"> ';
+html += `
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-ticket text-${remainingTextColor}"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 5l0 2" /><path d="M15 11l0 2" /><path d="M15 17l0 2" /><path d="M5 5h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-3a2 2 0 0 0 0 -4v-3a2 2 0 0 1 2 -2" /></svg>
+`;
+html += " (" + fields[5] + " ";
+html += namingconvention;
+html += ")</p>";
+}
+if (cost != "0.00"){
+html += '<p class="ibpadPrice mb-0 text-primary"><i class="bi bi-cash"></i>  ' + fields[3]+ cost;
+if (fee != "0.00"){
+html += " (Fee " + fee +")";
+};
+html += '</p>';
+};
+};
+html += "</div>";
+html += "</div>";
+};
+if (!multiple[Name]){
+//$("input[name='" + Name + "-PAD'").val("");
+};
+html += "</ul>";
+$("#"+Name+"-TIME").html(html);
+//window.location.hash = '#'+Name+'PAD';
+if ($("#"+Name+"-PAD").val() != ""){
+console.log('NAME', Name)
+console.log('$(Name PAD).val()', $("#"+Name+"-PAD").val())
+selectPADTime(Name,$("#"+Name+"-PAD").val(),false);
+};
+};
+};
+const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function unixtimeToDate(Tz,TimeStamp){
+var date = new Date(TimeStamp*1000);
+return(date.getDate()+" " + months[date.getMonth()]  + " " + date.getFullYear());
+};
+function unixtimeToTime(Tz,TimeStamp){
+var date = new Date(TimeStamp*1000);
+date.setTime( date.getTime() + Tz*60*1000 );
+var hours = date.getHours();
+// Minutes part from the timestamp
+var minutes = date.getMinutes();
+if (minutes < 10){
+minutes = "0"+minutes;
+};
+var ampm = "";
+if (hours < 12){
+ampm = "AM";
+}
+else {
+ampm = "PM";
+};
+return(hours+":"+minutes + " " + ampm);
+};
+function exists(str,val){
+if (str ==  undefined){
+return(false);
+};
+if (str == ""){
+return(false);
+};
+var itemsSelected = str.split(",");
+var newselection = "";
+for (var x = 0; x < itemsSelected.length; x++){
+if (itemsSelected[x] == val){
+return(true);
+};
+};
+return(false);
+};
+function stripArray(str,vals){
+// removes vals from str
+var v = String(vals);
+var itemsRemoving = v.split(",");
+for (var y = 0; y < itemsRemoving.length;y++){
+var itemsSelected = str.split(",");
+var newselection = "";
+for (var x = 0; x < itemsSelected.length; x++){
+if (itemsSelected[x] != itemsRemoving[y]){
+newselection += itemsSelected[x] + ",";
+};
+// console.log(newselection);
+};
+str = newselection.substring(0,newselection.length-1);
+};
+return(str);
+};
+function selectPADTime(Name,Value,Manual){
+var currentSelection = $("input[name='" + Name + "-PAD']").val();
+console.log('multiple', multiple)
+console.log('multiple[Name]', multiple[Name])
+console.log('currentSelection', currentSelection);
+if (multiple[Name]){
+var nval = "";
+if (Manual && currentSelection != ""){
+// one already selected
+console.log("SELECTED:" + Value + " from " + currentSelection);
+nval = stripArray(currentSelection,Value);
+// console.log(currentSelection);
+if (nval != currentSelection){
+// this means the current item was in there and has been removed
+// they are delecting an item!
+$('div[id^="PAD' + Name + "-" + Value + '"]').addClass('ibpadTime').removeClass('ibpadTimeSelected');
+//$('div[id^="PAD' + Name + "-" + Value + '"]').parent('li').removeClass('bg-warning');
+$("input[name='" + Name + "-PAD']").val(nval);
+// console.log(nval);
+updateSelectedPAD(Name,'');
+return(true);
+};
+};
+}
+else {
+// deselect all previous
+$('div[id^="PAD'+Name+'"]').addClass('ibpadTime').removeClass('ibpadTimeSelected');
+//$('div[id^="PAD'+Name+'"]').parent('li').removeClass('bg-warning');
+};
+// selects individual item
+// only if manually clicked and the previous click isn't the same button
+// or it's not a manual click (when they load the page) and we must select the item
+if (Manual && currentSelection != Value || !Manual){
+console.log('Name, value', Name, Value)
+if (Manual && dependencies[Name] != undefined){
+var deptype = dependencies[Name].substring(0,1);
+var depamount = dependencies[Name].substring(1);
+console.log('dependencies', deptype , depamount)
+// this means we have dependencies to worry about, so we need to remove any items that are in the same group as the one just selected
+var itemsSelected = $("input[name='" + Name + "-PAD']").val().split(",");
+if (deptype == 'M' && itemsSelected.length > depamount-1){
+alert("Too Many Selected");
+return(false);
+}
+else if (deptype == 'E' && itemsSelected.length > depamount-1){
+alert("Too Many Selected. Please select only " + depamount);
+return(false);
+}
+};
+if(typeof Value === 'string'){
+const splitValues = Value.split(',');
+if(splitValues.length > 0){
+$.each(splitValues, (i, id) => {
+$("#PAD"+Name +"-" + id).addClass('ibpadTimeSelected').removeClass('ibpadTime');
+})
+}
+}else{
+$("#PAD"+Name +"-" + Value).addClass('ibpadTimeSelected').removeClass('ibpadTime');
+}
+//$("#PAD"+Name +"-" + Value).parent('li').addClass('bg-warning');
+}
+else {
+// this code is when is deselected
+Value = "";
+};
+// console.log('INPUT', $("input[name='" + Name + "-PAD']"))
+if (multiple[Name]){
+var tmpval = $("input[name='" + Name + "-PAD']").val();
+tmpval = stripArray(tmpval,Value);
+if (tmpval != ""){
+tmpval += ",";
+}
+tmpval += Value;
+// store this value in a global map. Store all details about this so we can show a basket
+//console.log(tmpval + " stored in " + Name + "-PAD");
+$("input[name='" + Name + "-PAD']").val(tmpval);
+}
+else {
+$("input[name='" + Name + "-PAD']").val(Value);
+};
+updateSelectedPAD(Name,'');
+};
+function date2Unix(dstring){
+if (dstring == undefined){
+return("");
+};
+// console.log("SDFSDFSDF" + dstring);
+// routine needs to be updated to deal with US dates
+var d = new Date();
+parts = dstring.split(" ");
+dpart = parts[0].split("/");
+d.setDate(dpart[1]);
+d.setMonth(dpart[0]-1);
+d.setYear(dpart[2]);
+if (parts.length > 1){
+tpart = parts[1].split(":");
+d.setHours(tpart[0]);
+d.setMinutes(tpart[1]);
+};
+return(d.getTime()/1000);
+};
+</script>
+<div class=clear></div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID3005  formFieldType9" >
+<div class="col-sm mb-4">
+<div class="fieldType9 pb-0 fieldID3005 ">
+<div class="attributeName form-label mb-0 required">
+Which Festival are you applying for?
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType9 ">
+<div class=form-check><span class="ibCheckboxSpan3005 ibCheckboxSpan" id="vpattrib3005"><INPUT TYPE=CHECKBOX NAME=3005 VALUE="The Warm Up (February 12-13, 2027)" class=" ibFormCheckBox formCheckbox form-check-input"><label class=form-check-label for="ibPA3005-1825">The Warm Up (February 12-13, 2027)</label></span></div><div class=form-check><span class="ibCheckboxSpan3005 ibCheckboxSpan" id="vpattrib3005"><INPUT TYPE=CHECKBOX NAME=3005 VALUE="Canmore Folk Festival (July 31-August 2, 2027)" class=" ibFormCheckBox formCheckbox form-check-input"><label class=form-check-label for="ibPA3005-1827">Canmore Folk Festival (July 31-August 2, 2027)</label></span></div><INPUT TYPE=HIDDEN NAME=3005-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID495  formFieldType9" >
+<div class="col-sm mb-4">
+<div class="fieldType9 pb-0 fieldID495 ">
+<div class="attributeName form-label mb-0 required">
+Availability
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType9 ">
+<div class=form-check><span class="ibCheckboxSpan495 ibCheckboxSpan" id="vpattrib495"><INPUT TYPE=CHECKBOX NAME=495 VALUE="I confirm that we are available to play on the dates above" class=" ibFormCheckBox formCheckbox form-check-input"><label class=form-check-label for="ibPA495-331">I confirm that we are available to play on the dates above</label></span></div><INPUT TYPE=HIDDEN NAME=495-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID765  formFieldType33" >
+<div class="col-sm mb-4">
+<div class="fieldType33 pb-0 fieldID765 ">
+<div class="attributeName form-label mb-0 required">
+Band/Artist Name
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType33 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="765" SIZE=25 VALUE="" ID=ibPA765><INPUT TYPE=HIDDEN NAME=765-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID767  formFieldType31" >
+<div class="col-sm mb-4">
+<div class="fieldType31 pb-0 fieldID767 ">
+<div class="attributeName form-label mb-0 required">
+First Name
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType31 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="767" SIZE=25 VALUE="" ID=ibPA767><INPUT TYPE=HIDDEN NAME=767-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID769  formFieldType32" >
+<div class="col-sm mb-4">
+<div class="fieldType32 pb-0 fieldID769 ">
+<div class="attributeName form-label mb-0 required">
+Last Name
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType32 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="769" SIZE=25 VALUE="" ID=ibPA769><INPUT TYPE=HIDDEN NAME=769-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID771  formFieldType40" >
+<div class="col-sm mb-4">
+<div class="fieldType40 pb-0 fieldID771 ">
+<div class="attributeName form-label mb-0 required">
+Email
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType40 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="EMAIL" NAME="771" SIZE=25 VALUE="" onChange=checkAccount(this.value) id=ibNameField  ID=ibPA771><INPUT TYPE=HIDDEN NAME=771-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=clear id=ibLoginCommentNewLine></div>
+<div class=formRow style="display:none;" id=ibLoginComment>An account with this email address already exists, a token has been sent to this email address. Please enter it below.<br>If you want it resent please click here <A HREF="#" id="forgotten_pass">Click here</A>
+</div>
+<div class=clear id=ibLoginCommentNewLine></div>
+<div class=formRow style="display:none;" id=ibLoginInput>
+<div class=formCell>
+<div class="formPersonalTag"><span class=formPassword>Login Token</span></div>
+<div class=formCell>
+<div class=formErrorTag>
+</div>
+</div>
+</div>
+</div>
+<script>
+$(document).on('click', '#forgotten_pass', (e) => {
+e.preventDefault();
+let email = $('#ibNameField').val();
+var settings = {
+"async": true,
+"crossDomain": true,
+"url": 'https://canmorefolkfest.festivalpro.com/?forgottenPassword&FORM=TRUE&EVENTID=5048&EVENT=TRUE&POPUP=TRUE&EMAIL='+ email,
+"method": "GET",
+"headers": {
+"Content-Type": "text/html",
+},
+"processData": false,
+}
+$.ajax(settings).then((response) => {
+console.log(response)
+alertInfo({html: response})
+})
+//showModal({title: 'Forgotten Password', size: 'simple', url: 'https://canmorefolkfest.festivalpro.com/?forgottenPassword&FORM=TRUE&EVENTID=5048&EVENT=TRUE&POPUP=TRUE&EMAIL='+ email})
+})
+</script>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID493  formFieldType1" >
+<div class="col-sm mb-4">
+<div class="fieldType1 pb-0 fieldID493 ">
+<div class="attributeName form-label mb-0 required">
+Location
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType1 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="493" SIZE=20 VALUE="" ID=ibPA493><INPUT TYPE=HIDDEN NAME=493-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+<div class="description form-hint"><span>(Country, province/state, city/town)</span>  </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID1357  formFieldType5" >
+<div class="col-sm mb-4">
+<div class="fieldType5 pb-0 fieldID1357 ">
+<div class="attributeName form-label mb-0 ">
+Have you performed at one of our festivals in the past?
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType5 ">
+<div class="form-check form-switch"><INPUT id=ibPA1357 NAME=1357 TYPE=CHECKBOX switch='bool' VALUE=1 class="form-check-input" ><label class="form-check-label" for="ibPA1357" data-on-label="Yes" data-off-label="No"></label></div><INPUT TYPE=HIDDEN NAME=1357-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID1359  formFieldType1" >
+<div class="col-sm mb-4">
+<div class="fieldType1 pb-0 fieldID1359 ">
+<div class="attributeName form-label mb-0 required">
+Which Year(s)?
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType1 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="1359" SIZE=20 VALUE="" ID=ibPA1359><INPUT TYPE=HIDDEN NAME=1359-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID246  formFieldType3" >
+<div class="col-sm mb-4">
+<div class="fieldType3 pb-0 fieldID246 ">
+<div class="attributeName form-label mb-0 required">
+Type of Artist
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType3 ">
+<SELECT NAME="246" class=" ibFormSelect formSelect form-select w-auto">	<OPTION VALUE=""> - Not Selected - </OPTION><OPTION VALUE="Solo">Solo</OPTION><OPTION VALUE="Group">Group</OPTION><OPTION VALUE="Both/Either">Both/Either</OPTION></SELECT><INPUT TYPE=HIDDEN NAME=246-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+<div class="description form-hint">  </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID3013  formFieldType2" >
+<div class="col-sm mb-4">
+<div class="fieldType2 pb-0 fieldID3013 ">
+<div class="attributeName form-label mb-0 required">
+List names and instruments of all artists
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType2 ">
+<TEXTAREA class=" ibFormTextArea formTextarea form-control" NAME="3013" COLS="10" ROWS=15></TEXTAREA><INPUT TYPE=HIDDEN NAME=3013-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID2933  formFieldType2" >
+<div class="col-sm mb-4">
+<div class="fieldType2 pb-0 fieldID2933 ">
+<div class="attributeName form-label mb-0 required">
+Artist Biography
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType2 ">
+<TEXTAREA class=" ibFormTextArea formTextarea form-control" NAME="2933" COLS="10" ROWS=10></TEXTAREA><INPUT TYPE=HIDDEN NAME=2933-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID2997  formFieldType2" >
+<div class="col-sm mb-4">
+<div class="fieldType2 pb-0 fieldID2997 ">
+<div class="attributeName form-label mb-0 ">
+Recent or upcoming performances/showcases/festivals
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+<div class="description form-hint mb-2 mt-1"><span>(Please list recent notable performances including location and date)</span>  </div>
+</div>
+<div class="rightColumn fieldRightType2 ">
+<TEXTAREA class=" ibFormTextArea formTextarea form-control" NAME="2997" COLS="10" ROWS=15></TEXTAREA><INPUT TYPE=HIDDEN NAME=2997-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class='description form-hint ibFieldID951'>
+Select all that apply
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID951  formFieldType4" >
+<div class="col-sm mb-4">
+<div class="fieldType4 pb-0 fieldID951 ">
+<div class="attributeName form-label mb-0 required">
+Genres/Styles of Music
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType4 ">
+<SELECT MULTIPLE NAME="951" class=" ibFormMultipleSelect pattrib951 form-select w-auto">
+<OPTION VALUE="Folk">Folk</OPTION>
+<OPTION VALUE="R&B">R&B</OPTION>
+<OPTION VALUE="Soul">Soul</OPTION>
+<OPTION VALUE="Country">Country</OPTION>
+<OPTION VALUE="Blues">Blues</OPTION>
+<OPTION VALUE="Rock">Rock</OPTION>
+<OPTION VALUE="Indie">Indie</OPTION>
+<OPTION VALUE="Bluegrass">Bluegrass</OPTION>
+<OPTION VALUE="Roots">Roots</OPTION>
+<OPTION VALUE="Traditional">Traditional</OPTION>
+<OPTION VALUE="Other">Other</OPTION>
+</SELECT><INPUT TYPE=HIDDEN NAME=951-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID249  formFieldType19" >
+<div class="col-sm mb-4">
+<div class="fieldType19 pb-0 fieldID249 ">
+<div class="attributeName form-label mb-0 ">
+Website
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType19 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="249" SIZE=45 VALUE="" ID=ibPA249><INPUT TYPE=HIDDEN NAME=249-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID763  formFieldType19" >
+<div class="col-sm mb-4">
+<div class="fieldType19 pb-0 fieldID763 ">
+<div class="attributeName form-label mb-0 ">
+Instagram
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType19 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="763" SIZE=45 VALUE="" ID=ibPA763><INPUT TYPE=HIDDEN NAME=763-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID250  formFieldType19" >
+<div class="col-sm mb-4">
+<div class="fieldType19 pb-0 fieldID250 ">
+<div class="attributeName form-label mb-0 ">
+Facebook
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType19 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="250" SIZE=45 VALUE="" ID=ibPA250><INPUT TYPE=HIDDEN NAME=250-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID443  formFieldType19" >
+<div class="col-sm mb-4">
+<div class="fieldType19 pb-0 fieldID443 ">
+<div class="attributeName form-label mb-0 ">
+Spotify
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType19 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="443" SIZE=45 VALUE="" ID=ibPA443><INPUT TYPE=HIDDEN NAME=443-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID3001  formFieldType19" >
+<div class="col-sm mb-4">
+<div class="fieldType19 pb-0 fieldID3001 ">
+<div class="attributeName form-label mb-0 ">
+Apple Music
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType19 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="3001" SIZE=45 VALUE="" ID=ibPA3001><INPUT TYPE=HIDDEN NAME=3001-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID251  formFieldType19" >
+<div class="col-sm mb-4">
+<div class="fieldType19 pb-0 fieldID251 ">
+<div class="attributeName form-label mb-0 ">
+YouTube
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType19 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="251" SIZE=45 VALUE="" ID=ibPA251><INPUT TYPE=HIDDEN NAME=251-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID2999  formFieldType19" >
+<div class="col-sm mb-4">
+<div class="fieldType19 pb-0 fieldID2999 ">
+<div class="attributeName form-label mb-0 ">
+Bandcamp
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType19 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="2999" SIZE=45 VALUE="" ID=ibPA2999><INPUT TYPE=HIDDEN NAME=2999-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID3003  formFieldType10" >
+<div class="col-sm mb-4">
+<div class="fieldType10 pb-0 fieldID3003 ">
+<div class="attributeName form-label mb-0 ">
+EPK (Electronic Press Kit)
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+<span class="ibmaxSize form-hint">(MAX SIZE 5MB)</span>
+</div>
+<div class="rightColumn fieldRightType10 ">
+<div><INPUT class=" ibFormFile formInput w-auto form-control" TYPE="FILE" NAME="3003" ></div><INPUT TYPE=HIDDEN NAME=3003-EXISTS VALUE=1>
+<script>
+filesizemax[3003] = 5;
+$("input[name='3003']").on('change',function() {
+if(this.files[0].size > 5000000){
+Swal.fire({
+icon: "error",
+title: "File too big",
+showConfirmButton: false,
+showCancelButton: true,
+cancelButtonText: 'Close',
+text: 'The file you uploading is too big for this form. Please compress or upload a smaller file'
+});
+this.value = "";
+};
+});
+</script>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID477  formFieldType10" >
+<div class="col-sm mb-4">
+<div class="fieldType10 pb-0 fieldID477 ">
+<div class="attributeName form-label mb-0 ">
+Please upload an Artist photo.
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+<span class="ibmaxSize form-hint">(MAX SIZE 5MB)</span>
+</div>
+<div class="rightColumn fieldRightType10 ">
+<div><INPUT class=" ibFormFile formInput w-auto form-control" TYPE="FILE" NAME="477" ></div><INPUT TYPE=HIDDEN NAME=477-EXISTS VALUE=1>
+<script>
+filesizemax[477] = 5;
+$("input[name='477']").on('change',function() {
+if(this.files[0].size > 5000000){
+Swal.fire({
+icon: "error",
+title: "File too big",
+showConfirmButton: false,
+showCancelButton: true,
+cancelButtonText: 'Close',
+text: 'The file you uploading is too big for this form. Please compress or upload a smaller file'
+});
+this.value = "";
+};
+});
+</script>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID3007  formFieldType5" >
+<div class="col-sm mb-4">
+<div class="fieldType5 pb-0 fieldID3007 ">
+<div class="attributeName form-label mb-0 ">
+Have you participated in any other folk festivals or similar events?
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType5 ">
+<div class="form-check form-switch"><INPUT id=ibPA3007 NAME=3007 TYPE=CHECKBOX switch='bool' VALUE=1 class="form-check-input" ><label class="form-check-label" for="ibPA3007" data-on-label="Yes" data-off-label="No"></label></div><INPUT TYPE=HIDDEN NAME=3007-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID3009  formFieldType2" >
+<div class="col-sm mb-4">
+<div class="fieldType2 pb-0 fieldID3009 ">
+<div class="attributeName form-label mb-0 required">
+Please list events
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType2 ">
+<TEXTAREA class=" ibFormTextArea formTextarea form-control" NAME="3009" COLS="10" ROWS=15></TEXTAREA><INPUT TYPE=HIDDEN NAME=3009-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID253  formFieldType2" >
+<div class="col-sm mb-4">
+<div class="fieldType2 pb-0 fieldID253 ">
+<div class="attributeName form-label mb-0 required">
+Why do you want to play at our festival?
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType2 ">
+<TEXTAREA class=" ibFormTextArea formTextarea form-control" NAME="253" COLS="10" ROWS=10></TEXTAREA><INPUT TYPE=HIDDEN NAME=253-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<div class=" row mt-4 mb-2 ibFormOption align-items-start ibFieldID3011  formFieldType1" >
+<div class="col-sm mb-4">
+<div class="fieldType1 pb-0 fieldID3011 ">
+<div class="attributeName form-label mb-0 ">
+Anything else you would like us to know?
+<!-- TML NAME=MANDATORY SET=1 VALUE="<span class=ibCompulsory>*</span>" -->
+</div>
+</div>
+<div class="rightColumn fieldRightType1 ">
+<INPUT class=" ibFormText formInput form-control" TYPE="TEXT" NAME="3011" SIZE=20 VALUE="" ID=ibPA3011><INPUT TYPE=HIDDEN NAME=3011-EXISTS VALUE=1>
+</div>
+<div class=clear> </div>
+</div>
+</div>
+<script>
+$(window).on('load', function () {
+$('form').on('keyup change paste', 'input, select, textarea', function(){
+dynamicScript();
+});
+dynamicScript();
+});
+function dynamicScript(){
+//alert("dynamicScript");
+if ($('input[name="1357"]') != undefined && !($('input[name="1357"]').is(':checked'))){
+$('.ibFieldID1359').hide();
+$('1359').val('');
+} else {
+$('.ibFieldID1359').show();
+}
+if ($('input[name="3007"]') != undefined && !($('input[name="3007"]').is(':checked'))){
+$('.ibFieldID3009').hide();
+$('3009').val('');
+} else {
+$('.ibFieldID3009').show();
+}
+};
+function reenable(){
+$('#register').prop("disabled", false)
+};
+function onIBSubmitCaptcha(){
+if ($("#register").length != 0) {
+document.getElementById('register').disabled = true;
+}
+grecaptcha.execute('6Lf2w3EnAAAAAKDMKc6g8tGbz92Lr1RphdhxB-E_', {action: 'registerVS'}).then(function(token) {
+$("#captcha").val(token);
+var e;
+return(onIBSubmit(e));
+});
+return(false);
+};
+function onIBSubmit(e){
+//console.log("onIBSubmit");
+// check emails are the same?
+if (!isLoginEnabled && $("#ibEmail2Field").length != 0 && $("#ibNameField").val().replace(/ /g,'') != $("#ibEmail2Field").val().replace(/ /g,'')){
+alert("Email addresses do not match");
+return(false);
+}
+$("#ibEmailField").attr("autocomplete","on");
+$("#ibNameField").attr("autocomplete","on");
+$('#register').prop('disabled', true);
+setTimeout('reenable()',3000);
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+!null;
+$('#offset').attr('value',JSON.stringify(ib_offset));
+console.log("OFFSET" + JSON.stringify(ib_max));
+console.log(JSON.stringify(ib_offset));
+console.log("returning true");
+$("#ifields").submit();
+if ($("#register").length != 0) {
+//document.getElementById('register').disabled = true;
+document.getElementById('register').value= 'Submitted - Please WAIT';
+}
+return(true);
+};
+$(".fieldRightType55 img").on("error", function () {
+// Check if the backupImageExists has already been attempted
+if (!$(this).data("backupImageExists")) {
+$(this).data("backupImageExists", true); // Set a flagto show backupImageExists has been checked
+$(this).attr("src", "/new_css/layout/festivalpro_images/profilebackground.png");
+}
+});
+function changeLanguage(lang){
+let url = location.href;
+url = url.replace("&LANGUAGE=XXX","");
+url = url.replace("&LANGUAGE=","");
+console.log(url);
+window.location=url + "&LANGUAGE=" + lang;
+};
+if (typeof secondarylanguage !== 'undefined' && secondarylanguage == 1){
+var langs = "";
+$("#secondarylanguage").show();
+var firstOption = $("#ibLanguageOption option:first-child");
+$("#ibLanguageOption").empty().append(firstOption).append("<OPTION VALUE=XXX >" + langs);
+};
+// safari bug when back button is clicked and form submit button is still disabled
+window.addEventListener('pageshow', function( e ){
+// test
+if (e.persisted) {
+console.log('This page was restored from the bfcache.');
+// Fix for firefox
+$('input[name="REGISTER"]').prop('disabled', false).val('Next')
+} else {
+console.log('This page was loaded normally.');
+}
+if ($("#register").length != 0) {
+document.getElementById('register').disabled = false;
+//document.getElementById('formSubmit').value = 'Next';
+//grecaptcha.reset();
+}
+});
+$(document).on('click', '.more_info', (e) => {
+e.preventDefault();
+const target = $(e.currentTarget),
+isCollapsed = target.data('collapsed'),
+icon_collapsed = target.find('.icon-tabler-chevron-right'),
+icon_expanded = target.find('icon-tabler-chevron-down'),
+divID = target.data('toggle');
+if(isCollapsed){
+$('#' + divID).slideDown();
+icon_collapsed.css('rotate', '90deg')
+target.data('collapsed', false)
+}else{
+$('#' + divID).slideUp();
+icon_collapsed.css('rotate', '0deg')
+target.data('collapsed', true)
+}
+})
+</script>
+<div class=clear></div>
+<div class=clear></div>
+<div class=clear></div>
+<div class="row my-4">
+<div class=col>
+<INPUT class="btn btn-success formButton" TYPE=BUTTON id=register NAME="REGISTER" onClick='onIBSubmitCaptcha()' VALUE="SUBMIT">
+<!-- TML NAME=INTERNAL NOTSET=TRUE STRIP=ON>
+TML NAME="*FA::Forms::Edit Completed Form" NOTSET=TRUE STRIP=ON>
+&nbsp;&nbsp;&nbsp;<INPUT TYPE="SUBMIT" NAME="COMPLETE" CLASS="btn btn-primary btn-lg" VALUE="Complete"  BORDER=0> <i> Can no
+longer be edited afterwards</i>
+TML STRIP=OFF
+-->
+</div>
+</div>
+</FORM>
+<script>
+function dynamicScript(){
+//alert("dynamicScript");
+if ($('input[name="1357"]') != undefined && !($('input[name="1357"]').is(':checked'))){
+$('.ibFieldID1359').hide();
+$('1359').val('');
+} else {
+$('.ibFieldID1359').show();
+}
+if ($('input[name="3007"]') != undefined && !($('input[name="3007"]').is(':checked'))){
+$('.ibFieldID3009').hide();
+$('3009').val('');
+} else {
+$('.ibFieldID3009').show();
+}
+};
+}
+}
+</script>
+</body></html>

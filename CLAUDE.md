@@ -1204,6 +1204,37 @@ form on it — retrying is pointless, this one is filled in by hand) from `faile
 (a timeout, a 403 — worth another go, and the HTTP status is kept because 403
 and 404 are different stories).
 
+**The address on a listing is usually the page that announces the form, not the
+form.** `readApplicationForm` follows **one** Apply link when the page it was
+given has no application on it. Canmore's artist-info page
+(`canmorefolkfestival.com/get-involved/artist-info`) carries an *APPLY NOW!*
+button to `canmorefolkfest.festivalpro.com/form/…`, a different host. The address
+it lands on is the one saved as `application_url`. It follows only when a single
+link clearly stands out (`chooseFormLink`): a known form host outranks any
+wording, a link that names vendors or volunteers is marked down, and two buttons
+that read alike are reported by name rather than picked between, because a wrong
+pick stages answers against the wrong form. One hop is deliberate — the
+festival's home page is two clicks from the form and is reported as having none.
+
+**A newsletter box is not an application.** The generic reader counted any
+`<input>` on the page, so a listing page came back `ready` with one field —
+"Enter your email", from the footer's Mailchimp form — and the artist's address
+staged against it. Forms whose tag names a newsletter, subscription or search
+are skipped, and a read that yields only a single email field is `blocked`
+rather than a one-question form. "Sign-up" is deliberately *not* in that list,
+since some festivals call the application that.
+
+**FestivalPro gets its own reader (`parseFestivalProForm`), found by markup
+rather than host.** Its questions are `div.ibFormOption` rows with the text in
+`div.attributeName` and no `<label for>` reaching the input, so the generic
+reader labelled every question with its field number — "765", "2933". The field
+number stays the `fieldKey`, which is what lets a re-read rename rows already
+stored instead of duplicating them. Follow-ups the page's script hides until a
+switch is on (`$('.ibFieldID1359').hide()`) are marked not required with a note
+saying what they depend on, because a required question nobody sees would stop
+an application ever reading as ready. Fixtures are real captures:
+`test/fixtures/festivalpro-artist-form.html`, `canmore-artist-info.html`.
+
 **A reply is matched by name, not by domain.** Of eight real organiser replies
 in this mailbox exactly one came from the festival's own domain; the rest came
 from Wufoo, Jotform, a portal, a parent organisation and two personal gmail

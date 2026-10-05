@@ -2,9 +2,10 @@
 //
 // Deliberately dependency-free and regex-based rather than HTMLRewriter: this
 // runs identically in the Worker and in `vitest` (node), so the parsing rules
-// are directly testable. Two sources are supported:
+// are directly testable. Three sources are supported:
 //   - ordinary server-rendered HTML forms (<input>/<textarea>/<select>)
 //   - Google Forms, whose fields live in the FB_PUBLIC_LOAD_DATA_ blob
+//   - FestivalPro forms, whose questions are rows of <div>s rather than labels
 //
 // Anything behind a login, or rendered entirely by JavaScript, is reported as
 // blocked instead of guessed at.
@@ -20,12 +21,21 @@ export interface ParsedField {
   position: number
 }
 
+/**
+ * Why a read produced no fields. The three want different things done next:
+ * a login wall is a fact about the opportunity, a JavaScript form is filled in
+ * by hand, and a page with no form on it may simply be the announcement that
+ * links to one.
+ */
+export type BlockedKind = 'login' | 'javascript' | 'no-fields'
+
 export interface ParsedForm {
   title: string | null
-  source: 'html' | 'google-forms'
+  source: 'html' | 'google-forms' | 'festivalpro'
   loginRequired: boolean
   /** Set when fields could not be read — the reason is shown in the dashboard. */
   blockedReason: string | null
+  blockedKind?: BlockedKind
   fields: ParsedField[]
 }
 
@@ -237,6 +247,180 @@ export function parseGoogleForm(html: string): ParsedForm | null {
   }
 }
 
+// ── FestivalPro forms ─────────────────────────────────────────────────────────
+//
+// FestivalPro hosts the artist-application form for a good many festivals, on
+// the festival's own subdomain or a custom domain, so it is recognised by its
+// markup rather than its host. Every question is one `div.ibFormOption
+// .ibFieldID<n>` row: the question is the text of a `div.attributeName`, and
+// nothing links it to its input — no <label for> reaches it. That is why the
+// generic reader, finding no label, fell back to the input's `name` and filed
+// a form whose questions were called "765", "3013" and "2933".
+//
+// The name is the field's number, and it stays the key: a re-read then
+// refreshes the rows already stored under those keys instead of adding a
+// second set beside them.
+
+/**
+ * Fields the page's own script hides until a switch is on, as dependent id →
+ * trigger id. The markup says nothing about it — every row is present and
+ * `required` — so the only record is the jQuery that hides them:
+ *
+ *   if (!($('input[name="1357"]').is(':checked'))){ $('.ibFieldID1359').hide(); }
+ */
+function festivalProConditionals(html: string): Map<string, string> {
+  const out = new Map<string, string>()
+  const re =
+    /!\s*\(\s*\$\(\s*["']input\[name=["']?(\d+)["']?\]["']\s*\)\.is\(\s*["']:checked["']\s*\)\s*\)\s*\)\s*\{([^}]*)\}/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html))) {
+    for (const hidden of m[2].matchAll(/\.ibFieldID(\d+)["']\s*\)\.hide\(\)/g)) out.set(hidden[1], m[1])
+  }
+  return out
+}
+
+export function parseFestivalProForm(html: string): ParsedForm | null {
+  const conditionals = festivalProConditionals(html)
+  const body = stripScripts(html).replace(/<!--[\s\S]*?-->/g, ' ')
+
+  const heads: { id: string; index: number }[] = []
+  const rowRe = /<div\b[^>]*\bclass\s*=\s*(["'])([^"']*\bibFormOption\b[^"']*)\1[^>]*>/gi
+  let m: RegExpExecArray | null
+  while ((m = rowRe.exec(body))) {
+    const id = /\bibFieldID(\d+)\b/.exec(m[2])?.[1]
+    if (id) heads.push({ id, index: m.index })
+  }
+  if (heads.length === 0) return null
+
+  const formEnd = body.search(/<\/form\b/i)
+  const stop = formEnd > heads[heads.length - 1].index ? formEnd : body.length
+  const chunkOf = (i: number) => body.slice(heads[i].index, i + 1 < heads.length ? heads[i + 1].index : stop)
+
+  // A hint is usually inside its row, but "Select all that apply" is a div of
+  // its own, beside the row rather than in it, which says whose it is in its
+  // class. Both are read from the page as a whole so neither goes to the row
+  // that merely happens to be next to it.
+  const hints = new Map<string, string[]>()
+  const descRe = /<div\b[^>]*\bclass\s*=\s*(["'])([^"']*\bdescription\b[^"']*)\1[^>]*>([\s\S]*?)<\/div>/gi
+  while ((m = descRe.exec(body))) {
+    const at = m.index
+    const inside = heads.filter((h) => h.index <= at && at < stop)
+    const id = /\bibFieldID(\d+)\b/.exec(m[2])?.[1] ?? inside[inside.length - 1]?.id
+    const text = textOf(m[3]).replace(/^\((.*)\)$/, '$1')
+    if (id && text) hints.set(id, [...(hints.get(id) ?? []), text])
+  }
+
+  const fields: ParsedField[] = []
+  const used = new Set<string>()
+  const byId = new Map<string, ParsedField>()
+
+  for (let i = 0; i < heads.length; i++) {
+    const { id } = heads[i]
+    const chunk = chunkOf(i)
+
+    const controls = [...chunk.matchAll(/<(input|textarea|select)\b([^>]*)>/gi)]
+      .map((c) => ({
+        tagName: c[1].toLowerCase(),
+        tag: c[0],
+        index: c.index ?? 0,
+        type: (attr(c[0], 'type') ?? 'text').toLowerCase(),
+        name: attr(c[0], 'name'),
+      }))
+      .filter((c) => c.name && !(c.tagName === 'input' && SKIP_TYPE.has(c.type)))
+    const first = controls[0]
+    if (!first?.name) continue // a heading or a paragraph, not a question
+
+    const labelBlock = chunk.match(
+      /<div\b[^>]*\bclass\s*=\s*(["'])([^"']*\battributeName\b[^"']*)\1[^>]*>([\s\S]*?)<\/div>/i,
+    )
+    const label =
+      (labelBlock && textOf(labelBlock[3])) ||
+      attr(first.tag, 'aria-label') ||
+      attr(first.tag, 'placeholder') ||
+      `Question ${fields.length + 1}`
+    const required = !!labelBlock && /\brequired\b/i.test(labelBlock[2])
+
+    let fieldType: string
+    let options: string[] | undefined
+    let maxLength: number | undefined
+
+    if (first.tagName === 'textarea') {
+      fieldType = 'textarea'
+    } else if (first.tagName === 'select') {
+      // Picking several is a checkbox group that happens to be drawn as a list.
+      fieldType = hasAttr(first.tag, 'multiple') ? 'checkbox' : 'select'
+      options = selectOptions(chunk, first.index)
+    } else if (first.type === 'checkbox' && /\bswitch\s*=/i.test(first.tag)) {
+      // A switch is a yes/no question, and the page says what its two ends are.
+      fieldType = 'radio'
+      options = [
+        chunk.match(/data-on-label\s*=\s*["']([^"']*)["']/i)?.[1] || 'Yes',
+        chunk.match(/data-off-label\s*=\s*["']([^"']*)["']/i)?.[1] || 'No',
+      ]
+    } else if (first.type === 'checkbox' || first.type === 'radio') {
+      fieldType = first.type
+      options = [
+        ...new Set(
+          controls
+            .filter((c) => c.name === first.name && c.type === first.type)
+            .map((c) => attr(c.tag, 'value'))
+            .filter((v): v is string => !!v),
+        ),
+      ]
+    } else {
+      fieldType = normaliseType(first.type, first.tag)
+      const limit = parseInt(attr(first.tag, 'maxlength') ?? '', 10)
+      if (Number.isFinite(limit)) maxLength = limit
+    }
+
+    const notes = [...(hints.get(id) ?? [])]
+    const size = chunk.match(/<span\b[^>]*\bibmaxSize\b[^>]*>([\s\S]*?)<\/span>/i)
+    if (size) {
+      const text = textOf(size[1])
+      const limitText = /max size\s*([\d.]+\s*[kmg]b)/i.exec(text)
+      notes.push(limitText ? `Maximum file size ${limitText[1].replace(/\s+/g, '')}` : text.replace(/^\(|\)$/g, ''))
+    }
+
+    let key = first.name
+    while (used.has(key)) key = `${key}_${fields.length}`
+    used.add(key)
+
+    const field: ParsedField = {
+      fieldKey: key,
+      label,
+      fieldType,
+      options: options && options.length ? options : undefined,
+      required,
+      maxLength,
+      helpText: notes.length ? notes.join(' · ') : undefined,
+      position: fields.length,
+    }
+    fields.push(field)
+    byId.set(id, field)
+  }
+
+  if (fields.length === 0) return null
+
+  // A follow-up the form only shows after a switch is on is not owed by
+  // somebody who left it off, so it is not required — a required one would
+  // keep the application from ever reading as ready. The fact is kept as a
+  // note rather than dropped.
+  for (const [dependent, trigger] of conditionals) {
+    const field = byId.get(dependent)
+    if (!field) continue
+    const asked = byId.get(trigger)
+    field.required = false
+    field.helpText = [
+      field.helpText,
+      asked ? `Only asked if “${asked.label}” is switched on` : 'Only asked if an earlier switch is on',
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  }
+
+  return { title: pageTitle(html), source: 'festivalpro', loginRequired: false, blockedReason: null, fields }
+}
+
 // ── Plain HTML forms ──────────────────────────────────────────────────────────
 
 function labelMap(html: string): Map<string, string> {
@@ -252,17 +436,35 @@ function labelMap(html: string): Map<string, string> {
 }
 
 function selectOptions(html: string, fromIndex: number): string[] {
-  const end = html.indexOf('</select>', fromIndex)
-  if (end === -1) return []
-  const block = html.slice(fromIndex, end)
+  // Case-insensitive: some form builders write their tags in capitals.
+  const length = html.slice(fromIndex).search(/<\/select>/i)
+  if (length === -1) return []
+  const block = html.slice(fromIndex, fromIndex + length)
   const out: string[] = []
-  const re = /<option\b[^>]*>([\s\S]*?)<\/option>/gi
+  const re = /<option\b([^>]*)>([\s\S]*?)<\/option>/gi
   let m: RegExpExecArray | null
   while ((m = re.exec(block))) {
-    const label = textOf(m[1])
+    // An option whose value is empty is the prompt ("- Not Selected -"), which
+    // is what the box shows before you choose, not something you can choose.
+    if (attr(`<option ${m[1]}>`, 'value') === '') continue
+    const label = textOf(m[2])
     if (label) out.push(label)
   }
   return out
+}
+
+// Forms that sit on nearly every festival site and are never the application: the
+// footer newsletter box and the site search. Matched on the <form> tag itself
+// (its action, id, name and class), and kept to words that are unambiguous —
+// "signup" is not here, because "artist sign-up" is what some festivals call
+// the real thing.
+const NOT_AN_APPLICATION =
+  /newsletter|subscribe|mailing[-_ ]?list|list-manage|mailchimp|constantcontact|campaign-?monitor|convertkit|mailerlite|klaviyo|substack|search/i
+
+function withoutSignupForms(html: string): string {
+  return html.replace(/<form\b([^>]*)>[\s\S]*?<\/form>/gi, (block, attrs: string) =>
+    NOT_AN_APPLICATION.test(attrs) ? ' ' : block,
+  )
 }
 
 export function parseHtmlForm(html: string, url: string): ParsedForm {
@@ -276,6 +478,7 @@ export function parseHtmlForm(html: string, url: string): ParsedForm {
       source: 'html',
       loginRequired: true,
       blockedReason: 'The application form is behind a login, so it can’t be read automatically.',
+      blockedKind: 'login',
       fields: [],
     }
   }
@@ -286,11 +489,12 @@ export function parseHtmlForm(html: string, url: string): ParsedForm {
       source: 'html',
       loginRequired: false,
       blockedReason: `${host} renders its form with JavaScript — the fields aren’t in the page source.`,
+      blockedKind: 'javascript',
       fields: [],
     }
   }
 
-  const body = stripScripts(html)
+  const body = withoutSignupForms(stripScripts(html))
   const labels = labelMap(body)
   const fields: ParsedField[] = []
   const usedKeys = new Set<string>()
@@ -373,6 +577,22 @@ export function parseHtmlForm(html: string, url: string): ParsedForm {
     })
   }
 
+  // One email box and nothing else is a signup, whatever its markup calls
+  // itself. Left as a form it reads as ready, with the artist's address staged
+  // against it, which is how a festival's footer newsletter box became the
+  // whole application.
+  if (fields.length === 1 && fields[0].fieldType === 'email') {
+    return {
+      title,
+      source: 'html',
+      loginRequired: false,
+      blockedReason:
+        'The only thing on the page to fill in is an email box, which is a signup rather than an application.',
+      blockedKind: 'no-fields',
+      fields: [],
+    }
+  }
+
   if (fields.length === 0) {
     return {
       title,
@@ -380,6 +600,7 @@ export function parseHtmlForm(html: string, url: string): ParsedForm {
       loginRequired: false,
       blockedReason:
         'No form fields were found on the page — the application may open later, be a PDF, or be submitted by email.',
+      blockedKind: 'no-fields',
       fields: [],
     }
   }
@@ -391,6 +612,121 @@ export function parseApplicationForm(html: string, url: string): ParsedForm {
   if (!detectLoginRequired(html, url)) {
     const google = parseGoogleForm(html)
     if (google) return google
+    const festivalPro = parseFestivalProForm(html)
+    if (festivalPro) return festivalPro
   }
   return parseHtmlForm(html, url)
+}
+
+// ── Finding the form from the page that announces it ──────────────────────────
+//
+// The address an artist or an agent has is usually the festival's artist-info
+// page, and the form is one button away — often on another host entirely
+// (canmorefolkfestival.com → canmorefolkfest.festivalpro.com). Such a page has
+// no fields, so the reader used to report "no form fields found" about a page
+// that links to the very form it was asked for.
+
+export interface FormLink {
+  url: string
+  /** What the link says, which is what the artist would have clicked. */
+  text: string
+  score: number
+}
+
+// Hosts whose whole job is hosting forms. A link to one of these is a form
+// whatever it says, so it outranks any wording.
+const FORM_PLATFORMS: { host: string; path?: RegExp }[] = [
+  { host: 'festivalpro.com', path: /^\/form\// },
+  { host: 'docs.google.com', path: /^\/forms\// },
+  { host: 'forms.gle' },
+  { host: 'jotform.com' },
+  { host: 'wufoo.com' },
+  { host: 'formstack.com' },
+  { host: 'cognitoforms.com' },
+  { host: 'paperform.co' },
+  { host: 'typeform.com', path: /^\/to\// },
+  { host: 'tally.so', path: /^\/r\// },
+  { host: 'airtable.com', path: /^\/(shr|app)/ },
+  { host: 'submittable.com', path: /^\/submit/ },
+]
+
+const APPLY_WORDS = /\b(apply|applications?|submit|submissions?|audition)\b/i
+const ARTIST_WORDS = /\b(artists?|bands?|performers?|musicians?|performances?)\b/i
+// The same page often offers a form for every way of taking part, and the one
+// for vendors is not the one for acts.
+const OTHER_ROLES =
+  /\b(vendors?|volunteers?|sponsors?|sponsorships?|donors?|donate|jobs?|employment|staff|media|press|exhibitors?|booths?|workshops?|food|craft|artisans?|market)\b/i
+
+/** Below this a link is not obviously an application at all. */
+const FOLLOW_MIN = 4
+/** A runner-up closer than this means the page offers a choice we cannot make. */
+const FOLLOW_MARGIN = 4
+
+export function findApplicationLinks(html: string, pageUrl: string): FormLink[] {
+  let page: URL
+  try {
+    page = new URL(pageUrl)
+  } catch {
+    return []
+  }
+  const here = `${page.origin}${page.pathname}${page.search}`
+
+  const best = new Map<string, FormLink>()
+  const re = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi
+  const body = stripScripts(html)
+  let m: RegExpExecArray | null
+  while ((m = re.exec(body))) {
+    const href = attr(`<a ${m[1]}>`, 'href')
+    if (!href) continue
+
+    let target: URL
+    try {
+      target = new URL(href, page)
+    } catch {
+      continue
+    }
+    if (target.protocol !== 'https:' && target.protocol !== 'http:') continue
+    const key = `${target.origin}${target.pathname}${target.search}`
+    if (key === here) continue
+
+    const text = textOf(m[2]) || attr(`<a ${m[1]}>`, 'aria-label') || attr(`<a ${m[1]}>`, 'title') || ''
+    const host = target.hostname.toLowerCase()
+    const platform = FORM_PLATFORMS.some(
+      (p) => matchesHost(host, [p.host]) && (!p.path || p.path.test(target.pathname)),
+    )
+
+    // Path included in the wording tests: /get-involved/vendors says what a
+    // button labelled only "Apply" would not.
+    let path = target.pathname
+    try {
+      path = decodeURIComponent(path)
+    } catch {
+      // A stray % in somebody's markup: the raw path reads well enough.
+    }
+    const said = `${text} ${path}`.replace(/[-_/]+/g, ' ')
+    const score =
+      (platform ? 10 : 0) +
+      (APPLY_WORDS.test(text) ? 4 : 0) +
+      (ARTIST_WORDS.test(said) ? 2 : 0) -
+      (OTHER_ROLES.test(said) ? 6 : 0)
+
+    const prior = best.get(key)
+    if (!prior || score > prior.score) best.set(key, { url: target.toString(), text, score })
+  }
+
+  return [...best.values()].sort((a, b) => b.score - a.score)
+}
+
+/**
+ * The one link worth following, or none. `candidates` is what to name to the
+ * artist when there was a choice: two apply buttons that read alike is a
+ * question for them, and guessing one stages answers against the wrong form.
+ */
+export function chooseFormLink(links: FormLink[]): { link: FormLink | null; candidates: FormLink[] } {
+  const eligible = links.filter((l) => l.score >= FOLLOW_MIN)
+  if (eligible.length === 0) return { link: null, candidates: [] }
+  if (eligible.length > 1 && eligible[0].score - eligible[1].score < FOLLOW_MARGIN) {
+    return { link: null, candidates: eligible }
+  }
+  return { link: eligible[0], candidates: [] }
 }

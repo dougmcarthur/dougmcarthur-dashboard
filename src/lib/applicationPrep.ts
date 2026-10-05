@@ -9,7 +9,13 @@
  * and an account" rather than "the app is broken".
  */
 
-import { parseApplicationForm, type ParsedField } from './formParser'
+import {
+  chooseFormLink,
+  findApplicationLinks,
+  parseApplicationForm,
+  type BlockedKind,
+  type ParsedField,
+} from './formParser'
 import type { PrepStatus } from '../../shared/application'
 
 export interface PrepOutcome {
@@ -21,6 +27,8 @@ export interface PrepOutcome {
   fields: ParsedField[]
   /** The URL actually read, after any redirect the fetch followed. */
   url: string
+  /** Why a blocked read was blocked, so the caller need not read the note. */
+  blockedKind?: BlockedKind
 }
 
 /** Long enough for a slow festival CMS, short enough not to hold a request. */
@@ -46,10 +54,19 @@ export function isReadableFormUrl(raw: string): boolean {
   }
 }
 
+/**
+ * Read the form at `url`. When that page turns out not to be the form but
+ * links to one — the festival's artist-info page with an Apply button, which
+ * is the address most listings carry — follow that link, once.
+ */
 export async function readApplicationForm(
   url: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<PrepOutcome> {
+  return readPage(url, fetchImpl, true)
+}
+
+async function readPage(url: string, fetchImpl: typeof fetch, mayFollow: boolean): Promise<PrepOutcome> {
   if (!isReadableFormUrl(url)) {
     return { status: 'failed', note: `"${url}" is not a web address the form reader can open.`, title: null, fields: [], url }
   }
@@ -86,17 +103,64 @@ export async function readApplicationForm(
   }
 
   const html = await res.text()
-  const parsed = parseApplicationForm(html, res.url || url)
+  const landed = res.url || url
+  const parsed = parseApplicationForm(html, landed)
 
   if (parsed.blockedReason || parsed.fields.length === 0) {
-    return {
+    const blocked: PrepOutcome = {
       status: 'blocked',
       note: parsed.blockedReason ?? 'No form fields were found on the page.',
       title: parsed.title,
       fields: [],
-      url: res.url || url,
+      url: landed,
+      blockedKind: parsed.blockedKind ?? 'no-fields',
+    }
+    return mayFollow && blocked.blockedKind === 'no-fields'
+      ? ((await followApplyLink(html, landed, blocked, fetchImpl)) ?? blocked)
+      : blocked
+  }
+
+  return { status: 'ready', note: null, title: parsed.title, fields: parsed.fields, url: landed }
+}
+
+/**
+ * A page with no form on it, so look for the link to one. Returns null when
+ * there is nothing worth following, and the original outcome stays.
+ *
+ * One hop, and only when one link clearly stands out. Two buttons that both
+ * say Apply is a question for the artist, and picking one stages answers
+ * against what may be the volunteer form — so that case says so instead.
+ */
+async function followApplyLink(
+  html: string,
+  pageUrl: string,
+  blocked: PrepOutcome,
+  fetchImpl: typeof fetch,
+): Promise<PrepOutcome | null> {
+  const { link, candidates } = chooseFormLink(findApplicationLinks(html, pageUrl))
+
+  if (!link) {
+    if (candidates.length === 0) return null
+    const names = candidates
+      .slice(0, 3)
+      .map((c) => `“${c.text || 'untitled link'}” (${new URL(c.url).hostname})`)
+      .join(', ')
+    return {
+      ...blocked,
+      note: `${blocked.note} It links to more than one possible form — ${names} — so add the address of the artist one by hand.`,
     }
   }
 
-  return { status: 'ready', note: null, title: parsed.title, fields: parsed.fields, url: res.url || url }
+  const next = await readPage(link.url, fetchImpl, false)
+
+  // A form is the answer, and so is a form behind a login or drawn by
+  // JavaScript: those are facts about this opportunity, and more useful to
+  // record than "no fields on the announcement". The address it landed on is
+  // what gets saved against the gig.
+  if (next.status === 'ready' || next.blockedKind === 'login' || next.blockedKind === 'javascript') return next
+
+  return {
+    ...blocked,
+    note: `${blocked.note} Its “${link.text || 'apply'}” link went to ${link.url}, which could not be read as a form: ${next.note}`,
+  }
 }
