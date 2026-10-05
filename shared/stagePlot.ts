@@ -246,6 +246,39 @@ export interface Performer {
   vocals: Vocals
   /** Named gear, one item per entry, as the artist wrote it. */
   gear: string[]
+  /**
+   * The picture on this performer's card: a photo from the library, `'none'`
+   * for no photo, or absent to let Scout choose (the artist's own press photo
+   * on the artist's own card, nobody else's). See `performerPhoto`.
+   */
+  photo?: string | null
+}
+
+export const NO_PHOTO = 'none'
+
+/** A photo address worth storing: an https URL, or the explicit "no photo". */
+export function isPhotoChoice(v: unknown): v is string {
+  return typeof v === 'string' && (v === NO_PHOTO || (/^https:\/\/\S+$/i.test(v) && v.length <= 2000))
+}
+
+/**
+ * The photo a card shows. A choice the artist made wins, including "none";
+ * with no choice, the press photo goes on the solo performer's card or on the
+ * card whose name is the artist's own — a library holds one person's
+ * pictures, so nobody else's face is guessed.
+ */
+export function performerPhoto(
+  plot: StagePlot,
+  index: number,
+  fallback: { photo: string | null; ownName: string | null },
+): string | null {
+  const p = plot.performers[index]
+  if (p.photo === NO_PHOTO) return null
+  if (p.photo) return p.photo
+  if (!fallback.photo) return null
+  if (plot.performers.length === 1) return fallback.photo
+  const own = fallback.ownName?.trim().toLowerCase()
+  return own && performerName(p, index).trim().toLowerCase() === own ? fallback.photo : null
 }
 
 export interface StagePlot {
@@ -328,6 +361,7 @@ export function parseStagePlot(raw: string | null | undefined): StagePlot | null
       gear: Array.isArray(q.gear)
         ? q.gear.map((g) => str(g, 120)).filter(Boolean).slice(0, MAX_GEAR)
         : [],
+      ...(isPhotoChoice(q.photo) ? { photo: q.photo } : {}),
     }
   })
   return {

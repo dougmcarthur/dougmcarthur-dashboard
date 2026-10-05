@@ -6,6 +6,7 @@ import {
   inputList,
   monitorMixes,
   performerName,
+  performerPhoto,
   performerRole,
   powerDrops,
   type Performer,
@@ -22,6 +23,7 @@ import {
   connectionClass,
   loadPlotView,
   savePlotView,
+  type LibraryPhoto,
   type PlotViewOptions,
 } from './StageCards'
 import { readClues, type ClueSource } from '../../../../shared/stagePlotClues'
@@ -61,17 +63,15 @@ export function StagePlotTab() {
   }, [docs.data, library.data, readings.data])
   const waiting = readings.data?.pending ?? []
 
-  // The artist's own press photo, on the artist's own card: a solo act's only
-  // performer, or the band member whose name is the profile's. Nobody else's
-  // face is guessed from a library that holds one person's pictures.
-  const photo =
-    (library.data?.items ?? []).find((a) => a.kind === 'photo' && !a.archived && /^https:\/\//.test(a.value ?? ''))?.value ?? null
-  const ownName = profile.data?.displayName?.trim().toLowerCase() ?? ''
-  const photoFor = (p: Performer, i: number): string | null => {
-    if (!photo || !current) return null
-    if (current.performers.length === 1) return photo
-    return ownName && performerName(p, i).trim().toLowerCase() === ownName ? photo : null
-  }
+  // Every usable photo in the library, offered on each card; the first one is
+  // Scout's choice for the artist's own card (`performerPhoto`).
+  const photos: LibraryPhoto[] = (library.data?.items ?? [])
+    .filter((a) => a.kind === 'photo' && !a.archived && /^https:\/\//.test(a.value ?? ''))
+    .map((a) => ({ url: a.value!, label: a.label }))
+  const photoFor = (_p: Performer, i: number): string | null =>
+    current
+      ? performerPhoto(current, i, { photo: photos[0]?.url ?? null, ownName: profile.data?.displayName ?? null })
+      : null
 
   const remove = useMutation({
     mutationFn: api.stagePlot.remove,
@@ -107,6 +107,7 @@ export function StagePlotTab() {
           plot={current}
           waiting={waiting}
           photoFor={photoFor}
+          photos={photos}
           onEdit={() => setSurveying(true)}
           onReset={() => {
             if (confirm('Start the stage plot over? Your answers will be cleared.')) remove.mutate()
@@ -148,12 +149,14 @@ function PlotView({
   plot,
   waiting,
   photoFor,
+  photos,
   onEdit,
   onReset,
 }: {
   plot: StagePlot
   waiting: Array<{ assetId: number; label: string }>
   photoFor: (p: Performer, i: number) => string | null
+  photos: LibraryPhoto[]
   onEdit: () => void
   onReset: () => void
 }) {
@@ -175,6 +178,17 @@ function PlotView({
   const [focus, setFocus] = useState<Connection | null>(null)
   const [arranging, setArranging] = useState(false)
   const used = connectionsUsed(plot.performers.flatMap((p, i) => cardRows(plot, lines, p, i + 1)))
+
+  const choosePhoto = useMutation({
+    mutationFn: ({ id, choice }: { id: string; choice: string | null }) => {
+      const { updatedAt: _, ...body } = plot
+      return api.stagePlot.save({
+        ...body,
+        performers: body.performers.map((p) => (p.id === id ? { ...p, photo: choice } : p)),
+      })
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['stage-plot'] }),
+  })
 
   const arrange = useMutation({
     mutationFn: (stage: StageArrangement | null) => {
@@ -260,11 +274,15 @@ function PlotView({
           hovered={hovered}
           onHover={setHovered}
           photoFor={photoFor}
+          photos={photos}
+          onChoosePhoto={(id, choice) => choosePhoto.mutate({ id, choice })}
+          choosingPhoto={choosePhoto.isPending}
           arranging={arranging}
           saving={arrange.isPending}
           onSaveArrangement={(stage) => arrange.mutate(stage)}
           onCancelArrangement={() => setArranging(false)}
         />
+        {choosePhoto.error && <p className="text-sm text-danger-fg">The photo didn’t save. Try again.</p>}
         {arrange.error && (
           <p className="text-sm text-danger-fg">The positions didn’t save. Try again.</p>
         )}
