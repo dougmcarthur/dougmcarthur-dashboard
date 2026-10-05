@@ -1,39 +1,34 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
 import {
-  INSTRUMENTS,
-  STAGE,
   channelCount,
-  channelsFor,
   inputList,
-  instrumentSpec,
-  layoutStage,
   monitorMixes,
   performerName,
   performerRole,
   powerDrops,
-  stationScale,
-  stationSpread,
-  type InputLine,
-  type Placed,
+  type Performer,
+  type StageArrangement,
   type StagePlot,
 } from '../../../../shared/stagePlot'
+import { cardRows, connectionOf, connectionsUsed, type Connection } from '../../../../shared/stagePlotCards'
+import {
+  ConnectionLegend,
+  ChannelChip,
+  StageCards,
+  Toggle,
+  chipClass,
+  connectionClass,
+  loadPlotView,
+  savePlotView,
+  type PlotViewOptions,
+} from './StageCards'
 import { readClues, type ClueSource } from '../../../../shared/stagePlotClues'
 import { Button } from '../../components/ui/Button'
 import { Caption, Card, EmptyState } from '../../components/ui/Surface'
 import { shortDate } from '../../format'
 import { StagePlotFlow } from './StagePlotFlow'
-import {
-  AmpDrawing,
-  DiDrawing,
-  Glyph,
-  IemDrawing,
-  InstrumentDrawing,
-  MicDrawing,
-  PowerDrawing,
-  WedgeDrawing,
-} from './stagePlotIcons'
 
 /**
  * The stage plot: the drawing, the input list, and what a tech needs to know
@@ -65,6 +60,18 @@ export function StagePlotTab() {
     return readClues(sources)
   }, [docs.data, library.data, readings.data])
   const waiting = readings.data?.pending ?? []
+
+  // The artist's own press photo, on the artist's own card: a solo act's only
+  // performer, or the band member whose name is the profile's. Nobody else's
+  // face is guessed from a library that holds one person's pictures.
+  const photo =
+    (library.data?.items ?? []).find((a) => a.kind === 'photo' && !a.archived && /^https:\/\//.test(a.value ?? ''))?.value ?? null
+  const ownName = profile.data?.displayName?.trim().toLowerCase() ?? ''
+  const photoFor = (p: Performer, i: number): string | null => {
+    if (!photo || !current) return null
+    if (current.performers.length === 1) return photo
+    return ownName && performerName(p, i).trim().toLowerCase() === ownName ? photo : null
+  }
 
   const remove = useMutation({
     mutationFn: api.stagePlot.remove,
@@ -99,6 +106,7 @@ export function StagePlotTab() {
         <PlotView
           plot={current}
           waiting={waiting}
+          photoFor={photoFor}
           onEdit={() => setSurveying(true)}
           onReset={() => {
             if (confirm('Start the stage plot over? Your answers will be cleared.')) remove.mutate()
@@ -139,19 +147,45 @@ function WaitingNote({ waiting }: { waiting: Array<{ assetId: number; label: str
 function PlotView({
   plot,
   waiting,
+  photoFor,
   onEdit,
   onReset,
 }: {
   plot: StagePlot
   waiting: Array<{ assetId: number; label: string }>
+  photoFor: (p: Performer, i: number) => string | null
   onEdit: () => void
   onReset: () => void
 }) {
+  const qc = useQueryClient()
   const lines = inputList(plot)
-  const placed = layoutStage(plot)
   const mixes = monitorMixes(plot)
   const drops = powerDrops(plot)
   const monitorKind = { wedges: 'floor wedges', iem: 'in-ear monitors', both: 'wedges and in-ears', none: '' }[plot.monitors]
+  const [view, setViewState] = useState<PlotViewOptions>(loadPlotView)
+  const setView = (patch: Partial<PlotViewOptions>) =>
+    setViewState((v) => {
+      const next = { ...v, ...patch }
+      savePlotView(next)
+      return next
+    })
+  // A card and its input-list rows light up together, and a legend chip picks
+  // out every connection of its kind — the two questions a tech asks of a plot.
+  const [hovered, setHovered] = useState<string | null>(null)
+  const [focus, setFocus] = useState<Connection | null>(null)
+  const [arranging, setArranging] = useState(false)
+  const used = connectionsUsed(plot.performers.flatMap((p, i) => cardRows(plot, lines, p, i + 1)))
+
+  const arrange = useMutation({
+    mutationFn: (stage: StageArrangement | null) => {
+      const { updatedAt: _, ...body } = plot
+      return api.stagePlot.save({ ...body, stage })
+    },
+    onSuccess: () => {
+      setArranging(false)
+      return qc.invalidateQueries({ queryKey: ['stage-plot'] })
+    },
+  })
 
   return (
     <div className="space-y-4 stage-plot-print">
@@ -182,8 +216,59 @@ function PlotView({
             {drops.length} power {drops.length === 1 ? 'drop' : 'drops'}
           </p>
         </div>
-        <StageDiagram placed={placed} lines={lines} iem={plot.monitors === 'iem' || plot.monitors === 'both'} />
-        <Legend plot={plot} placed={placed} />
+
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
+          <Toggle
+            label="Colour"
+            value={view.colour ? 'colour' : 'mono'}
+            onChange={(id) => setView({ colour: id === 'colour' })}
+            options={[
+              { id: 'colour', label: 'Colour' },
+              { id: 'mono', label: 'Print view' },
+            ]}
+          />
+          <Toggle
+            label="Detail"
+            value={view.detail}
+            onChange={(id) => setView({ detail: id === 'simple' ? 'simple' : 'expanded' })}
+            options={[
+              { id: 'expanded', label: 'Expanded' },
+              { id: 'simple', label: 'Simple' },
+            ]}
+          />
+          <Toggle
+            label="Names"
+            value={view.models ? 'models' : 'types'}
+            onChange={(id) => setView({ models: id === 'models' })}
+            options={[
+              { id: 'models', label: 'Make and model' },
+              { id: 'types', label: 'Type only' },
+            ]}
+          />
+          {plot.performers.length > 1 && !arranging && (
+            <Button variant="neutral" size="sm" onClick={() => setArranging(true)}>
+              Rearrange
+            </Button>
+          )}
+        </div>
+
+        <StageCards
+          plot={plot}
+          lines={lines}
+          view={view}
+          focus={focus}
+          hovered={hovered}
+          onHover={setHovered}
+          photoFor={photoFor}
+          arranging={arranging}
+          saving={arrange.isPending}
+          onSaveArrangement={(stage) => arrange.mutate(stage)}
+          onCancelArrangement={() => setArranging(false)}
+        />
+        {arrange.error && (
+          <p className="text-sm text-danger-fg">The positions didn’t save. Try again.</p>
+        )}
+        <ConnectionLegend used={used} view={view} focus={focus} onFocus={setFocus} />
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr),minmax(0,2fr)]">
@@ -207,18 +292,34 @@ function PlotView({
                 </thead>
                 <tbody className="divide-y divide-line">
                   {lines.map((l) => (
-                    <tr key={`${l.ch}-${l.label}`}>
+                    <tr
+                      key={`${l.ch}-${l.label}`}
+                      onMouseEnter={() => setHovered(l.performerId)}
+                      onMouseLeave={() => setHovered(null)}
+                      className={`transition-colors ${hovered && hovered === l.performerId ? 'bg-accent-soft print:bg-surface' : ''} ${
+                        focus && focus !== connectionOf(l.source) ? 'opacity-30 print:opacity-100' : ''
+                      }`}
+                    >
                       <td className="px-3 py-2 whitespace-nowrap">
                         {/* The same mark the drawing puts beside the source, so the two can be matched by eye. */}
-                        <span className="inline-flex min-w-6 h-6 px-1.5 items-center justify-center rounded-full border border-ink text-xs font-semibold text-ink tabular-nums">
-                          {l.stereo ? `${l.ch}–${l.ch + 1}` : l.ch}
-                        </span>
+                        <ChannelChip
+                          ch={l.stereo ? `${l.ch}–${l.ch + 1}` : String(l.ch)}
+                          className={chipClass(connectionOf(l.source), view.colour)}
+                        />
                       </td>
                       <td className="px-3 py-2 text-ink">
                         {l.label}
                         {l.stereo && <span className="text-muted"> (L/R)</span>}
                       </td>
-                      <td className="px-3 py-2 text-body">{l.source}</td>
+                      <td className="px-3 py-2 text-body">
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            aria-hidden
+                            className={`h-2.5 w-2.5 shrink-0 rounded-full border ${connectionClass(connectionOf(l.source), view.colour)}`}
+                          />
+                          {l.source}
+                        </span>
+                      </td>
                       <td className="px-3 py-2 text-body">{l.stand ?? '—'}</td>
                       <td className="px-3 py-2 text-body">{l.phantom ? 'Yes' : ''}</td>
                     </tr>
@@ -270,294 +371,5 @@ function PlotView({
         list — both are printed on the plot.
       </p>
     </div>
-  )
-}
-
-const SCALE = 10
-const W = STAGE.width * SCALE
-const D = STAGE.depth * SCALE
-
-function StageDiagram({ placed, lines, iem }: { placed: Placed[]; lines: InputLine[]; iem: boolean }) {
-  let mix = 0
-  const k = stationScale(placed.length)
-  const sp = stationSpread(placed.length)
-  return (
-    <svg
-      viewBox={`-20 -30 ${W + 40} ${D + 90}`}
-      role="img"
-      aria-label={`Stage plot showing ${placed.map((p) => `${p.name}, ${p.role}`).join('; ')}`}
-      className="w-full h-auto"
-    >
-      {/* The stage, back wall at the top. */}
-      <rect x={0} y={0} width={W} height={D} rx={8} className="fill-sunken stroke-line-strong" strokeWidth={2} />
-      <text x={W / 2} y={-10} textAnchor="middle" className="fill-muted" fontSize={16} letterSpacing={2}>
-        UPSTAGE
-      </text>
-      <text x={10} y={D - 12} className="fill-faint" fontSize={14}>
-        Stage right
-      </text>
-      <text x={W - 10} y={D - 12} textAnchor="end" className="fill-faint" fontSize={14}>
-        Stage left
-      </text>
-      <text x={W / 2} y={D + 44} textAnchor="middle" className="fill-muted" fontSize={16} letterSpacing={2}>
-        AUDIENCE
-      </text>
-
-      {placed.map((p) => {
-        const wedgeNumber = p.wedge ? ++mix : 0
-        const cx = p.x * SCALE
-        const cy = p.y * SCALE
-        return (
-          <g key={p.performerId}>
-            {p.wedge && (
-              <g>
-                <Glyph x={p.wedge.x * SCALE} y={p.wedge.y * SCALE} size={50 * k} className="text-body" title={`Monitor mix ${wedgeNumber}`}>
-                  <WedgeDrawing />
-                </Glyph>
-                <text
-                  x={p.wedge.x * SCALE}
-                  y={p.wedge.y * SCALE + 34 * k}
-                  textAnchor="middle"
-                  className="fill-body"
-                  fontSize={13 * k}
-                  fontWeight={600}
-                >
-                  Mix {wedgeNumber}
-                </text>
-              </g>
-            )}
-            {/* Scaled around its own centre; the layout already made room. */}
-            <g transform={`translate(${cx} ${cy}) scale(${k}) translate(${-cx} ${-cy})`}>
-              <Station p={p} iem={iem} sp={sp} lines={lines} />
-            </g>
-          </g>
-        )
-      })}
-    </svg>
-  )
-}
-
-/**
- * A channel number beside a source, matching the Ch column of the input list:
- * the drawing says where a thing stands and the list says what it is, and the
- * number is how a tech gets from one to the other.
- */
-function ChannelMark({ x, y, ch }: { x: number; y: number; ch: string | null }) {
-  if (!ch) return null
-  const w = Math.max(22, ch.length * 8 + 10)
-  return (
-    <g>
-      <title>{`Channel ${ch}`}</title>
-      <rect x={x - w / 2} y={y - 11} width={w} height={22} rx={11} className="fill-surface stroke-ink" strokeWidth={1.5} />
-      <text x={x} y={y + 4.5} textAnchor="middle" className="fill-ink" fontSize={13} fontWeight={700}>
-        {ch}
-      </text>
-    </g>
-  )
-}
-
-/** A word under a piece of gear that carries no channel — "DI", "Power", "Amp". */
-function GearCaption({ x, y, children }: { x: number; y: number; children: ReactNode }) {
-  return (
-    <text x={x} y={y} textAnchor="middle" className="fill-muted" fontSize={11} fontWeight={600} letterSpacing={0.5}>
-      {children}
-    </text>
-  )
-}
-
-/**
- * One performer's spot: the player, what they play and sing into, and what
- * has to reach them — the amp behind, the DI and the power drop beside.
- *
- * Held instruments (a guitar, a fiddle) sit beside the player, angled as they
- * are worn; instruments that stand in front of the player (a keyboard, a
- * laptop, hand drums) go downstage of them, with the vocal mic moved to the
- * side so the two do not stack. The kit is its own drawing, throne upstage.
- *
- * `sp` spreads the gear away from the player without enlarging it, so a small
- * act's station fills its stage instead of huddling in the middle.
- */
-function Station({ p, iem, sp, lines }: { p: Placed; iem: boolean; sp: number; lines: InputLine[] }) {
-  const cx = p.x * SCALE
-  const cy = p.y * SCALE
-  const held = p.instruments.filter((i) => INSTRUMENTS[i].placement === 'held')
-  const inFront = p.instruments.filter((i) => INSTRUMENTS[i].placement === 'front')
-  const sings = p.vocals !== 'none'
-  const ch = (feed: InputLine['feed']) => channelsFor(lines, p.performerId, feed)
-  // An instrument whose input is a mic on its amp is numbered at the amp.
-  const onAmp = (id: (typeof p.instruments)[number]) => {
-    const spec = instrumentSpec(id)
-    return spec?.amp === true && spec.inputs.every((i) => i.source.startsWith('Mic'))
-  }
-  const ampChannels = p.instruments.filter(onAmp).map(ch).filter(Boolean).join(', ') || null
-  const o = (n: number) => n * sp
-
-  if (p.drums) {
-    const extras = p.instruments.filter((i) => i !== 'drums')
-    return (
-      <g>
-        <rect x={cx - 92} y={cy - 70} width={184} height={150} rx={10} strokeDasharray="6 6" className="fill-none stroke-line" strokeWidth={1.5} />
-        <Glyph x={cx} y={cy + 4} size={150} title="Drum kit">
-          <InstrumentDrawing id="drums" />
-        </Glyph>
-        <ChannelMark x={cx - 70} y={cy - 56} ch={ch('drums')} />
-        {sings && (
-          <>
-            <Glyph x={cx + 70} y={cy - 40} size={32} className="text-body" title="Vocal mic">
-              <MicDrawing />
-            </Glyph>
-            <ChannelMark x={cx + 96} y={cy - 56} ch={ch('vocal')} />
-          </>
-        )}
-        {extras.map((id, n) => (
-          <g key={id}>
-            <Glyph x={cx - 118} y={cy - 20 + n * 56} size={50} title={INSTRUMENTS[id].label}>
-              <InstrumentDrawing id={id} />
-            </Glyph>
-            <ChannelMark x={cx - 146} y={cy - 40 + n * 56} ch={ch(id)} />
-          </g>
-        ))}
-        {iem && (
-          <Glyph x={cx - 30} y={cy - 56} size={26} className="text-body" title="In-ear monitors">
-            <IemDrawing />
-          </Glyph>
-        )}
-        {p.power && (
-          <g>
-            <Glyph x={cx + 118} y={cy + 30} size={30} className="text-warn-fg" title="Power drop">
-              <PowerDrawing />
-            </Glyph>
-            <GearCaption x={cx + 118} y={cy + 58}>POWER</GearCaption>
-          </g>
-        )}
-        <Label x={cx} y={cy + 96} name={p.name} role={p.role} />
-      </g>
-    )
-  }
-
-  // Beside the player, alternating sides, angled as a guitar is worn.
-  const heldAt = (n: number) => {
-    const side = n % 2 === 0 ? 1 : -1
-    const step = Math.floor(n / 2)
-    return { x: cx + side * o(44 + step * 34), y: cy + 6, rotate: side * 28 }
-  }
-  const micAt = inFront.length ? { x: cx + o(58), y: cy + o(22) } : { x: cx, y: cy + o(34) }
-
-  return (
-    <g>
-      {p.amp && (
-        <g>
-          <Glyph x={cx} y={cy - o(60)} size={50} className="text-body" title="Amp">
-            <AmpDrawing />
-          </Glyph>
-          {ampChannels ? <ChannelMark x={cx + 36} y={cy - o(60) - 18} ch={ampChannels} /> : <GearCaption x={cx} y={cy - o(60) - 30}>AMP</GearCaption>}
-        </g>
-      )}
-      {p.di && (
-        <g>
-          <Glyph x={cx - o(60)} y={cy - o(46)} size={38} className="text-body" title="DI">
-            <DiDrawing />
-          </Glyph>
-        </g>
-      )}
-      {p.power && (
-        <g>
-          <Glyph x={cx + o(56)} y={cy - o(46)} size={32} className="text-warn-fg" title="Power drop">
-            <PowerDrawing />
-          </Glyph>
-          <GearCaption x={cx + o(56)} y={cy - o(46) + 28}>POWER</GearCaption>
-        </g>
-      )}
-      {iem && (
-        <g>
-          <Glyph x={cx - o(22)} y={cy - o(34)} size={24} className="text-body" title="In-ear monitors">
-            <IemDrawing />
-          </Glyph>
-          {sp > 1 && <GearCaption x={cx - o(22)} y={cy - o(34) + 26}>IEM</GearCaption>}
-        </g>
-      )}
-
-      {held.map((id, n) => {
-        const at = heldAt(n)
-        return (
-          <g key={id}>
-            <Glyph x={at.x} y={at.y} size={56} rotate={at.rotate} title={INSTRUMENTS[id].label}>
-              <InstrumentDrawing id={id} />
-            </Glyph>
-            {!onAmp(id) && <ChannelMark x={at.x + (at.x > cx ? 30 : -30)} y={at.y + 30} ch={ch(id)} />}
-          </g>
-        )
-      })}
-
-      <circle cx={cx} cy={cy} r={20} className="fill-accent-soft stroke-accent" strokeWidth={2.5} />
-      <text x={cx} y={cy + 7} textAnchor="middle" className="fill-ink" fontSize={18} fontWeight={700}>
-        {p.name.slice(0, 1).toUpperCase()}
-      </text>
-
-      {inFront.map((id, n) => {
-        const x = cx + (n === 0 ? 0 : n % 2 ? o(70) : -o(70))
-        const wide = id === 'keys' || id === 'synth' || id === 'pedal_steel'
-        return (
-          <g key={id}>
-            <Glyph x={x} y={cy + o(42)} width={wide ? 92 : 58} height={58} title={INSTRUMENTS[id].label}>
-              <InstrumentDrawing id={id} />
-            </Glyph>
-            {!onAmp(id) && <ChannelMark x={x - (wide ? 52 : 36)} y={cy + o(42) - 18} ch={ch(id)} />}
-          </g>
-        )
-      })}
-
-      {sings && (
-        <g>
-          <Glyph x={micAt.x} y={micAt.y} size={34} className="text-body" title={p.vocals === 'lead' ? 'Lead vocal mic' : 'Backing vocal mic'}>
-            <MicDrawing />
-          </Glyph>
-          <ChannelMark x={micAt.x + 26} y={micAt.y + 4} ch={ch('vocal')} />
-        </g>
-      )}
-
-      <Label x={cx} y={cy + (inFront.length ? o(42) + 46 : sings ? micAt.y - cy + 34 : 48)} name={p.name} role={p.role} />
-    </g>
-  )
-}
-
-/**
- * The performer's name under their station. Only the name: the drawings say
- * what they play, and a role line wide enough to read collided with the next
- * station's on any front line of three. The full role is in the SVG's title
- * for a screen reader and in the line-up beside the plot.
- */
-function Label({ x, y, name, role }: { x: number; y: number; name: string; role: string }) {
-  return (
-    <text x={x} y={y} textAnchor="middle" className="fill-ink" fontSize={17} fontWeight={600}>
-      <title>{`${name} — ${role}`}</title>
-      {name.length > 18 ? `${name.slice(0, 17)}…` : name}
-    </text>
-  )
-}
-
-/** A key to the drawing, with the same drawings at icon size, and only what the plot uses. */
-function Legend({ plot, placed }: { plot: StagePlot; placed: Placed[] }) {
-  const items: Array<{ label: string; draw: ReactNode; className?: string }> = []
-  const ids = [...new Set(plot.performers.flatMap((p) => p.instruments))]
-  for (const id of ids) items.push({ label: INSTRUMENTS[id].label, draw: <InstrumentDrawing id={id} /> })
-  if (plot.performers.some((p) => p.vocals !== 'none')) items.push({ label: 'Vocal mic', draw: <MicDrawing />, className: 'text-body' })
-  if (placed.some((p) => p.amp)) items.push({ label: 'Amp', draw: <AmpDrawing />, className: 'text-body' })
-  if (placed.some((p) => p.di)) items.push({ label: 'DI box', draw: <DiDrawing />, className: 'text-body' })
-  if (placed.some((p) => p.power)) items.push({ label: 'Power drop', draw: <PowerDrawing />, className: 'text-warn-fg' })
-  if (placed.some((p) => p.wedge)) items.push({ label: 'Monitor wedge', draw: <WedgeDrawing />, className: 'text-body' })
-  if (plot.monitors === 'iem' || plot.monitors === 'both') items.push({ label: 'In-ear monitors', draw: <IemDrawing />, className: 'text-body' })
-
-  return (
-    <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted">
-      {items.map((it) => (
-        <li key={it.label} className="flex items-center gap-1.5">
-          <svg viewBox="0 0 48 48" className={`h-6 w-6 shrink-0 ${it.className ?? 'text-ink'}`} aria-hidden>
-            {it.draw}
-          </svg>
-          {it.label}
-        </li>
-      ))}
-    </ul>
   )
 }

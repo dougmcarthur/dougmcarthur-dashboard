@@ -105,7 +105,7 @@ function looksLikeImage(url: string | null): boolean {
  * longer exist. On failure it becomes the fallback rather than a broken-image
  * icon wearing its alt text.
  */
-function Thumb({ src, alt, className, fallback }: { src: string; alt: string; className: string; fallback: ReactNode }) {
+export function Thumb({ src, alt, className, fallback }: { src: string; alt: string; className: string; fallback: ReactNode }) {
   const [failed, setFailed] = useState(false)
   if (failed) return <>{fallback}</>
   return (

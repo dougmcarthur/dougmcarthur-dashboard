@@ -9,9 +9,11 @@ import {
   parseStagePlot,
   performerRole,
   powerDrops,
+  stageLines,
   type StagePlot,
 } from '../shared/stagePlot'
 import { readClues } from '../shared/stagePlotClues'
+import { cardRows } from '../shared/stagePlotCards'
 
 function band(): StagePlot {
   const plot = emptyPlot('band', 4, 'Sam')
@@ -167,5 +169,50 @@ describe('what a solo acoustic act asks for', () => {
     expect(channelsFor(lines, 'p1', 'vocal')).toBe('2')
     const kit = band()
     expect(channelsFor(inputList(kit), 'p4', 'drums')).toBe('1–7')
+  })
+})
+
+describe('the stage as cards', () => {
+  const solo = (): StagePlot => {
+    const plot = emptyPlot('solo', 1, 'Doug')
+    plot.performers[0] = { ...plot.performers[0], instruments: ['acoustic_guitar'], vocals: 'lead', gear: ['Taylor 114ce', 'Boss TU-3 tuner', 'Shure SM58'] }
+    return plot
+  }
+
+  it('puts the make and model on the instrument it belongs to, and nothing it cannot place', () => {
+    const plot = solo()
+    const rows = cardRows(plot, inputList(plot), plot.performers[0], 1)
+    const guitar = rows.find((r) => r.instrument === 'acoustic_guitar')!
+    expect(guitar).toMatchObject({ model: 'Taylor 114ce', connection: 'di', channels: '1' })
+    expect(rows.find((r) => r.kind === 'vocal')).toMatchObject({ model: 'Shure SM58', connection: 'mic', channels: '2' })
+    // A tuner is not the guitar: it gets its own row rather than a guess.
+    expect(rows.find((r) => r.kind === 'gear')?.title).toBe('Boss TU-3 tuner')
+    expect(rows.map((r) => r.kind)).toEqual(['instrument', 'vocal', 'gear', 'monitor', 'power'])
+  })
+
+  it('counts a kit by its channels, not its microphones', () => {
+    const plot = band()
+    const kit = cardRows(plot, inputList(plot), plot.performers[3], 4).find((r) => r.instrument === 'drums')!
+    expect(kit.spec).toMatch(/^7 channels/)
+  })
+
+  it('stands the kit and back line upstage until the artist moves somebody', () => {
+    const plot = band()
+    expect(stageLines(plot)).toEqual({ upstage: ['p3', 'p4'], downstage: ['p1', 'p2'] })
+    plot.stage = { upstage: ['p4'], downstage: ['p3', 'p1', 'p2', 'gone'] }
+    expect(stageLines(plot)).toEqual({ upstage: ['p4'], downstage: ['p3', 'p1', 'p2'] })
+  })
+
+  it('places a performer the saved arrangement never heard of', () => {
+    const plot = band()
+    plot.stage = { upstage: ['p4'], downstage: ['p1'] }
+    const lines = stageLines(plot)
+    expect([...lines.upstage, ...lines.downstage].sort()).toEqual(['p1', 'p2', 'p3', 'p4'])
+  })
+
+  it('reads a stored arrangement back', () => {
+    const plot = band()
+    plot.stage = { upstage: ['p4', 'p3'], downstage: ['p1', 'p2'] }
+    expect(parseStagePlot(JSON.stringify(plot))?.stage).toEqual(plot.stage)
   })
 })

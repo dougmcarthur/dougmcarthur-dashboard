@@ -34,6 +34,15 @@ const PlotSchema = z.object({
   monitors: z.enum(['wedges', 'iem', 'both', 'none']),
   playback: z.boolean(),
   notes: z.string().max(NOTE_MAX).nullable(),
+  // Where each person stands, when arranged by hand. Optional, so a client
+  // that has never heard of it saves exactly what it did before.
+  stage: z
+    .object({
+      upstage: z.array(z.string().min(1).max(20)).max(MAX_PERFORMERS),
+      downstage: z.array(z.string().min(1).max(20)).max(MAX_PERFORMERS),
+    })
+    .nullable()
+    .optional(),
 })
 
 const stagePlot = new Hono<AppEnv>()
