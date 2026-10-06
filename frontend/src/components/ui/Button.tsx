@@ -13,7 +13,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
  * below use the `-bg-hover` tokens, which is what makes them respond.
  */
 export type ButtonVariant = 'primary' | 'neutral' | 'quiet' | 'good' | 'danger' | 'info'
-export type ButtonSize = 'sm' | 'md'
+export type ButtonSize = 'sm' | 'md' | 'lg'
 
 const VARIANTS: Record<ButtonVariant, string> = {
   // The one action a screen wants you to take. At most one per group.
@@ -30,6 +30,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
 const SIZES: Record<ButtonSize, string> = {
   sm: 'text-xs px-2.5 py-1',
   md: 'text-xs px-3 py-1.5',
+  // For a screen a stranger reads on a phone: a tap target a thumb can hit.
+  lg: 'text-sm px-4 py-2.5',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

@@ -90,3 +90,26 @@ MAIL_POSTAL_ADDRESS = "55 Tunis Bay, Winnipeg, MB R3T 2X2"
 # Cloudflare Access off — headless callers cannot do a passkey ceremony, so
 # without it every agent POST becomes a 401 the moment Access stops letting
 # them through.
+
+# The artist survey (docs/artist-survey-questionnaire.md). Shipped CLOSED.
+#
+# It opens only when SURVEY_OPEN is exactly "true" AND SURVEY_CONTACT_EMAIL is
+# set, because the notice every respondent reads promises a contact address and
+# a public survey that cannot say who to ask is not one to open. Turn it off by
+# setting SURVEY_OPEN back to "false": nobody new can start, and people already
+# partway through can still finish.
+#
+# Before sharing the link:
+#   1. Set SURVEY_CONTACT_EMAIL (a real mailbox somebody reads).
+#   2. Turnstile, so a bot cannot fill it: create a widget in the Cloudflare
+#      dashboard (Turnstile → Add site, the site's hostname), put the SITE key
+#      here as TURNSTILE_SITE_KEY, and the SECRET with
+#      `wrangler secret put TURNSTILE_SECRET_KEY`. Without both it still runs,
+#      and the owner's survey panel says no spam check is configured.
+#   3. Have two or three artists read it aloud first (the doc's section 7).
+#   4. Optionally SURVEY_RESULTS_URL, where a summary will be posted. The notice
+#      promises a summary; with no address it says so without a link.
+SURVEY_OPEN = "false"
+# SURVEY_CONTACT_EMAIL = ""
+# SURVEY_RESULTS_URL = ""
+# TURNSTILE_SITE_KEY = ""

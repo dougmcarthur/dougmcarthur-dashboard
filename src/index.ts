@@ -30,6 +30,7 @@ import feedbackRoute from './routes/feedback'
 import stagePlotRoute from './routes/stagePlot'
 import documentReadings from './routes/documentReadings'
 import publicSite from './routes/publicSite'
+import surveyRoute from './routes/survey'
 import { runCatalogBackfillOnce } from './lib/catalog'
 import { pruneInviteRequests } from './lib/inviteRequests'
 import connectors from './routes/connectors'
@@ -217,6 +218,9 @@ app.route('/api/public', publicEpk)
 // The logged-out landing page: the catalog's recent listings and the
 // invitation request form. Public under the same prefix; see publicSite.ts.
 app.route('/api/public', publicSite)
+// The artist survey: public, anonymous, and closed until it can name a contact.
+// See survey.ts and docs/artist-survey-questionnaire.md.
+app.route('/api/public', surveyRoute)
 // The oversight surface. See ADMIN_API_PREFIX above for what the middleware
 // does with it, in both directions.
 app.route('/api/admin', admin)

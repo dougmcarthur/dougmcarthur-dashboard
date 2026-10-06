@@ -6,6 +6,7 @@ import { JoinScreen } from './JoinScreen'
 import { useHashRoute } from '../hooks/useHashRoute'
 import { PublicEpkPage } from '../pages/epk/PublicEpkPage'
 import { LandingPage } from '../pages/LandingPage'
+import { SurveyPage } from '../pages/survey/SurveyPage'
 
 /**
  * Nothing renders until the Worker says who is asking.
@@ -57,6 +58,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // A shared EPK is for people who will never sign in, so it is answered
   // before the session is — signed in or not, the link shows the same page.
   if (page === 'epk' && arg) return <PublicEpkPage token={arg} />
+
+  // The artist survey is for anybody with the link, so like a shared EPK it is
+  // answered before the session is, and looks the same signed in or not.
+  if (page === 'survey') return <SurveyPage />
+
 
   if (session.isLoading) return <div className="min-h-screen bg-canvas" />
 

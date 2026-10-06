@@ -67,6 +67,23 @@ export type Env = {
    * a copy of the database is not a working Gmail credential.
    */
   TOKEN_ENCRYPTION_KEY?: string
+  /**
+   * The artist survey (docs/artist-survey-questionnaire.md). It is closed unless
+   * `SURVEY_OPEN` is exactly "true" **and** `SURVEY_CONTACT_EMAIL` is set: the
+   * notice a respondent reads promises a contact address, and a public survey
+   * that cannot say who to ask is not one to open. Plain vars, not secrets.
+   */
+  SURVEY_OPEN?: string
+  SURVEY_CONTACT_EMAIL?: string
+  /** Where the summary of results will be posted, if anywhere yet. Optional. */
+  SURVEY_RESULTS_URL?: string
+  /** Cloudflare Turnstile's public site key. A var: the widget runs in the page. */
+  TURNSTILE_SITE_KEY?: string
+  /**
+   * Turnstile's secret. Unset, the survey still opens and runs with no bot check,
+   * and the owner's survey panel says so; set it before sharing the link.
+   */
+  TURNSTILE_SECRET_KEY?: string
 }
 
 /**

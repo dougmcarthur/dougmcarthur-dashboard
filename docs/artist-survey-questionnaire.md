@@ -1,8 +1,10 @@
 # Artist survey: what makes an opportunity worth an artist's time
 
-**Status: draft for review, 2026-10-05. Nothing is built.** This is the
-questionnaire, the reasoning behind it, and what we would compute from the
-answers, written before any code so it can be argued with cheaply.
+**Status, 2026-10-05: built, and closed.** The survey exists and works end to end,
+and **ships closed**: nobody can start it until a contact address is configured
+and it is asked to open (section 10). This is the questionnaire, the reasoning
+behind it, and what is computed from the answers. It was written before any code
+so it could be argued with cheaply, and the code is held to it by tests.
 
 *Revised the same day: E2 and E3 were reworded, and A8 added, after comparing
 them with the Manitoba Arts Council's and Arts Nova Scotia's identification forms.
@@ -78,6 +80,31 @@ whoever the link reaches (section 7). It reports who answered and stops there.
 11. **Accessible by default.** WCAG 2.1 AA: keyboard-operable, labelled for
     screen readers, no information carried by colour alone, plain language
     around a Grade 8 reading level.
+12. **Nobody's list is shortened because of who they are.** It is tempting to hide
+    factors a respondent will find irrelevant, for example the "people who could
+    hire me again" factor for a hobby-level artist. It is not done, for four reasons.
+    - *It assumes the answer.* The survey exists to measure whether a hobbyist cares
+      about, say, industry attendance. A hobbyist who is quietly hoping to turn
+      professional never gets to say so, and the answer is decided before anyone is
+      asked.
+    - *The ranking already records irrelevance.* The "least" pick is how a ranking
+      says "this does not matter to me". A factor that is irrelevant costs a few
+      seconds and gives us exactly the data the pruning would have thrown away.
+    - *It breaks the arithmetic.* Which factors a person saw would depend on their
+      earlier answers, so each factor's score would come mostly from the people who
+      were shown it, and groups could not be compared on the same footing. Randomly
+      chosen subsets, which is what nine of thirteen is, do not have this problem,
+      because what a person sees does not depend on anything about them.
+    - *It treats people differently on a guess.* Whoever ticks "hobby" would be
+      shown a different survey from whoever ticks "main job", on a stereotype about
+      what a hobbyist cares about, and a self-description is not a reliable
+      stand-in for ambition.
+
+    What helps the hobby-level respondent without any of that: the "least" pick
+    (above), an optional anchor screen (decision 8, section 9) that records which
+    factors a respondent would weigh at all, and, between the first wave and the
+    second, pruning by what the **whole** sample did, which uses no individual's
+    characteristics.
 
 ## 3. The questionnaire
 
@@ -90,7 +117,7 @@ than forced. Sensitive items always offer "Prefer not to say".
 ### Welcome and consent
 
 > **Which opportunities are worth an artist's time?**
-> A survey for musicians and bands working in Canada. About 10 to 12 minutes.
+> A survey for musicians and bands working in Canada. About 10 minutes.
 >
 > Sun Dogs Music, a small company in Winnipeg, is building tools to help artists
 > find and keep track of opportunities: festivals, showcases, grants, venue
@@ -240,21 +267,14 @@ B4 and B5 are the same list read two ways on purpose: what made someone pass
 and what made someone go are the revealed half of the picture, and section C is
 the stated half. Where they disagree, that is a finding (section 6).
 
-**B6. How long does a typical application take you, start to finish?** · single
-choice · F
-Under 15 minutes · 15 to 60 minutes · 1 to 3 hours · More than 3 hours · It varies
-a lot
-
-**B7. In the last 12 months, did you pay any application or entry fees?** ·
-single choice · F
-No · Yes, under $50 in total · $50 to $149 · $150 to $299 · $300 or more · I do
-not remember
-
-**B8. Of the opportunities you applied for in the last 12 months, about how many
-were successful?** *You were selected, offered a slot or given funding.* · single
-choice · F
-None of them · Fewer than a quarter · A quarter to a half · More than half · I am
-still waiting to hear on all of them · I did not apply for any
+**Parked for a later wave** (cut to reach ten minutes, by Doug's decision):
+- *How long does a typical application take you, start to finish?* The paired
+  choices still measure how much application time costs; this would only have
+  told us how long applications actually take.
+- *In the last 12 months, did you pay any application or entry fees?*
+- *Of the opportunities you applied for in the last 12 months, about how many were
+  successful?* The one the analysis misses most: it is the only check on how
+  well artists' sense of their own odds matches what happened.
 
 ### C. Deciding what is worth it (ranking)
 
@@ -379,7 +399,7 @@ have already met)
 - Living with a disability (physical, mental or intellectual)
 - Two-Spirit, lesbian, gay, bisexual, transgender, queer, or part of the 2SLGBTQ+
   community in another way
-- New to Canada (arrived in the last 10 years)
+- New to Canada (landed within the last 5 years)
 - Part of another community that faces barriers in the music industry
 - *None of these* (exclusive)
 - *Prefer not to say* (exclusive)
@@ -412,11 +432,14 @@ first draft, and why:
   things, "this does not apply to me" and "I would rather not say", and the Manitoba
   form cannot tell them apart because a blank could be either.
 
-**Not settled.** The ten-year window on "New to Canada" is my guess; none of the
-sources checked asks it, so no published definition is being followed. Neither is
-any wording final: the Canada Council's review says terminology moves and should
-be revisited every few years, and asks that members of the communities named help
-design the questions. Section 7 builds that into the read-through.
+**"New to Canada" is five years, by Doug's decision.** It was ten in the first
+draft, which had no source. Five matches the federal definitions that were found
+(see the end of section 8), with one open point about whom "landed" includes.
+
+**Not settled.** No wording is final: the Canada Council's review says terminology
+moves and should be revisited every few years, and asks that members of the
+communities named help design the questions. Section 7 builds that into the
+read-through.
 
 **E4. About how much did you earn from all your music work in the last 12 months,
 before expenses?** *Include performing, teaching music, royalties, grants and
@@ -428,12 +451,14 @@ The $10,000 break is on purpose: the 2024 survey by Hill Strategies and the
 Cultural Human Resources Council reported the share of artists earning under
 $10,000, so this question can be set against a published figure.
 
-**E5. Is there anything about how you decide which opportunities to go for that we
-did not ask?** · optional free text, up to 500 characters
+**E5. Is there anything that matters to you when you decide which opportunities to
+go for that we did not mention?** · optional free text, up to 500 characters
 
-The only open question. Open text is expensive to read and easy to skim into
+The only open question, and the one place a respondent can tell us what the factor
+list in section C missed. Open text is expensive to read and easy to skim into
 whatever you already believe, so there is one, it is read in full, and it is
-coded by theme with the codes written down before reading.
+coded by theme with the codes written down before reading. It is worded to ask for
+a missing factor directly, because a first-wave list cannot know what it left out.
 
 ### Close
 
@@ -622,30 +647,82 @@ Not found or not read, so none of this should be treated as checked:
   likeliest published instrument from the music industry itself. Its report was too
   large to read here, and it should be asked for directly.
 
-## 9. Decisions for you
+### How the "new to Canada" window was checked
 
-1. **Length.** The honest estimate is **10 to 12 minutes**, longer than the 8 I
-   first suggested. To get nearer 8, cut in this order, which loses the least:
-   B6 to B8, then the open question, then the ranking down to 9 factors.
-2. **Random 9 of 13 ranking screens, or all 13?** Nine is quicker and fine for the
-   average. Thirteen is only needed if we ever want an estimate for one person.
-3. **The factor list** (section C). This is the part most worth arguing with. Is
-   anything missing that you hear artists say? Is anything here something nobody
-   decides on? Fewer factors is a better survey.
+The window is five years, chosen by Doug as a judgement call, and compared with
+what federal and arts-sector bodies use. **The primary pages for most of these
+could not be opened** (Statistics Canada's dictionary refused automated access with
+a 403, as Manitoba Music did, and the CRA's report sits behind a disclaimer page),
+so each figure below is from a search summary of the source, not from the source.
+
+| Body | What it uses | Clock starts at |
+| --- | --- | --- |
+| **Statistics Canada**, "recent immigrant" in the 2021 census | The five years before the census (1 January 2016 to 11 May 2021) | Landing, or becoming a permanent resident |
+| **CRA**, for its own 2023 study of newcomers | Within the last five years | Entering Canada, as a permanent **or temporary** resident (work or study), intending to settle |
+| **CRA**, for tax purposes | The first year of residency only | The first day living in Canada |
+| **IRCC**, settlement-service eligibility | About six years from April 2026, and five from April 2027, for economic immigrants | Becoming a permanent resident |
+| **Toronto Arts Council**, newcomer artist programmes | Under seven years | Arriving as an immigrant or refugee |
+
+**Five years agrees with Statistics Canada, with the CRA's research definition, and
+with where IRCC's window is heading.** The one arts-sector figure found is longer
+(seven).
+
+**What the comparison turned up that the five years does not settle:** who counts.
+Statistics Canada's clock starts at landing, so it counts permanent residents. The
+CRA's research definition also counts people on work or study permits. A musician
+here on a work permit is exactly the person whose touring and networks are most
+constrained, and "landed" excludes them, and is immigration jargon besides, which
+section 2 rules out. A plainer wording that includes them would be *"New to Canada
+(you came to live here within the last 5 years)"*. The survey is built with Doug's
+wording, "landed within the last 5 years", until that is decided.
+
+**FACTOR and SOCAN:** no definition of "newcomer" or "recent immigrant" was found
+for either. FACTOR's eligibility is by citizenship or permanent residence (found
+for its Official Language Minority Communities showcase programme), which is not the
+same question, and nothing was found for SOCAN.
+
+## 9. Decisions
+
+**Settled, 2026-10-05:**
+
+1. **Length: aim for ten minutes.** B6 to B8 are cut (parked in section 3), which
+   brings the estimate to about ten; that is an estimate until the read-through
+   times it. **The open question stays, out of the cut order I proposed**, because
+   decision 3 leans on it: it is the one place respondents can tell us what the
+   factor list missed. If the read-through runs over, cut next from A8 and B3, then
+   reduce the ranking screens, and the open question last.
+2. **Nine of the thirteen ranking screens per respondent.** Fine for the average
+   artist, which is the aim; thirteen would only be needed for an estimate of one
+   person.
+3. **The factor list stays at thirteen for the first wave, shown the same way to
+   everyone, and nothing is hidden by who the respondent is.** Nobody can say what
+   is missing until responses arrive, so the open question (E5) now asks for it
+   directly, and the second wave prunes or adds factors using the first wave's
+   data. The reasoning against hiding factors from, say, hobby-level artists is
+   principle 12 in section 2.
+
+**Still open** (the build takes the default in brackets, and each is easy to change):
+
 4. **Optional personal questions** (E1 to E4). Is asking these in an anonymous
    survey to a small network acceptable to you, given the re-identification risk in
    section 4? Dropping E3 is the cheap way to lower that risk, at the cost of not
    seeing equity differences. E2 and E3 were reworded after comparing them with the
-   Manitoba Arts Council's form (see the end of section 8); two things are yours to
-   confirm: whether **A8 (language of the songs) is enough** in place of an
-   official-language item, and what the **window on "New to Canada"** should be,
-   since I picked ten years without a source.
+   Manitoba Arts Council's form (see the end of section 8); "New to Canada" is five
+   years as decided, and one point is still open: whether it should also include
+   people who arrived on a work or study permit and have not landed. [Asked, as
+   drafted.]
 5. **Saved as you go.** Keeping partial answers lets us see where people drop out,
    and the notice says so. The alternative is to keep nothing until someone
-   finishes. Which would you rather tell your members?
+   finishes. [Saved as you go, with Close without saving to delete.]
 6. **Where the results go**, and who the contact address belongs to. The notice
-   promises both.
-7. **No incentive.** Agreed?
+   promises both. [The survey does not open until a contact address is configured.]
+7. **No incentive.** Agreed? [None.]
+8. **An anchor question after the ranking** (proposed in answer to decision 3, see
+   principle 12): one screen asking which of the thirteen factors the respondent
+   would actually weigh, so a hobby-level artist who finds most of the list
+   irrelevant is visible as that and not forced into a relative ranking. About 30
+   seconds, which puts the estimate nearer 10 and a half minutes. [Not built;
+   additive if wanted.]
 
 **Risks worth saying out loud.**
 - A single association's members are not a sample of artists. They skew toward
@@ -656,3 +733,76 @@ Not found or not read, so none of this should be treated as checked:
 - A dollar value inferred from made-up opportunities is a stated preference, not
   behaviour. The comparison with B4 and B5 is the check, and it is partial.
 - Anyone may share the link, and we will not know where it went except by the tag.
+
+## 10. What was built, and how to open it
+
+**It is closed by default.** Shipping the code does not publish anything.
+
+### To launch
+
+1. **Set a contact address.** `SURVEY_CONTACT_EMAIL` in `wrangler.toml`, a mailbox
+   somebody reads. The notice every respondent reads promises one, so the survey
+   will not open without it.
+2. **Set up the spam check.** In the Cloudflare dashboard (Turnstile → Add site, this
+   site's hostname), put the **site key** in `wrangler.toml` as
+   `TURNSTILE_SITE_KEY` and the **secret** with `wrangler secret put
+   TURNSTILE_SECRET_KEY`. Without both the survey still runs and the owner's panel
+   says no spam check is configured: do not share the link in that state.
+3. **Do the read-through** (section 7): two or three artists, aloud, including people
+   from the communities in E3, and ask Manitoba Music to look at the terminology.
+   This is also the only way to time it. About ten minutes is an estimate until then.
+4. **Have the privacy read** (section 4) by someone qualified, before a public link.
+5. Optionally set `SURVEY_RESULTS_URL`.
+6. **Set `SURVEY_OPEN = "true"`** and deploy. Switching it back to `"false"` stops new
+   starts and lets anyone partway through finish.
+
+The owner's page for all of this is **Admin mode → Artist survey**: the checklist
+above with what is and is not done, a link builder that tags a channel
+(`#survey?src=manitoba-music-newsletter`), who has answered, the results, and a
+CSV download.
+
+### Where it lives
+
+| What | Where |
+| --- | --- |
+| Every word and answer shape | `shared/surveyInstrument.ts` |
+| What one respondent is shown, from one seed | `shared/surveyDesign.ts` |
+| The paired-choice design (generated, committed) | `shared/surveyChoiceDesign.ts`, `scripts/generate-survey-design.ts` |
+| Checking every answer against the plan | `shared/surveyAnswers.ts` |
+| What a tap means; when Next unlocks | `shared/surveyDraft.ts` |
+| The model, the dollar values, the summary, the export | `shared/surveyAnalysis.ts`, `shared/surveyLogit.ts` |
+| Public routes, `/api/public/survey/…` | `src/routes/survey.ts` |
+| The owner's routes, `/api/admin/survey` | `src/routes/admin.ts` |
+| The table | `migrations/0035_survey_responses.sql` |
+| The respondent's screens | `frontend/src/pages/survey/` |
+| The owner's panel | `frontend/src/components/SurveyPanel.tsx` |
+
+### What differs from the draft above
+
+- **B6 to B8 are not in the survey** (cut for length, section 9, decision 1).
+- **The choice screen is a table**, one row per attribute with Opportunity A and B
+  side by side, not two cards. On a phone two cards meant scrolling between the
+  two things being compared.
+- **The notice says the browser keeps a random code**, because it does: it is how a
+  refresh or a later visit resumes. It keeps nothing else, and never an answer.
+- **The attention check** is checked by the server and shown to the owner as a count
+  of passed, failed and not reached. Nobody is removed unless the owner asks.
+- **Rate limits are global.** A per-sender limit needs something that recognises
+  the sender, and the notice says no address is stored, not even a hash.
+
+### What is not built
+
+- **French.** The structure is ready (every string is `{ en, fr? }`, ids are stable)
+  and nothing is translated. It waits on the English settling after the read-through.
+- **The anchor screen** (section 9, decision 8). Additive if wanted.
+- **Intervals by resampling.** `bootstrap()` exists and is tested, but the owner's page
+  shows model-based ranges only. The method section calls for resampling for the
+  final report.
+- **An automatic test for an order effect.** The page shows how many respondents saw
+  each order; comparing their answers is by hand.
+- **Group comparisons.** Income against pay, how much music is their living against
+  time away, and years performing against audience (section 6, step 4) need more
+  responses than a first wave will have.
+- **Wiring the weights into Scout.** The result is a table the owner reads. Nothing
+  scores a gig with it yet; that is the scoring side of the pipeline plan, and it
+  waits on there being data.
