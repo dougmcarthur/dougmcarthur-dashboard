@@ -569,9 +569,13 @@ export const INTROS: Record<'B' | 'C' | 'D' | 'E', { title: Text; body: Text[] }
 }
 
 /**
- * The welcome screen. `{contact}` and `{results}` are filled in from the
- * deployment's configuration at the last moment, and the survey does not open
- * until a contact address exists: the notice promises one.
+ * The welcome, shown one paragraph to a screen (`shared/surveyConsent.ts`): the
+ * title, lede and intro first, then each point under its own heading, then the
+ * agreement. `{contact}` and `{results}` are filled in from the deployment's
+ * configuration at the last moment, and the survey does not open until a contact
+ * address exists: the notice promises one.
+ *
+ * A point's `lead` is its screen's heading, so it is a whole sentence.
  */
 export const CONSENT = {
   title: { en: 'Which opportunities are worth an artist’s time?' } as Text,
@@ -586,16 +590,18 @@ export const CONSENT = {
       body: 'We do not ask for your name or email, and we do not store your IP address. To keep out spam, the page runs a Cloudflare check that does see your IP address while it runs; we do not receive or keep it. The questions at the end about age, identity and income are optional, and each has “Prefer not to say”.',
     },
     {
-      lead: 'Saved as you go.',
-      body: 'If you stop, what you have answered stays, anonymously. Your browser keeps a random code, and nothing else, so you can pick up where you left off. You can choose Close without saving at any time to delete it. Once you finish, we cannot find your answers again, because nothing connects them to you, so they cannot be taken back after that.',
+      lead: 'Your answers are saved as you go.',
+      body:'If you stop, what you have answered stays, anonymously. Your browser keeps a random code, and nothing else, so you can pick up where you left off. You can choose Close without saving at any time to delete it. Once you finish, we cannot find your answers again, because nothing connects them to you, so they cannot be taken back after that.',
     },
     {
-      lead: 'What happens to it.',
-      body: 'We combine answers across artists and publish a summary of the results{results}. We never publish one person’s answers, or the answers of any small group.',
+      lead: 'Here is what happens to your answers.',
+      body:'We combine answers across artists and publish a summary of the results{results}. We never publish one person’s answers, or the answers of any small group.',
     },
     { lead: 'It is voluntary.', body: 'There is no payment and no prize draw.' },
   ].map(({ lead, body }) => ({ lead: { en: lead } as Text, body: { en: body } as Text })),
   questions: { en: 'Questions: {contact}' } as Text,
+  /** The heading of the last screen, the one with the checkbox. */
+  confirm: { en: 'One last thing before you start.' } as Text,
   agree: { en: 'I am 18 or older and happy to take part.' } as Text,
 }
 

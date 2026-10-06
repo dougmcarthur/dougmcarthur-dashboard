@@ -50,6 +50,7 @@ function everyString(): string[] {
     take(p.body)
   })
   take(CONSENT.questions)
+  take(CONSENT.confirm)
   take(CONSENT.agree)
   for (const t of Object.values(THANKS)) {
     take(t.title)
