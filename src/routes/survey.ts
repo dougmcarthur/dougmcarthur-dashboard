@@ -45,6 +45,8 @@ export const SURVEY_LIMITS = {
   savesPerResponse: 300,
   /** Request bodies. The largest honest one is a 500-character answer. */
   bodyBytes: 8_192,
+  /** The longest a screen's time is recorded as. Anything longer is somebody who walked away. */
+  maxSeconds: 3600,
 }
 
 const survey = new Hono<RootEnv>()
@@ -196,8 +198,14 @@ const AnswerSchema = z.object({
   id: ID,
   screen: z.string().min(1).max(16),
   answer: z.unknown(),
-  /** Seconds on the screen, as measured by the page. Used to spot speeding, never to remove anybody. */
-  seconds: z.number().min(0).max(3600).optional(),
+  /**
+   * Seconds on the screen, as measured by the page. Used to spot speeding, never to
+   * remove anybody. Clamped on the way in rather than refused here: the page counts
+   * from when the screen opened, so a tab left open reports hours and a clock set
+   * back reports less than nothing, and refusing either left the respondent stuck
+   * on a screen they had already answered.
+   */
+  seconds: z.number().optional(),
 })
 
 survey.post('/survey/answer', zValidator('json', AnswerSchema), async (c) => {
@@ -215,7 +223,9 @@ survey.post('/survey/answer', zValidator('json', AnswerSchema), async (c) => {
   const answers = parse<AnswerMap>(row.answers, {})
   const seconds = parse<Record<string, number>>(row.seconds, {})
   answers[body.screen] = checked.answer
-  if (body.seconds !== undefined) seconds[body.screen] = Math.round(body.seconds)
+  if (body.seconds !== undefined) {
+    seconds[body.screen] = Math.round(Math.min(Math.max(body.seconds, 0), SURVEY_LIMITS.maxSeconds))
+  }
 
   // Whoever is not the artist is thanked and stopped, and what they said is
   // kept as the one answer that explains why the response is so short.

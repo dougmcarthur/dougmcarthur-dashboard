@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, type SurveyStatus } from '../../api'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Field'
 import { TurnstileBox } from './TurnstileBox'
-import { ChoiceScreen, IntroScreen, QuestionScreen, RankScreen } from './SurveyScreens'
+import { ChoiceScreen, HEADING, IntroScreen, QuestionScreen, RankScreen } from './SurveyScreens'
 import { checkAnswer, type AnswerMap } from '../../../../shared/surveyAnswers'
+import { consentSteps } from '../../../../shared/surveyConsent'
 import { partOf, screenKind, type Plan } from '../../../../shared/surveyDesign'
 import {
   answerFromDraft,
@@ -122,6 +123,15 @@ export function Message({ title, body, children }: { title: string; body: string
 
 // ── Consent ───────────────────────────────────────────────────────────────────
 
+/**
+ * The welcome, one paragraph to a screen (shared/surveyConsent.ts decides which),
+ * with the age confirmation on the last. The checkbox, the spam check and the
+ * field a person never sees all live in `Agreement`, so they mount together when
+ * it is reached: a spam token lasts five minutes, and somebody reading five
+ * screens carefully can take longer than that. Going Back from it and returning
+ * starts the check again, and the box has to be ticked again, which is right for
+ * a consent.
+ */
 function ConsentScreen({
   status,
   starting,
@@ -133,37 +143,108 @@ function ConsentScreen({
   error: string | null
   onStart: (token: string | null, honeypot: string) => void
 }) {
+  const [step, setStep] = useState(0)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const steps = consentSteps(CONSENT.points.length)
+  const current = steps[step]
+
+  // Each step is a new screen to a screen reader: put focus on its heading, and
+  // the top in view.
+  useEffect(() => {
+    heading.current?.focus()
+    window.scrollTo(0, 0)
+  }, [step])
+
+  const results = status.resultsUrl ? ` at ${status.resultsUrl}` : ''
+  const where = <span className="ml-auto text-xs text-muted">{step + 1} of {steps.length}</span>
+  const back = step > 0 && (
+    <Button size="lg" onClick={() => setStep(step - 1)}>
+      Back
+    </Button>
+  )
+
+  if (current.kind === 'agree') {
+    return (
+      <Agreement
+        status={status}
+        starting={starting}
+        error={error}
+        onStart={onStart}
+        headingRef={heading}
+        back={back}
+        where={where}
+      />
+    )
+  }
+
+  const point = current.kind === 'point' ? CONSENT.points[current.index] : null
+  return (
+    <div className="space-y-5">
+      {point ? (
+        <div className="space-y-3">
+          <h1 ref={heading} tabIndex={-1} className={HEADING}>
+            {tx(point.lead)}
+          </h1>
+          <p className="text-base text-body leading-relaxed">{tx(point.body).replace('{results}', results)}</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <h1 ref={heading} tabIndex={-1} className="text-2xl font-semibold text-ink tracking-tight focus:outline-none">
+              {tx(CONSENT.title)}
+            </h1>
+            <p className="text-sm text-muted">{tx(CONSENT.lede)}</p>
+          </div>
+          <p className="text-base text-body leading-relaxed">{tx(CONSENT.intro)}</p>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {back}
+        <Button variant="primary" size="lg" onClick={() => setStep(step + 1)}>
+          Continue
+        </Button>
+        {where}
+      </div>
+    </div>
+  )
+}
+
+function Agreement({
+  status,
+  starting,
+  error,
+  onStart,
+  headingRef,
+  back,
+  where,
+}: {
+  status: SurveyStatus
+  starting: boolean
+  error: string | null
+  onStart: (token: string | null, honeypot: string) => void
+  headingRef: Ref<HTMLHeadingElement>
+  back: ReactNode
+  where: ReactNode
+}) {
   const [agreed, setAgreed] = useState(false)
   const [token, setToken] = useState<string | null>(null)
   const [honeypot, setHoneypot] = useState('')
-  const heading = useRef<HTMLHeadingElement>(null)
-  useEffect(() => heading.current?.focus(), [])
 
-  const results = status.resultsUrl ? ` at ${status.resultsUrl}` : ''
   const [before, after = ''] = tx(CONSENT.questions).split('{contact}')
   const ready = agreed && (!status.siteKey || !!token)
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <h1 ref={heading} tabIndex={-1} className="text-2xl font-semibold text-ink tracking-tight focus:outline-none">
-          {tx(CONSENT.title)}
+    <div className="space-y-5">
+      <div className="space-y-3">
+        <h1 ref={headingRef} tabIndex={-1} className={HEADING}>
+          {tx(CONSENT.confirm)}
         </h1>
-        <p className="text-sm text-muted">{tx(CONSENT.lede)}</p>
+        <p className="text-base text-body">
+          {before}
+          <a className="underline" href={`mailto:${status.contact}`}>{status.contact}</a>
+          {after}
+        </p>
       </div>
-      <p className="text-sm text-body leading-relaxed">{tx(CONSENT.intro)}</p>
-      <ul className="space-y-3">
-        {CONSENT.points.map((p) => (
-          <li key={p.lead.en} className="text-sm text-body leading-relaxed">
-            <strong className="text-ink">{tx(p.lead)}</strong> {tx(p.body).replace('{results}', results)}
-          </li>
-        ))}
-      </ul>
-      <p className="text-sm text-body">
-        {before}
-        <a className="underline" href={`mailto:${status.contact}`}>{status.contact}</a>
-        {after}
-      </p>
 
       {/* A field no person sees. Anything in it is a form-filling bot. */}
       <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
@@ -190,9 +271,13 @@ function ConsentScreen({
           {error}
         </p>
       )}
-      <Button variant="primary" size="lg" disabled={!ready || starting} onClick={() => onStart(token, honeypot)}>
-        {starting ? 'Starting…' : 'Start'}
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        {back}
+        <Button variant="primary" size="lg" disabled={!ready || starting} onClick={() => onStart(token, honeypot)}>
+          {starting ? 'Starting…' : 'Start'}
+        </Button>
+        {where}
+      </div>
     </div>
   )
 }

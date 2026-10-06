@@ -131,11 +131,11 @@ than forced. Sensitive items always offer "Prefer not to say".
 >   that does see your IP address while it runs; we do not receive or keep it.
 >   The questions at the end about age, identity and income are optional, and
 >   each has "Prefer not to say".
-> - **Saved as you go.** If you stop, what you have answered stays, anonymously.
+> - **Your answers are saved as you go.** If you stop, what you have answered stays, anonymously.
 >   You can choose **Close without saving** at any time to delete it. Once you
 >   finish, we cannot find your answers again, because nothing connects them to
 >   you, so they cannot be taken back after that.
-> - **What happens to it.** We combine answers across artists and publish a
+> - **Here is what happens to your answers.** We combine answers across artists and publish a
 >   summary of the results at [address]. We never publish one person's answers,
 >   or the answers of any small group.
 > - It is voluntary. There is no payment and no prize draw.
@@ -146,6 +146,19 @@ than forced. Sensitive items always offer "Prefer not to say".
 
 The checkbox is required to continue. Under-18s are excluded to avoid
 guardian-consent obligations, not because their view is unwelcome.
+
+**Shown one paragraph to a screen.** Written out as above, the notice ran to a
+screen and a half on a phone with the checkbox below the fold. It is seven
+screens: the welcome (title, lede and what the survey is for), one screen for
+each of the five points under its own heading, and a last one that holds only the
+checkbox, the spam check and **Start**. Every screen has Back, and a count ("3 of
+7") beside the buttons. The heading of a point is its bold lead, which is why two
+of them became whole sentences (*Your answers are saved as you go*, *Here is what
+happens to your answers*): a fragment makes a poor heading. Nothing else in the
+notice was reworded. The spam check is mounted with the checkbox rather than at
+the start, because its token lasts five minutes and somebody reading carefully can
+take longer than that. `shared/surveyConsent.ts` decides the steps from the number
+of points, so a sixth point gets its own screen without anyone building one.
 
 **S1. Which of these describes you?** · single choice · F
 - I perform or release music in Canada, solo or in a band, and I decide or help

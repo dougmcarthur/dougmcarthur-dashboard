@@ -24,7 +24,7 @@ import { OTHER_MAX } from '../../../../shared/surveyAnswers'
  * checkbox carries the state for a screen reader.
  */
 
-const HEADING = 'text-xl font-semibold text-ink tracking-tight focus:outline-none'
+export const HEADING = 'text-xl font-semibold text-ink tracking-tight focus:outline-none'
 
 /** A single option row. The native control carries the state; the border and tint repeat it. */
 function Row({

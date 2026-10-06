@@ -87,6 +87,40 @@ describe('the spam check', () => {
   })
 })
 
+describe('the welcome', () => {
+  const WELCOME = PAGE.slice(PAGE.indexOf('function ConsentScreen('), PAGE.indexOf('function Agreement('))
+  const AGREEMENT = PAGE.slice(PAGE.indexOf('function Agreement('), PAGE.indexOf('function Progress('))
+
+  it('shows the notice a point at a time, never all of it on one screen', () => {
+    expect(PAGE).not.toMatch(/CONSENT\.points\.map/)
+    expect(WELCOME).toContain('consentSteps(CONSENT.points.length)')
+    expect(WELCOME).toMatch(/CONSENT\.points\[current\.index\]/)
+  })
+
+  it('keeps the checkbox, the spam check and the hidden field together on the last screen', () => {
+    // A spam token lasts five minutes. Mounted with the agreement, it starts when
+    // the person arrives at Start rather than before they have read anything.
+    expect(AGREEMENT).toContain('type="checkbox"')
+    expect(AGREEMENT).toMatch(/status\.siteKey && <TurnstileBox/)
+    expect(AGREEMENT).toContain('Website')
+    for (const piece of ['type="checkbox"', 'TurnstileBox', 'Website']) expect(WELCOME, piece).not.toContain(piece)
+  })
+
+  it('still waits for the box to be ticked and the spam check to pass before Start', () => {
+    expect(AGREEMENT).toMatch(/agreed && \(!status\.siteKey \|\| !!token\)/)
+    expect(AGREEMENT).toMatch(/disabled=\{!ready \|\| starting\}/)
+  })
+
+  it('still puts the results address into the paragraph that promises it', () => {
+    expect(WELCOME).toMatch(/\.replace\('\{results\}', results\)/)
+  })
+
+  it('can be walked back, and a step is not a place in the address bar', () => {
+    expect(WELCOME).toMatch(/setStep\(step - 1\)/)
+    expect(PAGE).not.toMatch(/location\.hash\s*=|history\.(push|replace)State/)
+  })
+})
+
 describe('the results page', () => {
   it('says plainly that nothing is posted until something is, and reads nothing but the published snapshot', () => {
     expect(RESULTS).toMatch(/have not been posted yet/)

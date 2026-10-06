@@ -277,6 +277,49 @@ describe('answers that did not come from the screen', () => {
     expect((await t.call('answer', { id, screen: 'A2', answer: { value: 'A2.lt2' } })).status).toBe(429)
   })
 
+  // The page measures from when a screen opened, so a tab left open over lunch, or a
+  // phone put to sleep, reports hours. Refusing that left the respondent unable to
+  // move on from the screen: every retry sent a larger number, and they saw
+  // "[object Object]". The time is a measurement, so it is clamped, never refused.
+  describe('the time a screen reports', () => {
+    const save = async (t: ReturnType<typeof setup>, id: string, seconds: unknown) =>
+      t.call('answer', { id, screen: 'A2', answer: { value: 'A2.lt2' }, seconds })
+    const stored = (t: ReturnType<typeof setup>, id: string) => JSON.parse(t.row(id)!.seconds).A2
+
+    it('saves the answer from a screen left open for hours, recording the longest time it keeps', async () => {
+      const t = setup()
+      const { id } = await startOne(t)
+      for (const seconds of [SURVEY_LIMITS.maxSeconds, SURVEY_LIMITS.maxSeconds + 1, 86_400, 1e9]) {
+        const res = await save(t, id, seconds)
+        expect(res.status, String(seconds)).toBe(200)
+        expect(stored(t, id), String(seconds)).toBe(SURVEY_LIMITS.maxSeconds)
+      }
+      expect(JSON.parse(t.row(id)!.answers).A2).toEqual({ value: 'A2.lt2' })
+    })
+
+    it('saves the answer when the clock was set back, recording no time', async () => {
+      const t = setup()
+      const { id } = await startOne(t)
+      const res = await save(t, id, -42)
+      expect(res.status).toBe(200)
+      expect(stored(t, id)).toBe(0)
+    })
+
+    it('keeps an ordinary time, to the second', async () => {
+      const t = setup()
+      const { id } = await startOne(t)
+      expect((await save(t, id, 12.4)).status).toBe(200)
+      expect(stored(t, id)).toBe(12)
+    })
+
+    it('still refuses a time that is not a number', async () => {
+      const t = setup()
+      const { id } = await startOne(t)
+      expect((await save(t, id, 'a while')).status).toBe(400)
+      expect(JSON.parse(t.row(id)!.answers)).toEqual({})
+    })
+  })
+
   it('refuses a source tag that is not a plain tag', async () => {
     const t = setup()
     expect((await t.call('start', { source: 'a b' })).status).toBe(400)
