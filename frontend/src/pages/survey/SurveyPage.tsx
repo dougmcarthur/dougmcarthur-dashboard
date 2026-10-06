@@ -81,7 +81,7 @@ type Phase =
   | { kind: 'screened' }
   | { kind: 'deleted' }
 
-function Shell({ children, contact }: { children: ReactNode; contact?: string | null }) {
+export function Shell({ children, contact }: { children: ReactNode; contact?: string | null }) {
   return (
     <div className="min-h-screen bg-canvas text-body">
       <header className="border-b border-line bg-surface">
@@ -97,7 +97,7 @@ function Shell({ children, contact }: { children: ReactNode; contact?: string | 
   )
 }
 
-function Message({ title, body, children }: { title: string; body: string[]; children?: ReactNode }) {
+export function Message({ title, body, children }: { title: string; body: string[]; children?: ReactNode }) {
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => heading.current?.focus(), [])
   return (

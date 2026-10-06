@@ -38,7 +38,8 @@ import { inviteEmail } from '../lib/authMail'
 import { readTenantHealth } from '../lib/tenantHealth'
 import { MEASURED_FIELDS } from '../lib/usage'
 import { isFeedbackKind } from '../../shared/feedback'
-import { surveyConfig } from './survey'
+import { readSurveyConfig, writeSurveySettings } from '../lib/surveySettings'
+import type { Env } from '../types'
 import { summarise, toCsv, toRespondent, type Respondent } from '../../shared/surveyAnalysis'
 
 const admin = new Hono<AdminEnv>()
@@ -455,19 +456,30 @@ async function surveyRespondents(binding: D1Database): Promise<{ respondents: Re
   }
 }
 
+/**
+ * What the owner's panel shows and edits about whether the survey is open.
+ * The contact address and site key are returned because both are public in the
+ * survey itself; the Turnstile secret is only ever reported as set or not.
+ */
+async function surveyConfigView(c: { env: Env; req: { url: string } }) {
+  const cfg = await readSurveyConfig(c.env, new URL(c.req.url).origin)
+  return {
+    open: cfg.open,
+    asked: cfg.wanted,
+    contact: cfg.contact,
+    siteKey: cfg.siteKey,
+    secretSet: cfg.secretSet,
+    botCheck: cfg.botCheck,
+    resultsUrl: cfg.resultsUrl,
+    changedAt: cfg.changedAt,
+  }
+}
+
 admin.get('/survey', async (c) => {
   if (!adminOf(c)) return c.json({ error: 'not available' }, 403)
   const { respondents, truncated } = await surveyRespondents(c.env.DB)
-  const cfg = surveyConfig(c.env)
   return c.json({
-    // Whether it can open, and the four things the launch checklist asks for.
-    config: {
-      open: cfg.open,
-      asked: cfg.wanted,
-      contactSet: !!cfg.contact,
-      botCheck: cfg.botCheck,
-      resultsUrlSet: !!cfg.resultsUrl,
-    },
+    config: await surveyConfigView(c),
     summary: summarise(respondents, {
       failedCheck: c.req.query('failedCheck') === '1',
       speeders: c.req.query('speeders') === '1',
@@ -475,6 +487,42 @@ admin.get('/survey', async (c) => {
     truncated,
   })
 })
+
+/**
+ * Open it, close it, and say who to ask.
+ *
+ * No passkey touch beyond being in admin mode. This changes whether a public
+ * page accepts answers, not who can get into the app, and the elevation rule is
+ * narrow on purpose: closing a survey is the action you want to be able to take
+ * in a hurry. The refusal that matters is `writeSurveySettings`'s — it will not
+ * leave the survey on with nobody to contact.
+ *
+ * The site key is checked against the shape Cloudflare issues rather than
+ * trusted: it is handed to every respondent's browser.
+ */
+const SITE_KEY = /^[A-Za-z0-9_-]{8,100}$/
+
+admin.patch(
+  '/survey/settings',
+  zValidator(
+    'json',
+    z
+      .object({
+        open: z.boolean(),
+        contact: z.union([z.string().trim().email().max(254), z.literal('')]).nullable(),
+        siteKey: z.union([z.string().trim().regex(SITE_KEY, 'That does not look like a Turnstile site key.'), z.literal('')]).nullable(),
+      })
+      .partial()
+      .strict(),
+  ),
+  async (c) => {
+    if (!adminOf(c)) return c.json({ error: 'not available' }, 403)
+    const current = await readSurveyConfig(c.env, new URL(c.req.url).origin)
+    const result = await writeSurveySettings(c.env, current, c.req.valid('json'))
+    if (!result.ok) return c.json({ error: result.error }, 409)
+    return c.json({ config: await surveyConfigView(c) })
+  },
+)
 
 admin.get('/survey/export', async (c) => {
   if (!adminOf(c)) return c.json({ error: 'not available' }, 403)

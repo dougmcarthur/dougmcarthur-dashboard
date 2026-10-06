@@ -1,21 +1,23 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { api } from '../api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { api, type SurveyConfigView } from '../api'
+import { relativeTime } from '../format'
 import type { Estimate, RankingResult, Tally } from '../../../shared/surveyAnalysis'
 import { Button } from './ui/Button'
 import { Input } from './ui/Field'
 import { Explainer } from './ui/Explainer'
-import { Card } from './ui/Surface'
+import { Banner, Card } from './ui/Surface'
 
 /**
- * The artist survey, from the owner's side: whether it can open, who has
- * answered, and what they said. The method is written down in
+ * The artist survey, from the owner's side: whether it is open and who to
+ * contact, who has answered, and what they said. The method is written down in
  * docs/artist-survey-questionnaire.md, and every rule it states shows up here:
  * a group under ten is never shown, every estimate carries its range, and a
  * result is not turned into dollars when it cannot be told from nothing.
  *
- * Read-only apart from the spreadsheet download. There is nothing here that
- * opens a response, because there is nobody to open: nothing identifies them.
+ * What it changes is whether the survey is open, who respondents are told to
+ * contact and the spam check's public key. There is nothing here that opens a
+ * response, because there is nobody to open: nothing identifies them.
  */
 
 const money = (v: number) => `${v < 0 ? '−' : ''}$${Math.abs(Math.round(v)).toLocaleString('en-CA')}`
@@ -102,17 +104,176 @@ function Estimates({ rows, unit }: { rows: Estimate[]; unit: 'dollars' | 'ratio'
   )
 }
 
+/**
+ * The switch, and the two settings it depends on.
+ *
+ * Opening is refused until there is a contact address, because the notice every
+ * respondent reads promises one — the Worker enforces that, and the button says
+ * why it is waiting rather than failing. The spam check warns and does not block:
+ * the survey runs without it, which is a decision for the owner and not
+ * something to take away.
+ *
+ * Mounted once the settings have loaded, so the fields start from what is saved.
+ */
+function SurveyAccess({ config }: { config: SurveyConfigView }) {
+  const qc = useQueryClient()
+  const [contact, setContact] = useState(config.contact ?? '')
+  const [siteKey, setSiteKey] = useState(config.siteKey ?? '')
+  const [tag, setTag] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const save = useMutation({
+    mutationFn: (patch: Parameters<typeof api.admin.setSurvey>[0]) => api.admin.setSurvey(patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'survey'] }),
+  })
+
+  const dirty = contact.trim() !== (config.contact ?? '') || siteKey.trim() !== (config.siteKey ?? '')
+  const link = `${window.location.origin}${window.location.pathname}#survey${/^[a-zA-Z0-9._-]{1,40}$/.test(tag) ? `?src=${tag}` : ''}`
+
+  const needsContact = !config.asked && !config.contact
+  const blocker = dirty
+    ? 'Save your changes first.'
+    : needsContact
+      ? 'Add a contact address first. The notice promises one.'
+      : null
+
+  const spamCheck = config.botCheck
+    ? null
+    : config.siteKey && !config.secretSet
+      ? 'The spam check has its site key but not its secret, so it is off.'
+      : !config.siteKey && config.secretSet
+        ? 'The spam check has its secret but not its site key, so it is off.'
+        : 'The spam check is not set up.'
+
+  return (
+    <Card className="space-y-4">
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-ink">
+          {config.open ? 'Open: anyone with the link can take it.' : 'Closed: nobody can start it.'}
+        </p>
+        {config.changedAt && <p className="text-xs text-muted">Changed {relativeTime(config.changedAt)}.</p>}
+      </div>
+
+      {config.open && spamCheck && (
+        <Banner tone="warn" size="sm">
+          {spamCheck} Anyone with a script can fill the survey in, the hourly limit is all that slows them down, and the
+          notice tells respondents the page runs a Cloudflare check, which it would not be.
+        </Banner>
+      )}
+
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-3">
+          {config.asked ? (
+            <Button disabled={save.isPending || dirty} onClick={() => save.mutate({ open: false })}>
+              Close the survey
+            </Button>
+          ) : (
+            <Button variant="primary" disabled={save.isPending || !!blocker} onClick={() => save.mutate({ open: true })}>
+              Open the survey
+            </Button>
+          )}
+          {!config.asked && blocker && <p className="text-xs text-muted">{blocker}</p>}
+        </div>
+        <p className="text-xs text-muted">
+          {config.asked
+            ? 'Closing stops anyone new from starting. People partway through can still finish.'
+            : 'Opening makes the link below work for anybody who has it.'}
+        </p>
+        {save.isError && (
+          <p role="alert" className="text-sm text-danger-fg">
+            {save.error instanceof Error ? save.error.message : 'That did not save.'}
+          </p>
+        )}
+      </div>
+
+      <form
+        className="space-y-3 border-t border-line pt-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          save.mutate({ contact: contact.trim() || null, siteKey: siteKey.trim() || null })
+        }}
+      >
+        <div className="space-y-1">
+          <label className="block text-xs font-medium text-muted" htmlFor="survey-contact">
+            Contact address. Shown to every respondent for questions, so it should be a mailbox somebody reads.
+          </label>
+          <Input
+            id="survey-contact"
+            type="email"
+            value={contact}
+            placeholder="hello@example.com"
+            onChange={(e) => setContact(e.target.value)}
+            className="max-w-sm"
+          />
+          {config.asked && !contact.trim() && (
+            <p className="text-xs text-warn-fg">Close the survey before removing its contact address.</p>
+          )}
+        </div>
+        <div className="space-y-1">
+          <label className="block text-xs font-medium text-muted" htmlFor="survey-sitekey">
+            Spam check site key. The public half of the Turnstile widget.
+          </label>
+          <Input
+            id="survey-sitekey"
+            value={siteKey}
+            placeholder="0x4AAAAAAA…"
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(e) => setSiteKey(e.target.value)}
+            className="max-w-sm"
+          />
+          <p className="text-xs text-muted">
+            The secret half is not saved here, because a secret cannot be kept safely on a screen like this one. Add it in the
+            Cloudflare dashboard under the Worker’s Settings, Variables and Secrets, as a secret named{' '}
+            <code>TURNSTILE_SECRET_KEY</code>. Status: {config.secretSet ? 'set' : 'not set'}.
+          </p>
+        </div>
+        <Button type="submit" disabled={save.isPending || !dirty}>
+          {save.isPending ? 'Saving…' : 'Save'}
+        </Button>
+      </form>
+
+      <p className="border-t border-line pt-3 text-xs text-muted">
+        The notice tells respondents the summary will be posted at{' '}
+        <a className="underline" href={config.resultsUrl} target="_blank" rel="noreferrer">
+          {config.resultsUrl}
+        </a>
+        . That page says the results have not been posted yet, and will until a summary is published there.
+      </p>
+
+      <div className="space-y-1.5 border-t border-line pt-3">
+        <label className="block text-xs font-medium text-muted" htmlFor="survey-tag">
+          Link for a channel. Tag it so you can tell where responses came from (letters, numbers, dots, dashes).
+        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input id="survey-tag" value={tag} placeholder="manitoba-music-newsletter" onChange={(e) => setTag(e.target.value)} className="max-w-xs" />
+          <Button
+            onClick={() =>
+              navigator.clipboard
+                .writeText(link)
+                .then(() => {
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1500)
+                })
+                .catch(() => undefined)
+            }
+          >
+            {copied ? 'Copied' : 'Copy link'}
+          </Button>
+        </div>
+        <p className="text-xs text-faint break-all">{link}</p>
+      </div>
+    </Card>
+  )
+}
+
 export function SurveyPanel() {
   const [failedCheck, setFailedCheck] = useState(false)
   const [speeders, setSpeeders] = useState(false)
-  const [tag, setTag] = useState('')
-  const [copied, setCopied] = useState(false)
   const results = useQuery({
     queryKey: ['admin', 'survey', failedCheck, speeders],
     queryFn: () => api.admin.survey({ failedCheck, speeders }),
   })
-
-  const link = `${window.location.origin}${window.location.pathname}#survey${/^[a-zA-Z0-9._-]{1,40}$/.test(tag) ? `?src=${tag}` : ''}`
 
   if (results.isLoading) return <div className="h-24 bg-sunken rounded-xl animate-pulse" />
   if (results.error || !results.data) {
@@ -126,13 +287,6 @@ export function SurveyPanel() {
   const { config, summary: s, truncated } = results.data
   const done = s.counts.complete
 
-  const checklist: Array<[boolean, string]> = [
-    [config.contactSet, 'A contact address is set (SURVEY_CONTACT_EMAIL). The notice promises one, so it cannot open without it.'],
-    [config.asked, 'The survey has been asked to open (SURVEY_OPEN is "true").'],
-    [config.botCheck, 'The spam check is configured (both Turnstile keys). Without it anyone with a script can fill it.'],
-    [config.resultsUrlSet, 'A results address is set (SURVEY_RESULTS_URL). Optional: without it the notice promises a summary but gives no link.'],
-  ]
-
   return (
     <section className="space-y-4">
       <header>
@@ -143,44 +297,7 @@ export function SurveyPanel() {
         </Explainer>
       </header>
 
-      <Card className="space-y-3">
-        <p className="text-sm font-medium text-ink">
-          {config.open ? 'Open: anyone with the link can take it.' : 'Closed: nobody can start it.'}
-        </p>
-        <ul className="text-sm space-y-1">
-          {checklist.map(([ok, text]) => (
-            <li key={text} className="flex gap-2">
-              <span aria-hidden="true">{ok ? '✓' : '✗'}</span>
-              <span className={ok ? 'text-body' : 'text-warn-fg'}>
-                <span className="sr-only">{ok ? 'Done: ' : 'Not done: '}</span>
-                {text}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-muted" htmlFor="survey-tag">
-            Link for a channel. Tag it so you can tell where responses came from (letters, numbers, dots, dashes).
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <Input id="survey-tag" value={tag} placeholder="manitoba-music-newsletter" onChange={(e) => setTag(e.target.value)} className="max-w-xs" />
-            <Button
-              onClick={() =>
-                navigator.clipboard
-                  .writeText(link)
-                  .then(() => {
-                    setCopied(true)
-                    setTimeout(() => setCopied(false), 1500)
-                  })
-                  .catch(() => undefined)
-              }
-            >
-              {copied ? 'Copied' : 'Copy link'}
-            </Button>
-          </div>
-          <p className="text-xs text-faint break-all">{link}</p>
-        </div>
-      </Card>
+      <SurveyAccess config={config} />
 
       <Card className="space-y-3">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

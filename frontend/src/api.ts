@@ -473,8 +473,25 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /** The owner's view of the survey: whether it can open, and what the responses say. */
+export interface SurveyConfigView {
+  /** Open to the public: switched on, and with a contact address. */
+  open: boolean
+  /** The owner's switch, whether or not it can take effect. */
+  asked: boolean
+  contact: string | null
+  siteKey: string | null
+  /** The Turnstile secret is present on the Worker. Never sent here, only noticed. */
+  secretSet: boolean
+  /** Both Turnstile halves are set, so a start is actually checked. */
+  botCheck: boolean
+  /** Where the notice tells respondents the summary will be posted. */
+  resultsUrl: string
+  /** When the switch last changed, or null if it never has. */
+  changedAt: string | null
+}
+
 export interface SurveyResults {
-  config: { open: boolean; asked: boolean; contactSet: boolean; botCheck: boolean; resultsUrlSet: boolean }
+  config: SurveyConfigView
   summary: SurveySummary
   /** True when there are more responses than the summary reads. */
   truncated: boolean
@@ -484,7 +501,7 @@ export interface SurveyResults {
 export interface SurveyStatus {
   open: boolean
   contact: string | null
-  resultsUrl: string | null
+  resultsUrl: string
   /** Turnstile's public site key, when the spam check is configured. */
   siteKey: string | null
   instrument: string
@@ -891,6 +908,9 @@ export const api = {
     inviteRequests: () => apiFetch<{ items: InviteRequestItem[] }>('/admin/invite-requests'),
     survey: (flags: { failedCheck: boolean; speeders: boolean }) =>
       apiFetch<SurveyResults>(`/admin/survey?failedCheck=${flags.failedCheck ? 1 : 0}&speeders=${flags.speeders ? 1 : 0}`),
+    /** Open or close the survey, set who to contact, set the spam check's site key. */
+    setSurvey: (patch: { open?: boolean; contact?: string | null; siteKey?: string | null }) =>
+      apiFetch<{ config: SurveyConfigView }>('/admin/survey/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
     setInviteRequest: (id: number, status: InviteRequestStatus) =>
       apiFetch<{ ok: boolean }>(`/admin/invite-requests/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
     listings: () => apiFetch<{ items: ListingItem[] }>('/admin/listings'),

@@ -3,7 +3,7 @@ import { app } from '../src/index'
 import { createSession, setSessionMode, sha256Hex } from '../src/lib/auth'
 import { SESSION_COOKIE } from '../shared/auth'
 import { MIN_GROUP } from '../shared/surveyAnalysis'
-import { simulate } from './support/surveyFixtures'
+import { simulate, storeSurveySettings } from './support/surveyFixtures'
 import { sqliteD1 } from './support/sqliteD1'
 
 /**
@@ -41,7 +41,14 @@ async function setup(vars: Record<string, string> = {}) {
     return `${SESSION_COOKIE}=${token}`
   }
   const get = (path: string, headers: Record<string, string> = {}) => app.request(path, { headers }, env)
-  return { env, get, sessionFor }
+  const patch = (body: unknown, headers: Record<string, string> = {}) =>
+    app.request(
+      '/api/admin/survey/settings',
+      { method: 'PATCH', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) },
+      env,
+    )
+  const publicStatus = async () => (await (await app.request('/api/public/survey/status', {}, env)).json()) as any
+  return { env, db, get, patch, publicStatus, sessionFor }
 }
 
 describe('who may see the survey results', () => {
@@ -98,21 +105,40 @@ describe('what the owner sees', () => {
     }
   })
 
-  it('reads the launch checklist from the configuration', async () => {
+  it('reads what is switched on and set from the stored settings', async () => {
     const closed = await setup()
     const cookie = await closed.sessionFor('usr_0001', true)
     const a = (await (await closed.get('/api/admin/survey', { Cookie: cookie })).json()) as any
-    expect(a.config).toEqual({ open: false, asked: false, contactSet: false, botCheck: false, resultsUrlSet: false })
-
-    const ready = await setup({
-      SURVEY_OPEN: 'true',
-      SURVEY_CONTACT_EMAIL: 'survey@example.test',
-      TURNSTILE_SITE_KEY: 'site',
-      TURNSTILE_SECRET_KEY: 'secret',
-      SURVEY_RESULTS_URL: 'https://example.test/results',
+    expect(a.config).toEqual({
+      open: false,
+      asked: false,
+      contact: null,
+      siteKey: null,
+      secretSet: false,
+      botCheck: false,
+      resultsUrl: 'http://localhost:8787/survey-results',
+      changedAt: null,
     })
+
+    const ready = await setup({ TURNSTILE_SECRET_KEY: 'secret' })
+    storeSurveySettings(ready.db, { open: true, contact: 'survey@example.test', siteKey: 'site-key-123' }, '2026-02-03T04:05:06.000Z')
     const b = (await (await ready.get('/api/admin/survey', { Cookie: await ready.sessionFor('usr_0001', true) })).json()) as any
-    expect(b.config).toEqual({ open: true, asked: true, contactSet: true, botCheck: true, resultsUrlSet: true })
+    expect(b.config).toEqual({
+      open: true,
+      asked: true,
+      contact: 'survey@example.test',
+      siteKey: 'site-key-123',
+      secretSet: true,
+      botCheck: true,
+      resultsUrl: 'http://localhost:8787/survey-results',
+      changedAt: '2026-02-03T04:05:06.000Z',
+    })
+  })
+
+  it('never sends the Turnstile secret back, only whether it is there', async () => {
+    const t = await setup({ TURNSTILE_SECRET_KEY: 'a-very-secret-value' })
+    const res = await t.get('/api/admin/survey', { Cookie: await t.sessionFor('usr_0001', true) })
+    expect(await res.text()).not.toContain('a-very-secret-value')
   })
 
   it('leaves out the flagged respondents only when asked', async () => {
@@ -138,5 +164,134 @@ describe('the export', () => {
     const lines = (await res.text()).trim().split('\n')
     expect(lines[0].startsWith('id,status,source,device')).toBe(true)
     expect(lines.length).toBeGreaterThan(RESPONDENTS)
+  })
+})
+
+describe('who may open and close the survey', () => {
+  it('nobody without a session', async () => {
+    const t = await setup()
+    expect((await t.patch({ open: true })).status).toBe(401)
+  })
+
+  it('not an artist', async () => {
+    const t = await setup()
+    const res = await t.patch({ open: true }, { Cookie: await t.sessionFor('usr_artist', false) })
+    expect(res.status).toBe(403)
+  })
+
+  it('not the owner either, until they have switched to admin mode', async () => {
+    const t = await setup()
+    const res = await t.patch({ open: true }, { Cookie: await t.sessionFor('usr_0001', false) })
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ needsMode: 'admin' })
+    expect((await t.publicStatus()).open).toBe(false)
+  })
+
+  it('not a research agent holding a token', async () => {
+    const t = await setup()
+    expect((await t.patch({ open: true }, { Authorization: 'Bearer agent-secret' })).status).toBe(403)
+  })
+})
+
+describe('opening and closing it from admin mode', () => {
+  const asOwner = async (t: Awaited<ReturnType<typeof setup>>) => ({ Cookie: await t.sessionFor('usr_0001', true) })
+
+  it('refuses to open without a contact address, and stores nothing', async () => {
+    const t = await setup()
+    const res = await t.patch({ open: true }, await asOwner(t))
+    expect(res.status).toBe(409)
+    expect(((await res.json()) as any).error).toMatch(/contact address/i)
+    expect((await t.publicStatus()).open).toBe(false)
+    expect(t.db.prepare(`SELECT count(*) AS n FROM app_settings WHERE key LIKE 'survey.%'`).get()).toEqual({ n: 0 })
+  })
+
+  it('opens in one request when the address comes with it, and the public page sees it at once', async () => {
+    const t = await setup()
+    const res = await t.patch({ contact: 'hello@example.test', open: true }, await asOwner(t))
+    expect(res.status).toBe(200)
+    expect(((await res.json()) as any).config).toMatchObject({ open: true, asked: true, contact: 'hello@example.test' })
+    expect(await t.publicStatus()).toMatchObject({ open: true, contact: 'hello@example.test' })
+  })
+
+  it('opens with an address stored earlier, then closes again', async () => {
+    const t = await setup()
+    const as = await asOwner(t)
+    expect((await t.patch({ contact: 'hello@example.test' }, as)).status).toBe(200)
+    expect((await t.publicStatus()).open).toBe(false)
+
+    expect((await t.patch({ open: true }, as)).status).toBe(200)
+    expect((await t.publicStatus()).open).toBe(true)
+
+    const closed = await t.patch({ open: false }, as)
+    expect(closed.status).toBe(200)
+    expect(((await closed.json()) as any).config).toMatchObject({ open: false, asked: false, contact: 'hello@example.test' })
+    expect((await t.publicStatus()).open).toBe(false)
+  })
+
+  it('will not strip the address from an open survey, which would close it behind a switch that reads on', async () => {
+    const t = await setup()
+    const as = await asOwner(t)
+    await t.patch({ contact: 'hello@example.test', open: true }, as)
+
+    for (const contact of ['', null]) {
+      const res = await t.patch({ contact }, as)
+      expect(res.status).toBe(409)
+      expect(((await res.json()) as any).error).toMatch(/close the survey/i)
+    }
+    expect(await t.publicStatus()).toMatchObject({ open: true, contact: 'hello@example.test' })
+
+    // Closing and removing it in one request is fine: nothing is left open.
+    expect((await t.patch({ open: false, contact: null }, as)).status).toBe(200)
+    expect(await t.publicStatus()).toMatchObject({ open: false, contact: null })
+  })
+
+  it('only moves "changed" when the switch does', async () => {
+    const t = await setup()
+    const as = await asOwner(t)
+    await t.patch({ contact: 'hello@example.test', open: true }, as)
+    const first = ((await (await t.get('/api/admin/survey', as)).json()) as any).config.changedAt
+    expect(first).toEqual(expect.any(String))
+
+    t.db.prepare(`UPDATE app_settings SET updated_at = '2020-01-01T00:00:00.000Z' WHERE key = 'survey.open'`).run()
+    await t.patch({ open: true, contact: 'other@example.test' }, as)
+    const second = ((await (await t.get('/api/admin/survey', as)).json()) as any).config.changedAt
+    expect(second).toBe('2020-01-01T00:00:00.000Z')
+  })
+
+  it('takes a site key in the shape Cloudflare issues, since every respondent’s browser is handed it', async () => {
+    const t = await setup()
+    const as = await asOwner(t)
+    for (const siteKey of ['has spaces in it', '<script>alert(1)</script>', 'short', 'x'.repeat(101)]) {
+      expect((await t.patch({ siteKey }, as)).status, siteKey).toBe(400)
+    }
+    const ok = await t.patch({ siteKey: '0x4AAAAAAAbcdefGHIJ_k-1' }, as)
+    expect(ok.status).toBe(200)
+    expect(((await ok.json()) as any).config).toMatchObject({ siteKey: '0x4AAAAAAAbcdefGHIJ_k-1', botCheck: false })
+  })
+
+  it('switches the spam check on only with both halves, and clears the key when told to', async () => {
+    const t = await setup({ TURNSTILE_SECRET_KEY: 'secret' })
+    const as = await asOwner(t)
+    await t.patch({ contact: 'hello@example.test', open: true, siteKey: 'site-key-123' }, as)
+    expect(await t.publicStatus()).toMatchObject({ siteKey: 'site-key-123' })
+
+    await t.patch({ siteKey: '' }, as)
+    expect((await t.publicStatus()).siteKey).toBeNull()
+  })
+
+  it('rejects a bad address and anything it was not asked for', async () => {
+    const t = await setup()
+    const as = await asOwner(t)
+    expect((await t.patch({ contact: 'not an address' }, as)).status).toBe(400)
+    expect((await t.patch({ open: 'yes' }, as)).status).toBe(400)
+    expect((await t.patch({ results: 'x' }, as)).status).toBe(400)
+    expect((await t.get('/api/admin/survey', as).then((r) => r.json())) as any).toMatchObject({ config: { contact: null } })
+  })
+
+  it('does not touch a response while it does any of this', async () => {
+    const t = await setup()
+    const before = t.db.prepare('SELECT count(*) AS n FROM survey_responses').get()
+    await t.patch({ contact: 'hello@example.test', open: true }, await asOwner(t))
+    expect(t.db.prepare('SELECT count(*) AS n FROM survey_responses').get()).toEqual(before)
   })
 })

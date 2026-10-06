@@ -8,6 +8,7 @@ import { verifyTurnstile } from '../src/lib/turnstile'
 import { screenKind, type Plan } from '../shared/surveyDesign'
 import { questionOf, SCREEN_IN, type ChoiceQuestion } from '../shared/surveyInstrument'
 import { sqliteD1 } from './support/sqliteD1'
+import { storeSurveySettings, type StoredSurveySettings } from './support/surveyFixtures'
 
 /**
  * The survey's public routes, run for real against the production schema.
@@ -18,10 +19,16 @@ import { sqliteD1 } from './support/sqliteD1'
  * is a promise made in plain words, so each is a test.
  */
 
-const OPEN = { SURVEY_OPEN: 'true', SURVEY_CONTACT_EMAIL: 'survey@example.test' }
+const OPEN: StoredSurveySettings = { open: true, contact: 'survey@example.test' }
 
-function setup(vars: Record<string, string> = OPEN) {
+/**
+ * The survey is configured by what the owner's screen stores, so a test says what
+ * is stored. `vars` is the environment, which now carries only the Turnstile
+ * secret and the dashboard address.
+ */
+function setup(settings: StoredSurveySettings = OPEN, vars: Record<string, string> = {}) {
   const { d1, db } = sqliteD1()
+  storeSurveySettings(db, settings)
   const env = { DB: d1, ...vars } as never
   const call = (path: string, body: unknown, headers: Record<string, string> = {}) =>
     app.request(
@@ -65,7 +72,7 @@ async function startOne(t: ReturnType<typeof setup>, extra: Record<string, unkno
 }
 
 describe('closed until it can say who to ask', () => {
-  it('is closed by default', async () => {
+  it('is closed by default, with nothing stored', async () => {
     const t = setup({})
     expect(await (await t.status()).json()).toMatchObject({ open: false, contact: null })
     const res = await t.call('start', {})
@@ -75,13 +82,13 @@ describe('closed until it can say who to ask', () => {
   })
 
   it('stays closed when asked to open but with no contact address', async () => {
-    const t = setup({ SURVEY_OPEN: 'true' })
+    const t = setup({ open: true })
     expect((await (await t.status()).json()).open).toBe(false)
     expect((await t.call('start', {})).status).toBe(403)
   })
 
   it('stays closed with a contact address but not asked to open', async () => {
-    const t = setup({ SURVEY_OPEN: 'false', SURVEY_CONTACT_EMAIL: 'survey@example.test' })
+    const t = setup({ open: false, contact: 'survey@example.test' })
     expect((await t.call('start', {})).status).toBe(403)
   })
 
@@ -91,8 +98,44 @@ describe('closed until it can say who to ask', () => {
   })
 
   it('does not offer the spam check unless both halves are configured', async () => {
-    expect((await (await setup({ ...OPEN, TURNSTILE_SITE_KEY: 'site' }).status()).json()).siteKey).toBeNull()
-    expect((await (await setup({ ...OPEN, TURNSTILE_SITE_KEY: 'site', TURNSTILE_SECRET_KEY: 's' }).status()).json()).siteKey).toBe('site')
+    expect((await (await setup({ ...OPEN, siteKey: 'site' }).status()).json()).siteKey).toBeNull()
+    expect((await (await setup(OPEN, { TURNSTILE_SECRET_KEY: 's' }).status()).json()).siteKey).toBeNull()
+    expect((await (await setup({ ...OPEN, siteKey: 'site' }, { TURNSTILE_SECRET_KEY: 's' }).status()).json()).siteKey).toBe('site')
+  })
+
+  it('follows the stored switch on the next request, with no deploy between', async () => {
+    const t = setup()
+    expect((await (await t.status()).json()).open).toBe(true)
+    storeSurveySettings(t.db, { open: false })
+    expect((await (await t.status()).json()).open).toBe(false)
+    expect((await t.call('start', {})).status).toBe(403)
+    storeSurveySettings(t.db, { open: true })
+    expect((await t.call('start', {})).status).toBe(200)
+  })
+
+  it('lets somebody partway through finish after it closes to new people', async () => {
+    const t = setup()
+    const { id } = await startOne(t)
+    storeSurveySettings(t.db, { open: false })
+    expect((await t.call('resume', { id })).status).toBe(200)
+  })
+
+  it('is not opened by the environment: the stored switch is the only one', async () => {
+    // Two switches for one thing is how a survey you closed stays open.
+    const t = setup({}, { SURVEY_OPEN: 'true', SURVEY_CONTACT_EMAIL: 'env@example.test' })
+    expect(await (await t.status()).json()).toMatchObject({ open: false, contact: null })
+    expect((await t.call('start', {})).status).toBe(403)
+  })
+
+  it('names the page that will hold the results, which is a real page', async () => {
+    const dashboard = { DASHBOARD_URL: 'https://scout.example.test/' }
+    const t = setup(OPEN, dashboard)
+    expect((await (await t.status()).json()).resultsUrl).toBe('https://scout.example.test/survey-results')
+
+    // The path is a route of this Worker, public, and lands on the app's hash route.
+    const res = await app.request('/survey-results', { redirect: 'manual' }, t.env)
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/#survey-results')
   })
 
   it('can be reached with no sign-in', async () => {
@@ -254,7 +297,7 @@ describe('bots and floods', () => {
   })
 
   it('asks for the spam check when it is configured, and turns away a start with no token', async () => {
-    const t = setup({ ...OPEN, TURNSTILE_SITE_KEY: 'site', TURNSTILE_SECRET_KEY: 'secret' })
+    const t = setup({ ...OPEN, siteKey: 'site' }, { TURNSTILE_SECRET_KEY: 'secret' })
     const res = await t.call('start', {})
     expect(res.status).toBe(400)
     expect(t.count()).toBe(0)

@@ -740,24 +740,34 @@ same question, and nothing was found for SOCAN.
 
 ### To launch
 
-1. **Set a contact address.** `SURVEY_CONTACT_EMAIL` in `wrangler.toml`, a mailbox
-   somebody reads. The notice every respondent reads promises one, so the survey
-   will not open without it.
+None of this is in `wrangler.toml`: the survey's switches are settings the owner changes
+in **Admin mode → Artist survey**, stored in the database, so opening or closing a
+public survey never waits on a deploy.
+
+1. **Set a contact address** in that panel: a mailbox somebody reads. The notice every
+   respondent reads promises one, so the survey will not open without it, and the
+   panel will not let it be removed while the survey is open.
 2. **Set up the spam check.** In the Cloudflare dashboard (Turnstile → Add site, this
-   site's hostname), put the **site key** in `wrangler.toml` as
-   `TURNSTILE_SITE_KEY` and the **secret** with `wrangler secret put
-   TURNSTILE_SECRET_KEY`. Without both the survey still runs and the owner's panel
-   says no spam check is configured: do not share the link in that state.
+   site's hostname) make a widget. Paste the **site key** into the panel. The **secret**
+   is the one piece that is not a setting, because a secret cannot be saved from a
+   screen: add it in the dashboard under the Worker's Settings, Variables and Secrets
+   as a secret named `TURNSTILE_SECRET_KEY` (or `wrangler secret put
+   TURNSTILE_SECRET_KEY`). Secrets survive a deploy. Without both halves the survey
+   still runs, and the panel warns that the notice describes a Cloudflare check that
+   would not be running: do not share the link in that state.
 3. **Do the read-through** (section 7): two or three artists, aloud, including people
    from the communities in E3, and ask Manitoba Music to look at the terminology.
    This is also the only way to time it. About ten minutes is an estimate until then.
 4. **Have the privacy read** (section 4) by someone qualified, before a public link.
-5. Optionally set `SURVEY_RESULTS_URL`.
-6. **Set `SURVEY_OPEN = "true"`** and deploy. Switching it back to `"false"` stops new
-   starts and lets anyone partway through finish.
+5. **Press Open the survey.** It takes effect on the next request. **Close the survey**
+   stops new starts and lets anyone partway through finish.
 
-The owner's page for all of this is **Admin mode → Artist survey**: the checklist
-above with what is and is not done, a link builder that tags a channel
+The results address in the notice is `/survey-results` on this site, a route of the
+Worker that lands on a page which says the results have not been posted yet. It is
+not a setting: a link that went nowhere would make the notice's promise look false.
+
+The owner's page for all of this is **Admin mode → Artist survey**: the switch, the
+contact address and site key, a link builder that tags a channel
 (`#survey?src=manitoba-music-newsletter`), who has answered, the results, and a
 CSV download.
 
@@ -773,6 +783,8 @@ CSV download.
 | The model, the dollar values, the summary, the export | `shared/surveyAnalysis.ts`, `shared/surveyLogit.ts` |
 | Public routes, `/api/public/survey/…` | `src/routes/survey.ts` |
 | The owner's routes, `/api/admin/survey` | `src/routes/admin.ts` |
+| The switch, contact address and site key (`app_settings`) | `src/lib/surveySettings.ts` |
+| The page the notice sends results readers to | `frontend/src/pages/survey/SurveyResultsPage.tsx`, `/survey-results` in `src/index.ts` |
 | The table | `migrations/0035_survey_responses.sql` |
 | The respondent's screens | `frontend/src/pages/survey/` |
 | The owner's panel | `frontend/src/components/SurveyPanel.tsx` |
@@ -794,6 +806,10 @@ CSV download.
 
 - **French.** The structure is ready (every string is `{ en, fr? }`, ids are stable)
   and nothing is translated. It waits on the English settling after the read-through.
+- **Publishing a summary.** The notice promises one and `/survey-results` exists, but it
+  says the results have not been posted yet and will until something is. What goes
+  there should be a snapshot the owner reviews and publishes, never a live view of
+  the data, so the step to build is the review and the publish.
 - **The anchor screen** (section 9, decision 8). Additive if wanted.
 - **Intervals by resampling.** `bootstrap()` exists and is tested, but the owner's page
   shows model-based ranges only. The method section calls for resampling for the
