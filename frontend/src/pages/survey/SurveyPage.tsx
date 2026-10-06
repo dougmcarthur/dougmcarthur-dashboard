@@ -81,15 +81,20 @@ type Phase =
   | { kind: 'screened' }
   | { kind: 'deleted' }
 
-export function Shell({ children, contact }: { children: ReactNode; contact?: string | null }) {
+/**
+ * The page around every survey screen. `wide` is for the results, which have
+ * charts to lay out; a question is read in a narrow column and should stay in one.
+ */
+export function Shell({ children, contact, wide = false }: { children: ReactNode; contact?: string | null; wide?: boolean }) {
+  const width = wide ? 'max-w-4xl sm:px-6' : 'max-w-xl'
   return (
     <div className="min-h-screen bg-canvas text-body">
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto max-w-xl px-4 py-3 text-sm font-semibold text-ink">Sun Dogs Music</div>
+        <div className={`mx-auto ${width} px-4 py-3 text-sm font-semibold text-ink`}>Sun Dogs Music</div>
       </header>
-      <main className="mx-auto max-w-xl px-4 py-6 space-y-6">{children}</main>
+      <main className={`mx-auto ${width} px-4 ${wide ? 'py-10 sm:py-14' : 'py-6'} space-y-6`}>{children}</main>
       {contact && (
-        <footer className="mx-auto max-w-xl px-4 pb-10 text-xs text-muted">
+        <footer className={`mx-auto ${width} px-4 pb-10 text-xs text-muted`}>
           Questions about this survey: <a className="underline" href={`mailto:${contact}`}>{contact}</a>
         </footer>
       )}

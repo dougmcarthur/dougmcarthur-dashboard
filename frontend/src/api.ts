@@ -8,6 +8,7 @@ import type { InviteRequestStatus } from '../../shared/inviteRequests'
 import type { Plan as SurveyPlan } from '../../shared/surveyDesign'
 import type { AnswerMap as SurveyAnswers } from '../../shared/surveyAnswers'
 import type { Summary as SurveySummary } from '../../shared/surveyAnalysis'
+import type { PublicResults } from '../../shared/surveyPublic'
 import { noteError } from './diagnostics'
 import type { NudgePreferences } from '../../shared/nudgeRouting'
 // Entity shapes live in shared/ because the Worker builds the review queue
@@ -497,6 +498,23 @@ export interface SurveyResults {
   truncated: boolean
 }
 
+/** What the owner sees before publishing the survey's summary, and what is public now. */
+export interface SurveyPublication {
+  /** Why nothing can be published yet. Empty when something can. */
+  blockers: string[]
+  /** What would be published, built just now. */
+  preview: PublicResults | null
+  /** Digest of the preview. Publishing carries it, so what goes public is what was looked at. */
+  fingerprint: string | null
+  published: {
+    publishedAt: string
+    n: number
+    leftOut: PublicResults['leftOut']
+    /** Responses have come in, or the exclusions changed, since it was published. */
+    outOfDate: boolean
+  } | null
+}
+
 /** What the survey page needs to know before it can open. */
 export interface SurveyStatus {
   open: boolean
@@ -908,6 +926,13 @@ export const api = {
     inviteRequests: () => apiFetch<{ items: InviteRequestItem[] }>('/admin/invite-requests'),
     survey: (flags: { failedCheck: boolean; speeders: boolean }) =>
       apiFetch<SurveyResults>(`/admin/survey?failedCheck=${flags.failedCheck ? 1 : 0}&speeders=${flags.speeders ? 1 : 0}`),
+    /** What would be published now, and what is public. Built fresh on every call. */
+    surveyPublication: (flags: { failedCheck: boolean; speeders: boolean }) =>
+      apiFetch<SurveyPublication>(`/admin/survey/publication?failedCheck=${flags.failedCheck ? 1 : 0}&speeders=${flags.speeders ? 1 : 0}`),
+    /** Publish what was previewed. Carries only its digest and the exclusions: the Worker builds the page itself. */
+    publishSurvey: (body: { fingerprint: string; failedCheck: boolean; speeders: boolean }) =>
+      apiFetch<{ published: NonNullable<SurveyPublication['published']> }>('/admin/survey/publication', { method: 'POST', body: JSON.stringify(body) }),
+    unpublishSurvey: () => apiFetch<{ ok: boolean }>('/admin/survey/publication', { method: 'DELETE' }),
     /** Open or close the survey, set who to contact, set the spam check's site key. */
     setSurvey: (patch: { open?: boolean; contact?: string | null; siteKey?: string | null }) =>
       apiFetch<{ config: SurveyConfigView }>('/admin/survey/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
@@ -1000,6 +1025,8 @@ export const api = {
    */
   survey: {
     status: () => apiFetch<SurveyStatus>('/public/survey/status'),
+    /** The published summary, if there is one. Nothing is computed on this call. */
+    results: () => apiFetch<{ published: false } | { published: true; results: PublicResults }>('/public/survey/results'),
     start: (body: { source?: string; device?: 'phone' | 'computer'; token?: string; website?: string }) =>
       apiFetch<{ id: string; plan: SurveyPlan }>('/public/survey/start', { method: 'POST', body: JSON.stringify(body) }),
     resume: (id: string) =>

@@ -636,8 +636,10 @@ have to invent. It lives at `#survey` on this site (tag a channel with
 `#survey?src=…`), takes about ten minutes, stores nothing that identifies anyone,
 and **ships closed**: the owner opens and closes it in admin mode, and it will not
 open without a contact address. Nothing about it is in `wrangler.toml`, apart from
-a `TURNSTILE_SECRET_KEY` secret for the spam check. The owner's results page is in
-admin mode too.
+a `TURNSTILE_SECRET_KEY` secret for the spam check. The owner reads the full results in
+admin mode, reviews a public summary there, and publishes it to `/survey-results` when
+it is ready. The public page is a stored snapshot, not a live view, and carries nothing
+that names a person or any group of fewer than ten.
 
 The questionnaire, the method, what was found about how other Canadian
 organisations ask the same questions, and the launch steps are in

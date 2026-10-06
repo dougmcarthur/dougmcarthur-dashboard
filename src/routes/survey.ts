@@ -34,6 +34,7 @@ import { checkAnswer, isScreenedOut, type AnswerMap } from '../../shared/surveyA
 import { INSTRUMENT_VERSION } from '../../shared/surveyInstrument'
 import { verifyTurnstile } from '../lib/turnstile'
 import { readSurveyConfig } from '../lib/surveySettings'
+import { readPublication } from '../lib/surveyPublication'
 
 export const SURVEY_LIMITS = {
   /** New responses an hour, across everybody. Past this the survey asks people to come back. */
@@ -66,6 +67,18 @@ survey.get('/survey/status', async (c) => {
     siteKey: cfg.botCheck ? cfg.siteKey : null,
     instrument: INSTRUMENT_VERSION,
   })
+})
+
+/**
+ * The published summary, or `{ published: false }`. Served whether or not the
+ * survey is open: reading the results and taking part are separate things. It
+ * is a stored snapshot the owner reviewed (src/lib/surveyPublication.ts), never
+ * computed from the responses on a visit, and carries nothing that names one.
+ */
+survey.get('/survey/results', async (c) => {
+  const results = await readPublication(c.env)
+  c.header('Cache-Control', 'no-store')
+  return c.json(results ? { published: true, results } : { published: false })
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

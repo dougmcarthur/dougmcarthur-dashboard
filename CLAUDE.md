@@ -1695,11 +1695,44 @@ The questionnaire, the method and every reason are in
   warns when the spam check is not complete, and says the notice describes a check
   that would not be running. It warns rather than blocks: the survey runs without
   it, and that is the owner's call.
-- **The results address in the notice is a real page.** `/survey-results` is a route
-  of the Worker that redirects to `#survey-results`, which says the results have not
-  been posted yet. It is not configurable, because a link that went nowhere makes the
-  notice's promise read as false. Publishing a summary there is not built; when it is,
-  it should be a snapshot the owner reviews, never a live view of the responses.
+- **The results address in the notice is a real page, and what is on it is a snapshot
+  the owner reviewed.** `/survey-results` is a route of the Worker that redirects to
+  `#survey-results`. It is not configurable, because a link that went nowhere makes the
+  notice's promise read as false. It says the results have not been posted until the
+  owner publishes, and what it then shows is one stored row (`survey.published` in
+  `app_settings`, `src/lib/surveyPublication.ts`), never a view computed from the
+  responses on a visit: a page computed per visit reports a small group the moment the
+  tenth person in a category has not yet answered, which the notice promises never
+  happens.
+- **Publishing is review, then a digest.** `shared/surveyPublic.ts` builds the snapshot
+  from an allow-list, so a field added to the owner's summary next year is not public
+  until somebody decides it should be. `GET /api/admin/survey/publication` builds what
+  would be published now, and `POST` carries only the digest of what was looked at and
+  the exclusions. The Worker rebuilds, and if responses came in between it answers 409
+  and the owner reviews the new version first, so what is reviewed is what is shown.
+  The browser never sends the content. It needs `PUBLISH_FLOOR` (30) completed
+  responses, and the preview and the public page are the same component
+  (`ResultsView`) over the same object. `test/surveyPublic.test.ts` fails if a response
+  id, a channel tag, a free-text answer or any of age, gender, community and income
+  reaches it, and each rule in the file was mutation-checked.
+- **The public numbers are no firmer than the data.** Intervals come from the spread
+  between artists, each scored once per factor, not from the screens, because one
+  person answers several and treating them as independent makes the result look surer.
+  A factor is "clearly above average" only when its whole range is; two are "tied" when
+  their ranges overlap; and a dollar of entry fee is called "about a dollar" only when
+  the range is narrow around one (`RATIO_NARROW`), because the fee effect is small next
+  to pay and the range is often from nothing to three dollars. The headline of each
+  section is a sentence from the same functions as the "In short" list, so a heading
+  cannot be firmer than the chart under it.
+- **Say against do compares only reasons that at least ten artists gave.** B4 offers
+  fourteen reasons, so in a first wave most are under ten and may not be shown, and
+  ranking those as zero would draw a line to a number nobody may see. The chart says how
+  many were left out.
+- **How the page reads and looks is held by tests, because it was asked for.** No em
+  dash in anything a person reads, no small caption above a heading, no coloured bar
+  down the left edge of a rounded card, and only the app's colour tokens
+  (`test/surveyUi.test.ts`). Every card and headline is a whole sentence, and the cards
+  open on their figure so they read aloud as one (`test/surveyResultsHero.test.ts`).
 - **The analysis is checked by planting preferences and recovering them.**
   `test/surveyAnalysis.test.ts` simulates respondents with known utilities and
   fails if the estimator does not find them — and it was mutation-checked: an

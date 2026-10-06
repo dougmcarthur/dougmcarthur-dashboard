@@ -388,8 +388,9 @@ describe('what the notice says is not stored', () => {
   it('never puts the response id in a path, where the request logger prints it', () => {
     expect(route).not.toMatch(/survey\/[a-z]*\/?:/i)
     expect(route).not.toMatch(/'\/survey\/:/)
+    // `/survey/results` is the published summary: no id in it, and it names no response (surveyPublication.test.ts).
     expect([...route.matchAll(/survey\.(?:get|post|put|delete)\('([^']+)'/g)].map((m) => m[1]).sort()).toEqual([
-      '/survey/answer', '/survey/complete', '/survey/discard', '/survey/resume', '/survey/start', '/survey/status',
+      '/survey/answer', '/survey/complete', '/survey/discard', '/survey/results', '/survey/resume', '/survey/start', '/survey/status',
     ])
   })
 

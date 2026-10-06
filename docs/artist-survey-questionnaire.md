@@ -673,8 +673,10 @@ CRA's research definition also counts people on work or study permits. A musicia
 here on a work permit is exactly the person whose touring and networks are most
 constrained, and "landed" excludes them, and is immigration jargon besides, which
 section 2 rules out. A plainer wording that includes them would be *"New to Canada
-(you came to live here within the last 5 years)"*. The survey is built with Doug's
-wording, "landed within the last 5 years", until that is decided.
+(you came to live here within the last 5 years)"*. **Closed on 2026-10-05:** Doug decided
+it is not relevant to this tool, since what matters is whether someone who has moved here
+means to build a career in music here. The survey keeps his wording, "landed within the
+last 5 years", and the question is not being pursued.
 
 **FACTOR and SOCAN:** no definition of "newcomer" or "recent immigrant" was found
 for either. FACTOR's eligibility is by citizenship or permanent residence (found
@@ -708,9 +710,8 @@ same question, and nothing was found for SOCAN.
    section 4? Dropping E3 is the cheap way to lower that risk, at the cost of not
    seeing equity differences. E2 and E3 were reworded after comparing them with the
    Manitoba Arts Council's form (see the end of section 8); "New to Canada" is five
-   years as decided, and one point is still open: whether it should also include
-   people who arrived on a work or study permit and have not landed. [Asked, as
-   drafted.]
+   years as decided, and whether it should also include people on a work or study
+   permit was closed as not relevant to this tool. [Asked, as drafted.]
 5. **Saved as you go.** Keeping partial answers lets us see where people drop out,
    and the notice says so. The alternative is to keep nothing until someone
    finishes. [Saved as you go, with Close without saving to delete.]
@@ -763,13 +764,47 @@ public survey never waits on a deploy.
    stops new starts and lets anyone partway through finish.
 
 The results address in the notice is `/survey-results` on this site, a route of the
-Worker that lands on a page which says the results have not been posted yet. It is
-not a setting: a link that went nowhere would make the notice's promise look false.
+Worker. It is not a setting: a link that went nowhere would make the notice's promise
+look false. Until something is published it says the results have not been posted yet.
+
+### Publishing the summary
+
+6. **Review, then publish.** In the same panel, *Publish the summary* shows the public
+   page exactly as it will read, built just now, and nothing is public until you press
+   **Publish this**. It needs 30 completed responses; below that it says how many are in.
+   It uses the exclusions you have set above (leave out those who failed the attention
+   check, leave out the fastest), and the page says how many were left out and why.
+
+What is public is a **stored snapshot**, not a view of the responses. The notice promises
+that a small group is never reported, and a page computed on every visit would break
+that the moment the tenth person in a category had not yet answered. So publishing is an
+act, and the page changes only when you publish again. The panel says when responses have
+come in since, and **Take it down** removes it at once.
+
+The Worker builds the snapshot from an allow-list, and the browser sends only a digest of
+what you looked at. If responses arrive between your preview and your press, the digest no
+longer matches, the Worker refuses, and you review the new version first. What is reviewed
+is what is shown.
+
+What the public page carries: the ranking (best minus worst, averaged over artists, with
+the range each is likely to sit in), the dollar values with their ranges when pay can be
+told from zero, the reasons for passing and for applying, how artists find opportunities,
+and who answered by province, years performing, how they perform and how much of their work
+music is. What it never carries: a response, a channel tag, a free-text answer, and age,
+gender, community or income. In a first wave from one provincial network a breakdown of a
+few of those is a short step from a name, and the owner's panel is where they are read.
+
+The sentences on the page are written from the same bands as the charts. A factor is
+called clearly above or below average only when its whole range is, two are called tied
+when their ranges overlap, and an entry-fee dollar is not called "about a dollar" when the
+range runs from nothing to three. The comparison the method section calls the most useful
+result, what artists say matters against what stopped them, is a slopegraph of the reasons
+that at least ten artists gave, with the count of those left out.
 
 The owner's page for all of this is **Admin mode → Artist survey**: the switch, the
 contact address and site key, a link builder that tags a channel
-(`#survey?src=manitoba-music-newsletter`), who has answered, the results, and a
-CSV download.
+(`#survey?src=manitoba-music-newsletter`), who has answered, the results, the summary
+to publish, and a CSV download.
 
 ### Where it lives
 
@@ -785,6 +820,10 @@ CSV download.
 | The owner's routes, `/api/admin/survey` | `src/routes/admin.ts` |
 | The switch, contact address and site key (`app_settings`) | `src/lib/surveySettings.ts` |
 | The page the notice sends results readers to | `frontend/src/pages/survey/SurveyResultsPage.tsx`, `/survey-results` in `src/index.ts` |
+| What may be public, and the sentences written from it | `shared/surveyPublic.ts` |
+| The stored snapshot, and its digest | `src/lib/surveyPublication.ts` |
+| The summary page and its charts | `frontend/src/pages/survey/results/` |
+| Reviewing and publishing, in admin mode | `frontend/src/components/SurveyPublish.tsx` |
 | The table | `migrations/0035_survey_responses.sql` |
 | The respondent's screens | `frontend/src/pages/survey/` |
 | The owner's panel | `frontend/src/components/SurveyPanel.tsx` |
@@ -806,10 +845,8 @@ CSV download.
 
 - **French.** The structure is ready (every string is `{ en, fr? }`, ids are stable)
   and nothing is translated. It waits on the English settling after the read-through.
-- **Publishing a summary.** The notice promises one and `/survey-results` exists, but it
-  says the results have not been posted yet and will until something is. What goes
-  there should be a snapshot the owner reviews and publishes, never a live view of
-  the data, so the step to build is the review and the publish.
+- **Group comparisons on the public page, and any breakdown by age, gender, community or
+  income.** Left out on purpose, as above.
 - **The anchor screen** (section 9, decision 8). Additive if wanted.
 - **Intervals by resampling.** `bootstrap()` exists and is tested, but the owner's page
   shows model-based ranges only. The method section calls for resampling for the
