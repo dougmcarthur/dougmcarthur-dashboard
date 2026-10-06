@@ -108,6 +108,32 @@ describe('the welcome questions', () => {
   it('renders through a portal, so no ancestor can offset it', () => {
     expect(flow).toMatch(/createPortal\(/)
   })
+
+  // The last screen listed two tasks and linked one: the second said what to do
+  // and gave no way to do it. Each task it lists is its own link.
+  it('links every task it lists on the last screen, not only the first', () => {
+    const src = read('frontend/src/components/OnboardingFlow.tsx')
+    expect(src).toMatch(/remaining\.map\(\(s, i\)[\s\S]{0,1200}href=\{s\.href\}/)
+    expect(src).toMatch(/<a\s+href=\{s\.href\}/)
+  })
+})
+
+// The other half of that: a step can only be listed there as a link if it has
+// somewhere to go. Name and goals are the two asked on the questions themselves.
+describe('a required step the questions do not ask has somewhere to go', () => {
+  it('gives every such step an href', () => {
+    const state = onboardingSteps(EMPTY, null)
+    const listed = state.steps.filter((s) => !s.optional && s.id !== 'name' && s.id !== 'goals')
+    expect(listed.map((s) => s.id)).toEqual(['profile', 'google'])
+    for (const s of listed) expect(s.href, s.id).toMatch(/^#[a-z]/)
+  })
+
+  it('points them at screens that exist', () => {
+    const hrefs = onboardingSteps(EMPTY, null)
+      .steps.filter((s) => s.href)
+      .map((s) => s.href)
+    expect(hrefs).toEqual(expect.arrayContaining(['#artist', '#settings/connections']))
+  })
 })
 
 describe('nextSteps', () => {
