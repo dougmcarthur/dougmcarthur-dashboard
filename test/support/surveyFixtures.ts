@@ -69,3 +69,28 @@ export function simulate(seed: number, opts: { failCheck?: boolean; seconds?: nu
   }
 }
 
+
+/**
+ * The survey's switches as the owner's screen stores them. The survey is
+ * configured in `app_settings`, never in the environment, so a test that wants
+ * it open writes the rows the admin route would write.
+ */
+export interface StoredSurveySettings {
+  open?: boolean
+  contact?: string
+  siteKey?: string
+}
+
+export function storeSurveySettings(
+  db: { prepare: (sql: string) => { run: (...args: unknown[]) => unknown } },
+  settings: StoredSurveySettings,
+  at = '2026-01-01T00:00:00.000Z',
+) {
+  const put = db.prepare(
+    `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+  )
+  if (settings.open !== undefined) put.run('survey.open', String(settings.open), at)
+  if (settings.contact !== undefined) put.run('survey.contactEmail', settings.contact, at)
+  if (settings.siteKey !== undefined) put.run('survey.turnstileSiteKey', settings.siteKey, at)
+}

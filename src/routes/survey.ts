@@ -33,6 +33,7 @@ import { buildPlan, type Plan } from '../../shared/surveyDesign'
 import { checkAnswer, isScreenedOut, type AnswerMap } from '../../shared/surveyAnswers'
 import { INSTRUMENT_VERSION } from '../../shared/surveyInstrument'
 import { verifyTurnstile } from '../lib/turnstile'
+import { readSurveyConfig } from '../lib/surveySettings'
 
 export const SURVEY_LIMITS = {
   /** New responses an hour, across everybody. Past this the survey asks people to come back. */
@@ -48,24 +49,15 @@ export const SURVEY_LIMITS = {
 const survey = new Hono<RootEnv>()
 
 // ── Configuration ─────────────────────────────────────────────────────────────
+//
+// Read from `app_settings` on every call (src/lib/surveySettings.ts), so the
+// owner's switch takes effect on the next request rather than the next deploy.
 
-export function surveyConfig(env: Env) {
-  const contact = (env.SURVEY_CONTACT_EMAIL ?? '').trim()
-  const wanted = env.SURVEY_OPEN === 'true'
-  return {
-    /** What the page needs to open: asked for, and able to say who to ask. */
-    open: wanted && contact.length > 0,
-    wanted,
-    contact: contact || null,
-    resultsUrl: (env.SURVEY_RESULTS_URL ?? '').trim() || null,
-    siteKey: (env.TURNSTILE_SITE_KEY ?? '').trim() || null,
-    /** Both halves of Turnstile are set, so a start is actually checked. */
-    botCheck: !!(env.TURNSTILE_SECRET_KEY && env.TURNSTILE_SITE_KEY),
-  }
-}
+const configFor = (c: { env: Env; req: { url: string } }) =>
+  readSurveyConfig(c.env, new URL(c.req.url).origin)
 
-survey.get('/survey/status', (c) => {
-  const cfg = surveyConfig(c.env)
+survey.get('/survey/status', async (c) => {
+  const cfg = await configFor(c)
   c.header('Cache-Control', 'no-store')
   return c.json({
     open: cfg.open,
@@ -122,7 +114,7 @@ const StartSchema = z.object({
 survey.post('/survey/start', zValidator('json', StartSchema), async (c) => {
   if (tooBig(c)) return c.json({ error: 'That request is too large.' }, 413)
   const body = c.req.valid('json')
-  const cfg = surveyConfig(c.env)
+  const cfg = await configFor(c)
 
   // A bot gets the same shape of answer as a person and a plan that goes
   // nowhere, so it learns nothing to adapt to. Nothing is stored.

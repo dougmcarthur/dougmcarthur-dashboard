@@ -14,12 +14,14 @@ function source(path: string): string {
 const PAGE = source('frontend/src/pages/survey/SurveyPage.tsx')
 const SCREENS = source('frontend/src/pages/survey/SurveyScreens.tsx')
 const TURNSTILE = source('frontend/src/pages/survey/TurnstileBox.tsx')
+const RESULTS = source('frontend/src/pages/survey/SurveyResultsPage.tsx')
+const PANEL = source('frontend/src/components/SurveyPanel.tsx')
 const API = source('frontend/src/api.ts')
 const GATE = source('frontend/src/components/AuthGate.tsx')
 
 describe('what a respondent reads', () => {
   it('never says "Scout"; the survey names the company and no product', () => {
-    for (const [name, text] of [['SurveyPage', PAGE], ['SurveyScreens', SCREENS], ['TurnstileBox', TURNSTILE]] as const) {
+    for (const [name, text] of [['SurveyPage', PAGE], ['SurveyScreens', SCREENS], ['TurnstileBox', TURNSTILE], ['SurveyResultsPage', RESULTS]] as const) {
       expect(text, name).not.toMatch(/scout/i)
     }
   })
@@ -65,6 +67,11 @@ describe('where the page is reached', () => {
     expect(GATE.indexOf("page === 'survey'")).toBeLessThan(GATE.indexOf('session.isLoading'))
   })
 
+  it('answers the results page before the session too, since the notice sends strangers there', () => {
+    expect(GATE.indexOf("page === 'survey-results'")).toBeGreaterThan(-1)
+    expect(GATE.indexOf("page === 'survey-results'")).toBeLessThan(GATE.indexOf('session.isLoading'))
+  })
+
   it('asks search engines not to list it, and puts the title back afterwards', () => {
     expect(PAGE).toContain("robots.content = 'noindex'")
     expect(PAGE).toMatch(/document\.title = previous/)
@@ -77,5 +84,40 @@ describe('the spam check', () => {
     expect(TURNSTILE).toMatch(/loading \?\?= new Promise/)
     // Rendered by the consent screen, and only when the deployment has a key.
     expect(PAGE).toMatch(/status\.siteKey && <TurnstileBox/)
+  })
+})
+
+describe('the results page', () => {
+  it('promises nothing it does not hold: no live data, and it says the results are not posted', () => {
+    expect(RESULTS).toMatch(/have not been posted yet/)
+    expect(RESULTS).not.toMatch(/api\.admin|summary|ranking/i)
+  })
+})
+
+describe('the owner’s switch', () => {
+  it('is the only control: nothing reads or names the old environment settings', () => {
+    // Two switches for one thing is how a survey you closed stays open.
+    const names = /SURVEY_OPEN|SURVEY_CONTACT_EMAIL|SURVEY_RESULTS_URL|TURNSTILE_SITE_KEY/
+    for (const [file, text] of [
+      ['src/routes/survey.ts', source('src/routes/survey.ts')],
+      ['src/routes/admin.ts', source('src/routes/admin.ts')],
+      ['src/lib/surveySettings.ts', source('src/lib/surveySettings.ts')],
+      ['src/types.ts', source('src/types.ts')],
+      ['SurveyPanel', PANEL],
+    ] as const) {
+      expect(text, file).not.toMatch(names)
+    }
+  })
+
+  it('waits on a contact address and on unsaved edits rather than failing after the click', () => {
+    expect(PANEL).toMatch(/Add a contact address first/)
+    expect(PANEL).toMatch(/Save your changes first/)
+    expect(PANEL).toContain('disabled={save.isPending || !!blocker}')
+  })
+
+  it('names the spam check’s secret only to say where it is set, and never asks for it', () => {
+    expect(PANEL).toContain('TURNSTILE_SECRET_KEY')
+    expect(PANEL).not.toMatch(/setSurvey\([^)]*secret/i)
+    expect(PANEL).not.toMatch(/type="password"/)
   })
 })

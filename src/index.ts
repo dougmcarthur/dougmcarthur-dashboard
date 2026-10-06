@@ -63,6 +63,7 @@ import { agentMayCall } from '../shared/agentRoutes'
 import { localParts } from '../shared/digestSchedule'
 import { runCredentialChecks } from './lib/credentialCheck'
 import { requestLog } from './lib/requestLog'
+import { SURVEY_RESULTS_PATH } from './lib/surveySettings'
 
 const app = new Hono<RootEnv>()
 
@@ -255,6 +256,11 @@ app.onError((err, c) => {
   console.error(err)
   return c.json({ error: err.message }, 500)
 })
+
+// The address the survey's notice gives for its results. The app routes on the
+// hash, so the path is a front door onto `#survey-results` rather than a second
+// way of routing — and it is a route here, so the link is never a 404.
+app.get(SURVEY_RESULTS_PATH, (c) => c.redirect('/#survey-results', 302))
 
 // Fall through to static assets for non-API routes
 app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))

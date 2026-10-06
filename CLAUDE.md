@@ -1679,10 +1679,27 @@ The questionnaire, the method and every reason are in
   assumes the answer the survey exists to measure, the "least" pick already records
   irrelevance, and showing different factors to different people breaks the
   arithmetic. Which nine of thirteen is decided by the seed, not the person.
-- **Ships closed.** It opens only when `SURVEY_OPEN` is exactly `"true"` **and**
-  `SURVEY_CONTACT_EMAIL` is set, because the notice promises a contact address.
-  The owner's panel (admin mode) shows the launch checklist and warns when the spam
-  check is not configured.
+- **Ships closed, and the owner's switch is in admin mode, not `wrangler.toml`.**
+  Whether it is open, the contact address and Turnstile's public site key are rows
+  in `app_settings` (`src/lib/surveySettings.ts`), changed from the survey panel and
+  read on every request, so closing a public survey never waits on a build. It opens
+  only when the switch is on **and** a contact address is stored, because the notice
+  promises one; `writeSurveySettings` refuses to turn it on without one and refuses
+  to strip the address from an open survey, which would close it behind a switch
+  that reads on. There is deliberately no environment variable for any of it:
+  `test/surveyUi.test.ts` fails if one comes back, because two switches for one
+  thing is how a survey you closed stays open. The one exception is the Turnstile
+  **secret**, a Worker secret (`TURNSTILE_SECRET_KEY`) since a secret cannot be saved
+  from a screen — and a dashboard *variable* would not do for the site key, because
+  the next `wrangler deploy` wipes any variable the file does not name. The panel
+  warns when the spam check is not complete, and says the notice describes a check
+  that would not be running. It warns rather than blocks: the survey runs without
+  it, and that is the owner's call.
+- **The results address in the notice is a real page.** `/survey-results` is a route
+  of the Worker that redirects to `#survey-results`, which says the results have not
+  been posted yet. It is not configurable, because a link that went nowhere makes the
+  notice's promise read as false. Publishing a summary there is not built; when it is,
+  it should be a snapshot the owner reviews, never a live view of the responses.
 - **The analysis is checked by planting preferences and recovering them.**
   `test/surveyAnalysis.test.ts` simulates respondents with known utilities and
   fails if the estimator does not find them — and it was mutation-checked: an

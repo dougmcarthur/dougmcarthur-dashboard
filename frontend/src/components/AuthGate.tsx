@@ -7,6 +7,7 @@ import { useHashRoute } from '../hooks/useHashRoute'
 import { PublicEpkPage } from '../pages/epk/PublicEpkPage'
 import { LandingPage } from '../pages/LandingPage'
 import { SurveyPage } from '../pages/survey/SurveyPage'
+import { SurveyResultsPage } from '../pages/survey/SurveyResultsPage'
 
 /**
  * Nothing renders until the Worker says who is asking.
@@ -62,7 +63,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // The artist survey is for anybody with the link, so like a shared EPK it is
   // answered before the session is, and looks the same signed in or not.
   if (page === 'survey') return <SurveyPage />
-
+  // Where the survey's notice says the summary will be posted. Public for the
+  // same reason, and reachable as /survey-results, which the Worker sends here.
+  if (page === 'survey-results') return <SurveyResultsPage />
 
   if (session.isLoading) return <div className="min-h-screen bg-canvas" />
 

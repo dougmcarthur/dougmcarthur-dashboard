@@ -634,8 +634,10 @@ A public, anonymous survey of how artists decide whether an opportunity is worth
 their time, built to measure the weights the pipeline's scoring would otherwise
 have to invent. It lives at `#survey` on this site (tag a channel with
 `#survey?src=…`), takes about ten minutes, stores nothing that identifies anyone,
-and **ships closed**: it opens only when `SURVEY_OPEN` is `"true"` and a contact
-address is set. The owner's results page is in admin mode.
+and **ships closed**: the owner opens and closes it in admin mode, and it will not
+open without a contact address. Nothing about it is in `wrangler.toml`, apart from
+a `TURNSTILE_SECRET_KEY` secret for the spam check. The owner's results page is in
+admin mode too.
 
 The questionnaire, the method, what was found about how other Canadian
 organisations ask the same questions, and the launch steps are in
