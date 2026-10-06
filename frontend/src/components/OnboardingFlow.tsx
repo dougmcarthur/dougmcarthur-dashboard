@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type OnboardingState } from '../api'
 import { GOAL_NOTE_MAX, type GoalId, type ReachId } from '../../../shared/onboarding'
-import { Button } from './ui/Button'
+import { Button, buttonClass } from './ui/Button'
 import {
   Continue,
   FLOW_INPUT,
@@ -261,28 +261,45 @@ export function OnboardingFlow({
                 finish setting up. You can do {remaining.length === 1 ? 'it' : 'them'} now, or later
                 from the checklist on the Overview.
               </p>
+              {/*
+                Every task is its own link. It used to be a plain box with one
+                button underneath for the first, so the second — Connect Google
+                — said what to do and gave no way to do it.
+              */}
               <ul className="space-y-3">
-                {remaining.map((s) => (
-                  <li key={s.id} className="rounded-lg border border-line-strong px-4 py-3">
-                    <p className="font-medium text-ink">{s.title}</p>
-                    <p className="text-sm text-muted mt-0.5">{s.why}</p>
+                {remaining.map((s, i) => (
+                  <li
+                    key={s.id}
+                    className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line-strong px-4 py-3"
+                  >
+                    <div className="min-w-0 flex-1 basis-56">
+                      <p className="font-medium text-ink">{s.title}</p>
+                      <p className="text-sm text-muted mt-0.5">{s.why}</p>
+                    </div>
+                    {s.href && (
+                      <a
+                        href={s.href}
+                        onClick={(e) => {
+                          // Navigate before the questions unmount, so the move
+                          // does not depend on a removed link still being
+                          // followed.
+                          e.preventDefault()
+                          window.location.hash = s.href!.slice(1)
+                          onClose()
+                        }}
+                        className={`shrink-0 ${buttonClass(i === 0 ? 'primary' : 'neutral', 'lg')}`}
+                      >
+                        {s.action}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>
             </>
           )}
           <div className="flex flex-wrap items-center gap-3">
-            {remaining[0]?.href ? (
-              <a
-                href={remaining[0].href}
-                onClick={onClose}
-                className="inline-flex items-center gap-2 rounded-md bg-accent text-accent-fg hover:bg-accent-hover px-4 py-2 text-sm font-medium transition-colors"
-              >
-                {remaining[0].action}
-              </a>
-            ) : null}
             <Button variant={remaining.length ? 'neutral' : 'primary'} onClick={onClose}>
-              Done
+              {remaining.length ? 'Not now' : 'Done'}
             </Button>
           </div>
         </>

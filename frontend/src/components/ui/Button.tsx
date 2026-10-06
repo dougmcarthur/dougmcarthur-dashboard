@@ -40,6 +40,16 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
 }
 
+/**
+ * The button's classes, for the places a button is really a link — a task that
+ * has to *take you somewhere* is an `<a href>`, so it can be opened in a new
+ * tab and read by a screen reader as navigation. Same variants, so a link that
+ * looks like a button cannot drift from one.
+ */
+export function buttonClass(variant: ButtonVariant = 'neutral', size: ButtonSize = 'md', className = ''): string {
+  return `inline-block rounded-md font-medium transition-colors ${SIZES[size]} ${VARIANTS[variant]} ${className}`.trim()
+}
+
 export function Button({
   variant = 'neutral',
   size = 'md',
