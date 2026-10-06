@@ -1649,6 +1649,56 @@ five copies of the input string preceded them, and eight of those buttons set
 `hover:bg-X` while already painted `bg-X` — a hover that rendered as none.
 `test/uiConsistency.test.ts` fails if either comes back.
 
+**The artist survey is public, anonymous, and ships closed.** It asks artists
+how they decide whether an opportunity is worth their time, so the scoring
+weights the pipeline plan was waiting on can be measured instead of invented.
+The questionnaire, the method and every reason are in
+`docs/artist-survey-questionnaire.md`; this records what the code must keep.
+
+- **Nothing identifies a respondent, and a test fails if that changes.**
+  `survey_responses` has no IP, user agent, email or hash of any of them —
+  `test/surveyRoutes.test.ts` fails if a column is added, if the route reads any
+  header but the body length, or if it hashes anything. A salted hash of an address
+  is still derived from one, and the notice says none is stored, which is why
+  `publicSite`'s per-sender rate limit was deliberately not copied: the limits
+  are global (an hourly cap and a total cap), plus Turnstile and a honeypot.
+- **The response id never appears in a path.** It is the only credential for its
+  response and the request logger prints paths, so every call that names one sends
+  it in the body (`/survey/answer`, `/survey/resume`, …). Same rule as the
+  invitation token living in the URL fragment.
+- **The server builds the plan and the browser invents nothing.** `buildPlan`
+  (`shared/surveyDesign.ts`) decides, from one seed, which ranking screens, in what
+  order, which choice-design version and which option order — and the plan is
+  *stored* with the answers, so what was shown is a record rather than something
+  rebuilt from code that may have changed. `checkAnswer` turns away anything the
+  plan never offered. The ranking's thirteen blocks are a difference set modulo 13
+  (`{0,1,3,9}`): every factor appears four times and every pair together exactly
+  once, which a test checks, and which survives the shuffle.
+- **Nobody's list is shortened because of who they are.** Hiding factors from, say,
+  hobby-level artists was considered and refused (principle 12 in the document): it
+  assumes the answer the survey exists to measure, the "least" pick already records
+  irrelevance, and showing different factors to different people breaks the
+  arithmetic. Which nine of thirteen is decided by the seed, not the person.
+- **Ships closed.** It opens only when `SURVEY_OPEN` is exactly `"true"` **and**
+  `SURVEY_CONTACT_EMAIL` is set, because the notice promises a contact address.
+  The owner's panel (admin mode) shows the launch checklist and warns when the spam
+  check is not configured.
+- **The analysis is checked by planting preferences and recovering them.**
+  `test/surveyAnalysis.test.ts` simulates respondents with known utilities and
+  fails if the estimator does not find them — and it was mutation-checked: an
+  unflipped sign on the "worst" stage, the wrong dollar scale and letting the
+  planted attention check into the model each turn it red. A survey method fails
+  silently (a wrong estimator still returns tidy numbers), so that is the only
+  convincing test. A dollar value is a ratio to the pay effect, so when pay cannot
+  be told from zero nothing is converted to dollars.
+- **A group under ten is never shown** in the owner's summary, and a spreadsheet
+  cell that begins with `=`, `+`, `-` or `@` is quoted in the export, since free text
+  typed by a stranger is exactly where a formula would arrive. The raw export is not
+  suppressed and is the owner's alone.
+- Respondent-facing text never says "Scout" (the bare word is the mark this product
+  avoids): the survey names Sun Dogs Music and no product, and a test walks every
+  string.
+
 ## Testing
 
 `npm test` (vitest) — pure logic in `shared/` is well covered; routes are only

@@ -8,6 +8,7 @@ import { InvitesPanel } from '../components/InvitesPanel'
 import { FeedbackInbox } from '../components/FeedbackInbox'
 import { InviteRequestsPanel } from '../components/InviteRequestsPanel'
 import { PublicListingsPanel } from '../components/PublicListingsPanel'
+import { SurveyPanel } from '../components/SurveyPanel'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from '../components/ui/Explainer'
 import { Card } from '../components/ui/Surface'
@@ -110,6 +111,8 @@ export function AdminPage() {
       <hr className="border-line" />
 
       <PublicListingsPanel />
+
+      <SurveyPanel />
     </div>
   )
 }

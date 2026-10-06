@@ -685,3 +685,36 @@ export const inviteRequests = sqliteTable('invite_requests', {
 
 export type OpportunityRow = typeof opportunities.$inferSelect
 export type InviteRequestRow = typeof inviteRequests.$inferSelect
+
+/**
+ * The artist survey's responses. Migration 0035; see
+ * docs/artist-survey-questionnaire.md.
+ *
+ * A platform table with no tenant — the people answering have no account — and
+ * nothing in it identifies anyone: no IP, no user agent, no email, no hash of
+ * any of them. The `id` is a random token that doubles as the only credential
+ * for the response it names.
+ */
+export const surveyResponses = sqliteTable('survey_responses', {
+  id: text('id').primaryKey(),
+  instrument: text('instrument').notNull(),
+  language: text('language').notNull().default('en'),
+  /** A tag from the link naming the channel, never a person. */
+  source: text('source'),
+  /** phone | computer */
+  device: text('device'),
+  /** JSON: what the respondent was shown. See shared/surveyDesign.ts. */
+  plan: text('plan').notNull(),
+  /** JSON, keyed by screen id. See shared/surveyAnswers.ts. */
+  answers: text('answers').notNull().default('{}'),
+  /** JSON: seconds spent on each screen, keyed by screen id. */
+  seconds: text('seconds').notNull().default('{}'),
+  /** in_progress | complete | screened_out */
+  status: text('status').notNull().default('in_progress'),
+  saves: integer('saves').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  completedAt: text('completed_at'),
+})
+
+export type SurveyResponseRow = typeof surveyResponses.$inferSelect

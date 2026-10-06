@@ -27,7 +27,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { asc, desc, eq, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
-import { feedback, inviteRequests, opportunities, tenants, usageDaily, users } from '../db/schema'
+import { feedback, inviteRequests, opportunities, surveyResponses, tenants, usageDaily, users } from '../db/schema'
 import { asTenantId } from '../db/scope'
 import { adminOf, type AdminEnv } from '../context'
 import { elevationState } from '../../shared/auth'
@@ -38,6 +38,8 @@ import { inviteEmail } from '../lib/authMail'
 import { readTenantHealth } from '../lib/tenantHealth'
 import { MEASURED_FIELDS } from '../lib/usage'
 import { isFeedbackKind } from '../../shared/feedback'
+import { surveyConfig } from './survey'
+import { summarise, toCsv, toRespondent, type Respondent } from '../../shared/surveyAnalysis'
 
 const admin = new Hono<AdminEnv>()
 
@@ -424,5 +426,66 @@ async function resolveTenant(binding: D1Database, raw: string | undefined) {
   const row = await getDb(binding).select().from(tenants).where(eq(tenants.id, raw)).get()
   return row ? asTenantId(row.id) : null
 }
+
+/**
+ * The artist survey's results (docs/artist-survey-questionnaire.md). Platform
+ * data with no tenant, read here and nowhere else.
+ *
+ * `GET /survey` is the summary the owner reads: who answered, with every group
+ * under ten suppressed, and the ranking and the dollar values with their error
+ * bars. `GET /survey/export` is the raw rows as a spreadsheet, which is not
+ * suppressed and is the owner's alone. Neither takes a response id, and neither
+ * can reach an artist's work: this router names no scoped table.
+ *
+ * The two query flags leave the flagged respondents out of the ranking and the
+ * choices, so the result can be read with and without them. Nobody is dropped
+ * unless asked, and the counts of who was flagged are always shown.
+ */
+const SURVEY_ROWS = 5000
+
+async function surveyRespondents(binding: D1Database): Promise<{ respondents: Respondent[]; truncated: boolean }> {
+  const rows = await getDb(binding)
+    .select()
+    .from(surveyResponses)
+    .orderBy(desc(surveyResponses.createdAt))
+    .limit(SURVEY_ROWS)
+  return {
+    respondents: rows.map(toRespondent).filter((r): r is Respondent => r !== null),
+    truncated: rows.length === SURVEY_ROWS,
+  }
+}
+
+admin.get('/survey', async (c) => {
+  if (!adminOf(c)) return c.json({ error: 'not available' }, 403)
+  const { respondents, truncated } = await surveyRespondents(c.env.DB)
+  const cfg = surveyConfig(c.env)
+  return c.json({
+    // Whether it can open, and the four things the launch checklist asks for.
+    config: {
+      open: cfg.open,
+      asked: cfg.wanted,
+      contactSet: !!cfg.contact,
+      botCheck: cfg.botCheck,
+      resultsUrlSet: !!cfg.resultsUrl,
+    },
+    summary: summarise(respondents, {
+      failedCheck: c.req.query('failedCheck') === '1',
+      speeders: c.req.query('speeders') === '1',
+    }),
+    truncated,
+  })
+})
+
+admin.get('/survey/export', async (c) => {
+  if (!adminOf(c)) return c.json({ error: 'not available' }, 403)
+  const { respondents } = await surveyRespondents(c.env.DB)
+  return new Response(toCsv(respondents), {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="artist-survey.csv"',
+      'Cache-Control': 'no-store',
+    },
+  })
+})
 
 export default admin

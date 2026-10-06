@@ -5,6 +5,9 @@ import type { StagePlot } from '../../shared/stagePlot'
 import type { DocumentReading } from '../../shared/documentReadings'
 import type { PublicOpportunity } from '../../shared/opportunityCatalog'
 import type { InviteRequestStatus } from '../../shared/inviteRequests'
+import type { Plan as SurveyPlan } from '../../shared/surveyDesign'
+import type { AnswerMap as SurveyAnswers } from '../../shared/surveyAnswers'
+import type { Summary as SurveySummary } from '../../shared/surveyAnalysis'
 import { noteError } from './diagnostics'
 import type { NudgePreferences } from '../../shared/nudgeRouting'
 // Entity shapes live in shared/ because the Worker builds the review queue
@@ -469,6 +472,24 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json()
 }
 
+/** The owner's view of the survey: whether it can open, and what the responses say. */
+export interface SurveyResults {
+  config: { open: boolean; asked: boolean; contactSet: boolean; botCheck: boolean; resultsUrlSet: boolean }
+  summary: SurveySummary
+  /** True when there are more responses than the summary reads. */
+  truncated: boolean
+}
+
+/** What the survey page needs to know before it can open. */
+export interface SurveyStatus {
+  open: boolean
+  contact: string | null
+  resultsUrl: string | null
+  /** Turnstile's public site key, when the spam check is configured. */
+  siteKey: string | null
+  instrument: string
+}
+
 /** Which surface this session is on. See docs/multi-tenant-plan.md. */
 export type SessionMode = 'artist' | 'admin'
 
@@ -868,6 +889,8 @@ export const api = {
     invites: () => apiFetch<InviteList>('/admin/invites'),
     feedback: () => apiFetch<{ items: FeedbackItem[] }>('/admin/feedback'),
     inviteRequests: () => apiFetch<{ items: InviteRequestItem[] }>('/admin/invite-requests'),
+    survey: (flags: { failedCheck: boolean; speeders: boolean }) =>
+      apiFetch<SurveyResults>(`/admin/survey?failedCheck=${flags.failedCheck ? 1 : 0}&speeders=${flags.speeders ? 1 : 0}`),
     setInviteRequest: (id: number, status: InviteRequestStatus) =>
       apiFetch<{ ok: boolean }>(`/admin/invite-requests/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
     listings: () => apiFetch<{ items: ListingItem[] }>('/admin/listings'),
@@ -950,6 +973,27 @@ export const api = {
    */
   publicEpk: (token: string) =>
     apiFetch<EpkPage>('/public/epk', { method: 'POST', body: JSON.stringify({ token, today: localToday() }) }),
+  /**
+   * The artist survey, which anybody may take. Every call that names a response
+   * carries its id in the body and never in a path: the id is the only credential
+   * for that response, and the request logger prints paths.
+   */
+  survey: {
+    status: () => apiFetch<SurveyStatus>('/public/survey/status'),
+    start: (body: { source?: string; device?: 'phone' | 'computer'; token?: string; website?: string }) =>
+      apiFetch<{ id: string; plan: SurveyPlan }>('/public/survey/start', { method: 'POST', body: JSON.stringify(body) }),
+    resume: (id: string) =>
+      apiFetch<{ status: string; plan: SurveyPlan; answers: SurveyAnswers }>('/public/survey/resume', {
+        method: 'POST',
+        body: JSON.stringify({ id }),
+      }),
+    answer: (body: { id: string; screen: string; answer: unknown; seconds: number }) =>
+      apiFetch<{ ok: boolean; status: string }>('/public/survey/answer', { method: 'POST', body: JSON.stringify(body) }),
+    complete: (id: string) =>
+      apiFetch<{ ok: boolean }>('/public/survey/complete', { method: 'POST', body: JSON.stringify({ id }) }),
+    discard: (id: string) =>
+      apiFetch<{ ok: boolean }>('/public/survey/discard', { method: 'POST', body: JSON.stringify({ id }) }),
+  },
   drive: {
     status: () => apiFetch<DriveStatus>('/drive/status'),
     files: () => apiFetch<DriveFiles>('/drive/files'),
