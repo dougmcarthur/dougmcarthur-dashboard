@@ -7,6 +7,7 @@ import { Button } from './ui/Button'
 import { Input } from './ui/Field'
 import { Explainer } from './ui/Explainer'
 import { Banner, Card } from './ui/Surface'
+import { SurveyPublish } from './SurveyPublish'
 
 /**
  * The artist survey, from the owner's side: whether it is open and who to
@@ -238,7 +239,7 @@ function SurveyAccess({ config }: { config: SurveyConfigView }) {
         <a className="underline" href={config.resultsUrl} target="_blank" rel="noreferrer">
           {config.resultsUrl}
         </a>
-        . That page says the results have not been posted yet, and will until a summary is published there.
+        . What is there is whatever you publish under Publish the summary, below.
       </p>
 
       <div className="space-y-1.5 border-t border-line pt-3">
@@ -421,6 +422,14 @@ export function SurveyPanel() {
           </details>
         </Card>
       )}
+
+      <SurveyPublish
+        failedCheck={failedCheck}
+        speeders={speeders}
+        resultsUrl={config.resultsUrl}
+        contact={config.contact}
+        surveyOpen={config.open}
+      />
 
       <div>
         <Button onClick={() => window.location.assign('/api/admin/survey/export')}>Download every response (CSV)</Button>

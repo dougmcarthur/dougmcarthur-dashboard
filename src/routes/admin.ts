@@ -39,8 +39,10 @@ import { readTenantHealth } from '../lib/tenantHealth'
 import { MEASURED_FIELDS } from '../lib/usage'
 import { isFeedbackKind } from '../../shared/feedback'
 import { readSurveyConfig, writeSurveySettings } from '../lib/surveySettings'
+import { clearPublication, fingerprint, readPublication, summarisePublication, writePublication } from '../lib/surveyPublication'
 import type { Env } from '../types'
 import { summarise, toCsv, toRespondent, type Respondent } from '../../shared/surveyAnalysis'
+import { buildPublicResults, publishBlockers } from '../../shared/surveyPublic'
 
 const admin = new Hono<AdminEnv>()
 
@@ -523,6 +525,68 @@ admin.patch(
     return c.json({ config: await surveyConfigView(c) })
   },
 )
+
+/**
+ * The public summary: preview it, publish it, take it down.
+ *
+ * `GET` builds what would be published *now* and says why it cannot be, if it
+ * cannot. `POST` publishes it, and carries the digest of the preview that was
+ * looked at: the Worker rebuilds from the responses as they are at that moment
+ * and refuses if the result is not the one reviewed, because new responses may
+ * have arrived in between. The browser never sends the content, so it cannot be
+ * made to publish anything the allow-list in `shared/surveyPublic.ts` did not
+ * produce. `DELETE` takes the page down. Nothing here names a response.
+ *
+ * Admin mode and nothing more: publishing is reversible by the next call, and
+ * the person pressing it has already paid a passkey touch to be here.
+ */
+const PublicationBody = z.object({
+  fingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  failedCheck: z.boolean().optional(),
+  speeders: z.boolean().optional(),
+})
+
+async function publicationState(env: Env, flags: { failedCheck?: boolean; speeders?: boolean }) {
+  const { respondents, truncated } = await surveyRespondents(env.DB)
+  const blockers = publishBlockers(respondents, flags)
+  if (truncated) {
+    blockers.push(`There are more than ${SURVEY_ROWS.toLocaleString('en-CA')} responses, and the summary reads only the newest. It cannot be published until that is handled.`)
+  }
+  const preview = blockers.length === 0 ? buildPublicResults(respondents, { now: new Date().toISOString(), exclusions: flags }) : null
+  return { blockers, preview }
+}
+
+admin.get('/survey/publication', async (c) => {
+  if (!adminOf(c)) return c.json({ error: 'not available' }, 403)
+  const flags = { failedCheck: c.req.query('failedCheck') === '1', speeders: c.req.query('speeders') === '1' }
+  const { blockers, preview } = await publicationState(c.env, flags)
+  const published = await readPublication(c.env)
+  c.header('Cache-Control', 'no-store')
+  return c.json({
+    blockers,
+    preview,
+    fingerprint: preview ? await fingerprint(preview) : null,
+    published: await summarisePublication(published, preview),
+  })
+})
+
+admin.post('/survey/publication', zValidator('json', PublicationBody), async (c) => {
+  if (!adminOf(c)) return c.json({ error: 'not available' }, 403)
+  const body = c.req.valid('json')
+  const { blockers, preview } = await publicationState(c.env, body)
+  if (!preview) return c.json({ error: blockers[0] ?? 'There is nothing to publish.' }, 409)
+  if ((await fingerprint(preview)) !== body.fingerprint) {
+    return c.json({ error: 'New responses have come in since you looked. Review the new version, then publish it.', changed: true }, 409)
+  }
+  await writePublication(c.env, preview)
+  return c.json({ published: await summarisePublication(preview, preview) })
+})
+
+admin.delete('/survey/publication', async (c) => {
+  if (!adminOf(c)) return c.json({ error: 'not available' }, 403)
+  await clearPublication(c.env)
+  return c.json({ ok: true })
+})
 
 admin.get('/survey/export', async (c) => {
   if (!adminOf(c)) return c.json({ error: 'not available' }, 403)

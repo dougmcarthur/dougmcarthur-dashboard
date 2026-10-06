@@ -88,9 +88,102 @@ describe('the spam check', () => {
 })
 
 describe('the results page', () => {
-  it('promises nothing it does not hold: no live data, and it says the results are not posted', () => {
+  it('says plainly that nothing is posted until something is, and reads nothing but the published snapshot', () => {
     expect(RESULTS).toMatch(/have not been posted yet/)
-    expect(RESULTS).not.toMatch(/api\.admin|summary|ranking/i)
+    expect(RESULTS).toContain('api.survey.results')
+    // Public: no admin route, and nothing that computes from the responses on a visit.
+    expect(RESULTS + VIEW_SOURCES.map(([, t]) => t).join('\n')).not.toMatch(/api\.admin|\/admin\//)
+  })
+})
+
+/**
+ * The look of everything the public sees of the results, held to the rules the
+ * owner set for this product's text and design: no em dash anywhere a person
+ * reads, no small caption above a heading, no coloured bar down the left edge of
+ * a rounded card, and no colour that is not one of the app's tokens.
+ */
+const RESULTS_DIR = 'frontend/src/pages/survey/results'
+const VIEW_SOURCES = [
+  'BarList',
+  'DollarCharts',
+  'Marks',
+  'RankingChart',
+  'ResultsView',
+  'SayDoChart',
+].map((name) => [name, source(`${RESULTS_DIR}/${name}.tsx`)] as const)
+const FORMAT = source(`${RESULTS_DIR}/format.ts`)
+const HERO = source(`${RESULTS_DIR}/hero.ts`)
+const PUBLISH = source('frontend/src/components/SurveyPublish.tsx')
+const SHARED = source('shared/surveyPublic.ts')
+const EVERYTHING_PUBLIC: Array<readonly [string, string]> = [
+  ...VIEW_SOURCES,
+  ['format', FORMAT],
+  ['hero', HERO],
+  ['SurveyResultsPage', RESULTS],
+  ['SurveyPublish', PUBLISH],
+  ['surveyPublic', SHARED],
+  ['SurveyPage', PAGE],
+  ['SurveyScreens', SCREENS],
+]
+
+describe('how the results look', () => {
+  it('has no em dash in anything a person reads', () => {
+    for (const [name, text] of EVERYTHING_PUBLIC) expect(text, name).not.toContain('\u2014')
+  })
+
+  it('puts no small label above a heading: a heading says the finding itself', () => {
+    for (const [name, text] of [...VIEW_SOURCES, ['SurveyPublish', PUBLISH] as const]) {
+      expect(text, name).not.toMatch(/uppercase/)
+      expect(text, name).not.toMatch(/<Caption\b/)
+      expect(text, name).not.toMatch(/eyebrow/i)
+    }
+  })
+
+  it('has no coloured bar down the left edge of a card', () => {
+    for (const [name, text] of [...VIEW_SOURCES, ['SurveyPublish', PUBLISH] as const]) {
+      expect(text, name).not.toMatch(/border-l-(?:\d|accent|success|info|danger|warn|cat-)/)
+    }
+  })
+
+  it('draws only in the app’s own colour tokens, so both themes follow', () => {
+    for (const [name, text] of VIEW_SOURCES) {
+      expect(text, name).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+      expect(text, name).not.toMatch(/\brgba?\(/)
+      expect(text, name).not.toMatch(/\bhsla?\(/)
+      expect(text, name).not.toMatch(/(?:bg|text|border|stroke|fill)-(?:red|green|blue|yellow|orange|purple|pink|indigo|teal|sky|rose|violet|emerald|amber|lime|slate|gray|zinc|neutral|stone)-\d/)
+    }
+  })
+
+  it('never says "Scout", and gives every chart a table twin so no number is only in a tooltip', () => {
+    for (const [name, text] of EVERYTHING_PUBLIC) expect(text, name).not.toMatch(/scout/i)
+    const all = VIEW_SOURCES.map(([, t]) => t).join('\n')
+    for (const chart of ['RankingChart', 'DollarCharts', 'SayDoChart']) {
+      expect(VIEW_SOURCES.find(([n]) => n === chart)![1], chart).toContain('<TableTwin')
+    }
+    expect(all).toContain('role="tooltip"')
+    // A tooltip only repeats what is printed or tabulated: it is never given the keyboard alone.
+    expect(all).toMatch(/focus-visible:block/)
+  })
+})
+
+describe('the owner’s side of publishing', () => {
+  it('shows the page before it can be published, and publishes only a digest of what was shown', () => {
+    expect(PUBLISH.indexOf('api.admin.surveyPublication(')).toBeGreaterThan(-1)
+    expect(PUBLISH.indexOf('api.admin.surveyPublication(')).toBeLessThan(PUBLISH.indexOf('api.admin.publishSurvey('))
+    expect(PUBLISH).toContain('<Disclosure')
+    expect(PUBLISH).toContain('<ResultsView')
+    // The browser sends a digest and the exclusions, never the content it was shown.
+    expect(PUBLISH).toMatch(/publishSurvey\(\{ fingerprint, \.\.\.flags \}\)/)
+    expect(PUBLISH).not.toMatch(/publishSurvey\([^)]*results/)
+  })
+
+  it('cannot publish a page that matches what is already published, which would change only the date', () => {
+    expect(PUBLISH).toMatch(/disabled=\{publish\.isPending \|\| current\}/)
+  })
+
+  it('uses one component for the preview and the public page, so what was reviewed is what is shown', () => {
+    expect(RESULTS).toContain('<ResultsView')
+    expect(PUBLISH).toContain('<ResultsView')
   })
 })
 
