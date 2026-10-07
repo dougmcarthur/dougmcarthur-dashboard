@@ -573,9 +573,10 @@ export const INTROS: Record<'B' | 'C' | 'D' | 'E', { title: Text; body: Text[] }
 /**
  * The welcome, shown one paragraph to a screen (`shared/surveyConsent.ts`): the
  * title, lede and intro first, then each point under its own heading, then the
- * agreement. `{contact}` and `{results}` are filled in from the deployment's
- * configuration at the last moment, and the survey does not open until a contact
- * address exists: the notice promises one.
+ * agreement. `{results}` is filled in from the deployment's configuration at the
+ * last moment. The contact address is not part of this text: it is the footer of
+ * every survey screen, the welcome's included, and the survey does not open until
+ * one exists, because the notice promises it.
  *
  * A point's `lead` is its screen's heading, so it is a whole sentence.
  */
@@ -601,7 +602,6 @@ export const CONSENT = {
     },
     { lead: 'It is voluntary.', body: 'There is no payment and no prize draw.' },
   ].map(({ lead, body }) => ({ lead: { en: lead } as Text, body: { en: body } as Text })),
-  questions: { en: 'Questions: {contact}' } as Text,
   /** The heading of the last screen, the one with the checkbox. */
   confirm: { en: 'One last thing before you start.' } as Text,
   agree: { en: 'I am 18 or older and happy to take part.' } as Text,

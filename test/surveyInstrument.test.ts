@@ -49,7 +49,6 @@ function everyString(): string[] {
     take(p.lead)
     take(p.body)
   })
-  take(CONSENT.questions)
   take(CONSENT.confirm)
   take(CONSENT.agree)
   for (const t of Object.values(THANKS)) {
@@ -194,8 +193,7 @@ describe('what the notice promises', () => {
     expect(notice).toMatch(/no payment and no prize draw/)
   })
 
-  it('leaves the contact address and results address to be filled from configuration', () => {
-    expect(CONSENT.questions.en).toContain('{contact}')
+  it('leaves the results address to be filled from configuration', () => {
     expect(CONSENT.points.map((p) => p.body.en).join(' ')).toContain('{results}')
   })
 
@@ -209,11 +207,11 @@ describe('what a respondent reads', () => {
     for (const s of everyString()) expect(s, s).not.toMatch(/scout/i)
   })
 
-  it('has no empty strings and no leftover template braces except the two placeholders', () => {
+  it('has no empty strings and no leftover template braces except the one placeholder', () => {
     for (const s of everyString()) {
       expect(s.trim().length, JSON.stringify(s)).toBeGreaterThan(0)
       const braces = s.match(/\{[^}]*\}/g) ?? []
-      for (const b of braces) expect(['{contact}', '{results}'], s).toContain(b)
+      for (const b of braces) expect(['{results}'], s).toContain(b)
     }
   })
 

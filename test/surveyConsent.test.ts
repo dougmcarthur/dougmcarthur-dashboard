@@ -45,7 +45,7 @@ describe('what each welcome screen says', () => {
   })
 
   it('has no em dash in anything a respondent reads here', () => {
-    const all = [CONSENT.title, CONSENT.lede, CONSENT.intro, CONSENT.confirm, CONSENT.agree, CONSENT.questions]
+    const all = [CONSENT.title, CONSENT.lede, CONSENT.intro, CONSENT.confirm, CONSENT.agree]
       .map((t) => t.en)
       .concat(CONSENT.points.flatMap((p) => [p.lead.en, p.body.en]))
     for (const s of all) expect(s, s).not.toContain('\u2014')
