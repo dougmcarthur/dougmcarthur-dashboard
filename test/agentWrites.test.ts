@@ -334,7 +334,10 @@ describe('who else reaches the same routes', () => {
 })
 
 describe('the middleware is on every create route', () => {
-  const src = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
+  // LF only: a Windows checkout with core.autocrlf holds CRLF, and one
+  // expectation below spans a line break.
+  const src = (rel: string) =>
+    readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n')
 
   it('names its kind before the route\'s own validator', () => {
     const routes: Array<[string, string]> = [
