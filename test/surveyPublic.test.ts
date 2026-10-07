@@ -495,8 +495,8 @@ describe('the sentences about what artists did', () => {
   const q = (id: string, bars: ReturnType<typeof bar>[]) => ({ id, title: id, question: id, base: 100, multi: false, bars, hidden: 0 })
 
   it('quotes the most common reason for passing, skipping "other" and the combined row', () => {
-    const stop = q('B4', [bar('B4.pay', 'The pay or fee was too low', 0.264), bar('B4.other', 'Other (please specify)', 0.3, 'other')])
-    expect(buildFindings(shell({ stop }))[0]).toBe('When asked about the last opportunity they passed on, 26% of artists said “The pay or fee was too low”, the most common reason.')
+    const stop = q('B4', [bar('B4.pay', 'The pay was too low', 0.264), bar('B4.other', 'Other (please specify)', 0.3, 'other')])
+    expect(buildFindings(shell({ stop }))[0]).toBe('When asked about the last opportunity they passed on, 26% of artists said “The pay was too low”, the most common reason.')
     expect(buildFindings(shell({ stop: q('B4', [bar('B4.small', 'Smaller groups, combined', 0.4, 'small')]) }))).toEqual([])
   })
 

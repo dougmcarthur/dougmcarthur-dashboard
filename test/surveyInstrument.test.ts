@@ -224,3 +224,76 @@ describe('what a respondent reads', () => {
     }
   })
 })
+
+/**
+ * Wording settled after a read-through (docs/artist-survey-questionnaire.md,
+ * "Wording that was changed"). Each is a thing that reads fine alone and misleads
+ * in context, so a later edit has no reason to notice it going back.
+ */
+describe('the wording that was settled', () => {
+  const text = (qid: string, optionId: string) => {
+    const q = questionOf(qid) as ChoiceQuestion
+    return q.options.find((o) => o.id === `${qid}.${optionId}`)!.text.en
+  }
+
+  it('uses no word that is a verdict on an answer', () => {
+    // "Exposure only" is how artists hear an unpaid offer described by somebody
+    // who is not paying, and it pushes the weight on pay up.
+    for (const s of everyString()) expect(s, s).not.toMatch(/exposure/i)
+  })
+
+  it('never calls what an artist is paid a fee, since fee means what it costs to apply', () => {
+    for (const s of everyString()) expect(s, s).not.toMatch(/pay or fee/i)
+    expect(text('B4', 'pay')).toBe('The pay was too low')
+    expect(text('B5', 'pay')).toBe('The pay was good')
+  })
+
+  it('reads B5 against B4: every reason in B5 is one B4 offers, apart from being recommended', () => {
+    const ids = (qid: string) => (questionOf(qid) as ChoiceQuestion).options.map((o) => o.id.split('.')[1])
+    const b4 = new Set(ids('B4'))
+    for (const id of ids('B5')) if (id !== 'recommended') expect(b4.has(id), id).toBe(true)
+    // The cost to apply and the effort to apply are separate reasons in both.
+    for (const id of ['fee', 'effort']) {
+      expect(ids('B4')).toContain(id)
+      expect(ids('B5')).toContain(id)
+    }
+  })
+
+  it('does not ask about two things in one option', () => {
+    for (const q of choiceQuestions) {
+      for (const o of q.options) expect(o.text.en, o.id).not.toMatch(/, and (quick|cheap|free|fast)\b/i)
+    }
+  })
+
+  it('says "few or none" about people who could hire again, as the paired choices do', () => {
+    const level = ATTRIBUTES.find((a) => a.id === 'industry')!.levels[0].text.en
+    expect(level).toBe('Few or none')
+    expect(text('B4', 'industry')).toContain(level)
+  })
+
+  it('gives the way out of B2 in the terms B1 asked: not having applied', () => {
+    expect(text('B2', 'none')).toBe('I did not apply for any')
+  })
+
+  it('lets the "please specify" box ask for the text, not the option', () => {
+    for (const q of choiceQuestions) {
+      for (const o of q.options) expect(o.text.en, o.id).not.toMatch(/please specify/i)
+    }
+  })
+
+  it('tells people they may pick several wherever they may', () => {
+    for (const q of choiceQuestions.filter((c) => c.kind === 'multi')) {
+      expect(q.help?.en, q.id).toMatch(/select all that apply/i)
+    }
+  })
+
+  it('puts Other before the answers that close a list, in every list', () => {
+    for (const q of choiceQuestions) {
+      const other = q.options.findIndex((o) => o.other)
+      if (other < 0) continue
+      q.options.forEach((o, i) => {
+        if (o.exclusive || (o.anchor && !o.other)) expect(i, `${q.id} ${o.id}`).toBeGreaterThan(other)
+      })
+    }
+  })
+})
