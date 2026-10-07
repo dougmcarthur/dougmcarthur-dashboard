@@ -9,6 +9,7 @@ import type { GigOpportunity, SyncTarget, PromoDraft } from '../../api'
 import type { ReviewItem } from '../../../../shared/reviewQueue'
 import { DecisionBar } from './DecisionBar'
 import { Caption, Card } from '../../components/ui/Surface'
+import { TermsPanel, mayPitch } from '../../components/SyncTerms'
 
 /**
  * Everything known about the selected item, on one surface.
@@ -53,7 +54,9 @@ export function Detail({
   // Anything already rendered as its own fact at the top would be said twice
   // as a chip — and "Deadline not a real date" beside a deadline that now
   // shows the prose underneath it was saying the same thing in two voices.
-  const SHOWN_AS_FACT = new Set(['overdue', 'due_soon', 'paid', 'vague_deadline', 'window', 'no_reply'])
+  // `no_unsolicited` is said by the decision sentence above and the terms panel
+  // under it, so a chip as well would be the third time.
+  const SHOWN_AS_FACT = new Set(['overdue', 'due_soon', 'paid', 'vague_deadline', 'window', 'no_reply', 'no_unsolicited'])
   const warningChips = warnings.filter((f) => !SHOWN_AS_FACT.has(f.id))
   const stateChips = states.filter((f) => !SHOWN_AS_FACT.has(f.id))
 
@@ -208,6 +211,15 @@ export function Detail({
         <p className="mt-1 text-sm text-body leading-relaxed">{item.decision.rationale}</p>
       </div>
 
+      {/* What their own site says about pitches from strangers, with the way
+          past a refusal. Here and not further down: it decides whether
+          anything below it, the draft especially, should be acted on. */}
+      {sync && (
+        <div className="mt-4">
+          <TermsPanel target={sync} quiet />
+        </div>
+      )}
+
       {/* The facts a decision turns on, before anything else. */}
       {facts.length > 0 && (
         <div className="mt-4">
@@ -328,7 +340,7 @@ export function Detail({
       {parsed.draftedMessage && (
         <Section
           title={`Drafted message${parsed.draftedMessage.channel ? ` — ${parsed.draftedMessage.channel}` : ''}`}
-          action={<CopyButton text={parsed.draftedMessage.body} />}
+          action={sync && !mayPitch(sync) ? undefined : <CopyButton text={parsed.draftedMessage.body} />}
         >
           <p className="whitespace-pre-wrap rounded-md bg-sunken p-3 text-sm leading-relaxed text-ink">
             {parsed.draftedMessage.body}
@@ -337,7 +349,7 @@ export function Detail({
       )}
 
       {sync?.pitchDraft && (
-        <Section title="Pitch draft" action={<CopyButton text={sync.pitchDraft} />}>
+        <Section title="Pitch draft" action={mayPitch(sync) ? <CopyButton text={sync.pitchDraft} /> : undefined}>
           <p className="whitespace-pre-wrap rounded-md bg-sunken p-3 text-sm leading-relaxed text-ink">
             {sync.pitchDraft}
           </p>

@@ -125,6 +125,10 @@ function actionableNow(item: ReviewItem): boolean {
  */
 const BUCKET_ORDER: Array<{ flag: FlagId; one: string; many: string; filter: string }> = [
   { flag: 'conflict', one: 'contradicts its own status', many: 'contradict their own status', filter: 'conflict' },
+  // The one that is a mistake waiting to be sent. Counted ahead of the dates,
+  // and it is on the "needs a decision" filter, so the link the email carries
+  // shows what the line counted.
+  { flag: 'no_unsolicited', one: 'says it takes no unsolicited pitches', many: 'say they take no unsolicited pitches', filter: 'needs' },
   // Above the reply and the deadline buckets: those are things you can still
   // do something about this week. A visa lead time that has run out is not.
   { flag: 'visa_risk', one: 'may not leave time for a US work permit', many: 'may not leave time for a US work permit', filter: 'timing' },

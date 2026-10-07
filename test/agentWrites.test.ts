@@ -67,7 +67,17 @@ describe('the Worker accepts exactly what the agent tools send', () => {
       feeCurrency: 'CAD',
       status: 'discovered',
     })
-    await createSyncTarget(cfg, { name: 'Library', agencyType: 'library', contactEmail: 'a@b.test', notes: 'n', pitchDraft: 'p' })
+    await createSyncTarget(cfg, {
+      name: 'Library',
+      agencyType: 'library',
+      contactEmail: 'a@b.test',
+      website: 'https://library.example',
+      submissionPolicy: 'open',
+      policyQuote: 'We welcome submissions.',
+      policyUrl: 'https://library.example/submit',
+      notes: 'n',
+      pitchDraft: 'p',
+    })
     await createPromoDraft(cfg, { month: '2026-11', title: 't', content: 'c' })
     await logRun(cfg, { taskId: 'gig-festival-scan', status: 'ok', summary: 's', itemsAdded: 2 })
 
@@ -83,7 +93,7 @@ describe('the Worker accepts exactly what the agent tools send', () => {
       ['gig show dates', { name: 'x', type: 'festival', performanceStart: '2027-07-01', performanceEnd: '2027-07-03' }],
       ['gig guarantee', { name: 'x', type: 'festival', guaranteeAmount: 5000 }],
       ['gig submitted stamp', { name: 'x', type: 'festival', submittedAt: '2026-01-01T00:00:00Z' }],
-      ['sync status', { name: 'x', status: 'confirmed' }],
+      ['sync status', { name: 'x', submissionPolicy: 'unknown', status: 'confirmed' }],
       ['promo status', { month: '2026-11', title: 't', content: 'c', status: 'posted' }],
       ['run timestamp', { task_id: 'gig-festival-scan', status: 'ok', run_at: '2099-01-01T00:00:00Z' }],
     ]
@@ -105,8 +115,8 @@ describe('the Worker accepts exactly what the agent tools send', () => {
       ['gig name', AgentGigSchema, { type: 'festival' }, AGENT_TEXT_MAX.name],
       ['gig fitRationale', AgentGigSchema, { name: 'x', type: 'festival' }, AGENT_TEXT_MAX.prose],
       ['gig deadlineNote', AgentGigSchema, { name: 'x', type: 'festival' }, AGENT_TEXT_MAX.note],
-      ['sync notes', AgentSyncSchema, { name: 'x' }, AGENT_TEXT_MAX.prose],
-      ['sync pitchDraft', AgentSyncSchema, { name: 'x' }, AGENT_TEXT_MAX.pitch],
+      ['sync notes', AgentSyncSchema, { name: 'x', submissionPolicy: 'unknown' }, AGENT_TEXT_MAX.prose],
+      ['sync pitchDraft', AgentSyncSchema, { name: 'x', submissionPolicy: 'unknown' }, AGENT_TEXT_MAX.pitch],
       ['promo content', AgentPromoSchema, { month: '2026-11', title: 't' }, AGENT_TEXT_MAX.prose],
       ['run summary', AgentTaskRunSchema, { task_id: 't', status: 'ok' }, AGENT_TEXT_MAX.summary],
     ]
@@ -281,11 +291,21 @@ describe('POST /api/gigs with an issued token', () => {
 describe('POST /api/sync, /api/promo and /api/task-runs with an issued token', () => {
   it('files a sync target and refuses its repeats and its extras', async () => {
     const t = await setup()
-    const body = { name: 'Musicbed', agencyType: 'library', contactEmail: 'submit@musicbed.test', notes: 'n', pitchDraft: 'p' }
+    const body = { name: 'Musicbed', agencyType: 'library', contactEmail: 'submit@musicbed.test', notes: 'n', pitchDraft: 'p', submissionPolicy: 'unknown' }
     expect((await t.agent('/api/sync', body)).status).toBe(201)
     expect((await t.agent('/api/sync', { ...body, name: 'Other', contactEmail: 'SUBMIT@musicbed.test' })).status).toBe(409)
-    expect((await t.agent('/api/sync', { name: 'Artlist', status: 'confirmed' })).status).toBe(400)
+    expect((await t.agent('/api/sync', { name: 'Artlist', submissionPolicy: 'unknown', status: 'confirmed' })).status).toBe(400)
     expect(t.count('sync_targets')).toBe(1)
+  })
+
+  it('refuses a sync target filed without saying what its own pages say about pitches', async () => {
+    // A target whose About page said "no unsolicited material" was filed as ready
+    // to pitch. "unknown" is an allowed answer; saying nothing is not.
+    const t = await setup()
+    const res = await t.agent('/api/sync', { name: 'Musicbed', contactEmail: 'submit@musicbed.test', notes: 'n', pitchDraft: 'p' })
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as { error: string }).error).toMatch(/submissionPolicy/)
+    expect(t.count('sync_targets')).toBe(0)
   })
 
   it('files a promo draft, refuses a status, and stops at its ceiling', async () => {

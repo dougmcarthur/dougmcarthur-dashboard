@@ -56,6 +56,7 @@ import { scoped, type TenantId } from './db/scope'
 import { readGigs } from './db/gigRows'
 import { reconcileAllGigs, type GigRow } from './lib/gigNudges'
 import { revisitForms } from './lib/formRevisit'
+import { checkPendingTerms } from './lib/syncTerms'
 import { readNudgePreferences } from './lib/nudgeSettings'
 import type { RootEnv } from './context'
 import { originAllowed, relyingParty } from '../shared/auth'
@@ -459,6 +460,22 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
       }
     } catch (err) {
       console.error('form revisit failed:', err)
+    }
+  }
+
+  // Read the websites of the sync targets nobody has read. This is how a target
+  // whose own site says "no unsolicited material" gets found when whoever filed
+  // it did not look, and how the ones filed before the check existed get
+  // looked at at all. Per tenant, a few a night, one site after another: see
+  // src/lib/syncTerms.ts.
+  for (const tenant of tenants) {
+    try {
+      const run = await checkPendingTerms(env, tenant, today)
+      if (run.checked) {
+        console.log(`sync terms for ${tenant}: ${run.checked} read of ${run.due} due, ${run.closed} newly refusing pitches`)
+      }
+    } catch (err) {
+      console.error('sync terms check failed:', err)
     }
   }
 

@@ -17,6 +17,8 @@
  * means inside a transfer encoding.
  */
 
+import { bulkSkipReason, type TermsFacts } from './syncTerms'
+
 export interface DraftMessage {
   to: string
   from?: string | null
@@ -73,8 +75,12 @@ export function encodeDraft(draft: DraftMessage): string {
 
 /* --------------------------------------------------------------------- */
 
-/** The shape the bulk panel needs from a sync target. Deliberately minimal. */
-export interface PitchCandidate {
+/**
+ * The shape the bulk panel needs from a sync target. Deliberately minimal.
+ * The terms columns are what `bulkSkipReason` reads; a candidate without them
+ * is an unchecked one, which is the safe reading.
+ */
+export interface PitchCandidate extends TermsFacts {
   id: number
   name: string
   contactEmail?: string | null
@@ -82,7 +88,11 @@ export interface PitchCandidate {
   status?: string | null
 }
 
-export type SkipReason = 'no pitch drafted' | 'no contact address' | 'already pitched'
+export type SkipReason =
+  | 'no pitch drafted'
+  | 'no contact address'
+  | 'already pitched'
+  | NonNullable<ReturnType<typeof bulkSkipReason>>
 
 export interface DraftPlan {
   ready: Array<{ id: number; name: string; to: string; subject: string; body: string }>
@@ -103,7 +113,11 @@ export function subjectFor(name: string): string {
  * them. This is what the preview renders before anything is written.
  *
  * `pitched` is excluded because drafting a second copy of a pitch already
- * sent is the one outcome here that is actively embarrassing.
+ * sent is the one outcome here that is actively embarrassing. So is a pitch to
+ * a company whose own site says it takes none, which is why a stated refusal
+ * leaves a target out and so does terms nobody has checked yet: seven drafts at
+ * once is where one of those costs the most, and the nightly check clears the
+ * backlog within days. A target the artist chose to pitch anyway goes through.
  */
 export function planDrafts(targets: PitchCandidate[]): DraftPlan {
   const plan: DraftPlan = { ready: [], skipped: [] }
@@ -111,8 +125,11 @@ export function planDrafts(targets: PitchCandidate[]): DraftPlan {
   for (const t of targets) {
     const body = t.pitchDraft?.trim()
     const to = t.contactEmail?.trim()
+    const terms = bulkSkipReason(t)
     if (t.status && t.status !== 'draft_ready') {
       plan.skipped.push({ id: t.id, name: t.name, reason: 'already pitched' })
+    } else if (terms) {
+      plan.skipped.push({ id: t.id, name: t.name, reason: terms })
     } else if (!body) {
       plan.skipped.push({ id: t.id, name: t.name, reason: 'no pitch drafted' })
     } else if (!to) {

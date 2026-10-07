@@ -1148,8 +1148,12 @@ export const api = {
     },
     create: (body: Omit<SyncTarget, 'id' | 'discoveredAt' | 'updatedAt' | 'reconciledAt' | 'pitchSent' | 'snoozedUntil' | 'snoozedAt'>) =>
       apiFetch<{ id: number }>('/sync', { method: 'POST', body: JSON.stringify(body) }),
-    patch: (id: number, body: Partial<SyncTarget>) =>
+    // `overrideTerms` is the artist's "pitch anyway", which is not a column of
+    // the target: see PATCH /api/sync/:id.
+    patch: (id: number, body: Partial<SyncTarget> & { overrideTerms?: boolean }) =>
       apiFetch<SyncTarget>(`/sync/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    /** Read the target's own site for its rules about unsolicited pitches. */
+    checkTerms: (id: number) => apiFetch<SyncTarget>(`/sync/${id}/check-terms`, { method: 'POST' }),
     delete: (id: number) => apiFetch<{ ok: boolean }>(`/sync/${id}`, { method: 'DELETE' }),
     reconcile: {
       preview: () => apiFetch<ReconcilePreview>('/sync/reconcile'),

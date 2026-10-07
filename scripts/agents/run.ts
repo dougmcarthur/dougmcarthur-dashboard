@@ -55,6 +55,7 @@ import {
   TOOLS_BY_AGENT,
   isAgentId,
   pitchLengthNote,
+  termsNote,
   type AgentId,
   type ToolName,
 } from './tools'
@@ -89,7 +90,7 @@ function toolsFor(agent: AgentId, cfg: ApiConfig, counter: { added: number }) {
       // read once at the start. A note it can act on for the *next* target in
       // the same run beats a rule it has already drifted from — and the
       // number is concrete where "keep it short" is not.
-      return JSON.stringify({ ...result, ...pitchLengthNote(input.pitchDraft as string | undefined) })
+      return JSON.stringify({ ...result, ...pitchLengthNote(input.pitchDraft as string | undefined), ...termsNote(input) })
     },
     create_promo_draft: async (input) => {
       const result = await createPromoDraft(cfg, { ...input })
