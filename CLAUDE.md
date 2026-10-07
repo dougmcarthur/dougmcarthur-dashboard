@@ -550,6 +550,23 @@ Things about it that are not obvious:
   routes: three reads, three creates and the run log. The legacy `API_TOKEN`
   is not limited — the CI runner has no shell and the route tests use it to
   reach every router — and nothing that reads untrusted pages is given it.
+- **Which routes is half of it; what they carry is the other half.** The
+  create routes were written for the artist's own form, so an issued token
+  could still send a gig already `booked` with show dates (which the nightly
+  reconcile puts on the calendar), a field of any length, or a run stamped next
+  year (which makes a stopped schedule look alive, since cadence is measured
+  from the newest `run_at`). `agentWrite` in `src/lib/agentWrites.ts` sits in
+  front of `POST /api/gigs`, `/sync`, `/promo` and `/task-runs` and, for an
+  issued token only, requires the body to be exactly the tool's fields
+  (`.strict()`, with `status` limited to `discovered`), bounds each text field,
+  refuses past a trailing day's ceiling (`AGENT_DAILY_LIMITS` in
+  `shared/agentWrites.ts`), and answers 409 with the row it repeats. Rows carry
+  no record of who filed them, so the ceiling counts the tenant's rows of that
+  kind rather than the token's; a person adding sixty gigs in a day holds the
+  agent off until tomorrow. `test/agentWrites.test.ts` checks the schemas
+  against `TOOL_SPECS`, so a field added to a tool and not to the Worker fails
+  there rather than as a 400 in a routine nobody is watching. A task run's
+  `run_at` is ignored for every agent credential, the legacy secret included.
 - **The agents get named, typed tools and never a general HTTP tool.**
   `create_gig_opportunity` is one prompt injection away from being safe;
   `http_request` would be one away from `DELETE /api/gigs/12`.
@@ -1603,7 +1620,11 @@ artist's gig and sync rows link to it by `opportunity_id`. `src/lib/catalog.ts`
 writes it: read-by-key then insert (no `ON CONFLICT`), a later sighting fills
 gaps and never overwrites — one research session reading a poisoned page must
 not rewrite what every artist sees — and linking is best-effort so a catalog
-failure never costs a filed gig. Sync targets are catalogued only when they
+failure never costs a filed gig. A row that missed its link is retried by
+the daily housekeeping tick (`relinkMissing`): the backfill is one-shot, and
+this module once said it would catch such rows when it would not. A retry does
+not know who filed the row, so it publishes by the backfill's rule — untouched
+rows only. Sync targets are catalogued only when they
 are organisations; a supervisor's name stays on the artist's own row.
 
 **The logged-out page shows the catalog, and publishing is conservative.**

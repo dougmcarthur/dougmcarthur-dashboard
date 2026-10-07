@@ -6,6 +6,7 @@ import { getDb } from '../db'
 import { promoDrafts } from '../db/schema'
 import { scoped, withTenant } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
+import { agentWrite } from '../lib/agentWrites'
 
 const promo = new Hono<AppEnv>()
 
@@ -27,7 +28,7 @@ promo.get('/', async (c) => {
   return c.json(rows)
 })
 
-promo.post('/', zValidator('json', PromoInsertSchema), async (c) => {
+promo.post('/', agentWrite('promo'), zValidator('json', PromoInsertSchema), async (c) => {
   const db = getDb(c.env.DB)
   const b = c.req.valid('json')
   const ts = new Date().toISOString()

@@ -80,7 +80,7 @@ export function normaliseUrl(raw: string | null | undefined): string | null {
   return `${host}${path}`
 }
 
-function slug(s: string): string {
+export function slug(s: string): string {
   return s
     .toLowerCase()
     .normalize('NFKD')

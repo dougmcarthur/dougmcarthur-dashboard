@@ -8,6 +8,7 @@ import { scoped, withTenant } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
 import { syncNoteColumns } from '../../shared/noteColumns'
 import { linkSync } from '../lib/catalog'
+import { agentWrite } from '../lib/agentWrites'
 
 const sync = new Hono<AppEnv>()
 
@@ -46,7 +47,7 @@ sync.get('/', async (c) => {
   return c.json(rows)
 })
 
-sync.post('/', zValidator('json', SyncInsertSchema), async (c) => {
+sync.post('/', agentWrite('sync'), zValidator('json', SyncInsertSchema), async (c) => {
   const db = getDb(c.env.DB)
   const b = c.req.valid('json')
   const ts = new Date().toISOString()

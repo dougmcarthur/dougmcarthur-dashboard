@@ -10,6 +10,7 @@ import { tenantOf, type AppEnv } from '../context'
 import { syncGigNudges, removeGigNudges, type GigRow } from '../lib/gigNudges'
 import { readNudgePreferences } from '../lib/nudgeSettings'
 import { linkGig } from '../lib/catalog'
+import { agentWrite } from '../lib/agentWrites'
 import {
   normaliseGigStatus,
   isGigSettled,
@@ -101,7 +102,7 @@ gigs.get('/', async (c) => {
   return c.json(status ? read.filter((r) => r.status === normaliseGigStatus(status)) : read)
 })
 
-gigs.post('/', zValidator('json', GigInsertSchema), async (c) => {
+gigs.post('/', agentWrite('gig'), zValidator('json', GigInsertSchema), async (c) => {
   const db = getDb(c.env.DB)
   const b = c.req.valid('json')
   const ts = new Date().toISOString()
