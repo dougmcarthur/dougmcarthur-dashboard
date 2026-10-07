@@ -65,6 +65,14 @@ function answerFor(plan: Plan, screen: string): unknown {
   }
 }
 
+/** Answers every screen of the plan in order, the way the page does, so the response can be finished. */
+async function answerAll(t: ReturnType<typeof setup>, id: string, plan: Plan) {
+  for (const screen of plan.screens) {
+    const res = await t.call('answer', { id, screen, answer: answerFor(plan, screen), seconds: 4 })
+    expect(res.status, screen).toBe(200)
+  }
+}
+
 async function startOne(t: ReturnType<typeof setup>, extra: Record<string, unknown> = {}) {
   const res = await t.call('start', { source: 'test-channel', device: 'computer', ...extra })
   expect(res.status).toBe(200)
@@ -198,21 +206,38 @@ describe('a respondent from start to finish', () => {
     expect(body.answers).toEqual({ S1: { value: SCREEN_IN }, A1: { value: 'A1.mb' } })
   })
 
-  it('refuses to finish until the last question has been reached', async () => {
+  it('refuses to finish until every screen has an answer, a skip included', async () => {
     const t = setup()
     const { id, plan } = await startOne(t)
     await t.call('answer', { id, screen: 'S1', answer: { value: SCREEN_IN } })
     expect((await t.call('complete', { id })).status).toBe(409)
+    // The last question alone is not enough: the page saves each screen on the way
+    // there, so a response that jumped to the end did not come from the page.
     await t.call('answer', { id, screen: 'E5', answer: { skipped: true } })
+    const early = await t.call('complete', { id })
+    expect(early.status).toBe(409)
+    expect(await early.json()).toMatchObject({ error: 'There are questions still to answer.' })
+    expect(t.row(id)!.status).toBe('in_progress')
+
+    await answerAll(t, id, plan)
     expect((await t.call('complete', { id })).status).toBe(200)
-    expect(plan.screens).toContain('E5')
+  })
+
+  it('counts a skipped screen as answered, since leaving one blank is allowed', async () => {
+    const t = setup()
+    const { id, plan } = await startOne(t)
+    for (const screen of plan.screens) {
+      const answer = screen === 'S1' || screenKind(screen) === 'intro' ? answerFor(plan, screen) : { skipped: true }
+      expect((await t.call('answer', { id, screen, answer, seconds: 1 })).status, screen).toBe(200)
+    }
+    expect((await t.call('complete', { id })).status).toBe(200)
   })
 
   it('refuses any more answers once it is finished', async () => {
     const t = setup()
-    const { id } = await startOne(t)
-    await t.call('answer', { id, screen: 'E5', answer: { skipped: true } })
-    await t.call('complete', { id })
+    const { id, plan } = await startOne(t)
+    await answerAll(t, id, plan)
+    expect((await t.call('complete', { id })).status).toBe(200)
     expect((await t.call('answer', { id, screen: 'A1', answer: { value: 'A1.mb' } })).status).toBe(409)
   })
 
@@ -238,9 +263,9 @@ describe('close without saving', () => {
 
   it('cannot take back a finished survey, as the notice says', async () => {
     const t = setup()
-    const { id } = await startOne(t)
-    await t.call('answer', { id, screen: 'E5', answer: { skipped: true } })
-    await t.call('complete', { id })
+    const { id, plan } = await startOne(t)
+    await answerAll(t, id, plan)
+    expect((await t.call('complete', { id })).status).toBe(200)
     expect((await t.call('discard', { id })).status).toBe(409)
     expect(t.row(id)).toBeDefined()
   })
@@ -303,6 +328,31 @@ describe('answers that did not come from the screen', () => {
       const res = await save(t, id, -42)
       expect(res.status).toBe(200)
       expect(stored(t, id)).toBe(0)
+    })
+
+    it('adds a second visit to the first, so going back to a screen does not erase how long it took', async () => {
+      const t = setup()
+      const { id } = await startOne(t)
+      await save(t, id, 20)
+      // Back, then straight on again: about a second, which used to replace the 20.
+      await save(t, id, 1)
+      expect(stored(t, id)).toBe(21)
+    })
+
+    it('keeps the longest a screen can show however many visits it took', async () => {
+      const t = setup()
+      const { id } = await startOne(t)
+      await save(t, id, 3000)
+      await save(t, id, 3000)
+      expect(stored(t, id)).toBe(SURVEY_LIMITS.maxSeconds)
+    })
+
+    it('leaves the time alone when a visit reports none', async () => {
+      const t = setup()
+      const { id } = await startOne(t)
+      await save(t, id, 20)
+      await t.call('answer', { id, screen: 'A2', answer: { value: 'A2.2to5' } })
+      expect(stored(t, id)).toBe(20)
     })
 
     it('keeps an ordinary time, to the second', async () => {
