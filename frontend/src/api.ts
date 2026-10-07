@@ -458,17 +458,25 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     if (res.status === 401) window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT))
     const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
-      error: string
+      error?: unknown
       needsElevation?: boolean
     }
+    // Every refusal this app writes by hand says `error` in a sentence. A route
+    // checked by zod's validator answers with an object there instead, and
+    // reading that as a sentence put a JavaScript error in front of the person
+    // (and lost the diagnostics line with it).
+    const message =
+      typeof err.error === 'string' && err.error
+        ? err.error
+        : res.statusText || `That was not accepted (${res.status}).`
     // Not an error to show: the caller is expected to ask for the passkey and
     // try again. Carried on the error rather than returned, because every
     // caller that does not know about it should keep failing loudly.
-    if (err.needsElevation) throw new ElevationRequired(err.error)
+    if (err.needsElevation) throw new ElevationRequired(message)
     // Kept in this tab for the feedback form, and nowhere else. A 401 is
     // being signed out, which is not a fault anybody writes in about.
-    if (res.status !== 401) noteError(what, res.status, err.error ?? res.statusText)
-    throw new Error(err.error)
+    if (res.status !== 401) noteError(what, res.status, message)
+    throw new Error(message)
   }
   return res.json()
 }

@@ -224,7 +224,12 @@ survey.post('/survey/answer', zValidator('json', AnswerSchema), async (c) => {
   const seconds = parse<Record<string, number>>(row.seconds, {})
   answers[body.screen] = checked.answer
   if (body.seconds !== undefined) {
-    seconds[body.screen] = Math.round(Math.min(Math.max(body.seconds, 0), SURVEY_LIMITS.maxSeconds))
+    // A visit adds to the screen's time rather than replacing it. Going Back and
+    // straight on again reports about a second, and replacing the first visit with
+    // that would make somebody who read every screen look like a speeder.
+    const visit = Math.round(Math.min(Math.max(body.seconds, 0), SURVEY_LIMITS.maxSeconds))
+    const before = Number.isFinite(seconds[body.screen]) ? seconds[body.screen] : 0
+    seconds[body.screen] = Math.min(before + visit, SURVEY_LIMITS.maxSeconds)
   }
 
   // Whoever is not the artist is thanked and stopped, and what they said is
@@ -247,7 +252,12 @@ survey.post('/survey/answer', zValidator('json', AnswerSchema), async (c) => {
   return c.json({ ok: true, status: screenedOut ? 'screened_out' : row.status })
 })
 
-/** The respondent reached the end. Only a response that got to the last question can be finished. */
+/**
+ * The respondent reached the end. Only a response with an answer for every screen
+ * of its plan can be finished, a skip included. The page saves each screen on the
+ * way through, so one that is missing a screen did not come from the page, and
+ * counting it as a completed survey would put it in every result.
+ */
 survey.post('/survey/complete', zValidator('json', IdSchema), async (c) => {
   const row = await loadRow(c.env, c.req.valid('json').id)
   if (!row) return c.json({ error: 'not found' }, 404)
@@ -255,7 +265,12 @@ survey.post('/survey/complete', zValidator('json', IdSchema), async (c) => {
   if (row.status === 'screened_out') return c.json({ error: 'This survey is already finished.' }, 409)
 
   const answers = parse<AnswerMap>(row.answers, {})
-  if (!('E5' in answers)) return c.json({ error: 'There are questions still to answer.' }, 409)
+  const screens = parse<Plan>(row.plan, {} as Plan).screens ?? []
+  // A plan that cannot be read has no screens to check, and finishing it would
+  // pass an empty check, so it is refused the same way.
+  if (screens.length === 0 || !screens.every((screen) => screen in answers)) {
+    return c.json({ error: 'There are questions still to answer.' }, 409)
+  }
 
   const now = new Date().toISOString()
   await getDb(c.env.DB)
