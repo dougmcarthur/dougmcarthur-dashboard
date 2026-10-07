@@ -185,15 +185,14 @@ Less than 2 years · 2 to 5 years · 6 to 10 years · 11 to 20 years · More tha
 
 **A3. How do you usually perform?** · single choice · required · F (smallest to
 largest)
-Solo · As a duo · In a group of 3 or more · It depends on the show · Other (please
-specify)
+Solo · As a duo · In a group of 3 or more · It depends on the show · Other
 
 **A4. Which genre best describes most of your music?** · single choice · required
 · F (alphabetical)
 Alternative or indie · Blues · Children's · Classical or contemporary classical ·
 Country · Electronic or dance · Folk, roots or singer-songwriter · Hip-hop or
 rap · Jazz · Metal, punk or hardcore · Pop · R&B or soul · Rock · World or global
-· Another genre (please specify)
+· Another genre
 
 **A5. How would you describe your work in music?** · single choice · required · F
 It is my main job · A major part of my work, alongside other work · A side
@@ -203,12 +202,13 @@ activity alongside other work or study · A hobby or occasional
 choice · required · F
 None · 1 to 5 · 6 to 15 · 16 to 40 · More than 40
 
-**A7. Who helps you find or apply for opportunities?** · multiple choice · R
+**A7. Who helps you find or apply for opportunities?** *Select all that apply.* ·
+multiple choice · R
 A manager · A booking agent · A label or publisher · A publicist · A bandmate or
-friend · *No one, I do it myself* (exclusive, F) · Other (please specify) (F)
+friend · Other (F) · *No one, I do it myself* (exclusive, F)
 
 **A8. What language are most of your songs or lyrics in?** · single choice · F
-English · French · An Indigenous language · Another language (please specify) ·
+English · French · An Indigenous language · Another language ·
 About equally in more than one · Mostly instrumental
 
 A8 is here because the language the music is in bears on which festivals and
@@ -231,24 +231,24 @@ None · 1 or 2 · 3 to 5 · 6 to 10 · 11 to 20 · More than 20
 Festivals · Showcases *(events where industry people come to watch artists play)*
 · Conferences or industry events · Venue bookings or residencies · Grants or
 funding · Competitions or awards · Radio, playlist or media pitches · Sync
-*(placing music in film, TV, games or ads)* · Other (please specify) (F) ·
-*None of these* (exclusive, F)
+*(placing music in film, TV, games or ads)* · Other (F) ·
+*I did not apply for any* (exclusive, F)
 
 **B3. How do you usually find opportunities?** · multiple choice · R
 Other artists or friends · Newsletters or websites from a music association ·
 Social media · Search or listing websites · Invitations sent to me directly · A
 manager, agent or other helper · An app or service that finds them for me · Other
-(please specify) (F) · *I do not actively look* (exclusive, F)
+(F) · *I do not actively look* (exclusive, F)
 
 **B4. Think of the most recent opportunity you could have applied for but chose
 not to. What was the main reason?** · single choice · required · R
-- The pay or fee was too low
+- The pay was too low
 - The cost to apply was too high
 - The application would have taken too long
 - Travel and lodging would have cost too much
 - It would have kept me away from home or other work for too long
 - The audience would have been too small
-- None of the people who could hire me again would have been there
+- Few or none of the people who could hire me again would have been there
 - It was not a good fit for my music
 - My chances of being selected seemed too low
 - I was not convinced the event was well known or respected enough
@@ -261,8 +261,9 @@ not to. What was the main reason?** · single choice · required · R
 
 **B5. Now think of the most recent opportunity you did apply for. What was the
 main reason you went for it?** · single choice · required · R
-- The pay or fee was good
-- It was free or cheap to apply, and quick
+- The pay was good
+- It was free or cheap to apply
+- The application was quick
 - Travel and lodging would cost me little, or were covered
 - It would take little time away from home or other work
 - The audience was a good size
@@ -279,6 +280,27 @@ main reason you went for it?** · single choice · required · R
 B4 and B5 are the same list read two ways on purpose: what made someone pass
 and what made someone go are the revealed half of the picture, and section C is
 the stated half. Where they disagree, that is a finding (section 6).
+
+**Wording that was changed after a read-through (instrument 2026-10-b), and why
+it should not change back.**
+- B5 lists the application's cost and its effort as two reasons, as B4 does. One
+  option that said "free or cheap to apply, and quick" asked about two things at
+  once and could not be read against B4.
+- Pay is "the pay" in both lists. "Pay or fee" used *fee* for what an artist is
+  paid, while *fee* everywhere else means what it costs to apply.
+- B4's industry reason says "few or none", as the paired choices do. "None of the
+  people who could hire me again" is hard to agree with when a few were going to
+  be there, and B4 is the list the say-against-do chart reads, so the wording
+  would have drawn a gap that was not in the answers.
+- $0 is shown as $0. "Exposure only" is a verdict artists hear as a complaint,
+  which pushes the weight on pay up, and principle 7 rules out loaded words.
+- B2's way out says "I did not apply for any". It follows B1, where "None" is a
+  real answer, and "None of these" read as though the kinds listed were the
+  problem.
+- An "Other" option says only "Other". The box that opens when it is ticked says
+  "Please specify (optional)", so the option cannot also ask for it.
+- A7 says "Select all that apply" like the other multiple-choice questions, and
+  lists Other before "No one", the order every other list uses.
 
 **Parked for a later wave** (cut to reach ten minutes, by Doug's decision):
 - *How long does a typical application take you, start to finish?* The paired
@@ -350,7 +372,7 @@ randomised across respondents.
 
 | Attribute | Levels |
 | --- | --- |
-| Pay if selected | $0 (exposure only) · $300 · $750 · $1,500 |
+| Pay if selected | $0 · $300 · $750 · $1,500 |
 | Cost to apply | Free · $20 · $40 · $75 |
 | Your out-of-pocket cost to get there and stay | $0 · $150 · $500 · $1,200 |
 | People in the audience | About 100 · About 500 · About 2,000 · About 10,000 |

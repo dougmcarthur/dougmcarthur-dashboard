@@ -14,7 +14,7 @@
  * read-through, so ids are stable and nothing is built from a string.
  */
 
-export const INSTRUMENT_VERSION = '2026-10-a'
+export const INSTRUMENT_VERSION = '2026-10-b'
 
 export type Lang = 'en'
 export interface Text {
@@ -144,7 +144,7 @@ export const QUESTIONS: Question[] = [
       ['duo', 'As a duo'],
       ['group', 'In a group of 3 or more'],
       ['varies', 'It depends on the show'],
-      ['other', 'Other (please specify)', 'o'],
+      ['other', 'Other', 'o'],
     ]),
   },
   {
@@ -168,7 +168,7 @@ export const QUESTIONS: Question[] = [
       ['rnb', 'R&B or soul'],
       ['rock', 'Rock'],
       ['world', 'World or global'],
-      ['other', 'Another genre (please specify)', 'o'],
+      ['other', 'Another genre', 'o'],
     ]),
   },
   {
@@ -204,14 +204,15 @@ export const QUESTIONS: Question[] = [
     kind: 'multi',
     shuffle: true,
     prompt: { en: 'Who helps you find or apply for opportunities?' },
+    help: { en: 'Select all that apply.' },
     options: options('A7', [
       ['manager', 'A manager'],
       ['agent', 'A booking agent'],
       ['label', 'A label or publisher'],
       ['publicist', 'A publicist'],
       ['friend', 'A bandmate or friend'],
+      ['other', 'Other', 'oa'],
       ['self', 'No one, I do it myself', 'xa'],
-      ['other', 'Other (please specify)', 'oa'],
     ]),
   },
   {
@@ -223,7 +224,7 @@ export const QUESTIONS: Question[] = [
       ['en', 'English'],
       ['fr', 'French'],
       ['indigenous', 'An Indigenous language'],
-      ['other', 'Another language (please specify)', 'o'],
+      ['other', 'Another language', 'o'],
       ['several', 'About equally in more than one'],
       ['instrumental', 'Mostly instrumental'],
     ]),
@@ -264,8 +265,8 @@ export const QUESTIONS: Question[] = [
       ['award', 'Competitions or awards'],
       ['media', 'Radio, playlist or media pitches'],
       ['sync', 'Sync (placing music in film, TV, games or ads)'],
-      ['other', 'Other (please specify)', 'oa'],
-      ['none', 'None of these', 'xa'],
+      ['other', 'Other', 'oa'],
+      ['none', 'I did not apply for any', 'xa'],
     ]),
   },
   {
@@ -283,7 +284,7 @@ export const QUESTIONS: Question[] = [
       ['invited', 'Invitations sent to me directly'],
       ['helper', 'A manager, agent or other helper'],
       ['app', 'An app or service that finds them for me'],
-      ['other', 'Other (please specify)', 'oa'],
+      ['other', 'Other', 'oa'],
       ['nolook', 'I do not actively look', 'xa'],
     ]),
   },
@@ -297,13 +298,13 @@ export const QUESTIONS: Question[] = [
       en: 'Think of the most recent opportunity you could have applied for but chose not to. What was the main reason?',
     },
     options: options('B4', [
-      ['pay', 'The pay or fee was too low'],
+      ['pay', 'The pay was too low'],
       ['fee', 'The cost to apply was too high'],
       ['effort', 'The application would have taken too long'],
       ['travel', 'Travel and lodging would have cost too much'],
       ['time', 'It would have kept me away from home or other work for too long'],
       ['audience', 'The audience would have been too small'],
-      ['industry', 'None of the people who could hire me again would have been there'],
+      ['industry', 'Few or none of the people who could hire me again would have been there'],
       ['fit', 'It was not a good fit for my music'],
       ['odds', 'My chances of being selected seemed too low'],
       ['repute', 'I was not convinced the event was well known or respected enough'],
@@ -311,7 +312,7 @@ export const QUESTIONS: Question[] = [
       ['goals', 'It would not have helped me toward my goals'],
       ['dates', 'The dates did not work'],
       ['late', 'I missed the deadline, or heard about it too late'],
-      ['other', 'Other (please specify)', 'oa'],
+      ['other', 'Other', 'oa'],
       ['none', 'I cannot think of one', 'a'],
     ]),
   },
@@ -325,8 +326,9 @@ export const QUESTIONS: Question[] = [
       en: 'Now think of the most recent opportunity you did apply for. What was the main reason you went for it?',
     },
     options: options('B5', [
-      ['pay', 'The pay or fee was good'],
-      ['cheap', 'It was free or cheap to apply, and quick'],
+      ['pay', 'The pay was good'],
+      ['fee', 'It was free or cheap to apply'],
+      ['effort', 'The application was quick'],
       ['travel', 'Travel and lodging would cost me little, or were covered'],
       ['time', 'It would take little time away from home or other work'],
       ['audience', 'The audience was a good size'],
@@ -337,7 +339,7 @@ export const QUESTIONS: Question[] = [
       ['treat', 'The organisers have a good record with artists'],
       ['goals', 'It would help me toward my goals'],
       ['recommended', 'Someone I know recommended it, or was involved'],
-      ['other', 'Other (please specify)', 'oa'],
+      ['other', 'Other', 'oa'],
       ['none', 'I cannot think of one', 'a'],
     ]),
   },
@@ -479,7 +481,7 @@ export const ATTRIBUTES: Attribute[] = [
     label: { en: 'Pay if selected' },
     better: 'higher',
     levels: [
-      { text: { en: '$0 (exposure only)' }, dollars: 0 },
+      { text: { en: '$0' }, dollars: 0 },
       { text: { en: '$300' }, dollars: 300 },
       { text: { en: '$750' }, dollars: 750 },
       { text: { en: '$1,500' }, dollars: 1500 },
