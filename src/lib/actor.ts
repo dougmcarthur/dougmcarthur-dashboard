@@ -64,6 +64,18 @@ export interface AdminActor {
 export type Actor = UserActor | AgentActor
 
 /**
+ * A token issued into `agent_tokens`, as opposed to the legacy `API_TOKEN`.
+ *
+ * The line `shared/agentRoutes.ts` already draws, for the same reason: an
+ * issued token is what a routine's session holds while it reads pages written
+ * by strangers, so it is the credential the Worker narrows. The legacy secret
+ * belongs to the CI runner, whose model only ever holds named tools.
+ */
+export function isIssuedAgent(actor: Actor): actor is AgentActor {
+  return actor.kind === 'agent' && actor.tokenId !== null
+}
+
+/**
  * The tenant behind a signed-in session.
  *
  * Null when the session names no user, or names one with no tenant. Neither

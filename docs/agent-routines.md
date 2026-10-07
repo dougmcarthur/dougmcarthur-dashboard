@@ -48,7 +48,10 @@ reads festival pages written by strangers.
 2. **The Worker limits what the token can do.** The proxy attaches the
    credential to *any* request for `scout.sundogsmusic.ca`, so hiding it does
    not stop `curl -X DELETE`. An issued token (`agent_tokens`) reaches seven
-   routes and nothing else — see `shared/agentRoutes.ts`. The legacy
+   routes and nothing else — see `shared/agentRoutes.ts` — and what it may send
+   through the create routes is limited too (`src/lib/agentWrites.ts`): only the
+   tool's own fields, a row only ever `discovered`, bounded text, a daily
+   ceiling, and a 409 for a row already on file. The legacy
    `API_TOKEN` is not limited, and is never given to anything that reads
    untrusted pages.
 3. **`cli.ts` is named operations, not a general client.** It is the easy path,

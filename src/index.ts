@@ -31,7 +31,7 @@ import stagePlotRoute from './routes/stagePlot'
 import documentReadings from './routes/documentReadings'
 import publicSite from './routes/publicSite'
 import surveyRoute from './routes/survey'
-import { runCatalogBackfillOnce } from './lib/catalog'
+import { relinkMissing, runCatalogBackfillOnce } from './lib/catalog'
 import { pruneInviteRequests } from './lib/inviteRequests'
 import connectors from './routes/connectors'
 import manitobaMusic from './routes/manitobaMusic'
@@ -425,6 +425,19 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
     await runCredentialChecks(env, new Date())
   } catch (err) {
     console.error('credential check failed:', err)
+  }
+
+  // Link the rows whose catalog write failed when they were filed. Filing never
+  // waits on the catalog, so a hiccup there leaves a gig with no entry, and the
+  // one-shot backfill above will not come back for it. Per tenant, and quiet
+  // when there is nothing to do, which is nearly always.
+  for (const tenant of tenants) {
+    try {
+      const linked = await relinkMissing(env, tenant)
+      if (linked) console.log(`catalog: linked ${linked} rows for ${tenant} that missed it when filed`)
+    } catch (err) {
+      console.error('catalog relink failed:', err)
+    }
   }
 
   // Go back to the application forms that were not there the first time.

@@ -9,6 +9,7 @@ import { tenantOf, type AppEnv } from '../context'
 import { recordEvent } from '../lib/notificationEvents'
 import type { Tier } from '../../shared/notifications'
 import { taskLabel } from '../../shared/taskLabels'
+import { agentWrite } from '../lib/agentWrites'
 
 /**
  * What a run is worth telling you about.
@@ -90,6 +91,7 @@ taskRunsRouter.get('/', async (c) => {
 
 taskRunsRouter.post(
   '/',
+  agentWrite('taskRun'),
   zValidator(
     'json',
     z.object({
@@ -104,7 +106,11 @@ taskRunsRouter.post(
     const db = getDb(c.env.DB)
     const b = c.req.valid('json')
 
-    const runAt = b.run_at ?? new Date().toISOString()
+    // A machine credential never chooses the timestamp. Cadence is measured
+    // from the newest `run_at`, so a run stamped in the future would make a
+    // stopped schedule read as alive until that date; neither runner sends one,
+    // and a person correcting the log by hand still can.
+    const runAt = c.get('actor').kind === 'agent' ? new Date().toISOString() : (b.run_at ?? new Date().toISOString())
     const added = b.items_added ?? 0
 
     const tenant = tenantOf(c)

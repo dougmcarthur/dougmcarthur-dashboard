@@ -31,7 +31,10 @@ Nobody is watching this session while it runs.
 
    A tool that answers with an error has not done what you asked. Read the
    error, fix the input if it says what is wrong, and never assume a row was
-   filed when the command failed.
+   filed when the command failed. Two errors are answers rather than faults:
+   *Already on file* means that row exists, so skip it and carry on; *the
+   agents may add* means today's ceiling is reached, so stop filing and say so
+   in `log_run`.
 
 3. Where the prompt says to search the web, use WebSearch. To read a page, use
    WebFetch. To read a file the prompt names — a PDF in the artist's library —
