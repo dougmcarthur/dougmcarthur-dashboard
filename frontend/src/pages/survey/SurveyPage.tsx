@@ -230,21 +230,13 @@ function Agreement({
   const [token, setToken] = useState<string | null>(null)
   const [honeypot, setHoneypot] = useState('')
 
-  const [before, after = ''] = tx(CONSENT.questions).split('{contact}')
   const ready = agreed && (!status.siteKey || !!token)
 
   return (
     <div className="space-y-5">
-      <div className="space-y-3">
-        <h1 ref={headingRef} tabIndex={-1} className={HEADING}>
-          {tx(CONSENT.confirm)}
-        </h1>
-        <p className="text-base text-body">
-          {before}
-          <a className="underline" href={`mailto:${status.contact}`}>{status.contact}</a>
-          {after}
-        </p>
-      </div>
+      <h1 ref={headingRef} tabIndex={-1} className={HEADING}>
+        {tx(CONSENT.confirm)}
+      </h1>
 
       {/* A field no person sees. Anything in it is a form-filling bot. */}
       <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">

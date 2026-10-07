@@ -111,6 +111,12 @@ describe('the welcome', () => {
     expect(AGREEMENT).toMatch(/disabled=\{!ready \|\| starting\}/)
   })
 
+  it('shows the contact address once: the footer of every screen carries it, so the last step does not repeat it', () => {
+    expect(AGREEMENT).not.toMatch(/mailto:|status\.contact/)
+    expect(PAGE).toMatch(/<Shell contact=\{contact\}>/)
+    expect(PAGE).toMatch(/Questions about this survey: <a className="underline" href=\{`mailto:\$\{contact\}`\}>/)
+  })
+
   it('still puts the results address into the paragraph that promises it', () => {
     expect(WELCOME).toMatch(/\.replace\('\{results\}', results\)/)
   })

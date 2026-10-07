@@ -140,8 +140,6 @@ than forced. Sensitive items always offer "Prefer not to say".
 >   or the answers of any small group.
 > - It is voluntary. There is no payment and no prize draw.
 >
-> Questions: [contact address]
->
 > ☐ I am 18 or older and happy to take part. **[Start]**
 
 The checkbox is required to continue. Under-18s are excluded to avoid
@@ -152,7 +150,9 @@ screen and a half on a phone with the checkbox below the fold. It is seven
 screens: the welcome (title, lede and what the survey is for), one screen for
 each of the five points under its own heading, and a last one that holds only the
 checkbox, the spam check and **Start**. Every screen has Back, and a count ("3 of
-7") beside the buttons. The heading of a point is its bold lead, which is why two
+7") beside the buttons. The contact address is the footer of every screen, the
+welcome's included, so it is not repeated as a line of the notice; the survey
+still does not open until one exists, because the notice promises it. The heading of a point is its bold lead, which is why two
 of them became whole sentences (*Your answers are saved as you go*, *Here is what
 happens to your answers*): a fragment makes a poor heading. Nothing else in the
 notice was reworded. The spam check is mounted with the checkbox rather than at
