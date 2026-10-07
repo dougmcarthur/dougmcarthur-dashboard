@@ -89,7 +89,12 @@ export async function readEvents(env: Env, tenant: TenantId, now = new Date()): 
     .orderBy(desc(notificationEvents.createdAt))
     .limit(200)
 
-  return rows.map((r) => ({
+  return rows.map(toStoredEvent)
+}
+
+/** A table row as the pure modules see it. Shared with the History reader. */
+export function toStoredEvent(r: typeof notificationEvents.$inferSelect): StoredEvent {
+  return {
     id: r.id,
     kind: r.kind,
     tier: r.tier,
@@ -100,7 +105,8 @@ export async function readEvents(env: Env, tenant: TenantId, now = new Date()): 
     createdAt: r.createdAt,
     readAt: r.readAt,
     dismissedAt: r.dismissedAt,
-  }))
+    dedupeKey: r.dedupeKey,
+  }
 }
 
 export async function markEventsRead(

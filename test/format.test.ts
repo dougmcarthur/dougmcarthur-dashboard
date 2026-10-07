@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shortDate, relativeTime } from '../frontend/src/format'
+import { shortDate, relativeTime, localDay, dayHeading } from '../frontend/src/format'
 
 const now = new Date('2026-08-24T12:00:00Z')
 
@@ -47,5 +47,34 @@ describe('relativeTime', () => {
 
   it('passes an unparseable value through rather than rendering Invalid Date', () => {
     expect(relativeTime('rolling intake', now)).toBe('rolling intake')
+  })
+})
+
+describe('localDay and dayHeading', () => {
+  it('files an instant under the day on the reader\'s own calendar', () => {
+    // Built from local parts so it means the same on every machine: noon on the
+    // fifth is the fifth wherever the suite runs, and half past midnight on the
+    // sixth is the sixth. `TZ=Pacific/Auckland npm test` is the check.
+    expect(localDay(new Date(2026, 9, 5, 12, 0).toISOString())).toBe('2026-10-05')
+    expect(localDay(new Date(2026, 9, 6, 0, 30).toISOString())).toBe('2026-10-06')
+  })
+
+  it('passes something unparseable through rather than throwing', () => {
+    expect(localDay('not a date')).toBe('not a date')
+  })
+
+  it('calls today and yesterday by name', () => {
+    expect(dayHeading('2026-10-07', '2026-10-07')).toBe('Today')
+    expect(dayHeading('2026-10-06', '2026-10-07')).toBe('Yesterday')
+  })
+
+  it('finds yesterday across a month and a year boundary', () => {
+    expect(dayHeading('2026-09-30', '2026-10-01')).toBe('Yesterday')
+    expect(dayHeading('2025-12-31', '2026-01-01')).toBe('Yesterday')
+  })
+
+  it('gives the weekday and date, and the year only when it is not this one', () => {
+    expect(dayHeading('2026-10-02', '2026-10-07')).toBe('Friday, October 2')
+    expect(dayHeading('2025-10-02', '2026-10-07')).toBe('Thursday, October 2, 2025')
   })
 })

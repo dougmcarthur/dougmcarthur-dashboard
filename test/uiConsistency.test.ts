@@ -488,10 +488,7 @@ describe('the shared draft actions open a compose window, never send one', () =>
  * the agents live outside this repo and will invent more.
  */
 describe('screens name things, they do not print identifiers', () => {
-  const RENDERS_TASKS = [
-    'frontend/src/components/ActivityList.tsx',
-    'frontend/src/pages/TaskRunsPage.tsx',
-  ]
+  const RENDERS_TASKS = ['frontend/src/components/ActivityList.tsx']
 
   it('renders a task through its label, never the raw id', () => {
     for (const file of RENDERS_TASKS) {
@@ -504,9 +501,21 @@ describe('screens name things, they do not print identifiers', () => {
     }
   })
 
+  it('prints no task id on the screens that list runs', () => {
+    // The History page and the bell never see a task id at all: a run's title
+    // is built on the Worker from `taskLabel`, and the entry that reaches the
+    // browser has no field to print. This fails if one is ever added and
+    // rendered.
+    for (const file of ['frontend/src/pages/HistoryPage.tsx', 'frontend/src/components/NotificationBell.tsx']) {
+      expect(withoutComments(readFileSync(file, 'utf8')), file).not.toMatch(/\.taskId\b/)
+    }
+  })
+
   it('builds notification titles from labels too', () => {
     // The Worker writes these, so the guard has to reach past the frontend.
-    for (const file of ['shared/notifications.ts', 'src/routes/taskRuns.ts']) {
+    // `runTitle` moved from the route to `shared/runEvents.ts` so History could
+    // build the same title from the same run, and the guard went with it.
+    for (const file of ['shared/notifications.ts', 'shared/runEvents.ts']) {
       const src = readFileSync(file, 'utf8')
       expect(src, file).toContain('taskLabel')
       expect(src, file).not.toMatch(/title:\s*`\$\{\s*(task\.)?taskId\s*\}/)

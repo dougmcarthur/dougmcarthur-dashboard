@@ -7,33 +7,12 @@ import { taskRuns } from '../db/schema'
 import { scoped, withTenant } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
 import { recordEvent } from '../lib/notificationEvents'
-import type { Tier } from '../../shared/notifications'
-import { taskLabel } from '../../shared/taskLabels'
+import { runEventKey, runTier, runTitle } from '../../shared/runEvents'
 import { agentWrite } from '../lib/agentWrites'
 
-/**
- * What a run is worth telling you about.
- *
- * `attention` rather than `critical` for a failure, deliberately. Critical is
- * reserved for plumbing that is broken *now* and costing you something
- * silently — a disconnected Calendar drops an event you believe was created.
- * A research run that failed is retried on its next schedule and costs you
- * nothing today. Colouring both the same makes neither mean anything.
- */
-function runTier(status: string): Tier {
-  return status === 'ok' || status === 'success' ? 'info' : 'attention'
-}
-
-/** Exported so the copy is testable — it is user-facing prose with branches. */
-export function runTitle(taskId: string, status: string, added: number): string {
-  // `taskLabel`, never the raw id. The id is what the agent POSTs — an
-  // internal handle — and it had reached three screens before anybody
-  // noticed it reading as developer-speak.
-  const name = taskLabel(taskId)
-  if (status !== 'ok' && status !== 'success') return `${name} ${status === 'failed' ? 'failed' : `finished ${status}`}`
-  if (added > 0) return `${name} added ${added} ${added === 1 ? 'item' : 'items'}`
-  return `${name} ran, nothing new`
-}
+// `runTier` and `runTitle` live in `shared/runEvents.ts` now: the History page
+// builds the same title from the same run, and a second copy of user-facing
+// prose with branches is how the two would stop agreeing.
 
 const taskRunsRouter = new Hono<AppEnv>()
 
@@ -133,9 +112,9 @@ taskRunsRouter.post(
       tier: runTier(b.status),
       title: runTitle(b.task_id, b.status, added),
       body: b.summary ?? null,
-      href: '#runs',
-      action: 'View run',
-      dedupeKey: `automation:${b.task_id}:${runAt}`,
+      href: '#runs/automation',
+      action: 'See report',
+      dedupeKey: runEventKey(b.task_id, runAt),
       createdAt: runAt,
     })
 

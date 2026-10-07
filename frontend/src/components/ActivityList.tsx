@@ -13,7 +13,7 @@ import { Caption, Card } from './ui/Surface'
  * of them were roughly 80% of the Overview — a log presented as headline news.
  * They answer "what did the runs do last Tuesday", which is a question asked
  * occasionally, so they live behind a disclosure and the full history lives on
- * the Log page.
+ * the History page.
  */
 
 const SHOWN = 5
