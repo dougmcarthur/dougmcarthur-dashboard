@@ -475,3 +475,104 @@ export function termsDue(
   if (unreachable) return days >= RETRY_DAYS ? 'retry' : null
   return days >= RECHECK_DAYS ? 'stale' : null
 }
+
+/* --------------------------------------------------------------------- */
+/* Reading every site on file in one go                                   */
+/* --------------------------------------------------------------------- */
+
+const DUE_ORDER = { never: 0, retry: 1, stale: 2 } as const
+
+/**
+ * The targets a "read them all" pass covers: exactly the ones the nightly pass
+ * would pick, never-read first. One rule, so pressing the button only does
+ * tonight's work and the next few nights' sooner, and the two cannot disagree
+ * about what is waiting.
+ */
+export function targetsToRead<T extends TermsFacts & { status: string | null }>(
+  rows: readonly T[],
+  today: string,
+): T[] {
+  return rows
+    .map((row) => ({ row, due: termsDue(row, today) }))
+    .filter((entry): entry is { row: T; due: 'never' | 'retry' | 'stale' } => entry.due !== null)
+    .sort((a, b) => DUE_ORDER[a.due] - DUE_ORDER[b.due])
+    .map((entry) => entry.row)
+}
+
+export type CheckRun = {
+  /** How many sites the pass set out to read. */
+  total: number
+  /** The rows the Worker handed back, one per site it read. */
+  read: ReadonlyArray<TermsFacts & { name: string }>
+  /** Requests that failed outright. Those targets are still unread, so tonight's pass takes them first. */
+  failed: number
+  stopped?: boolean
+}
+
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many)
+
+/**
+ * What a pass found, as sentences. The refusals are named, since that is the
+ * answer the pass exists for, and a site that said nothing is never worded as
+ * though it had said yes.
+ */
+export function checkRunLines(run: CheckRun): string[] {
+  const refused: string[] = []
+  let open = 0
+  let silent = 0
+  let unreadable = 0
+  let unread = run.failed
+  for (const row of run.read) {
+    switch (termsState(row)) {
+      case 'closed':
+      case 'overridden':
+        refused.push(row.name)
+        break
+      case 'open':
+        open += 1
+        break
+      case 'silent':
+        silent += 1
+        break
+      case 'unreadable':
+        unreadable += 1
+        break
+      case 'unchecked':
+        // A check always stamps the row, so this is a reply that is not one.
+        unread += 1
+        break
+    }
+  }
+
+  const read = run.read.length - (unread - run.failed)
+  const lines: string[] = []
+  if (run.stopped) lines.push(`Stopped after ${read} of ${run.total}.`)
+  else if (read === 0) lines.push('No sites were read.')
+  else lines.push(`Read ${read} ${plural(read, 'site', 'sites')}.`)
+
+  if (refused.length > 0) {
+    lines.push(
+      `${refused.length} ${plural(refused.length, 'says', 'say')} they take no unsolicited pitches: ${refused.join(', ')}.`,
+    )
+  } else if (read > 0) {
+    lines.push('None of the pages read refuse unsolicited pitches.')
+  }
+  if (open > 0) lines.push(`${open} ${plural(open, 'says', 'say')} they take submissions.`)
+  if (silent > 0) {
+    lines.push(
+      `${silent} ${plural(silent, 'has', 'have')} nothing about submissions on the pages read. ` +
+        'That is not permission, so look yourself before you pitch.',
+    )
+  }
+  if (unreadable > 0) lines.push(`${unreadable} could not be opened, or had no website on file.`)
+  if (unread > 0) {
+    lines.push(`${unread} could not be checked just now. The nightly check will try ${plural(unread, 'it', 'them')} again.`)
+  }
+  // A pass that gave up leaves targets it never asked about, which would
+  // otherwise be missing from every line above.
+  const untried = run.total - run.read.length - run.failed
+  if (untried > 0 && !run.stopped) {
+    lines.push(`${untried} ${plural(untried, 'was', 'were')} not tried. The nightly check will take ${plural(untried, 'it', 'them')}.`)
+  }
+  return lines
+}

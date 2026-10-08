@@ -651,8 +651,13 @@ on a page the site neither links to nor names conventionally is still missed, an
 the card says how many pages were read rather than that the target is fine. It
 covers sync targets only, not gig calls. Production is not backfilled by SQL: the
 rows already on file are read by the nightly pass, six a night, or by pressing
-*Check their site*. The Create and Edit forms on the Sync page sent `null` for
-every blank field and the route answered 400, so a target with any field blank
+*Check their site*, or all at once by *Read their sites* at the top of the Sync page
+(`CheckAllTerms`). That one runs from the browser, a target at a time through the same
+route as the row button, because a Worker request that read thirty sites would meet its
+own limits, and it picks its targets with `targetsToRead`, which is the nightly pass's
+own rule, so the two cannot disagree about what is waiting. It shows nothing once every
+site has been read, and it names the refusals it found. The Create and Edit forms on
+the Sync page sent `null` for every blank field and the route answered 400, so a target with any field blank
 could not be saved from the screen; the schema takes `nullish` now.
 
 **Screens name things; they never print identifiers.** The bell shipped saying

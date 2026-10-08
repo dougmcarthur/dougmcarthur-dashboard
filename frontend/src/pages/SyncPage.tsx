@@ -9,7 +9,7 @@ import { FIELD, FILTER } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { DraftActions } from '../components/DraftActions'
 import { GmailDraftsPanel } from '../components/GmailDraftsPanel'
-import { TermsChip, TermsPanel, mayPitch } from '../components/SyncTerms'
+import { CheckAllTerms, TermsChip, TermsPanel, mayPitch } from '../components/SyncTerms'
 import { termsState } from '../../../shared/syncTerms'
 import { Banner, Card, EmptyState } from '../components/ui/Surface'
 import { Caption, Label } from '../components/ui/Surface'
@@ -334,6 +334,10 @@ export function SyncPage() {
 
       {showReconcile && <ReconcilePanel onClose={() => setShowReconcile(false)} />}
       {showCreate && <CreateSyncForm onDone={() => setShowCreate(false)} />}
+
+      {/* Before the drafts panel, which leaves an unread target out until this
+          has read it. Nothing shows once every site has been read. */}
+      <CheckAllTerms />
 
       {/* Above the list, because it acts on all of it. Closed until asked,
           like every other bulk write in the app. */}
