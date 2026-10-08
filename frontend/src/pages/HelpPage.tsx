@@ -140,7 +140,8 @@ export function HelpPage() {
         </p>
         <p>
           A device that asks for more contrast gets High contrast until you choose a theme of your
-          own, and the choice is kept on each device you use.
+          own. The colour theme follows your account onto every device you sign in from; light or
+          dark, text size and the other settings are kept on each device.
         </p>
         <p className="text-xs text-muted">{themeCredit()}</p>
       </Section>

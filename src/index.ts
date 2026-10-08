@@ -26,6 +26,7 @@ import agentTokens from './routes/agentTokens'
 import admin from './routes/admin'
 import profile from './routes/profile'
 import onboarding from './routes/onboarding'
+import appearance from './routes/appearance'
 import feedbackRoute from './routes/feedback'
 import stagePlotRoute from './routes/stagePlot'
 import documentReadings from './routes/documentReadings'
@@ -206,6 +207,7 @@ app.route('/api/gmail', gmailDrafts)
 app.route('/api/agent-tokens', agentTokens)
 app.route('/api/profile', profile)
 app.route('/api/onboarding', onboarding)
+app.route('/api/appearance', appearance)
 app.route('/api/feedback', feedbackRoute)
 app.route('/api/stage-plot', stagePlotRoute)
 app.route('/api/document-readings', documentReadings)

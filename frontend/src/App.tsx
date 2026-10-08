@@ -13,6 +13,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { HelpPage } from './pages/HelpPage'
 import { useEffect } from 'react'
+import { AccountAppearance } from './hooks/useAppearance'
 import { notePage } from './diagnostics'
 
 export default function App() {
@@ -48,6 +49,7 @@ export default function App() {
 
   return (
     <Layout page={page} onNav={navigate}>
+      <AccountAppearance />
       <ErrorBoundary label="Page error">
         {page === 'overview' && <OverviewPage onNav={navigate} />}
         {page === 'review' && <ReviewPage initialFilter={arg} />}

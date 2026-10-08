@@ -1,8 +1,12 @@
 /**
  * Appearance settings: what they are, where they live, how they reach the DOM.
  *
- * Deliberately localStorage rather than the `app_settings` table the digest
- * uses. Those settings describe the system and must be identical wherever you
+ * One exception: the colour theme (`palette`) also follows the account, in
+ * `tenant_settings` (src/routes/appearance.ts), because an accessible theme is
+ * what a person wants on every device. This file stays the first paint.
+ *
+ * Everything else is deliberately localStorage rather than the `app_settings`
+ * table the digest uses. Those settings describe the system and must be identical wherever you
  * open it; these describe one pair of eyes on one screen, and syncing "large
  * text" from a laptop onto a phone would be a bug rather than a feature.
  *

@@ -2,6 +2,7 @@ import type { CredentialHealth } from '../../shared/credentialHealth'
 import type { FeedbackContext, FeedbackKind } from '../../shared/feedback'
 import type { GoalId, Goals, OnboardingStep, ReachId } from '../../shared/onboarding'
 import type { StagePlot } from '../../shared/stagePlot'
+import type { PaletteId } from '../../shared/themes'
 import type { DocumentReading } from '../../shared/documentReadings'
 import type { PublicOpportunity } from '../../shared/opportunityCatalog'
 import type { InviteRequestStatus } from '../../shared/inviteRequests'
@@ -1077,6 +1078,12 @@ export const api = {
   },
   /** Every show from every source, merged. `today` is the viewer's own date. */
   shows: () => apiFetch<ShowsResponse>(`/shows?today=${localToday()}`),
+  /** The colour theme, kept with the account. Nothing else about appearance is. */
+  appearance: {
+    read: () => apiFetch<{ palette: PaletteId | null }>('/appearance'),
+    save: (palette: PaletteId | null) =>
+      apiFetch<{ palette: PaletteId | null }>('/appearance', { method: 'PUT', body: JSON.stringify({ palette }) }),
+  },
   /** What to call this artist. One field, set by them, read by oversight. */
   onboarding: {
     read: () => apiFetch<OnboardingState>('/onboarding'),

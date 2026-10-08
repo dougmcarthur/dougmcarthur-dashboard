@@ -182,12 +182,31 @@ row's tinted fill, which is now a fitted ground. Done on 2026-10-07: 571 text
 elements per run, 12 theme and mode combinations, no failures (7:1 for the
 accessible two, 4.5:1 for the rest).
 
+## Per account storage
+
+The colour theme, and only the colour theme, follows the account. One
+`tenant_settings` row, `appearance.palette`, holds a theme id or nothing; nothing
+means "not chosen", which is not the same as the default, since a device that
+asks for more contrast gets High contrast until somebody picks. `GET /api/appearance`
+returns `{ palette }` and `PUT` takes `{ palette }` (an unknown id is a 400, null
+clears). It is read through the tenant helpers, needs no passkey touch because it
+changes nothing about who can get in, is not one of the agent routes (and refuses
+an agent credential itself), and is not reachable in admin mode, which has no
+tenant.
+
+The browser's own copy is still the first paint, so nothing waits on the network.
+Once after sign-in `AccountAppearance` reads the account's value and, if it
+differs, applies it and saves it locally. Choosing in Appearance applies at once
+and sends the `PUT` in the background, in order; if it fails, the choice still
+holds on this device. Signed out, or in admin mode, only the local value is used.
+A device that already has a choice and an account with none keeps its own; the
+local value is not uploaded until the next time somebody chooses.
+
+Light or dark, text size, typeface, width, contrast, motion and links stay per
+device: they describe one pair of eyes on one screen.
+
 ## What is not done
 
-- **Per account storage.** The choice is kept per device, in the browser, as
-  agreed for the first release. Now that accessible themes exist it should follow
-  the artist across devices: one row in `tenant_settings`, written on change and
-  read before the local value.
 - **Greyscale and Low glare.** Greyscale tells the meaning colours apart by
   lightness steps and weight alone, for achromatopsia or a monochrome display.
   Low glare is a dim, warm ground with no white in it and softened highlights, for

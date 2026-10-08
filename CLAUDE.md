@@ -1892,7 +1892,13 @@ waiting, clay broken) keep their hues in every aesthetic theme, and the accessib
 themes redraw them as blue, gold and rose. Light is the default; a `palette` of
 `null` means nothing has been chosen and follows the device (`prefers-contrast:
 more` selects High contrast); print is always the default's light palette on white.
-Appearance is per device, in the browser. See `docs/themes-plan.md`.
+The colour theme (`palette`) follows the account: one `tenant_settings` row,
+`appearance.palette`, behind `GET`/`PUT /api/appearance`, read once after sign-in and
+written in the background when the artist chooses, with the browser's own copy still
+the first paint so nothing waits on the network. It is refused to agent tokens and does
+not exist in admin mode. Everything else in Appearance (light or dark, text size,
+typeface, width, contrast, motion, links) stays per device, in the browser. See
+`docs/themes-plan.md`.
 
 ## Testing
 
