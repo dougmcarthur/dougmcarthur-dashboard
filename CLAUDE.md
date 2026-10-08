@@ -599,6 +599,62 @@ Dry run is the default, as in `scripts/backfill-deadlines.ts`: nothing is
 written without `--apply` — in `run.ts`, in `cli.ts`, and in
 `scripts/issue-agent-token.ts`.
 
+**A sync target says whether it takes pitches, and the app reads the answer
+instead of trusting that somebody did.** The research agent filed a library as
+ready to pitch, with a note calling its submission route "confirmed and
+simple", and its own About page said "NO unsolicited material please." A listed
+address is a way to reach a company. It is not permission, and a pitch to one
+that refuses is ignored at best and remembered at worst. So each target carries
+`submission_policy` (`open`, `closed`, or null), the sentence that says so
+(`policy_evidence`), the page it was on (`policy_url`), when somebody last
+looked (`policy_checked_at`) and the artist's own decision to go ahead anyway
+(`policy_overridden_at`, its own column so a re-check can never undo it). Migration 0036,
+`shared/syncTerms.ts`, `src/lib/syncTerms.ts`.
+
+- **Null is two things, and neither is a green light.** Never checked, and read
+  and found silent, are different states, and a site nobody could read (no
+  address, or it did not open) is a third. "No policy found" is never worded as
+  permission, and a card that cannot say a site was read does not say it.
+- **Automation only moves toward caution.** A refusal replaces anything; an
+  invitation fills only an empty policy; notes are read for refusals and never for
+  invitations, since a note is a claim about a page. An agent's `open` has to carry
+  the sentence (`startingTerms` refuses it otherwise), and a refusal on the site
+  beats an agent that said open. A person can say "pitch anyway" with the quote
+  beside the button, and nothing else writes the policy: the columns are not in
+  the PATCH schema.
+- **The Worker reads the site itself**, on filing, when the address changes, on
+  the button, and nightly for anything unread, six a night per tenant like the
+  form revisit (`checkPendingTerms`). It never touches `updated_at`. Reading is
+  not following the home page: the first target's domain redirects `/` to a rebuilt
+  site on every spelling and still serves the old `/about.html`, which nothing
+  links to and which holds the refusal. So it follows the links worth following
+  and also asks for the conventional pages (`POLICY_PATHS`) once per host,
+  whatever the root did. A first version skipped hosts whose root redirected away
+  and found nothing on the real site; `scanSite` is tested against a model of
+  that shape and was run against the real one. Only plain public websites are
+  fetched (`isFetchable`).
+- **The gate is on every way out.** A refusal removes Copy and the mail links, and
+  Mark Pitched, from the Sync row and the Review pane, offers Archive instead,
+  ranks the row near the top (`no_unsolicited` flag, 98) and puts it on the weekly
+  email. The bulk Gmail drafts leave out refusals and also targets nobody has
+  read, since seven drafts at once is where one mistake costs most. Recording a
+  send is not blocked, because refusing to write down what happened would make the
+  app lie. `test/syncTermsUi.test.ts` fails if a surface that renders a pitch
+  draft beside Copy or a mail link stops asking `mayPitch`.
+- **Agents must say.** `create_sync_target` requires `submissionPolicy`
+  (`unknown` is an honest answer, silence is not); the prompt tells it to read the
+  target's own pages, search the domain for the phrase because old pages outlive
+  redesigns, and file a refusal with its quote and no pitch.
+
+What this does not do: it does not search the web, so a refusal that exists only
+on a page the site neither links to nor names conventionally is still missed, and
+the card says how many pages were read rather than that the target is fine. It
+covers sync targets only, not gig calls. Production is not backfilled by SQL: the
+rows already on file are read by the nightly pass, six a night, or by pressing
+*Check their site*. The Create and Edit forms on the Sync page sent `null` for
+every blank field and the route answered 400, so a target with any field blank
+could not be saved from the screen; the schema takes `nullish` now.
+
 **Screens name things; they never print identifiers.** The bell shipped saying
 *"gig-festival-scan has not run in 28 days"* — that string is the `task_id` an
 agent POSTs, a handle rather than a name, and it had reached three surfaces
@@ -713,6 +769,59 @@ on every read and self-heal when they stop being true; *events* are rows,
 because a run finishing is not recoverable from current state. Dismissing a
 condition lasts a day; dismissing an event is permanent. See
 `docs/notifications-plan.md` and `shared/notifications.ts`.
+
+**History is the bell with the cap taken off, and it is two tables.** `#runs`
+used to open the run log, a column of agent prose; it is the History page now
+(`#runs/<type>` opens on a type), a timeline by the reader's own day with
+what needs attention now above it. Standing conditions are listed apart from the
+timeline because they are not history: they stop being listed when they stop
+being true. A run is listed from `task_runs`, which has the structured fields
+and the whole report and is kept forever, never from its echo in
+`notification_events`, which is pruned at thirty days and is read for one thing,
+whether the run is still unread on the bell. The join is one string,
+`runEventKey` in `shared/runEvents.ts`, defined once for the writer and the
+reader, and `runTitle` and `runTier` moved there with it so both build the same
+sentence. A dismissed event is still listed: dismissing puts it away from the
+bell, it does not unhappen. `test/historyRoute.test.ts` runs the queries against
+the production schema, because what they let through, and whose it is, is the
+whole question.
+
+**A report is laid out, never interpreted.** `shared/runSummary.ts` finds a
+numbered or bulleted list, names each entry by what is before its dash, strips
+the `(#32)` row number, and breaks long paragraphs at sentence ends. It reads
+layout and nothing else, and when a report has no list it hands the paragraphs
+back untouched. In a single run-together paragraph nothing marks where the last
+entry ends, so the last entry keeps the tail rather than the parser guessing.
+Nothing is stored: a better reader next year improves every old run. The bell
+shows what a run filed (`runGist`) where it used to show the report, and every
+other event body is cut to 140 characters at a word, in `buildNotifications`
+rather than the component, so a writer that does not exist yet gets the same
+answer. A group's line is its newest member.
+
+**The notifications can be pinned beside the page, from 1280px up.** The bell
+becomes the switch for the panel once it is pinned, and `pinned` and `open` are
+separate flags so hiding the panel does not unpin it. Both live in
+`localStorage`, since they describe one screen. The threshold is the Gigs table's
+measured width plus the panel, not a taste. Only the bell polls; the panel reads
+what it keeps fresh, and `test/historyUi.test.ts` fails if both poll. What else
+might be pinned, and whether the navigation should move to the left, is in
+`docs/side-panel-plan.md`.
+
+**Answers at hand is the library cut for the moment a form is open.** The
+column's second panel (and a dialog below 1280px) lists what applications ask
+for, one Copy button each, from `GET /api/artist/answers`. The reads are the
+library and a count of `application_fields.question_kind`, both scoped, in
+`src/lib/answers.ts`; what is made of them is `shared/answersAtHand.ts`, pure and
+given `today` by the browser. Three rules to keep. It says what is wrong before
+the paste (`assetHealth`: a photo with no credit is broken, past its review date
+is overdue, unreviewed is a quiet note and never a problem). It names the
+questions the artist's own applications ask that nothing on file answers, and
+never matches paperwork by its label, since the classifier reads "minutes" as a
+set length and a hidden gap is worse than a gap named twice. And it never edits:
+a second place to edit an entry is a second place for it to be wrong. Text a
+person has to read is never `text-faint`, which is 3.6 to 1; a rendered contrast
+scan caught "Asked 4 times on your applications" in it, and
+`test/historyUi.test.ts` now fails on it.
 
 **The pipeline is a shape, not a free-for-all.** `nextGigStatuses` in
 `shared/gigStatus.ts` says which moves a status offers, and the PATCH route

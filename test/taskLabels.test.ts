@@ -39,7 +39,7 @@ describe('taskLabel', () => {
   })
 })
 
-import { runTitle } from '../src/routes/taskRuns'
+import { runTitle } from '../shared/runEvents'
 
 /**
  * The title a finished run puts in the bell.

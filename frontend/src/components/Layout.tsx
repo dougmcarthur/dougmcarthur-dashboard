@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { api } from '../api'
 import { useAppearance } from '../hooks/useAppearance'
 import { usePageAnnouncement } from '../hooks/usePageAnnouncement'
 import { NotificationBell } from './NotificationBell'
+import { SideDock } from './SidePanel'
+import { AnswersDialog } from './AnswersPanel'
+import { Icon } from './notificationParts'
+import { useSidePanel } from '../hooks/useSidePanel'
 import { HelpMenu } from './HelpMenu'
 import { FeedbackModal } from './FeedbackModal'
 import { Button } from './ui/Button'
@@ -104,6 +108,15 @@ export function Layout({
   // content, which is all a screen reader gets for a route that is only a hash.
   usePageAnnouncement(page, mainRef)
 
+  const side = useSidePanel()
+  // The answers, as a dialog, on a screen with no room for the column.
+  const [answersOpen, setAnswersOpen] = useState(false)
+  const closeAnswers = useCallback(() => setAnswersOpen(false), [])
+  useEffect(() => {
+    // Widening the window hands the dialog's job to the column.
+    if (side.wide) setAnswersOpen(false)
+  }, [side.wide])
+
   // Route changes close the mobile menu; leaving it open over the new page is
   // the classic hamburger bug.
   useEffect(() => setMenuOpen(false), [page])
@@ -184,7 +197,25 @@ export function Layout({
             )}
 
             <div className="flex items-center gap-1">
-              {admin ? null : <NotificationBell onNav={onNav} />}
+              {admin ? null : <NotificationBell onNav={onNav} side={side} />}
+              {/* Only where the column can open. Narrower than that the header has
+                  no room for another icon (at 320px it has three pixels to
+                  spare), so the answers are in the menu instead. */}
+              {admin || !side.wide ? null : (
+                <button
+                  type="button"
+                  onClick={() => side.toggle('answers')}
+                  aria-pressed={side.showing('answers')}
+                  aria-controls="side-panel"
+                  aria-label="Answers at hand"
+                  title={side.showing('answers') ? 'Hide your answers' : 'Show the answers a form asks for'}
+                  className={`p-2 rounded-md transition-colors hover:text-ink hover:bg-sunken ${
+                    side.showing('answers') ? 'text-ink bg-sunken' : 'text-muted'
+                  }`}
+                >
+                  <Icon name="book" className="h-4 w-4" />
+                </button>
+              )}
               {/* Not in admin mode: Help describes the artist surface, and
                   feedback is sent from it — an admin-mode session is refused
                   the route. */}
@@ -247,6 +278,18 @@ export function Layout({
                         {l.label}
                       </a>
                     ))}
+                    {!side.wide && (
+                      <button
+                        type="button"
+                        className={`block w-full text-left ${linkClass('answers')}`}
+                        onClick={() => {
+                          setMenuOpen(false)
+                          setAnswersOpen(true)
+                        }}
+                      >
+                        Answers at hand
+                      </button>
+                    )}
                     {/* The header's question mark, for a phone, where the
                         header has no room for it. */}
                     <span className="sm:hidden">
@@ -277,16 +320,24 @@ export function Layout({
         </div>
       </header>
 
-      <main
-        id="main"
-        ref={mainRef}
-        tabIndex={-1}
-        className="shell px-4 sm:px-6 lg:px-8 py-8 lg:py-10 focus:outline-none"
-      >
-        {children}
-      </main>
+      {/* The page and, when it is pinned, the panel beside it. Always a flex
+          row, so the page lays out the same with the panel or without: it
+          takes the width that is left and keeps its own centred maximum. Not
+          in admin mode, where the bell and everything it lists is refused. */}
+      <div className="flex items-start">
+        <main
+          id="main"
+          ref={mainRef}
+          tabIndex={-1}
+          className="shell min-w-0 px-4 sm:px-6 lg:px-8 py-8 lg:py-10 focus:outline-none"
+        >
+          {children}
+        </main>
+        {!admin && side.docked && <SideDock side={side} onNav={onNav} />}
+      </div>
 
       {admin ? null : <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />}
+      {!admin && answersOpen && !side.wide && <AnswersDialog onClose={closeAnswers} onNav={onNav} />}
     </div>
   )
 }

@@ -296,6 +296,8 @@ export type {
 export { KIND_LABELS } from '../../shared/notifications'
 
 import type { Notification as AppNotification } from '../../shared/notifications'
+import type { HistoryFeed } from '../../shared/history'
+import type { AnswersFeed } from '../../shared/answersAtHand'
 
 export interface NotificationFeed {
   items: AppNotification[]
@@ -305,13 +307,14 @@ export interface NotificationFeed {
   total: number
 }
 
-export interface TaskRunPage {
-  runs: TaskRun[]
-  /** Matching the filter, across every page. */
-  total: number
-  /** Values that actually occur in the log, so no control offers a dead click. */
-  facets: { tasks: string[]; statuses: string[] }
-}
+export type { HistoryEntry, HistoryFeed, DayGroup } from '../../shared/history'
+export type {
+  Answer,
+  AnswerSection,
+  AnswersFeed,
+  MissingAnswer,
+} from '../../shared/answersAtHand'
+export type { RunReport, RunEntry } from '../../shared/runSummary'
 
 export interface HealthStatus {
   /**
@@ -1148,8 +1151,12 @@ export const api = {
     },
     create: (body: Omit<SyncTarget, 'id' | 'discoveredAt' | 'updatedAt' | 'reconciledAt' | 'pitchSent' | 'snoozedUntil' | 'snoozedAt'>) =>
       apiFetch<{ id: number }>('/sync', { method: 'POST', body: JSON.stringify(body) }),
-    patch: (id: number, body: Partial<SyncTarget>) =>
+    // `overrideTerms` is the artist's "pitch anyway", which is not a column of
+    // the target: see PATCH /api/sync/:id.
+    patch: (id: number, body: Partial<SyncTarget> & { overrideTerms?: boolean }) =>
       apiFetch<SyncTarget>(`/sync/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    /** Read the target's own site for its rules about unsolicited pitches. */
+    checkTerms: (id: number) => apiFetch<SyncTarget>(`/sync/${id}/check-terms`, { method: 'POST' }),
     delete: (id: number) => apiFetch<{ ok: boolean }>(`/sync/${id}`, { method: 'DELETE' }),
     reconcile: {
       preview: () => apiFetch<ReconcilePreview>('/sync/reconcile'),
@@ -1162,15 +1169,6 @@ export const api = {
     patch: (id: number, body: Partial<PromoDraft>) =>
       apiFetch<PromoDraft>(`/promo/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (id: number) => apiFetch<{ ok: boolean }>(`/promo/${id}`, { method: 'DELETE' }),
-  },
-  taskRuns: {
-    list: (params?: { limit?: number; offset?: number; task?: string; status?: string }) => {
-      const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== '')
-      const qs = entries.length > 0
-        ? '?' + new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString()
-        : ''
-      return apiFetch<TaskRunPage>(`/task-runs${qs}`)
-    },
   },
   reminders: {
     dismiss: (id: number) =>
@@ -1185,6 +1183,12 @@ export const api = {
       return apiFetch<ArtistAssetPage>(`/artist${qs.size ? `?${qs}` : ''}`)
     },
     epk: (audience: EpkAudience) => apiFetch<Epk>(`/artist/epk?audience=${audience}`),
+    /**
+     * The library cut for the moment a form is open. `today` is the reader's own
+     * day, because an entry is overdue on their calendar and the Worker's is UTC.
+     */
+    answers: (today: string) =>
+      apiFetch<AnswersFeed>(`/artist/answers?today=${encodeURIComponent(today)}`),
     create: (body: ArtistAssetInput) =>
       apiFetch<{ id: number }>('/artist', { method: 'POST', body: JSON.stringify(body) }),
     patch: (id: number, body: Partial<ArtistAssetInput>) =>
@@ -1302,6 +1306,13 @@ export const api = {
   },
   notifications: {
     list: () => apiFetch<NotificationFeed>('/notifications'),
+    /** One page of the timeline. The first (no `before`) also carries the counts. */
+    history: (params: { kind?: string | null; before?: string | null }) => {
+      const qs = new URLSearchParams()
+      if (params.kind) qs.set('kind', params.kind)
+      if (params.before) qs.set('before', params.before)
+      return apiFetch<HistoryFeed>(`/notifications/history${qs.size ? `?${qs}` : ''}`)
+    },
     read: (body: { keys?: string[]; all?: boolean }) =>
       apiFetch<{ readAt: string }>('/notifications/read', {
         method: 'POST',

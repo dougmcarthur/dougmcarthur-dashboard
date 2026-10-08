@@ -9,6 +9,8 @@ import { FIELD, FILTER } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { DraftActions } from '../components/DraftActions'
 import { GmailDraftsPanel } from '../components/GmailDraftsPanel'
+import { TermsChip, TermsPanel, mayPitch } from '../components/SyncTerms'
+import { termsState } from '../../../shared/syncTerms'
 import { Banner, Card, EmptyState } from '../components/ui/Surface'
 import { Caption, Label } from '../components/ui/Surface'
 
@@ -17,11 +19,11 @@ const SYNC_STATUSES: SyncStatus[] = ['draft_ready', 'pitched', 'confirmed', 'dec
 
 type SyncDraft = {
   name: string; agencyType: string; contactEmail: string; contactRole: string
-  confirmationMethod: string; notes: string; pitchDraft: string; status: SyncStatus
+  website: string; confirmationMethod: string; notes: string; pitchDraft: string; status: SyncStatus
 }
 
 const EMPTY_DRAFT: SyncDraft = {
-  name: '', agencyType: '', contactEmail: '', contactRole: '',
+  name: '', agencyType: '', contactEmail: '', contactRole: '', website: '',
   confirmationMethod: '', notes: '', pitchDraft: '', status: 'draft_ready',
 }
 
@@ -39,6 +41,7 @@ function CreateSyncForm({ onDone }: { onDone: () => void }) {
         agencyType: draft.agencyType || null,
         contactEmail: draft.contactEmail || null,
         contactRole: draft.contactRole || null,
+        website: draft.website || null,
         confirmationMethod: draft.confirmationMethod || null,
         notes: draft.notes || null,
         pitchDraft: draft.pitchDraft || null,
@@ -71,6 +74,10 @@ function CreateSyncForm({ onDone }: { onDone: () => void }) {
         <div>
           <Label>Contact role</Label>
           <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} placeholder="A&R, Sync Supervisor…" className={FIELD} />
+        </div>
+        <div className="sm:col-span-2">
+          <Label>Their website</Label>
+          <input value={draft.website} onChange={(e) => set('website', e.target.value)} placeholder="label.com, so Scout can read whether they take pitches" className={FIELD} />
         </div>
         <div>
           <Label>Confirm via</Label>
@@ -122,6 +129,7 @@ function EditSyncPanel({
     agencyType: target.agencyType ?? '',
     contactEmail: target.contactEmail ?? '',
     contactRole: target.contactRole ?? '',
+    website: target.website ?? '',
     confirmationMethod: target.confirmationMethod ?? '',
     notes: target.notes ?? '',
     pitchDraft: target.pitchDraft ?? '',
@@ -148,6 +156,10 @@ function EditSyncPanel({
           <input value={draft.contactRole} onChange={(e) => set('contactRole', e.target.value)} className={FIELD} />
         </div>
         <div className="sm:col-span-2">
+          <Label>Their website</Label>
+          <input value={draft.website} onChange={(e) => set('website', e.target.value)} placeholder="Scout reads it for their submission rules" className={FIELD} />
+        </div>
+        <div className="sm:col-span-2">
           <Label>Confirm via</Label>
           <input value={draft.confirmationMethod} onChange={(e) => set('confirmationMethod', e.target.value)} className={FIELD} />
         </div>
@@ -166,6 +178,7 @@ function EditSyncPanel({
           agencyType: draft.agencyType || null,
           contactEmail: draft.contactEmail || null,
           contactRole: draft.contactRole || null,
+          website: draft.website || null,
           confirmationMethod: draft.confirmationMethod || null,
           notes: draft.notes || null,
           pitchDraft: draft.pitchDraft || null,
@@ -183,8 +196,13 @@ function EditSyncPanel({
 // ── Read-only detail panel ────────────────────────────────────────────────────
 
 function SyncDetail({ target, onEdit }: { target: SyncTarget; onEdit: () => void }) {
+  // A refusal on their own site withholds the mail links and Copy until the
+  // artist has said they have read it. See components/SyncTerms.tsx.
+  const open = mayPitch(target)
+  const confirmed = termsState(target) === 'open' || termsState(target) === 'overridden'
   return (
     <div className="space-y-4 max-w-2xl">
+      <TermsPanel target={target} />
       {target.notes && (
         <div>
           <Caption spaced>Notes</Caption>
@@ -199,14 +217,25 @@ function SyncDetail({ target, onEdit }: { target: SyncTarget; onEdit: () => void
           </p>
           {/* The agent writes this; you send it. Same shape as the reply
               draft, so the same actions — see components/DraftActions.tsx. */}
-          <DraftActions
-            draft={{
-              to: target.contactEmail,
-              subject: `Sync licensing — ${target.name}`,
-              body: target.pitchDraft,
-            }}
-            note="Read it before you send it. Nothing here goes out on its own."
-          />
+          {open ? (
+            <DraftActions
+              draft={{
+                to: target.contactEmail,
+                subject: `Sync licensing — ${target.name}`,
+                body: target.pitchDraft,
+              }}
+              note={
+                confirmed
+                  ? 'Read it before you send it. Nothing here goes out on its own.'
+                  : 'Their terms are not confirmed, so read their site before you send this one.'
+              }
+            />
+          ) : (
+            <p className="text-xs text-muted">
+              Copy and the mail links are switched off for this one, because their own site says they take no
+              unsolicited pitches. They come back if you choose to pitch anyway.
+            </p>
+          )}
         </div>
       )}
       {target.confirmationMethod && (
@@ -334,12 +363,22 @@ export function SyncPage() {
                       {target.contactRole && <span className="text-xs text-muted">· {target.contactRole}</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 ml-auto">
+                  <div className="flex flex-wrap items-center justify-end gap-2 ml-auto max-w-full">
+                    <TermsChip target={target} />
                     <StatusBadge status={target.status} />
-                    {target.status === 'draft_ready' && (
+                    {target.status === 'draft_ready' && mayPitch(target) && (
                       <Button variant="info" size="sm" disabled={isPatching}
                         onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'pitched' } }) }}>
                         Mark Pitched
+                      </Button>
+                    )}
+                    {/* Marking a refused target pitched would record a send the app
+                        has just advised against, so the quick action is to put it
+                        away. */}
+                    {target.status === 'draft_ready' && !mayPitch(target) && (
+                      <Button variant="neutral" size="sm" disabled={isPatching}
+                        onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'archived' } }) }}>
+                        Archive
                       </Button>
                     )}
                     {target.status === 'pitched' && (

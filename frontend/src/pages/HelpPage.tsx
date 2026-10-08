@@ -72,7 +72,7 @@ export function HelpPage() {
         </Entry>
         <Entry name="Sync">Music supervisors and briefs to pitch, with a short pitch drafted for each.</Entry>
         <Entry name="Promo">Promotion drafts, month by month.</Entry>
-        <Entry name="History">What ran, when, and whether it worked.</Entry>
+        <Entry name="History">Everything that happened, by day: what the research runs found, digests, replies from your mail. Filter it by type.</Entry>
         <Entry name="Settings">Connections, reminders and the weekly digest, your account and passkeys, and how the app looks.</Entry>
       </Section>
 

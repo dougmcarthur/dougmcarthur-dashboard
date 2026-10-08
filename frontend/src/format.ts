@@ -62,3 +62,44 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
 
   return shortDate(iso, now)
 }
+
+/**
+ * The reader's own calendar day for an instant, as YYYY-MM-DD.
+ *
+ * What a timeline groups by. The server's UTC day is wrong for exactly the
+ * hours a person is most likely to be looking: seven in the evening in
+ * Winnipeg is already tomorrow in UTC, and tonight's digest would be filed
+ * under a day that has not started.
+ */
+export function localDay(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso.slice(0, 10) : localToday(d)
+}
+
+/**
+ * A day as a heading: "Today", "Yesterday", then the weekday and date, with the
+ * year only once it is not this one. Takes `today` rather than reading the
+ * clock, like everything else here that is about which day it is.
+ */
+export function dayHeading(day: string, today: string): string {
+  if (day === today) return 'Today'
+
+  const [ty, tm, td] = today.split('-').map(Number)
+  if (day === localToday(new Date(ty, tm - 1, td - 1))) return 'Yesterday'
+
+  const [y, m, d] = day.split('-').map(Number)
+  if (!y || !m || !d) return day
+  return new Date(y, m - 1, d).toLocaleDateString('en-CA', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    ...(y === ty ? {} : { year: 'numeric' }),
+  })
+}
+
+/** The time of day on the reader's clock: "7:19 AM". */
+export function clockTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })
+}

@@ -167,6 +167,7 @@ have both. The client treats them identically.
 | 2 | Bell, badge, pane in the header. Polling with visibility pause. | done |
 | 3 | `notification_events` table (migration 0007); automation runs and digest sends write to it. Grouping. | done |
 | 4 | Pruning, "View all" into History, and delete the standalone alarm banner the pane replaces. | done |
+| 5 | History as the bell expanded: a timeline by day, filterable by type, with each run's report laid out. Compact rows in the bell. The panel can be pinned beside the page. | done |
 
 Phase 1 and 2 alone are worth shipping: they cover every critical, and the
 critical ones are the only notifications that can cost you something.
@@ -204,6 +205,27 @@ not lose the record of how long it has been true.
 per kind, came out as ten chips over four rows — taller than the notifications
 underneath it. Severities are icon-and-count, kinds are a select, and every
 count is what clicking would actually leave you looking at.
+
+### What phase 5 settled
+
+**"History" was the wrong thing to link to.** Phase 4 sent "View all" to the run
+log, which knew nothing about a digest or a reply and printed an agent's report as
+one block. History is now this list drawn wider: the same kinds, icons and unread
+marks, a timeline by the reader's own day in place of the cap, and a type filter
+whose counts the list can honour. What is true right now (a connection that is
+down, a deadline closing in) is listed above the timeline and not in it, because
+section 3's distinction still holds: conditions are state, events are history.
+
+**A row in the pane is a headline and one line.** The writers send whatever they
+had to say, so the cut is made once in `buildNotifications`, not in the component:
+an agent's report becomes what it filed, any other body is trimmed to 140
+characters at a word, and a group is its newest member. The full text is one click
+away, on the page with room for it.
+
+**Pinning is an option and a dropdown is still the default.** A docked
+notifications column is unusual, and it pays off only while you are working
+through a queue. See `docs/side-panel-plan.md` for why it starts at 1280px, and
+for what else might live in the same column.
 
 ## 10. What this feature must never become
 

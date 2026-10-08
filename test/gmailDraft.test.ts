@@ -69,7 +69,16 @@ describe('encodeDraft', () => {
 })
 
 describe('planDrafts', () => {
-  const base = { id: 1, name: 'Marmoset Music', contactEmail: 'sync@marmoset.test', pitchDraft: 'Hello', status: 'draft_ready' }
+  // Read, and said nothing either way: not a green light, but not a refusal,
+  // and nothing the bulk action holds back. The terms cases are below.
+  const base = {
+    id: 1,
+    name: 'Marmoset Music',
+    contactEmail: 'sync@marmoset.test',
+    pitchDraft: 'Hello',
+    status: 'draft_ready',
+    policyCheckedAt: '2026-10-01T00:00:00.000Z',
+  }
 
   it('readies a target that has both an address and a pitch', () => {
     const plan = planDrafts([base])
@@ -103,5 +112,42 @@ describe('planDrafts', () => {
 
   it('treats whitespace as absent', () => {
     expect(planDrafts([{ ...base, contactEmail: '  ' }]).skipped[0].reason).toBe('no contact address')
+  })
+
+  describe('what their own site says about pitches', () => {
+    const closed = { ...base, submissionPolicy: 'closed' }
+
+    it('leaves out a target that says it takes no unsolicited pitches', () => {
+      const plan = planDrafts([closed])
+      expect(plan.ready).toEqual([])
+      expect(plan.skipped[0].reason).toBe('says no unsolicited pitches')
+    })
+
+    it('leaves out a target nobody has checked, rather than drafting on a guess', () => {
+      const plan = planDrafts([{ ...base, policyCheckedAt: null }])
+      expect(plan.ready).toEqual([])
+      expect(plan.skipped[0].reason).toBe('terms not checked yet')
+    })
+
+    it('lets through a target that invites submissions, and one that said nothing', () => {
+      const plan = planDrafts([{ ...base, id: 5, submissionPolicy: 'open' }, { ...base, id: 6 }])
+      expect(plan.ready.map((r) => r.id)).toEqual([5, 6])
+    })
+
+    it('lets through a refusal the artist read and chose to override', () => {
+      const plan = planDrafts([{ ...closed, policyOverriddenAt: '2026-10-07T12:00:00.000Z' }])
+      expect(plan.ready).toHaveLength(1)
+    })
+
+    it('still says "already pitched" first, since that is the more useful answer', () => {
+      expect(planDrafts([{ ...closed, status: 'pitched' }]).skipped[0].reason).toBe('already pitched')
+    })
+
+    it('does not draft for a refusal that has no address or pitch either, and says the refusal', () => {
+      // The reason that matters is the one that cannot be fixed by filling
+      // something in.
+      const plan = planDrafts([{ ...closed, contactEmail: null, pitchDraft: null }])
+      expect(plan.skipped[0].reason).toBe('says no unsolicited pitches')
+    })
   })
 })

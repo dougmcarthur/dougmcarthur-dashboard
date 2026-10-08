@@ -72,6 +72,10 @@ const stamp = (offset) => {
   d.setUTCDate(d.getUTCDate() + offset)
   return d.toISOString().slice(0, 19).replace('T', ' ')
 }
+// An ISO instant some hours from now, which is how the Worker writes every
+// event and every run an agent posts. `stamp` above is the older zoneless
+// spelling two production rows carry, kept because it is a state worth seeing.
+const iso = (hours) => new Date(NOW.getTime() + hours * 3_600_000).toISOString()
 
 // ---------------------------------------------------------------------------
 // SQL helpers.
@@ -232,7 +236,53 @@ const syncTargets = [
   // Already pitched — the "skipped: already pitched" branch.
   { name: 'Foxglove Trailers', contact_email: 'team@example.test', contact_role: 'Creative Director', agency_type: 'trailer', status: 'pitched', pitch_draft: SHORT_PITCH, pitch_sent: stamp(-20), notes: 'Pitched last month, no reply yet.' },
   { name: 'Standing Stone Games', contact_email: 'audio@example.test', contact_role: 'Audio Lead', agency_type: 'games', status: 'draft_ready', pitch_draft: SHORT_PITCH, notes: null, snoozed_until: day(10), snoozed_at: stamp(-1) },
+  // The one this was built for: a target filed as ready to pitch, with a note
+  // calling its route "confirmed and simple", whose own About page says no.
+  { name: 'Friendly Faces Music Partners', contact_email: 'beth@friendlyfaces.example', contact_role: 'Founder', agency_type: 'library', status: 'draft_ready', pitch_draft: SHORT_PITCH, notes: 'LA one-stop library placing indie artists in TV and film. Submission route is confirmed and simple: email directly, no portal.' },
+  // A site that could not be opened: retried in days, never recorded as "read it".
+  { name: 'Lakeside Library', contact_email: 'sync@lakeside.example', contact_role: 'Sync Manager', agency_type: 'library', status: 'draft_ready', pitch_draft: SHORT_PITCH, notes: 'Small Vancouver library.' },
 ]
+
+// What each target's own site says about pitches from people it does not know,
+// by name. Every state the screens draw: refused, refused and overridden,
+// invited, read-and-silent, could-not-open, and never checked.
+const terms = {
+  'Friendly Faces Music Partners': {
+    website: 'friendlyfaces.example',
+    submission_policy: 'closed',
+    policy_evidence: 'NO unsolicited material please.',
+    policy_url: 'https://friendlyfaces.example/about.html',
+    policy_checked_at: stamp(-1),
+  },
+  'Standing Stone Games': {
+    submission_policy: 'closed',
+    policy_evidence: 'Submissions are by referral only.',
+    policy_url: 'https://standingstone.example/contact',
+    policy_checked_at: stamp(-9),
+    policy_overridden_at: stamp(-2),
+  },
+  'Greenroom Sync Agency': {
+    website: 'greenroom.example',
+    submission_policy: 'open',
+    policy_evidence: 'We welcome unsolicited submissions from independent artists.',
+    policy_url: 'https://greenroom.example/submit',
+    policy_checked_at: stamp(-4),
+  },
+  'Northline Pictures — Music Supervision': {
+    policy_evidence: 'Read 6 pages on northline.example. None says whether they take pitches from people they do not know.',
+    policy_checked_at: stamp(-3),
+  },
+  'Foxglove Trailers': {
+    policy_evidence: 'Read 3 pages on foxglove.example. None says whether they take pitches from people they do not know.',
+    policy_checked_at: stamp(-25),
+  },
+  'Lakeside Library': {
+    policy_evidence: 'Could not open lakeside.example. It will be tried again in a few days.',
+    policy_checked_at: stamp(-1),
+  },
+  // Prairie Public Broadcasting and Harbour Lights Media: never checked.
+}
+
 
 const syncRows = syncTargets.map((s, i) => ({
   name: s.name,
@@ -247,6 +297,12 @@ const syncRows = syncTargets.map((s, i) => ({
   updated_at: stamp(-(i % 14)),
   snoozed_until: s.snoozed_until ?? null,
   snoozed_at: s.snoozed_at ?? null,
+  website: terms[s.name]?.website ?? null,
+  submission_policy: terms[s.name]?.submission_policy ?? null,
+  policy_evidence: terms[s.name]?.policy_evidence ?? null,
+  policy_url: terms[s.name]?.policy_url ?? null,
+  policy_checked_at: terms[s.name]?.policy_checked_at ?? null,
+  policy_overridden_at: terms[s.name]?.policy_overridden_at ?? null,
   tenant_id: OWNER,
 }))
 
@@ -264,8 +320,8 @@ const promoRows = [
 
 const assets = [
   // Healthy, reviewed recently.
-  { kind: 'bio', label: 'Short bio (100 words)', value: 'Doug McArthur is a folk songwriter from Winnipeg.', question_kind: 'bio_short', variant: '100 words', char_count: 49, review_by: day(200), source: 'manual' },
-  { kind: 'bio', label: 'Long bio (300 words)', value: 'A longer biography used for programmes and press kits.', question_kind: 'bio_long', variant: '300 words', char_count: 54, review_by: day(150), source: 'manual' },
+  { kind: 'bio', label: 'Short bio (100 words)', value: 'Doug McArthur is a folk songwriter from Winnipeg.', question_kind: 'bio', variant: '100 words', char_count: 49, review_by: day(200), source: 'manual' },
+  { kind: 'bio', label: 'Long bio (300 words)', value: 'A longer biography used for programmes and press kits.', question_kind: 'bio', variant: '300 words', char_count: 54, review_by: day(150), source: 'manual' },
   // Overdue — review_by in the past.
   { kind: 'fact', label: 'Monthly listeners', value: '4,200', question_kind: 'stat', review_by: day(-30), source: 'manual' },
   { kind: 'fact', label: 'Mailing list size', value: '1,100', question_kind: 'stat', review_by: day(-75), source: 'manual' },
@@ -285,7 +341,50 @@ const assets = [
   })),
   { kind: 'audio', label: 'Live off the floor — title track', value: 'https://example.test/audio.mp3', question_kind: 'audio', review_by: null, source: 'reference_docs' },
   { kind: 'video', label: 'Live session video', value: 'https://example.test/video', question_kind: 'video', review_by: null, source: 'reference_docs' },
+  // The shapes the document sourcing really writes: multi-line facts filed under
+  // the vocabulary's own keys, which is what the Answers panel is built to cut.
+  { kind: 'fact', label: 'Artist Name', value: 'Doug McArthur\nFolk songwriter, Winnipeg, MB\n45-minute solo set', question_kind: 'artist_name', review_by: day(300), source: 'reference_docs' },
+  { kind: 'fact', label: 'Genre', value: 'Folk and Americana singer-songwriter, rooted in prairie storytelling.\n\nFor fans of: Gillian Welch, Ron Sexsmith\n\nInfluences: Gordon Lightfoot, Neil Young', question_kind: 'genre', review_by: day(300), source: 'reference_docs' },
+  { kind: 'fact', label: 'Hometown', value: 'Winnipeg, Manitoba, Canada', question_kind: 'hometown', review_by: day(300), source: 'manual' },
+  { kind: 'fact', label: 'Line-up', value: 'Solo: voice and guitar. Sometimes joined by a cellist.', question_kind: 'lineup', review_by: day(300), source: 'manual' },
+  { kind: 'fact', label: 'Contact email', value: 'booking@example.test', question_kind: 'email', review_by: null, source: 'reference_docs' },
+  { kind: 'bio', label: 'One-line description', value: 'A plainspoken Winnipeg songwriter with a dry sense of humour and an unhurried voice.', question_kind: 'one_liner', review_by: day(200), source: 'manual' },
+  { kind: 'bio', label: 'Medium bio (150 words)', value: 'Doug McArthur is a folk songwriter from Winnipeg, Manitoba. He writes slowly and plays quietly, and his songs are about the prairie, the people on it and the weather that decides most of their plans. His last record was made in a barn over one cold February, with the doors open for the sound of the room. He has played house concerts, folk festivals and a good many church basements, and he prefers the quiet ones.', question_kind: 'bio', variant: '150 words', review_by: day(180), source: 'manual' },
+  { kind: 'fact', label: 'Press quote', value: '"A quiet knockout of a record." — Prairie Folk Weekly', question_kind: 'press_quote', review_by: day(300), source: 'manual' },
+  { kind: 'fact', label: 'Technical requirements', value: 'Two DI lines, one vocal mic, a small monitor.', question_kind: 'tech_requirements', review_by: null, source: 'reference_docs' },
 ]
+
+/**
+ * What this artist's applications have asked, so the Answers panel has a count
+ * to order by and a gap to name: the bio four times, Spotify three, a set length
+ * and a fee that nothing on file answers, and one question that names the event
+ * and so can never be on file in advance.
+ */
+const askedFields = []
+const askedField = (gig, key, label, questionKind) => ({
+  tenant_id: OWNER,
+  gig_id: gig,
+  field_key: key,
+  label,
+  field_type: 'text',
+  options: null,
+  required: 1,
+  max_length: null,
+  help_text: null,
+  position: askedFields.length,
+  question_kind: questionKind,
+  answer: null,
+  answer_asset_id: null,
+  answer_state: 'empty',
+  created_at: stamp(-10),
+  updated_at: stamp(-10),
+})
+for (const gig of [1, 2, 3, 4]) askedFields.push(askedField(gig, 'bio', 'Artist bio', 'bio'))
+for (const gig of [1, 2, 3]) askedFields.push(askedField(gig, 'spotify', 'Spotify link', 'spotify'))
+for (const gig of [1, 2]) askedFields.push(askedField(gig, 'set', 'Set length', 'set_length'))
+askedFields.push(askedField(2, 'fee', 'Fee', 'fee'))
+askedFields.push(askedField(3, 'why', 'Why this festival', 'why_this_event'))
+askedFields.push(askedField(1, 'photo', 'Press photo', null))
 
 const assetRows = assets.map((a, i) => ({
   kind: a.kind,
@@ -353,6 +452,62 @@ for (const off of [-35, -65, -95]) {
 // A failure: runTier rates this 'attention', not 'critical', because the next
 // tick retries it.
 taskRuns.push({ task_id: 'gig-festival-scan', run_at: stamp(-1), status: 'failed', summary: 'Timed out fetching a listing page after 30s.', items_added: 0, tenant_id: OWNER })
+
+// What the History page is for: a run whose report is a list with caveats, and
+// one that came back incomplete with one long paragraph about why. Both are the
+// shapes an agent really writes, and both are the wall of text that page exists
+// to take apart. ISO timestamps, as an agent posts them.
+const reportRunAt = iso(-3)
+const reportSummary = [
+  'Checked the usual listings and the provincial association feeds for new calls open to a Manitoba songwriter.',
+  'Filed three new opportunities:',
+  '1. Canada Council for the Arts (#41) \u2014 Arts Across Canada and Abroad: rolling intake with no fixed deadline, funds travel to showcases.',
+  '2. Folk Alliance International (#42) \u2014 official showcase applications open Nov 1, fee waived for members.',
+  '3. Nuit Blanche Winnipeg (#43) \u2014 artist call closes Oct 31, paid, local.',
+  'Did not file the Brandon fair, which closed in September.',
+  'The Manitoba Music news feed was unreachable, so its calls are not covered this week.',
+].join('\n')
+taskRuns.push({ task_id: 'gig-festival-scan', run_at: reportRunAt, status: 'ok', summary: reportSummary, items_added: 3, tenant_id: OWNER })
+
+const incompleteRunAt = iso(-27)
+const incompleteSummary =
+  "Manitoba Music's whole site (manitobamusic.com) returned HTTP 403 to every fetch this run, including the deadlines page, the news feed, the live-music calendar and the homepage. I retried several of these more than once over the course of the run and it never cleared, so I could not do the three steps this prompt weights most heavily for a Manitoba-based artist. With the primary source down, I fell back to general web research: national and regional folk festivals, songwriter competitions, and arts council grant programs, cross-checked against the 58 rows already on file. The Manitoba and Western Canada folk festival circuit is thoroughly covered already. Filed two new grants and nothing else."
+taskRuns.push({ task_id: 'gig-festival-scan', run_at: incompleteRunAt, status: 'incomplete', summary: incompleteSummary, items_added: 2, tenant_id: OWNER })
+
+/**
+ * The bell's side of the same history: one of each kind, read and unread, one
+ * the artist dismissed, and the echoes the run route writes beside every run.
+ * Every column is named on every row, because the insert helper takes its
+ * column list from the first.
+ */
+const event = (o) => ({
+  tenant_id: OWNER,
+  kind: 'digest',
+  tier: 'info',
+  title: '',
+  body: null,
+  href: null,
+  action_label: null,
+  dedupe_key: null,
+  created_at: iso(-1),
+  read_at: null,
+  dismissed_at: null,
+  ...o,
+})
+const events = [
+  // The echoes of the two runs above. Unread, so the History page shows its dots.
+  event({ kind: 'automation', title: 'Gig research added 3 items', body: reportSummary, href: '#runs/automation', action_label: 'See report', dedupe_key: `automation:gig-festival-scan:${reportRunAt}`, created_at: reportRunAt }),
+  event({ kind: 'automation', tier: 'attention', title: 'Gig research finished incomplete', body: incompleteSummary, href: '#runs/automation', action_label: 'See report', dedupe_key: `automation:gig-festival-scan:${incompleteRunAt}`, created_at: incompleteRunAt }),
+  event({ kind: 'reconcile', tier: 'attention', title: '3 replies found in your mail', body: 'Local Fest: Declined \u00B7 Winter Fest: Info requested \u00B7 Unmatched: Acknowledged', href: '#review/mail', action_label: 'Read them', dedupe_key: `replies:${iso(-5).slice(0, 13)}`, created_at: iso(-5) }),
+  event({ kind: 'reconcile', title: 'One reply found in your mail', body: 'Acknowledgements only: nothing needs a decision.', href: '#review/mail', action_label: 'Read them', dedupe_key: `replies:${iso(-20).slice(0, 13)}`, created_at: iso(-20), read_at: iso(-19) }),
+  event({ kind: 'automation', title: 'Application form read for Nuit Blanche Winnipeg', body: 'Eleven questions are staged from your library. Nothing is filled in until you read them.', href: '#gigs/3', action_label: 'Open', dedupe_key: 'form-read:3', created_at: iso(-12) }),
+  event({ kind: 'feedback', tier: 'attention', title: 'Something is broken, from Sam', body: 'The deadline on the Overview card says Oct 21 but the listing says Oct 31. I think the year rolled over.', href: '#settings/account', action_label: 'Read it in admin mode', created_at: iso(-8) }),
+  event({ kind: 'digest', title: 'Weekly digest sent, 4 to act on', body: 'Sun Dogs Music Scout: your week, 4 to act on', href: '#review/needs', action_label: 'Open queue', dedupe_key: `digest:sent:${day(-1)}`, created_at: iso(-30), read_at: iso(-29) }),
+  event({ kind: 'signup', title: 'Invitation request from Jo Fiddle', body: 'I play fiddle in Brandon and would like to try it.', href: '#settings/account', action_label: 'Read it in admin mode', created_at: iso(-50), read_at: iso(-49) }),
+  // Dismissed in the bell eight days ago: gone there, still here.
+  event({ kind: 'digest', title: 'Weekly digest sent, 6 to act on', body: 'Sun Dogs Music Scout: your week, 6 to act on', href: '#review/needs', action_label: 'Open queue', dedupe_key: `digest:sent:${day(-8)}`, created_at: iso(-24 * 8), read_at: iso(-24 * 8 + 1), dismissed_at: iso(-24 * 8 + 1) }),
+  event({ kind: 'reconcile', title: 'Notes backfill found nothing to fill', body: 'Scanned 58 rows; every column the notes could fill already had a value.', href: '#settings/account', action_label: 'See settings', dedupe_key: 'once:notesBackfill', created_at: iso(-24 * 22), read_at: iso(-24 * 22 + 1) }),
+]
 
 /**
  * Replies, which is the screen this fixture most needs to be able to show.
@@ -466,7 +621,7 @@ const codeRow = {
 // ---------------------------------------------------------------------------
 
 const OWNED_TABLES = [
-  'gig_replies',
+  'application_fields', 'notification_events', 'gig_replies',
   'task_runs', 'artist_assets', 'reference_docs', 'promo_drafts',
   'sync_targets', 'gig_opportunities', 'auth_enrolment_codes', 'users', 'tenants',
 ]
@@ -481,6 +636,8 @@ const statements = [
   ...insert('artist_assets', assetRows),
   ...insert('reference_docs', referenceDocs),
   ...insert('task_runs', taskRuns),
+  ...insert('notification_events', events),
+  ...insert('application_fields', askedFields),
   ...insert('gig_replies', replies),
   ...insert('auth_enrolment_codes', [codeRow]),
   // The gig rows above are written in the fourteen-status vocabulary, which is
@@ -500,6 +657,8 @@ const counts = {
   artist_assets: assetRows.length,
   reference_docs: referenceDocs.length,
   task_runs: taskRuns.length,
+  notification_events: events.length,
+  application_fields: askedFields.length,
   gig_replies: replies.length,
 }
 

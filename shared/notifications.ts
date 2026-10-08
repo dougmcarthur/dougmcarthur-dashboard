@@ -37,6 +37,8 @@ import type { ReviewItem, QueueSummary } from './reviewQueue'
  */
 import { stalledTasks, type TaskHistory } from './taskCadence'
 import { taskLabel } from './taskLabels'
+import { isRunEventKey } from './runEvents'
+import { brief, runGist } from './runSummary'
 import type { CredentialHealth, CredentialId } from './credentialHealth'
 
 export type Tier = 'critical' | 'attention' | 'info'
@@ -58,6 +60,19 @@ export type NotificationKind =
   | 'reconcile'
   | 'feedback'
   | 'signup'
+
+/** Every kind, in the order the filters list them. */
+export const NOTIFICATION_KINDS = [
+  'connection',
+  'health',
+  'timing',
+  'snooze',
+  'automation',
+  'digest',
+  'reconcile',
+  'feedback',
+  'signup',
+] as const satisfies readonly NotificationKind[]
 
 /** Filter labels, here rather than in the UI so every consumer agrees. */
 export const KIND_LABELS: Record<NotificationKind, string> = {
@@ -107,6 +122,11 @@ export interface StoredEvent {
   createdAt: string
   readAt: string | null
   dismissedAt: string | null
+  /**
+   * Optional, so a caller that never needed it still builds a `StoredEvent`.
+   * What the History page joins a run to its echo on; see `shared/runEvents.ts`.
+   */
+  dedupeKey?: string | null
 }
 
 export interface Mark {
@@ -151,6 +171,17 @@ const GROUP_WINDOW_MS = 24 * 60 * 60 * 1000
 /** The pane is not a log. Anything past this lives in History. */
 const MAX_ITEMS = 20
 
+/**
+ * The longest line of context a row in the pane carries.
+ *
+ * A writer's `body` is whatever it had to say: an agent's whole report, a
+ * visitor's message, an error. The pane is read at a glance, so a body that
+ * runs past this is cut at a word and the rest is a click away on History,
+ * which has the room. Capped here rather than in the component so that every
+ * writer, including the ones that do not exist yet, gets the same answer.
+ */
+const BODY_LIMIT = 140
+
 /** Deadline horizon that counts as "on the clock". Matches the queue's own. */
 const DUE_SOON_DAYS = 14
 
@@ -187,8 +218,8 @@ function automationNotes(histories: TaskHistory[], today: string): Draft[] {
     tier: 'critical' as Tier,
     title: `${taskLabel(task.taskId)} has not run in ${task.daysSince} days`,
     body: `It ran about every ${task.everyDays} days until it stopped. Nothing has taken over in the meantime.`,
-    href: '#runs',
-    action: 'View runs',
+    href: '#runs/automation',
+    action: 'See history',
   }))
 }
 
@@ -369,6 +400,20 @@ function snoozeNotes(items: ReviewItem[], today: string): Draft[] {
 }
 
 /**
+ * The line of context under an event's title.
+ *
+ * A run's echo carries the agent's whole report as its body, so it is read for
+ * what the run filed instead; everything else is trimmed to `BODY_LIMIT`. The
+ * echo does not record the run's status, but it does record its tier, and a
+ * tier above `info` is exactly what a run that did not come back fine is rated.
+ */
+function eventBody(e: StoredEvent): string {
+  const body = e.body ?? ''
+  if (isRunEventKey(e.dedupeKey)) return runGist(body, e.tier === 'info' ? 'ok' : 'failed', BODY_LIMIT)
+  return brief(body, BODY_LIMIT)
+}
+
+/**
  * Clusters stored events into rows.
  *
  * Same kind, within `GROUP_WINDOW_MS` of the cluster's newest member: one row.
@@ -407,9 +452,6 @@ function groupEvents(events: StoredEvent[]): Array<Notification & { ids: number[
       .map((e) => e.tier as Tier)
       .sort((a, b) => TIER_RANK[a] - TIER_RANK[b])[0]
 
-    const names = c.slice(0, 3).map((e) => e.title)
-    const rest = c.length - names.length
-
     return {
       key: `event:${kind}:${ids.join('+')}`,
       kind,
@@ -418,15 +460,15 @@ function groupEvents(events: StoredEvent[]): Array<Notification & { ids: number[
         c.length === 1
           ? head.title
           : `${c.length} ${(KIND_LABELS[kind] ?? kind).toLowerCase()} updates`,
-      body:
-        c.length === 1
-          ? (head.body ?? '')
-          : rest > 0
-            ? `${names.join('; ')}, and ${plural(rest, 'more', 'more')}.`
-            : `${names.join('; ')}.`,
+      // One line either way. A group used to list its first three titles
+      // end to end, which made the row taller the more it had to say; the
+      // newest is the one worth a glance, and History has the rest, one each.
+      body: c.length === 1 ? eventBody(head) : `Latest: ${head.title}`,
       // History is where everything that happened lives, so it is the right
-      // fallback for an event whose writer had nowhere better to point.
-      href: (c.length === 1 ? head.href : null) ?? '#runs',
+      // fallback for an event whose writer had nowhere better to point. Opened
+      // on the event's own type, so "3 reconcile updates" lands on those three
+      // and not on everything.
+      href: (c.length === 1 ? head.href : null) ?? `#runs/${kind}`,
       action: c.length === 1 ? (head.actionLabel ?? undefined) : 'View all',
       read,
       firstSeen: head.createdAt,
@@ -465,6 +507,11 @@ export function buildNotifications(input: {
   taskRuns?: TaskHistory[]
   /** ISO timestamp; the date part is used for the dismissal window. */
   now: string
+  /**
+   * How many rows to return. The pane's twenty by default; the History page
+   * passes `Infinity`, because it is the place that cap sends you to.
+   */
+  limit?: number
 }): { items: Notification[]; unread: number; unreadCritical: number; total: number } {
   const today = input.now.slice(0, 10)
   const seen = new Map(input.marks.map((m) => [m.dedupeKey, m]))
@@ -505,7 +552,7 @@ export function buildNotifications(input: {
 
   // Truncation is by rank, so what falls off the end is always the least
   // urgent and the oldest. The count of what fell off goes back with it.
-  const items = all.slice(0, MAX_ITEMS)
+  const items = all.slice(0, input.limit ?? MAX_ITEMS)
 
   // Counted across everything, not just the visible page: a badge that only
   // counts the first twenty is a badge that lies once there are twenty-one.

@@ -127,6 +127,17 @@ export interface SyncTarget {
   discoveredAt: string
   updatedAt: string
   reconciledAt: string | null
+  /**
+   * Whether they take pitches from people they do not know, with the sentence
+   * that says so. Optional so a fixture written before migration 0036 still
+   * fits; see shared/syncTerms.ts.
+   */
+  website?: string | null
+  submissionPolicy?: string | null
+  policyEvidence?: string | null
+  policyUrl?: string | null
+  policyCheckedAt?: string | null
+  policyOverriddenAt?: string | null
 }
 
 export interface PromoDraft {

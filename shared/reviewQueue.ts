@@ -26,6 +26,7 @@ import type { GigOpportunity, SyncTarget, PromoDraft } from './types'
 import { decisionFor, type Decision } from './decisionCopy'
 import { visaLead } from './gigCost'
 import { withStoredColumns } from './noteColumns'
+import { pitchGate, termsOf } from './syncTerms'
 import {
   parseNote,
   parseFee,
@@ -41,6 +42,7 @@ export type ReviewKind = 'gig' | 'sync' | 'promo'
 
 export type FlagId =
   | 'conflict'
+  | 'no_unsolicited'
   | 'visa_risk'
   | 'reply_due'
   | 'no_reply'
@@ -177,6 +179,13 @@ const FLAG_WEIGHT: Record<FlagId, number> = {
   // lead time is a fact about whether the opportunity is possible at all —
   // which is a different class of thing from a deadline you can still meet.
   visa_risk: 97,
+  // A sync target whose own site refuses cold pitches. In the top band with
+  // the visa and reply flags, ahead of every deadline's base weight: sending
+  // to it is the one mistake here that cannot be taken back, so the row should
+  // be near the front rather than something you scroll past on the way to a
+  // date. Urgency can still lift a close deadline a few points past it, as it
+  // can for every flag in this table.
+  no_unsolicited: 98,
   // Above every deadline. An unanswered invitation or question is the only
   // thing in the queue where somebody outside is waiting on a reply, and a
   // deadline you miss costs you one opportunity where silence here costs you
@@ -263,6 +272,9 @@ function flagsFor(
   // everything that is not a gig.
   gig: GigOpportunity | null,
   today: string,
+  // Likewise for a sync target, whose terms live in columns rather than in
+  // any note.
+  sync: SyncTarget | null = null,
 ): ReviewFlag[] {
   const flags: ReviewFlag[] = []
   const claimsDone = kind === 'gig' ? gigClaimsDone(status) : kind === 'sync' ? SYNC_DONE.has(status) : false
@@ -282,6 +294,13 @@ function flagsFor(
         kind: 'warning',
       })
     }
+  }
+
+  // Their own site says no. Only while the pitch has not gone out: after that
+  // the Sync page still says so, but a flag on a sent row asks for a decision
+  // there is nothing left to make.
+  if (sync && !SYNC_DONE.has(status) && pitchGate(sync).blocked) {
+    flags.push({ id: 'no_unsolicited', label: termsOf(sync).label, severity: 'danger', kind: 'warning' })
   }
 
   // Phase 4, where they moved and you have not moved back. Named for what is
@@ -411,7 +430,7 @@ function syncItem(row: SyncTarget, today: string): Omit<ReviewItem, 'decision'> 
   })
   const fee = parseFee(null, 0)
   const deadline = parseDeadline(null)
-  const flags = flagsFor('sync', row.status, parsed, fee, deadline, null, null, today)
+  const flags = flagsFor('sync', row.status, parsed, fee, deadline, null, null, today, row)
 
   return {
     key: `sync-${row.id}`,
