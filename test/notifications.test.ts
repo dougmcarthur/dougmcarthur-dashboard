@@ -255,7 +255,10 @@ describe('events', () => {
     expect(r.items).toHaveLength(1)
     expect(r.items[0].count).toBe(3)
     expect(r.items[0].title).toBe('3 automation updates')
-    expect(r.items[0].body).toBe('A; B; C.')
+    // One line, naming the newest. The group used to list its first three
+    // titles end to end and grew taller the more it had to say; History has
+    // every member on a line of its own.
+    expect(r.items[0].body).toBe('Latest: A')
     // The key names the rows it stands for, so read and dismiss act on exactly
     // what was on screen.
     expect(r.items[0].key).toBe('event:automation:1+2+3')
@@ -281,7 +284,7 @@ describe('events', () => {
     expect(r.items.map((n) => n.count)).toEqual([1, 1])
   })
 
-  it('names the overflow rather than dropping it silently', () => {
+  it('says how many a group holds, and names only the newest of them', () => {
     const r = build({
       events: [
         event({ id: 1, createdAt: hoursAgo(1), title: 'A' }),
@@ -290,7 +293,8 @@ describe('events', () => {
         event({ id: 4, createdAt: hoursAgo(4), title: 'D' }),
       ],
     })
-    expect(r.items[0].body).toBe('A; B; C, and 1 more.')
+    expect(r.items[0].title).toBe('4 automation updates')
+    expect(r.items[0].body).toBe('Latest: A')
   })
 
   it('keeps a group unread while any member is unread', () => {
@@ -324,8 +328,8 @@ describe('events', () => {
     expect(r.items).toEqual([])
   })
 
-  it('falls back to History for an event whose writer had nowhere to point', () => {
-    expect(build({ events: [event({ id: 1 })] }).items[0].href).toBe('#runs')
+  it('falls back to History, on its own type, for an event whose writer had nowhere to point', () => {
+    expect(build({ events: [event({ id: 1 })] }).items[0].href).toBe('#runs/automation')
   })
 })
 

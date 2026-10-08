@@ -15,7 +15,13 @@ import {
   taskRuns,
 } from '../db/schema'
 import { buildReviewQueue, summariseQueue } from '../../shared/reviewQueue'
-import { buildNotifications, eventIdsFromKey, type Mark } from '../../shared/notifications'
+import {
+  buildNotifications,
+  eventIdsFromKey,
+  NOTIFICATION_KINDS,
+  type Mark,
+} from '../../shared/notifications'
+import type { HistoryFeed } from '../../shared/history'
 import type { TaskHistory } from '../../shared/taskCadence'
 import {
   readEvents,
@@ -23,6 +29,7 @@ import {
   markAllEventsRead,
   dismissEvents,
 } from '../lib/notificationEvents'
+import { countHistory, readHistoryPage } from '../lib/history'
 import { calendarConfigured } from '../lib/googleCalendar'
 import { gmailConfigured } from '../lib/gmail'
 import { mailerConfigured } from '../lib/mailer'
@@ -68,7 +75,13 @@ function groupRuns(rows: Array<{ taskId: string; runAt: string }>): TaskHistory[
  * A live key set derived any other way would drift from what the bell shows,
  * and pruning against a drifted set deletes marks that are still in use.
  */
-export async function composeFeed(env: Env, tenant: TenantId, now = new Date()) {
+export async function composeFeed(
+  env: Env,
+  tenant: TenantId,
+  now = new Date(),
+  /** The pane's own cap when absent; History passes `Infinity`. */
+  limit?: number,
+) {
   const db = getDb(env.DB)
 
   const [gigs, sync, promo, [orphans], marks, events, runs] = await Promise.all([
@@ -124,6 +137,7 @@ export async function composeFeed(env: Env, tenant: TenantId, now = new Date()) 
     events,
     taskRuns: groupRuns(runs),
     now: now.toISOString(),
+    limit,
   })
 
   return { built, marks }
@@ -151,6 +165,49 @@ notifications.get('/', async (c) => {
   }
 
   return c.json(built)
+})
+
+const HistoryQuery = z.object({
+  kind: z.enum(NOTIFICATION_KINDS).optional(),
+  // An instant, the `next` of the page before. Compared as text against ISO
+  // timestamps, so anything that is not one simply matches nothing.
+  before: z.string().min(1).max(40).optional(),
+  limit: z.coerce.number().int().min(1).max(60).default(30),
+})
+
+/**
+ * The History page. The bell, with the cap taken off.
+ *
+ * The first page also carries what describes the whole of History rather than
+ * a slice of it (the standing conditions, the count behind each filter chip,
+ * the unread total), so "show older" costs two queries and not a full feed.
+ * Conditions are listed apart from the timeline because they are not history:
+ * they are true now, and stop being listed when they stop being true.
+ */
+notifications.get('/history', zValidator('query', HistoryQuery), async (c) => {
+  const tenant = tenantOf(c)
+  const { kind, before, limit } = c.req.valid('query')
+  const now = new Date()
+
+  const page = await readHistoryPage(c.env, tenant, { kind: kind ?? null, before: before ?? null, limit, now })
+  if (before) return c.json({ entries: page.entries, next: page.next } satisfies HistoryFeed)
+
+  const [{ built }, eventCounts] = await Promise.all([
+    composeFeed(c.env, tenant, now, Infinity),
+    countHistory(c.env, tenant, now),
+  ])
+
+  const conditions = built.items.filter((n) => n.source === 'condition')
+  const counts = { ...eventCounts }
+  for (const n of conditions) counts[n.kind] = (counts[n.kind] ?? 0) + 1
+
+  return c.json({
+    entries: page.entries,
+    next: page.next,
+    counts,
+    attention: kind ? conditions.filter((n) => n.kind === kind) : conditions,
+    unread: built.unread,
+  } satisfies HistoryFeed)
 })
 
 const ReadSchema = z.object({

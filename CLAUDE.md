@@ -714,6 +714,59 @@ because a run finishing is not recoverable from current state. Dismissing a
 condition lasts a day; dismissing an event is permanent. See
 `docs/notifications-plan.md` and `shared/notifications.ts`.
 
+**History is the bell with the cap taken off, and it is two tables.** `#runs`
+used to open the run log, a column of agent prose; it is the History page now
+(`#runs/<type>` opens on a type), a timeline by the reader's own day with
+what needs attention now above it. Standing conditions are listed apart from the
+timeline because they are not history: they stop being listed when they stop
+being true. A run is listed from `task_runs`, which has the structured fields
+and the whole report and is kept forever, never from its echo in
+`notification_events`, which is pruned at thirty days and is read for one thing,
+whether the run is still unread on the bell. The join is one string,
+`runEventKey` in `shared/runEvents.ts`, defined once for the writer and the
+reader, and `runTitle` and `runTier` moved there with it so both build the same
+sentence. A dismissed event is still listed: dismissing puts it away from the
+bell, it does not unhappen. `test/historyRoute.test.ts` runs the queries against
+the production schema, because what they let through, and whose it is, is the
+whole question.
+
+**A report is laid out, never interpreted.** `shared/runSummary.ts` finds a
+numbered or bulleted list, names each entry by what is before its dash, strips
+the `(#32)` row number, and breaks long paragraphs at sentence ends. It reads
+layout and nothing else, and when a report has no list it hands the paragraphs
+back untouched. In a single run-together paragraph nothing marks where the last
+entry ends, so the last entry keeps the tail rather than the parser guessing.
+Nothing is stored: a better reader next year improves every old run. The bell
+shows what a run filed (`runGist`) where it used to show the report, and every
+other event body is cut to 140 characters at a word, in `buildNotifications`
+rather than the component, so a writer that does not exist yet gets the same
+answer. A group's line is its newest member.
+
+**The notifications can be pinned beside the page, from 1280px up.** The bell
+becomes the switch for the panel once it is pinned, and `pinned` and `open` are
+separate flags so hiding the panel does not unpin it. Both live in
+`localStorage`, since they describe one screen. The threshold is the Gigs table's
+measured width plus the panel, not a taste. Only the bell polls; the panel reads
+what it keeps fresh, and `test/historyUi.test.ts` fails if both poll. What else
+might be pinned, and whether the navigation should move to the left, is in
+`docs/side-panel-plan.md`.
+
+**Answers at hand is the library cut for the moment a form is open.** The
+column's second panel (and a dialog below 1280px) lists what applications ask
+for, one Copy button each, from `GET /api/artist/answers`. The reads are the
+library and a count of `application_fields.question_kind`, both scoped, in
+`src/lib/answers.ts`; what is made of them is `shared/answersAtHand.ts`, pure and
+given `today` by the browser. Three rules to keep. It says what is wrong before
+the paste (`assetHealth`: a photo with no credit is broken, past its review date
+is overdue, unreviewed is a quiet note and never a problem). It names the
+questions the artist's own applications ask that nothing on file answers, and
+never matches paperwork by its label, since the classifier reads "minutes" as a
+set length and a hidden gap is worse than a gap named twice. And it never edits:
+a second place to edit an entry is a second place for it to be wrong. Text a
+person has to read is never `text-faint`, which is 3.6 to 1; a rendered contrast
+scan caught "Asked 4 times on your applications" in it, and
+`test/historyUi.test.ts` now fails on it.
+
 **The pipeline is a shape, not a free-for-all.** `nextGigStatuses` in
 `shared/gigStatus.ts` says which moves a status offers, and the PATCH route
 refuses anything else, whoever is calling it. Declining is always their verb;

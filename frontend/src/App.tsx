@@ -10,7 +10,7 @@ import { ArtistPage } from './pages/ArtistPage'
 import { SyncPage } from './pages/SyncPage'
 import { PromoDraftsPage } from './pages/PromoDraftsPage'
 import { SettingsPage } from './pages/SettingsPage'
-import { TaskRunsPage } from './pages/TaskRunsPage'
+import { HistoryPage } from './pages/HistoryPage'
 import { HelpPage } from './pages/HelpPage'
 import { useEffect } from 'react'
 import { notePage } from './diagnostics'
@@ -55,7 +55,7 @@ export default function App() {
         {page === 'artist' && <ArtistPage initialTab={arg} />}
         {page === 'sync' && <SyncPage />}
         {page === 'promo' && <PromoDraftsPage />}
-        {page === 'runs' && <TaskRunsPage />}
+        {page === 'runs' && <HistoryPage key={arg ?? ''} initialKind={arg} onNav={navigate} />}
         {page === 'settings' && <SettingsPage initialTab={arg} />}
         {page === 'help' && <HelpPage />}
       </ErrorBoundary>

@@ -18,6 +18,7 @@ import {
   type Freshness,
 } from '../../shared/artistAssets'
 import { classifyQuestion, kindByKey, targetLength } from '../../shared/questionKinds'
+import { readAnswers } from '../lib/answers'
 import { extractAll, type AssetProposal } from '../../shared/artistSource'
 import type { Env } from '../types'
 
@@ -164,6 +165,21 @@ artist.get('/answer', async (c) => {
       .filter((a) => a.id !== answer?.id)
       .map((a) => ({ id: a.id, label: a.label, charCount: a.charCount ?? a.value?.length ?? 0 })),
   })
+})
+
+/**
+ * The library cut for the moment a form is open: every answer with a Copy's
+ * worth of text, what is wrong with it before it is pasted, and what the
+ * artist's own applications ask that nothing on file answers.
+ *
+ * `today` comes from the browser, for the reason `/api/artist` takes one: an
+ * entry is overdue on the reader's calendar, and the Worker's is UTC.
+ *
+ * See `src/lib/answers.ts` for what it reads and `shared/answersAtHand.ts` for
+ * what it makes of it.
+ */
+artist.get('/answers', async (c) => {
+  return c.json(await readAnswers(c.env, tenantOf(c), todayOf(c)))
 })
 
 /**
