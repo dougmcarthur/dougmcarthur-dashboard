@@ -350,6 +350,13 @@ score they were made against. 34 decisions is not enough to fit anything, which
 §8 says at length; the useful output is disagreement with the stated weights,
 not a number.
 
+*The logging half is built (migration 0038, `decision_log`).* Every move is
+stored with a snapshot of what the screen derived — deadline, fee, cost range,
+flags — and a reserved `score` that is null until there is one. Nothing reads
+it. It was written first because a decision that was not stored has no score to
+store, and the 34 decisions already on file were made before it existed and
+cannot be given one. See CLAUDE.md, "Every choice is logged".
+
 **H — Phase 5, agreement templates.** Last, and rightly: `booked` is the rarest
 transition in the pipeline and the one with the least to automate.
 

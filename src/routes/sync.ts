@@ -10,6 +10,7 @@ import { syncNoteColumns } from '../../shared/noteColumns'
 import { foldFinding, normaliseWebsite, readSubmissionPolicy, startingTerms, type TermsColumns } from '../../shared/syncTerms'
 import { linkSync } from '../lib/catalog'
 import { agentWrite } from '../lib/agentWrites'
+import { decisionActor, recordSyncDecision } from '../lib/decisionLog'
 import { checkTarget } from '../lib/syncTerms'
 
 const sync = new Hono<AppEnv>()
@@ -199,6 +200,19 @@ sync.patch('/:id', zValidator('json', SyncPatchSchema), async (c) => {
   }
 
   await db.update(syncTargets).set(set).where(scoped(syncTargets, tenant, eq(syncTargets.id, id)))
+
+  // Logged against the row as it was, and only for the status that was actually
+  // written: a blank status means "unchanged", so it is not a move.
+  if (set.status != null && set.status !== existing.status) {
+    await recordSyncDecision(c.env, tenant, existing, {
+      action: 'move',
+      from: existing.status,
+      to: set.status,
+      via: 'sync_patch',
+      actor: decisionActor(c.get('actor')),
+      at: ts,
+    })
+  }
 
   const row = await db.select().from(syncTargets).where(scoped(syncTargets, tenant, eq(syncTargets.id, id))).get()
   if (!row) return c.json({ error: 'not found' }, 404)

@@ -519,6 +519,39 @@ export const artistConnectors = sqliteTable('artist_connectors', {
   updatedAt: text('updated_at').notNull(),
 })
 
+/**
+ * What an artist chose, and what the screen showed them when they did. See
+ * migration 0038 and `shared/decisionLog.ts`.
+ *
+ * The seventeenth scoped table. Append-only: nothing updates or deletes a row
+ * except removing the whole tenant, because a record of a past decision that
+ * can be edited is not a record. `entityId` names a row that may no longer
+ * exist, so it is not a key.
+ */
+export const decisionLog = sqliteTable('decision_log', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  /** Which artist's row this is. See src/db/scope.ts. */
+  tenantId: text('tenant_id'),
+  /** `gig` or `sync`. */
+  entityType: text('entity_type').notNull(),
+  entityId: integer('entity_id').notNull(),
+  /** The catalog entry the row was linked to at the time, when it was. */
+  opportunityId: integer('opportunity_id'),
+  /** `move`, `snooze`, `wake` or `remove`. */
+  action: text('action').notNull(),
+  fromValue: text('from_value'),
+  toValue: text('to_value'),
+  toStage: text('to_stage'),
+  toOutcome: text('to_outcome'),
+  /** Which door it came through. A step after a choice is not a choice. */
+  via: text('via').notNull(),
+  /** `user` or `agent`. */
+  actor: text('actor').notNull(),
+  /** JSON, built only by `shared/decisionLog.ts`. Never read as prose. */
+  context: text('context').notNull(),
+  decidedAt: text('decided_at').notNull(),
+})
+
 /* --------------------------------------------------------------------- */
 /* Accounts. See migration 0021 and docs/multi-tenant-plan.md.            */
 /* --------------------------------------------------------------------- */

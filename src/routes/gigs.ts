@@ -11,6 +11,7 @@ import { syncGigNudges, removeGigNudges, type GigRow } from '../lib/gigNudges'
 import { readNudgePreferences } from '../lib/nudgeSettings'
 import { linkGig } from '../lib/catalog'
 import { agentWrite } from '../lib/agentWrites'
+import { decisionActor, recordGigDecision } from '../lib/decisionLog'
 import {
   normaliseGigStatus,
   isGigSettled,
@@ -296,6 +297,21 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
 
   await db.update(gigOpportunities).set(updates).where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
 
+  // What was chosen, and what the row said when it was. `before` is the row
+  // as the artist saw it — the PATCH may be editing the deadline in the same
+  // breath, and the decision was made against the old one. See
+  // shared/decisionLog.ts.
+  if (statusChanging) {
+    await recordGigDecision(c.env, tenant, before, {
+      action: 'move',
+      from: normaliseGigStatus(before.status),
+      to: newStatus,
+      via: 'gig_patch',
+      actor: decisionActor(c.get('actor')),
+      at: updates.updatedAt as string,
+    })
+  }
+
   const deadlineDate = after.deadline ? splitDeadline(after.deadline).date : null
 
   // A nudge to actually do the thing, once you have said you will. Written on
@@ -350,18 +366,16 @@ gigs.delete('/:id', async (c) => {
   // A gig can own six entries now, across two surfaces. Deleting only the
   // deadline reminder would leave an orphaned show on the calendar, and an
   // orphaned chore in Tasks, for a gig that no longer exists.
-  const row = await db
-    .select({
-      googleEventId: gigOpportunities.googleEventId,
-      opensEventId: gigOpportunities.opensEventId,
-      showEventId: gigOpportunities.showEventId,
-      opensTaskId: gigOpportunities.opensTaskId,
-      deadlineTaskId: gigOpportunities.deadlineTaskId,
-      replyTaskId: gigOpportunities.replyTaskId,
-    })
-    .from(gigOpportunities)
-    .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
-    .get()
+  // The whole row rather than the six ids: removing it is a decision, and the
+  // snapshot of what it looked like is the one thing that cannot be recovered
+  // once it is gone.
+  const row = readGig(
+    await db
+      .select()
+      .from(gigOpportunities)
+      .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
+      .get(),
+  )
 
   if (row) await removeGigNudges(c.env, row, tenantOf(c))
 
@@ -375,6 +389,15 @@ gigs.delete('/:id', async (c) => {
     .delete(reminders)
     .where(scoped(reminders, tenant, eq(reminders.entityType, 'gig'), eq(reminders.entityId, id)))
   await db.delete(gigOpportunities).where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id)))
+  if (row) {
+    await recordGigDecision(c.env, tenant, row, {
+      action: 'remove',
+      from: normaliseGigStatus(row.status),
+      via: 'gig_delete',
+      actor: decisionActor(c.get('actor')),
+      at: new Date().toISOString(),
+    })
+  }
   return c.json({ ok: true })
 })
 

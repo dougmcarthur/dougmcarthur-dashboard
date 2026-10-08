@@ -22,7 +22,9 @@
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { SCOPED_TABLES } from '../src/db/scope'
+import { getTableName } from 'drizzle-orm'
+import * as schema from '../src/db/schema'
+import { DOMAIN_TABLES, SCOPED_TABLES } from '../src/db/scope'
 
 const SRC = join(__dirname, '..', 'src')
 
@@ -242,5 +244,20 @@ describe('tenant scoping', () => {
     const expected = [...declared].filter((name) => !notDomain.has(name)).sort()
 
     expect(expected).toEqual([...SCOPED_TABLES].sort())
+  })
+
+  /**
+   * The check `scope.ts` says exists. `DOMAIN_TABLES` is what removing an artist
+   * and counting their rows iterate, so a table that is scoped by name and
+   * missing from it is one whose rows survive "delete my data" and go uncounted
+   * in the preview. Nothing compared the two until the seventeenth table made
+   * the claim worth testing — the names above only prove the *guard* knows a
+   * table, not that the *deleter* does.
+   */
+  it('deletes and counts exactly the tables it scopes', () => {
+    const byName = schema as unknown as Record<string, Parameters<typeof getTableName>[0]>
+    const scopedSql = SCOPED_TABLES.map((name) => getTableName(byName[name])).sort()
+    const iterated = DOMAIN_TABLES.map((table) => getTableName(table)).sort()
+    expect(iterated).toEqual(scopedSql)
   })
 })

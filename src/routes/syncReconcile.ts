@@ -7,6 +7,7 @@ import { syncTargets } from '../db/schema'
 import { scoped } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
 import { getSentEmailsForAddresses, gmailConfigured } from '../lib/gmail'
+import { decisionActor, recordSyncDecision } from '../lib/decisionLog'
 
 const reconcile = new Hono<AppEnv>()
 
@@ -102,8 +103,24 @@ reconcile.post(
       // The ids come from a preview the browser is holding, so each one is a
       // claim rather than a fact. Scoping the write is what makes a stale or
       // forged id a no-op instead of somebody else's status change.
+      const before = u.newStatus
+        ? await db.select().from(syncTargets).where(scoped(syncTargets, tenant, eq(syncTargets.id, u.id))).get()
+        : undefined
       await db.update(syncTargets).set(patch).where(scoped(syncTargets, tenant, eq(syncTargets.id, u.id)))
       applied.push(u.id)
+
+      // The artist previewed what the mailbox showed and pressed apply. See
+      // shared/decisionLog.ts for why that is logged apart from a choice.
+      if (before && u.newStatus && u.newStatus !== before.status) {
+        await recordSyncDecision(c.env, tenant, before, {
+          action: 'move',
+          from: before.status,
+          to: u.newStatus,
+          via: 'sync_reconcile',
+          actor: decisionActor(c.get('actor')),
+          at: now,
+        })
+      }
     }
 
     return c.json({ applied })
