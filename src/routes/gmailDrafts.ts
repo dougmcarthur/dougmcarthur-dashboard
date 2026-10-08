@@ -116,6 +116,9 @@ async function currentPlan(env: Env, tenant: TenantId) {
       contactEmail: r.contactEmail,
       pitchDraft: r.pitchDraft,
       status: r.status,
+      submissionPolicy: r.submissionPolicy,
+      policyCheckedAt: r.policyCheckedAt,
+      policyOverriddenAt: r.policyOverriddenAt,
     })),
   )
 }

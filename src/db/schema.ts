@@ -128,6 +128,16 @@ export const syncTargets = sqliteTable('sync_targets', {
   reconciledAt: text('reconciled_at'),
   /** The shared catalog entry, for organisations. See migration 0033. */
   opportunityId: integer('opportunity_id'),
+  /**
+   * Whether they take pitches from people they do not know, and the evidence.
+   * See migration 0036 and shared/syncTerms.ts.
+   */
+  website: text('website'),
+  submissionPolicy: text('submission_policy'), // open | closed | null
+  policyEvidence: text('policy_evidence'),
+  policyUrl: text('policy_url'),
+  policyCheckedAt: text('policy_checked_at'),
+  policyOverriddenAt: text('policy_overridden_at'),
 })
 
 export const promoDrafts = sqliteTable('promo_drafts', {

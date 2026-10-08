@@ -599,6 +599,62 @@ Dry run is the default, as in `scripts/backfill-deadlines.ts`: nothing is
 written without `--apply` — in `run.ts`, in `cli.ts`, and in
 `scripts/issue-agent-token.ts`.
 
+**A sync target says whether it takes pitches, and the app reads the answer
+instead of trusting that somebody did.** The research agent filed a library as
+ready to pitch, with a note calling its submission route "confirmed and
+simple", and its own About page said "NO unsolicited material please." A listed
+address is a way to reach a company. It is not permission, and a pitch to one
+that refuses is ignored at best and remembered at worst. So each target carries
+`submission_policy` (`open`, `closed`, or null), the sentence that says so
+(`policy_evidence`), the page it was on (`policy_url`), when somebody last
+looked (`policy_checked_at`) and the artist's own decision to go ahead anyway
+(`policy_overridden_at`, its own column so a re-check can never undo it). Migration 0036,
+`shared/syncTerms.ts`, `src/lib/syncTerms.ts`.
+
+- **Null is two things, and neither is a green light.** Never checked, and read
+  and found silent, are different states, and a site nobody could read (no
+  address, or it did not open) is a third. "No policy found" is never worded as
+  permission, and a card that cannot say a site was read does not say it.
+- **Automation only moves toward caution.** A refusal replaces anything; an
+  invitation fills only an empty policy; notes are read for refusals and never for
+  invitations, since a note is a claim about a page. An agent's `open` has to carry
+  the sentence (`startingTerms` refuses it otherwise), and a refusal on the site
+  beats an agent that said open. A person can say "pitch anyway" with the quote
+  beside the button, and nothing else writes the policy: the columns are not in
+  the PATCH schema.
+- **The Worker reads the site itself**, on filing, when the address changes, on
+  the button, and nightly for anything unread, six a night per tenant like the
+  form revisit (`checkPendingTerms`). It never touches `updated_at`. Reading is
+  not following the home page: the first target's domain redirects `/` to a rebuilt
+  site on every spelling and still serves the old `/about.html`, which nothing
+  links to and which holds the refusal. So it follows the links worth following
+  and also asks for the conventional pages (`POLICY_PATHS`) once per host,
+  whatever the root did. A first version skipped hosts whose root redirected away
+  and found nothing on the real site; `scanSite` is tested against a model of
+  that shape and was run against the real one. Only plain public websites are
+  fetched (`isFetchable`).
+- **The gate is on every way out.** A refusal removes Copy and the mail links, and
+  Mark Pitched, from the Sync row and the Review pane, offers Archive instead,
+  ranks the row near the top (`no_unsolicited` flag, 98) and puts it on the weekly
+  email. The bulk Gmail drafts leave out refusals and also targets nobody has
+  read, since seven drafts at once is where one mistake costs most. Recording a
+  send is not blocked, because refusing to write down what happened would make the
+  app lie. `test/syncTermsUi.test.ts` fails if a surface that renders a pitch
+  draft beside Copy or a mail link stops asking `mayPitch`.
+- **Agents must say.** `create_sync_target` requires `submissionPolicy`
+  (`unknown` is an honest answer, silence is not); the prompt tells it to read the
+  target's own pages, search the domain for the phrase because old pages outlive
+  redesigns, and file a refusal with its quote and no pitch.
+
+What this does not do: it does not search the web, so a refusal that exists only
+on a page the site neither links to nor names conventionally is still missed, and
+the card says how many pages were read rather than that the target is fine. It
+covers sync targets only, not gig calls. Production is not backfilled by SQL: the
+rows already on file are read by the nightly pass, six a night, or by pressing
+*Check their site*. The Create and Edit forms on the Sync page sent `null` for
+every blank field and the route answered 400, so a target with any field blank
+could not be saved from the screen; the schema takes `nullish` now.
+
 **Screens name things; they never print identifiers.** The bell shipped saying
 *"gig-festival-scan has not run in 28 days"* — that string is the `task_id` an
 agent POSTs, a handle rather than a name, and it had reached three surfaces
