@@ -283,7 +283,6 @@ const terms = {
   // Prairie Public Broadcasting and Harbour Lights Media: never checked.
 }
 
-
 const syncRows = syncTargets.map((s, i) => ({
   name: s.name,
   contact_email: s.contact_email ?? null,
