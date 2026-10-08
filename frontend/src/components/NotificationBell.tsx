@@ -95,7 +95,7 @@ export function NotificationBell({
             aria-hidden="true"
             className={`absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 grid place-items-center
                         rounded-full text-[10px] font-bold leading-none border-2 border-surface
-                        ${critical ? 'bg-danger-solid text-white' : 'bg-ink text-surface'}`}
+                        ${critical ? 'bg-danger-fg text-surface' : 'bg-ink text-surface'}`}
           >
             {unread}
           </span>
