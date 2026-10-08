@@ -1,4 +1,5 @@
 import { StatusBadge } from '../../components/StatusBadge'
+import { DraftedMessage } from '../../components/DraftedMessage'
 import { PitchDiff } from '../../components/PitchDiff'
 import { SnoozeMenu } from '../../components/SnoozeMenu'
 import { shortDate } from '../../format'
@@ -10,6 +11,7 @@ import type { ReviewItem } from '../../../../shared/reviewQueue'
 import { DecisionBar } from './DecisionBar'
 import { Caption, Card } from '../../components/ui/Surface'
 import { TermsPanel, mayPitch } from '../../components/SyncTerms'
+import { mapsLink } from '../../../../shared/travelDistance'
 
 /**
  * Everything known about the selected item, on one surface.
@@ -188,6 +190,19 @@ export function Detail({
           <p className="text-sm text-muted mt-0.5">
             {item.subtitle}
             {parsed.location && <span> · {parsed.location}</span>}
+            {item.source.kind === 'gig' && mapsLink({ ...item.source.row, location: item.source.row.location ?? parsed.location }) && (
+              <>
+                {' · '}
+                <a
+                  href={mapsLink({ ...item.source.row, location: item.source.row.location ?? parsed.location })!}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-info-fg hover:underline"
+                >
+                  Open in Maps ↗
+                </a>
+              </>
+            )}
           </p>
         </div>
         {item.url && (
@@ -338,14 +353,13 @@ export function Detail({
       )}
 
       {parsed.draftedMessage && (
-        <Section
-          title={`Drafted message${parsed.draftedMessage.channel ? ` — ${parsed.draftedMessage.channel}` : ''}`}
-          action={sync && !mayPitch(sync) ? undefined : <CopyButton text={parsed.draftedMessage.body} />}
-        >
-          <p className="whitespace-pre-wrap rounded-md bg-sunken p-3 text-sm leading-relaxed text-ink">
-            {parsed.draftedMessage.body}
-          </p>
-        </Section>
+        <div className="mt-4">
+          <DraftedMessage
+            body={parsed.draftedMessage.body}
+            channel={parsed.draftedMessage.channel}
+            canCopy={!sync || mayPitch(sync)}
+          />
+        </div>
       )}
 
       {sync?.pitchDraft && (

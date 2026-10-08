@@ -1563,6 +1563,42 @@ is never a zero** — no `nights` leaves lodging out of the sum and names it in
 the prose location and labelled as guessed, the same treatment a deadline
 recovered from prose gets. See `docs/gig-pipeline-plan.md` §7.
 
+**A distance is measured once and cached, and a home nobody set is no
+distance.** The travel band used to be guessed from a list of place names
+written for Winnipeg, which is wrong for any other artist and cannot judge the
+boundary that costs money: Regina, Thunder Bay and Minneapolis are on no list.
+`enrichTravel` (`src/lib/travelEnrich.ts`) runs on the hourly tick, per tenant,
+ten gigs at a time and one request every 1.1 seconds, geocoding the gig's place
+with OpenStreetMap's Nominatim and routing the drive from the artist's home
+base with OSRM (`src/lib/geo.ts`, migration 0039). Three rules hold it.
+**Cached, not fetched on read**, because both services allow about one request
+a second from the whole app and require results to be stored: `geo_place` and
+`geo_home` record which place and home an answer was for, so only an edit or a
+moved home base asks again, and a place Nominatim does not know is remembered
+as such while a network failure writes nothing and is retried. **The home base
+is the artist's own** (`travel.home` in `tenant_settings`, Settings → Account)
+and has no default, for the reason the recovery address has none: without it
+the job does nothing and the cost panel keeps the place-name guess and says so,
+since a distance from a home nobody set is a guess dressed as a measurement.
+**A measured distance outranks the guess and yields to a band a person set**,
+and it is checked rather than believed: a road shorter than the straight line
+is the router snapping an endpoint somewhere it could reach (Glasgow came back
+as a 1,004 km drive from Winnipeg, 5,789 km away) and is treated as no route,
+and a place with no road gets a straight-line figure marked `straight_line`.
+Only "Town, Region" is looked up (`mappablePlace`): a bare province geocodes to
+the middle of it. What leaves the app is the gig's place text and the home
+base the artist typed, to two public OpenStreetMap services; the card says so,
+and the screens credit OpenStreetMap beside a measured figure.
+
+**A drafted message is lifted out of a note and shown as its own block.** The
+agents write an outreach message into a gig's note when there is no form to
+fill, and the Gigs row printed it inside the reasoning with no way to copy it.
+`splitDraftedMessage` separates it and `DraftedMessage` shows the channel, the
+text verbatim and Copy, never depersonalised, since "I'm Doug McArthur" is the
+message. Copy only, no send. On the Review pane it takes `canCopy={mayPitch}`
+for a sync target, so a refusal that removes Copy from the pitch draft removes
+it from this too.
+
 **The visa lead time counts from the deadline, not from today.** A Canadian
 musician doing a paid US performance needs a P-2: about $800 and ninety days.
 You cannot file for a performer before somebody has agreed you are performing,

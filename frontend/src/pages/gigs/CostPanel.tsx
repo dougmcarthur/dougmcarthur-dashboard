@@ -1,4 +1,6 @@
-import { type GigOpportunity } from '../../api'
+import { useQuery } from '@tanstack/react-query'
+import { api, type GigOpportunity } from '../../api'
+import { mappablePlace, measuredDistance } from '../../../../shared/travelDistance'
 import {
   estimateGigCost,
   visaLead,
@@ -19,6 +21,22 @@ import { Caption } from '../../components/ui/Surface'
 export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }) {
   const estimate = estimateGigCost(gig)
   const lead = visaLead(gig, today)
+  const home = useQuery({ queryKey: ['travel-home'], queryFn: api.travel.home })
+
+  // Measured on the map, or why not. Only asked where the gig names a real
+  // place and nobody set its band by hand — elsewhere a map has nothing to add.
+  const travel = estimate.lines.find((l) => l.id === 'travel')
+  const mapBasis = travel?.basis ?? null
+  const measurable = !gig.travelBand && mappablePlace(gig) !== null && !measuredDistance(gig)
+  const whyGuessed = !measurable
+    ? null
+    : home.data && !home.data.home
+      ? 'Set where you travel from in Settings, and this trip is measured on the map instead of guessed.'
+      : gig.geoStatus === 'not_found' && gig.geoPlace === mappablePlace(gig)
+        ? `The map does not know "${gig.geoPlace}", so this is guessed from the name.`
+        : home.data?.home
+          ? 'Being measured on the map — it takes up to an hour.'
+          : null
 
   // Nothing banded and nothing paid: the row has none of the inputs, and a
   // panel reading "$0" would be a claim rather than an absence.
@@ -58,7 +76,11 @@ export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }
                 The same treatment a deadline gets when its date came out of
                 prose. A band nobody set must not read as one somebody did.
               */}
-              {line.inferred && <span className="text-faint"> · guessed</span>}
+              {line.basis ? (
+                <span className="text-faint"> · from the map</span>
+              ) : (
+                line.inferred && <span className="text-faint"> · guessed</span>
+              )}
             </span>
             <span className="text-ink tabular-nums">{formatCostRange(line.amount)}</span>
           </li>
@@ -99,6 +121,22 @@ export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }
           </p>
         </div>
       )}
+
+      {/*
+        The credit OpenStreetMap's licence asks for, wherever a figure derived
+        from it is shown — and the one caveat about how it was derived.
+      */}
+      {mapBasis && (
+        <p className="mt-2 text-xs text-faint">
+          {mapBasis === 'straight_line' ? 'No road route was found, so the distance is a straight line, adjusted. ' : ''}
+          Distance from{' '}
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline">
+            © OpenStreetMap contributors
+          </a>
+          .
+        </p>
+      )}
+      {whyGuessed && <p className="mt-2 text-xs text-faint">{whyGuessed}</p>}
 
       {estimate.unknowns.length > 0 && (
         <div className="mt-3">

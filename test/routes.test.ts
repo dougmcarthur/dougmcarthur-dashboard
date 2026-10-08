@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { app, isReplyScanHour, REPLY_SCAN_HOURS } from '../src/index'
 import { ownerOnlyD1 } from './support/fakeD1'
 
@@ -33,6 +33,26 @@ function request(path: string, init: RequestInit = {}, env: Record<string, unkno
 }
 
 describe('API route registration', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  // Where you travel from. A place the map cannot find is refused with the
+  // reason, never stored as a guess; a place that is not a place is refused
+  // before anything is asked of the map at all.
+  it('PUT /api/travel/home refuses a place too short to look up, before asking the map', async () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    const res = await request('/api/travel/home', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ place: 'x' }) }, emptyEnv)
+    expect(res.status).toBe(400)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('PUT /api/travel/home says plainly when the map does not know the place', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json([])))
+    const res = await request('/api/travel/home', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ place: 'Nowheresville, MB' }) }, emptyEnv)
+    expect(res.status).toBe(422)
+    expect(((await res.json()) as { error: string }).error).toContain('Winnipeg, MB')
+  })
+
   // Connect without Gmail: the consent Google sees must not mention Gmail, and
   // a value the switch does not know is refused rather than read as 'ask for
   // everything' — the way Gmail would get requested after somebody said no.

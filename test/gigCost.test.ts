@@ -12,6 +12,7 @@ import {
   LODGING_TIERS,
   PER_DIEM,
   P2,
+  placeOf,
 } from '../shared/gigCost'
 import type { GigOpportunity } from '../shared/types'
 
@@ -366,5 +367,33 @@ describe('the band that was missing', () => {
     expect(inferTravelBand('Owen Sound, ON', 'CA')).toBe('regional')
     expect(inferTravelBand('Lyons, CO', 'US')).toBe('regional')
     expect(inferTravelBand('Austin, TX', 'US')).toBe('transcontinental')
+  })
+})
+
+/**
+ * The place, when it is only in the name. The Listening Room — Lac du Bonnet,
+ * MB, about 100 km from Winnipeg, costed as a regional flight because
+ * `location` was empty and a Canadian gig with nothing to read falls through to
+ * a flight.
+ */
+describe('placeOf', () => {
+  it('prefers the location when there is one', () => {
+    expect(placeOf({ location: 'Brandon, MB', name: 'Something — Toronto, ON' })).toBe('Brandon, MB')
+  })
+
+  it('reads a trailing "— Town, XX" from the name when location is empty', () => {
+    expect(placeOf({ location: null, name: 'The Listening Room — Lac du Bonnet, MB' })).toBe('Lac du Bonnet, MB')
+  })
+
+  it('does not take an organisation in a name for a place', () => {
+    expect(placeOf({ location: null, name: 'New Music Night — Park Alleys (Manitoba Music)' })).toBeNull()
+    expect(placeOf({ location: null, name: 'Salmon Arm Roots & Blues Festival 2027 — Artist Application' })).toBeNull()
+  })
+
+  it('costs the Listening Room as a drive, not a flight', () => {
+    const estimate = estimateGigCost(gig({ name: 'The Listening Room — Lac du Bonnet, MB', location: null, country: 'CA' }))
+    const travel = estimate.lines.find((l) => l.id === 'travel')!
+    expect(travel.label).toBe(TRAVEL_BANDS.drive.label)
+    expect(travel.inferred).toBe(true)
   })
 })

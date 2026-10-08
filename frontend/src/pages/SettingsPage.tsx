@@ -10,6 +10,7 @@ import { PasskeysCard } from '../components/PasskeysCard'
 import { AgentTokensCard } from '../components/AgentTokensCard'
 import { AdminModeCard } from '../components/AdminModeCard'
 import { ProfileCard } from '../components/ProfileCard'
+import { HomeBaseCard } from '../components/HomeBaseCard'
 import { Tabs } from '../components/ui/Tabs'
 import { useSession } from '../hooks/useSession'
 
@@ -93,6 +94,8 @@ export function SettingsPage({ initialTab = null }: { initialTab?: string | null
           left={
             <>
               <ProfileCard />
+              {/* Beside your name: the other fact about you rather than the app. */}
+              <HomeBaseCard />
               <PasskeysCard />
             </>
           }

@@ -544,8 +544,14 @@ function parseDraftedFields(block: string): { fields: DraftedField[]; trailing: 
   return { fields, trailing }
 }
 
-/** Extracts a `"…"` block following a "Drafted outreach message:" lead-in. */
-function extractDraftedMessage(text: string): { message: DraftedMessage | null; rest: string } {
+/**
+ * Extracts a `"…"` block following a "Drafted outreach message:" lead-in.
+ *
+ * Exported as `splitDraftedMessage` for the screens that show a note as prose
+ * rather than through `parseNote` — the Gigs row printed the whole note, draft
+ * and all, as one paragraph under "Why it fits".
+ */
+export function splitDraftedMessage(text: string): { message: DraftedMessage | null; rest: string } {
   const lead = text.match(RE.draftedMessage)
   if (!lead || lead.index === undefined) return { message: null, rest: text }
 
@@ -592,7 +598,7 @@ export function parseNote(note: string | null | undefined): ParsedNote {
 
   // 2. A drafted outreach message is a verbatim quoted body — lift it out
   //    before sentence splitting would shred it.
-  const { message: draftedMessage, rest: afterMessage } = extractDraftedMessage(working)
+  const { message: draftedMessage, rest: afterMessage } = splitDraftedMessage(working)
   working = afterMessage
 
   // 3. The drafted-values run is semicolon-delimited, also not sentences.
