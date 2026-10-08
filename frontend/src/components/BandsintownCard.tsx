@@ -23,7 +23,7 @@ const KEY_PAGE = 'https://artists.bandsintown.com/artist/settings/general'
 
 const STATUS: Record<string, { label: string; tone: string; dot: string }> = {
   working: { label: 'Working', tone: 'bg-success-bg text-success-fg', dot: 'bg-success-solid' },
-  rejected: { label: 'Refused', tone: 'bg-warn-bg text-warn-fg', dot: 'bg-warn-fg' },
+  rejected: { label: 'Refused', tone: 'bg-danger-bg text-danger-fg', dot: 'bg-danger-solid' },
   unreachable: { label: 'No answer', tone: 'bg-sunken text-muted', dot: 'bg-muted' },
   unverified: { label: 'Not checked', tone: 'bg-sunken text-muted', dot: 'bg-muted' },
 }
@@ -100,7 +100,7 @@ export function BandsintownCard() {
             {current.checkedAt && <span className="text-muted"> · checked {relativeTime(current.checkedAt)}</span>}
           </p>
           {current.statusNote && current.status !== 'working' && (
-            <p className="text-xs text-warn-fg">Bandsintown said: {current.statusNote}</p>
+            <p className={`text-xs ${current.status === 'rejected' ? 'text-danger-fg' : 'text-warn-fg'}`}>Bandsintown said: {current.statusNote}</p>
           )}
           <div className="flex flex-wrap gap-2">
             <Button variant="neutral" size="sm" disabled={check.isPending} onClick={() => check.mutate()}>

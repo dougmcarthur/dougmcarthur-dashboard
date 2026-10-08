@@ -24,7 +24,7 @@ import { Explainer } from './ui/Explainer'
  */
 
 const TONE: Record<string, string> = {
-  declined: 'border-danger-line text-danger-fg',
+  declined: 'border-line text-muted',
   invited: 'border-success-line text-success-fg',
   info_requested: 'border-warn-line text-warn-fg',
   acknowledged: 'border-info-line text-info-fg',

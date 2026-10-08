@@ -21,7 +21,9 @@
     "db:seed:local": "node scripts/seed-local-db.mjs",
     "db:migrate:remote": "wrangler d1 migrations apply dougmcarthur-music-hq --remote",
     "typecheck:agents": "tsc -p tsconfig.scripts.json",
-    "agent": "tsx scripts/agents/run.ts"
+    "agent": "tsx scripts/agents/run.ts",
+    "themes:css": "tsx scripts/build-themes-css.ts",
+    "themes:derive": "node scripts/themes/derive.mjs --write"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.4.3",

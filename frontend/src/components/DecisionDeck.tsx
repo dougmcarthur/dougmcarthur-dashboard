@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type GigOpportunity, type SyncTarget, type PromoDraft } from '../api'
 import type { ReviewItem } from '../../../shared/reviewQueue'
+import { flagTone } from '../../../shared/flagTone'
 import {
   GIG_STATUS_BY_INTENT,
   actionGlyph,
@@ -157,17 +158,18 @@ function DeckShell({ children, head }: { children: React.ReactNode; head: React.
  * It replaced the sentence on the card. The sentence is still one click away,
  * in the item's detail on the Review screen, which is where reasoning gets
  * read; a card is for deciding at a glance. New takes the accent, because new
- * is what the deck is for. Anything the queue rated a warning or worse takes
- * the same clay as the stripe above it, and everything else is neutral.
+ * is what the deck is for. A flag that means waiting takes the ochre, one that
+ * means broken takes the clay, and everything else is neutral. The card has no
+ * coloured edge: the badge is the only place its colour shows.
  */
 function Badge({ item }: { item: ReviewItem }) {
-  const severity = item.flags[0]?.severity
+  const flagColour = item.flags[0] ? flagTone(item.flags[0]) : 'info'
   const tone =
     item.decision.badge === 'New'
       ? 'bg-accent-soft text-accent'
-      : severity === 'danger'
+      : flagColour === 'danger'
         ? 'bg-danger-bg text-danger-fg'
-        : severity === 'warn'
+        : flagColour === 'waiting'
           ? 'bg-warn-bg text-warn-fg'
           : 'bg-raised text-ink border border-line-strong'
   return (
@@ -273,9 +275,6 @@ export function DecisionDeck({
   }
 
   const { decision } = item
-  const severity = item.flags[0]?.severity ?? 'info'
-  const stripe =
-    severity === 'danger' ? 'border-t-danger-solid' : severity === 'warn' ? 'border-t-warn-fg' : 'border-t-line-strong'
 
   const act = (intent: DecisionIntent) => {
     const status = STATUS_BY_INTENT[item.kind][intent]
@@ -312,7 +311,7 @@ export function DecisionDeck({
           <div aria-hidden className="absolute inset-0 rounded-xl border border-line bg-surface translate-y-[5px] scale-x-[0.984] opacity-80" />
         )}
 
-        <div className={`relative rounded-xl border border-line border-t-[3px] ${stripe} bg-surface shadow-raised p-5 lg:p-6`}>
+        <div className={`relative rounded-xl border border-line bg-surface shadow-raised p-5 lg:p-6`}>
           <div className="flex items-center gap-2 mb-1.5">
             <Badge item={item} />
             <KindTag kind={item.kind} />
@@ -354,7 +353,7 @@ export function DecisionDeck({
                 className={`grid place-items-center h-9 w-9 rounded-lg border disabled:opacity-40 transition-colors ${
                   a.tone === 'go'
                     ? 'bg-accent border-transparent text-accent-fg hover:bg-accent-hover'
-                    : 'bg-transparent border-danger-line text-danger-fg hover:bg-danger-bg'
+                    : 'bg-transparent border-line-strong text-muted hover:bg-sunken hover:text-ink'
                 }`}
               >
                 <ActionIcon name={actionGlyph(a)} />

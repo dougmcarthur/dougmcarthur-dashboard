@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type OnboardingState } from '../api'
 import type { OnboardingStep } from '../../../shared/onboarding'
@@ -63,6 +63,10 @@ export function OnboardingCard({
   onStart: (screen: FlowScreen) => void
 }) {
   const qc = useQueryClient()
+  // Closed to one line unless asked for: this card sits above the first
+  // opportunity on the Overview, and five rows, a paragraph and three links
+  // made it the whole first screen on a phone. Help shows it open.
+  const [open, setOpen] = useState(showDone)
 
   const hide = useMutation({
     mutationFn: api.onboarding.hide,
@@ -76,6 +80,41 @@ export function OnboardingCard({
   /** Where the welcome questions open for a step that is asked there. */
   const flowFor = (step: OnboardingStep): FlowScreen | null =>
     step.id === 'name' ? 'name' : step.id === 'goals' ? (step.done ? 'goals' : 'welcome') : null
+
+  if (!open) {
+    const upNext = next ?? optional.find((s) => !s.done)
+    const upNextScreen = upNext ? flowFor(upNext) : null
+    return (
+      <Card pad="sm" as="section" aria-labelledby="onboarding-title">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0">
+            <h2 id="onboarding-title" className="text-sm font-semibold text-ink">
+              {state.complete ? 'You’re set up' : 'Finish setting up'}
+              <span className="ml-2 font-normal text-muted tabular-nums">
+                {state.done} of {state.total} done
+              </span>
+            </h2>
+            {upNext && <p className="mt-0.5 text-sm text-body">Next: {upNext.title}</p>}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {upNext && (
+              <StepAction
+                step={upNext}
+                current
+                onOpen={upNextScreen ? () => onStart(upNextScreen) : undefined}
+              />
+            )}
+            <Button variant="quiet" size="sm" aria-expanded={false} onClick={() => setOpen(true)}>
+              All steps
+            </Button>
+            <Button variant="quiet" size="sm" onClick={() => hide.mutate()} disabled={hide.isPending}>
+              Hide
+            </Button>
+          </div>
+        </div>
+      </Card>
+    )
+  }
 
   return (
     <Card pad="md" as="section" className="space-y-4" aria-labelledby="onboarding-title">
@@ -95,9 +134,14 @@ export function OnboardingCard({
             {state.done} of {state.total} done
           </span>
           {!showDone && (
-            <Button variant="quiet" size="sm" onClick={() => hide.mutate()} disabled={hide.isPending}>
-              Hide
-            </Button>
+            <>
+              <Button variant="quiet" size="sm" aria-expanded onClick={() => setOpen(false)}>
+                Fewer steps
+              </Button>
+              <Button variant="quiet" size="sm" onClick={() => hide.mutate()} disabled={hide.isPending}>
+                Hide
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -200,24 +244,43 @@ function StepRow({
           {!step.done && <p className="text-xs text-muted mt-0.5 max-w-prose">{step.why}</p>}
         </div>
         <div className="shrink-0">
-          {onOpen ? (
-            <Button variant={step.done ? 'quiet' : current ? 'primary' : 'neutral'} size="sm" onClick={onOpen}>
-              {step.done ? 'Change' : step.action}
-            </Button>
-          ) : step.href && !step.done ? (
-            <a
-              href={step.href}
-              className={`inline-block rounded-md text-xs px-3 py-1.5 transition-colors ${
-                current
-                  ? 'bg-accent text-accent-fg hover:bg-accent-hover'
-                  : 'border border-line-strong text-body hover:bg-sunken hover:text-ink'
-              }`}
-            >
-              {step.action}
-            </a>
-          ) : null}
+          <StepAction step={step} current={current} onOpen={onOpen} />
         </div>
       </div>
     </li>
   )
+}
+
+/** The one button a step offers, or nothing for a step with nowhere to go. */
+function StepAction({
+  step,
+  current,
+  onOpen,
+}: {
+  step: OnboardingStep
+  current: boolean
+  onOpen?: () => void
+}) {
+  if (onOpen) {
+    return (
+      <Button variant={step.done ? 'quiet' : current ? 'primary' : 'neutral'} size="sm" onClick={onOpen}>
+        {step.done ? 'Change' : step.action}
+      </Button>
+    )
+  }
+  if (step.href && !step.done) {
+    return (
+      <a
+        href={step.href}
+        className={`inline-block rounded-md text-xs px-3 py-1.5 transition-colors ${
+          current
+            ? 'bg-accent text-accent-fg hover:bg-accent-hover'
+            : 'border border-line-strong text-body hover:bg-sunken hover:text-ink'
+        }`}
+      >
+        {step.action}
+      </a>
+    )
+  }
+  return null
 }

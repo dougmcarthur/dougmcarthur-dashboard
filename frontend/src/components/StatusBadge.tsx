@@ -17,7 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
   passed: 'bg-sunken text-muted',
   preparing: 'bg-raised text-ink border border-line-strong',
   acknowledged: 'bg-info-bg text-info-fg',
-  info_requested: 'bg-danger-bg text-danger-fg',
+  info_requested: 'bg-warn-bg text-warn-fg',
   invited: 'bg-success-bg text-success-fg',
   booked: 'bg-success-bg text-success-fg',
   expired: 'bg-sunken text-muted',
@@ -64,7 +64,7 @@ const STAGE_COLORS = {
 }
 
 const FLAG_COLORS = {
-  reply_owed: 'bg-danger-bg text-danger-fg',
+  reply_owed: 'bg-warn-bg text-warn-fg',
   offer_pending: 'bg-success-bg text-success-fg',
 }
 

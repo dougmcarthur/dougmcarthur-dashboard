@@ -1,5 +1,6 @@
 import { KindTag } from '../../components/ReviewPanels'
 import type { ReviewItem } from '../../../../shared/reviewQueue'
+import { flagTone } from '../../../../shared/flagTone'
 
 /** One row in the left rail: enough to choose from, never enough to decide on. */
 export function QueueRow({
@@ -15,8 +16,9 @@ export function QueueRow({
   return (
     <button
       onClick={onSelect}
-      className={`w-full text-left px-3 py-2.5 border-l-2 transition-colors ${
-        active ? 'bg-accent/[0.04] border-accent' : 'border-transparent hover:bg-sunken'
+      aria-current={active ? 'true' : undefined}
+      className={`w-full text-left px-3 py-2.5 transition-colors ${
+        active ? 'bg-accent-soft' : 'hover:bg-sunken'
       }`}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -24,7 +26,7 @@ export function QueueRow({
         {top && (
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              top.severity === 'danger' ? 'bg-danger-solid' : top.severity === 'warn' ? 'bg-line-strong' : 'bg-line'
+              flagTone(top) === 'danger' ? 'bg-danger-solid' : flagTone(top) === 'waiting' ? 'bg-warn-fg' : 'bg-line'
             }`}
           />
         )}

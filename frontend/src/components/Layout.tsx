@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { api } from '../api'
 import { useAppearance } from '../hooks/useAppearance'
+import { usePageAnnouncement } from '../hooks/usePageAnnouncement'
 import { NotificationBell } from './NotificationBell'
 import { HelpMenu } from './HelpMenu'
 import { FeedbackModal } from './FeedbackModal'
@@ -97,6 +98,11 @@ export function Layout({
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
+
+  // Says where you are after a page change: the tab title, and focus on the
+  // content, which is all a screen reader gets for a route that is only a hash.
+  usePageAnnouncement(page, mainRef)
 
   // Route changes close the mobile menu; leaving it open over the new page is
   // the classic hamburger bug.
@@ -125,7 +131,17 @@ export function Layout({
 
   return (
     <div className="min-h-screen bg-canvas">
-      <a href="#main" className="skip-link">
+      {/* Not a plain `#main` link: with hash routing that reads as a page called
+          "main", which renders nothing, so skipping to content blanked it. */}
+      <a
+        href="#main"
+        className="skip-link"
+        onClick={(e) => {
+          e.preventDefault()
+          mainRef.current?.focus()
+          mainRef.current?.scrollIntoView()
+        }}
+      >
         Skip to content
       </a>
 
@@ -261,7 +277,12 @@ export function Layout({
         </div>
       </header>
 
-      <main id="main" className="shell px-4 sm:px-6 lg:px-8 py-8 lg:py-10">
+      <main
+        id="main"
+        ref={mainRef}
+        tabIndex={-1}
+        className="shell px-4 sm:px-6 lg:px-8 py-8 lg:py-10 focus:outline-none"
+      >
         {children}
       </main>
 

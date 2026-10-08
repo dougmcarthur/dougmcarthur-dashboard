@@ -1770,6 +1770,21 @@ The questionnaire, the method and every reason are in
   avoids): the survey names Sun Dogs Music and no product, and a test walks every
   string.
 
+**Colour themes are data, and the stylesheet is generated from them.** Six ship:
+Sun Dogs (the default, drawn by hand in `shared/themeSunDogs.ts`), Pebble, Opal and
+Harvest (aesthetic, derived from Figma palettes by `scripts/themes/derive.mjs` into
+`shared/themeData.ts`) and High contrast and Colour-blind safe (accessible). The file
+`frontend/src/themes.css` is written from them by `npm run themes:css`, and a test
+fails if it is edited by hand. Two standards, on purpose: the default and the
+accessible themes are held to strict contrast and colour-blind gates, while an
+aesthetic theme is held by a ratchet (`shared/themeBaselines.ts`, which may only go
+up) plus one floor, ink and body text at 4.5:1. The meaning colours (green go, ochre
+waiting, clay broken) keep their hues in every aesthetic theme, and the accessible
+themes redraw them as blue, gold and rose. Light is the default; a `palette` of
+`null` means nothing has been chosen and follows the device (`prefers-contrast:
+more` selects High contrast); print is always the default's light palette on white.
+Appearance is per device, in the browser. See `docs/themes-plan.md`.
+
 ## Testing
 
 `npm test` (vitest) — pure logic in `shared/` is well covered; routes are only

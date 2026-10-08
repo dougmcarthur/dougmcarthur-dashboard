@@ -197,7 +197,7 @@ function SamplePreview() {
               </span>
               <span className="ml-2 text-xs font-medium text-body">Opportunities</span>
             </div>
-            <span className="text-[11px] font-medium uppercase tracking-wide text-faint">Example</span>
+            <span className="text-xs font-medium text-muted">Example</span>
           </div>
 
           {/* A phone gets two fixed lines per entry rather than the table: the

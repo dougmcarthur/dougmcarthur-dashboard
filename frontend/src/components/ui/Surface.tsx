@@ -102,13 +102,13 @@ export function Label({
  * The class itself, for the two places that cannot be an element: a `<th>`
  * carrying sort affordances, and `Explainer`'s `titleClassName`.
  *
- * `tracking-wide` rather than `wider`: both were in use, two call sites
- * against ten, and letter-spacing that differs by a quarter of a pixel
- * between two lists is drift rather than a decision.
+ * Sentence case, no tracking. It was small capitals, and small capitals over a
+ * group of rows are the caption-above-a-heading habit this product avoids;
+ * `test/calmUi.test.ts` fails if `uppercase` comes back.
  */
-export const CAPTION_CLASS = 'text-xs font-semibold text-muted uppercase tracking-wide'
+export const CAPTION_CLASS = 'text-xs font-semibold text-muted'
 
-/** A small upper-case heading over a group of rows. */
+/** A small heading over a group of rows, in sentence case. */
 export function Caption({
   children,
   spaced = false,

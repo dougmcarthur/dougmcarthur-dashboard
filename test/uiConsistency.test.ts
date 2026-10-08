@@ -51,7 +51,7 @@ describe('form controls come from one place', () => {
     const copies = FILES.filter(
       (f) =>
         !/[\\/]ui[\\/]/.test(f) &&
-        /border border-line-strong rounded-md[^'"]*focus:ring-accent/.test(readFileSync(f, 'utf8')),
+        /border border-(?:line-strong|field) rounded-md[^'"]*focus:ring-accent/.test(readFileSync(f, 'utf8')),
     )
     expect(copies).toEqual([])
   })
@@ -792,7 +792,8 @@ describe('density: a thing that is always the same is not information', () => {
  * `rgb(#0b0c0b / 0.9)`, which is invalid and every bit as silently transparent.
  */
 describe('colour tokens take an opacity modifier', () => {
-  const css = readFileSync('frontend/src/index.css', 'utf8')
+  // The tokens live in the generated themes.css; index.css reads them.
+  const css = readFileSync('frontend/src/themes.css', 'utf8') + readFileSync('frontend/src/index.css', 'utf8')
 
   it('declares every colour in the Tailwind config with <alpha-value>', async () => {
     const config = (await import('../tailwind.config.js')).default
@@ -803,6 +804,7 @@ describe('colour tokens take an opacity modifier', () => {
   })
 
   it('stores every --c- colour as RGB channels, never a finished colour', () => {
+    expect(css.match(/--c-canvas:/g)?.length ?? 0).toBeGreaterThan(5)
     const finished = [...css.matchAll(/(--c-[a-z-]+):\s*([^;]+);/g)]
       .filter(([, , value]) => !/^\d{1,3} \d{1,3} \d{1,3}$/.test(value.trim()))
       .map(([, name, value]) => `${name}: ${value}`)

@@ -99,7 +99,7 @@ export function AssociationsCard() {
                 {a.profileName && <> · {a.profileName}</>}
                 {a.checkedAt && <span className="text-muted"> · read {relativeTime(a.checkedAt)}</span>}
               </p>
-              {a.status !== 'working' && a.statusNote && <p className="text-xs text-warn-fg">Last read failed: {a.statusNote}</p>}
+              {a.status !== 'working' && a.statusNote && <p className="text-xs text-danger-fg">Last read failed: {a.statusNote}</p>}
               <div className="flex flex-wrap gap-2">
                 <a
                   href={a.url}

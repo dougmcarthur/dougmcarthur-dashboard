@@ -51,6 +51,16 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener('change', onChange)
   }, [appearance])
 
+  // The same for contrast, while contrast or the colour theme is still following the device.
+  useEffect(() => {
+    if (typeof matchMedia === 'undefined') return
+    if (appearance.highContrast !== null && appearance.palette !== null) return
+    const mq = matchMedia('(prefers-contrast: more)')
+    const onChange = () => applyAppearance(appearance)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [appearance])
+
   const set = useCallback((patch: Partial<Appearance>) => {
     setAppearance((prev) => ({ ...prev, ...patch }))
   }, [])

@@ -73,8 +73,7 @@ export function JoinScreen({ token, onJoined }: { token: string; onJoined: () =>
     <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-1">
-          <p className="text-xs font-medium tracking-[0.14em] uppercase text-faint">Sun Dogs Music</p>
-          <h1 className="text-2xl font-semibold text-ink tracking-tight">Scout</h1>
+          <h1 className="text-2xl font-semibold text-ink tracking-tight">Sun Dogs Music Scout</h1>
           <p className="text-sm text-muted">
             {refusal
               ? 'This invitation cannot be used.'

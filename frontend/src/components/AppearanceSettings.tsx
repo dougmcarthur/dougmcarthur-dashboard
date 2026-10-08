@@ -1,6 +1,9 @@
 import { useAppearance } from '../hooks/useAppearance'
+import { ThemePicker } from './ThemePicker'
 import {
   TEXT_SCALE,
+  resolveContrast,
+  resolvePalette,
   type FontChoice,
   type ShellWidth,
   type TextSize,
@@ -133,11 +136,22 @@ export function AppearanceSettings() {
       </div>
 
       <Field
-        label="Theme"
+        label="Colour theme"
+        hint="Sets the grounds, the green and the other colours. Light or dark is separate, and text size, typeface, width and contrast apply to every theme. If your device asks for more contrast and you have not chosen a theme, you get High contrast."
+      >
+        <ThemePicker
+          value={resolvePalette(a)}
+          mode={resolved}
+          onChange={(palette) => set({ palette })}
+        />
+      </Field>
+
+      <Field
+        label="Light or dark"
         hint={a.theme === 'system' ? `Following your system, currently ${resolved}.` : undefined}
       >
         <Segmented<ThemeChoice>
-          name="Theme"
+          name="Light or dark"
           value={a.theme}
           onChange={(theme) => set({ theme })}
           options={[
@@ -219,10 +233,10 @@ export function AppearanceSettings() {
 
       <Field
         label="Higher contrast"
-        hint="Darkens secondary text and strengthens borders. Useful in bright rooms."
+        hint="Darkens secondary text and strengthens borders. Useful in bright rooms. Until you change it here, it follows your device's own contrast setting."
       >
         <Toggle
-          checked={a.highContrast}
+          checked={resolveContrast(a)}
           onChange={(highContrast) => set({ highContrast })}
           label="Higher contrast"
         />

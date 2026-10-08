@@ -7,6 +7,7 @@ import { QueueRow } from './review/QueueRow'
 import { Detail } from './review/Detail'
 import { ReplyInbox } from '../components/ReplyInbox'
 import { Banner } from '../components/ui/Surface'
+import { Select } from '../components/ui/Field'
 
 /**
  * The filters, and why they are worded the way they are.
@@ -53,6 +54,14 @@ const FILTERS: Array<{ id: ReviewFilter; label: string; hint: string }> = [
   { id: 'all', label: 'Everything', hint: 'The whole queue, minus anything snoozed.' },
 ]
 
+
+/**
+ * The chips that always have a place in the row. The other six filters are
+ * real and are asked for rarely, so they sit behind one "More filters"
+ * control: ten chips in two rows was a toolbar the queue had to be found
+ * under. The counts are unchanged, and a filter that is on keeps showing.
+ */
+const PRIMARY_FILTERS: ReviewFilter[] = ['needs', 'in_progress', 'waiting', 'all']
 
 /** What an empty queue means, which differs per filter and is worth saying. */
 const EMPTY: Partial<Record<ReviewFilter, string>> = {
@@ -259,10 +268,12 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
           }`}
         >
           New mail
-          <span className={`ml-1.5 text-xs ${mailOpen ? 'text-faint' : 'text-muted'}`}>{newMail}</span>
+          <span className={`ml-1.5 text-xs ${mailOpen ? 'text-accent-fg' : 'text-muted'}`}>{newMail}</span>
         </button>
         {FILTERS.filter(
-          (f) => (counts?.[f.id] ?? 0) > 0 || filter === f.id || f.id === 'all',
+          (f) =>
+            PRIMARY_FILTERS.includes(f.id) &&
+            ((counts?.[f.id] ?? 0) > 0 || filter === f.id || f.id === 'all'),
         ).map((f) => {
           const count = counts?.[f.id] ?? 0
           const active = !mailOpen && filter === f.id
@@ -279,10 +290,37 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
               }`}
             >
               {f.label}
-              <span className={`ml-1.5 text-xs ${active ? 'text-faint' : 'text-muted'}`}>{count}</span>
+              <span className={`ml-1.5 text-xs ${active ? 'text-accent-fg' : 'text-muted'}`}>{count}</span>
             </button>
           )
         })}
+        {(() => {
+          const more = FILTERS.filter(
+            (f) => !PRIMARY_FILTERS.includes(f.id) && ((counts?.[f.id] ?? 0) > 0 || filter === f.id),
+          )
+          if (more.length === 0) return null
+          const onMore = !mailOpen && more.some((f) => f.id === filter)
+          return (
+            <Select
+              filter
+              aria-label="More filters"
+              value={onMore ? filter : ''}
+              onChange={(e) => {
+                if (!e.target.value) return
+                setMailOpen(false)
+                setFilter(e.target.value as ReviewFilter)
+              }}
+              className={onMore ? 'border-accent font-medium text-ink' : ''}
+            >
+              <option value="">More filters</option>
+              {more.map((f) => (
+                <option key={f.id} value={f.id} title={f.hint}>
+                  {f.label} ({counts?.[f.id] ?? 0})
+                </option>
+              ))}
+            </Select>
+          )
+        })()}
       </div>
 
       {saveError && (

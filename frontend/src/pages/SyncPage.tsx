@@ -348,7 +348,7 @@ export function SyncPage() {
                           onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'confirmed' } }) }}>
                           Confirmed
                         </Button>
-                        <Button variant="danger" size="sm" disabled={isPatching}
+                        <Button variant="neutral" size="sm" disabled={isPatching}
                           onClick={(e) => { e.stopPropagation(); patchMutation.mutate({ id: target.id, body: { status: 'declined' } }) }}>
                           Declined
                         </Button>

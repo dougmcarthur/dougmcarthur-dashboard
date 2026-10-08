@@ -45,7 +45,7 @@ const PINNED_TINT =
 const TYPE_COLORS: Record<string, string> = {
   festival: 'bg-cat-violet-bg text-cat-violet-fg',
   showcase: 'bg-cat-sky-bg text-cat-sky-fg',
-  competition: 'bg-warn-bg text-warn-fg',
+  competition: 'bg-cat-rose-bg text-cat-rose-fg',
   residency: 'bg-cat-teal-bg text-cat-teal-fg',
   venue: 'bg-cat-orange-bg text-cat-orange-fg',
   conference: 'bg-cat-rose-bg text-cat-rose-fg',
@@ -270,9 +270,9 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
         // the first squeezed: "Will apply" broke onto two lines, and its Pass
         // stretched beside it to a 44px pill in a row of 26px ones.
         return (
-          <div className="flex gap-1 justify-end whitespace-nowrap">
+          <div className="row-actions flex gap-1 justify-end whitespace-nowrap">
             {inlineGigMoves(row.status, row.type).map(({ to, tone, label, meaning }) => (
-              <Button key={to} variant={tone === 'go' ? 'good' : 'danger'} size="sm" disabled={isPatching}
+              <Button key={to} variant={tone === 'go' ? 'good' : 'neutral'} size="sm" disabled={isPatching}
                 title={meaning}
                 onClick={() => patchMutation.mutate({ id: row.id, body: { status: to } })}>
                 {label}
@@ -370,7 +370,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
             <tbody className="divide-y divide-line">
               {table.getRowModel().rows.map((row) => (
                 <Fragment key={row.id}>
-                  <tr className={`transition-colors ${expanded.has(row.original.id) ? 'bg-info-bg/40' : 'hover:bg-sunken'}`}>
+                  <tr className={`group transition-colors ${expanded.has(row.original.id) ? 'bg-info-bg/40' : 'hover:bg-sunken'}`}>
                     {row.getVisibleCells().map((cell, i) => (
                       <td key={cell.id} className={`px-4 py-3 text-body ${
                         // Pinned, so it needs a background of its own or the

@@ -89,10 +89,9 @@ export function LoginScreen({ session, onSignedIn }: { session: SessionState; on
     <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-1">
-          {/* House mark above, product name as the heading — the same
-              structure the name itself has: Scout, by Sun Dogs Music. */}
-          <p className="text-xs font-medium tracking-[0.14em] uppercase text-faint">Sun Dogs Music</p>
-          <h1 className="text-2xl font-semibold text-ink tracking-tight">Scout</h1>
+          {/* The whole product name, because the bare word is the mark this
+              product avoids. No caption above it either. */}
+          <h1 className="text-2xl font-semibold text-ink tracking-tight">Sun Dogs Music Scout</h1>
           <p className="text-sm text-muted">
             {mode === 'signin'
               ? 'Sign in with the passkey on this device.'

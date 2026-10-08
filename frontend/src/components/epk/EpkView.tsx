@@ -33,8 +33,8 @@ function Section({ id, title, children }: { id?: string; title: string; children
   )
 }
 
-function Eyebrow({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-xs font-semibold uppercase tracking-widest text-muted">{children}</h3>
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <h3 className="text-sm font-semibold text-muted">{children}</h3>
 }
 
 function pill(primary: boolean) {
@@ -94,7 +94,7 @@ function Bio({ profile }: { profile: EpkProfile }) {
 function Names({ title, names }: { title: string; names: string[] }) {
   return (
     <div className="space-y-2">
-      <Eyebrow>{title}</Eyebrow>
+      <SectionLabel>{title}</SectionLabel>
       {/* Each name kept whole: "I Mother Earth" must not break after the I. */}
       <p className="text-sm text-body leading-relaxed">
         {names.map((n, i) => (
@@ -113,7 +113,7 @@ function ShowRow({ show }: { show: MergedShow }) {
   return (
     <li className="flex items-center gap-4 py-3 border-b border-line last:border-b-0">
       <div className="w-12 shrink-0 text-center rounded-lg bg-sunken py-1.5">
-        <div className="text-[11px] font-semibold text-accent uppercase">{MONTH[Number(m) - 1]}</div>
+        <div className="text-xs font-semibold text-accent">{MONTH[Number(m) - 1]}</div>
         <div className="text-lg font-semibold text-ink leading-tight">{Number(d)}</div>
       </div>
       <div className="min-w-0 flex-1">
@@ -133,7 +133,7 @@ function LinkColumn({ title, links }: { title: string; links: ProfileLink[] }) {
   if (links.length === 0) return null
   return (
     <div className="space-y-2.5 min-w-0">
-      <Eyebrow>{title}</Eyebrow>
+      <SectionLabel>{title}</SectionLabel>
       <ul className="space-y-1.5">
         {links.map((l) => (
           <li key={l.url} className="min-w-0">
@@ -206,7 +206,7 @@ export function EpkView({ page }: { page: EpkPage }) {
             </figure>
           )}
           {heroQuote && (
-            <figure className="border-l-2 border-accent pl-5 break-inside-avoid">
+            <figure className="break-inside-avoid">
               <blockquote className="font-serif text-lg leading-snug text-ink text-pretty">“{heroQuote.text}”</blockquote>
               {heroQuote.source && <figcaption className="mt-3 text-sm text-muted">— {heroQuote.source}</figcaption>}
             </figure>
@@ -218,7 +218,7 @@ export function EpkView({ page }: { page: EpkPage }) {
         {quotes.length > 0 && (
           <div className="space-y-10">
             {quotes.map((q, i) => (
-              <figure key={i} className="max-w-3xl border-l-2 border-accent pl-5 sm:pl-8 break-inside-avoid">
+              <figure key={i} className="max-w-3xl break-inside-avoid">
                 <blockquote className="font-serif text-xl sm:text-2xl leading-snug text-ink text-pretty">“{q.text}”</blockquote>
                 {q.source && <figcaption className="mt-3 text-sm text-muted">— {q.source}</figcaption>}
               </figure>
@@ -286,7 +286,7 @@ export function EpkView({ page }: { page: EpkPage }) {
                   <dl className="space-y-4">
                     {p.glance.map((f) => (
                       <div key={f.label} className="space-y-1">
-                        <dt className="text-xs font-semibold uppercase tracking-widest text-muted">{f.label}</dt>
+                        <dt className="text-xs font-semibold text-muted">{f.label}</dt>
                         <dd className="text-sm text-ink whitespace-pre-line">{f.value}</dd>
                       </div>
                     ))}
@@ -304,7 +304,7 @@ export function EpkView({ page }: { page: EpkPage }) {
             <dl className="grid grid-cols-1 sm:grid-cols-[9rem_minmax(0,1fr)] gap-x-8 border-t border-line">
               {p.highlights.map((h, i) => (
                 <div key={i} className="contents">
-                  <dt className="pt-4 sm:pb-4 sm:border-b border-line text-xs font-semibold uppercase tracking-widest text-muted">
+                  <dt className="pt-4 sm:pb-4 sm:border-b border-line text-xs font-semibold text-muted">
                     {h.label ?? ''}
                   </dt>
                   <dd className="pt-1 pb-4 sm:pt-4 border-b border-line text-sm sm:text-base text-body leading-relaxed">{h.text}</dd>
@@ -319,13 +319,13 @@ export function EpkView({ page }: { page: EpkPage }) {
             <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
               {shows.upcoming.length > 0 && (
                 <div className="space-y-1">
-                  <Eyebrow>Upcoming</Eyebrow>
+                  <SectionLabel>Upcoming</SectionLabel>
                   <ul>{shows.upcoming.map((s) => <ShowRow key={s.key} show={s} />)}</ul>
                 </div>
               )}
               {shows.past.length > 0 && (
                 <div className="space-y-1">
-                  <Eyebrow>Recently played</Eyebrow>
+                  <SectionLabel>Recently played</SectionLabel>
                   <ul>{shows.past.map((s) => <ShowRow key={s.key} show={s} />)}</ul>
                 </div>
               )}

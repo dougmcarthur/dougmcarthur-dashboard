@@ -293,7 +293,7 @@ export function DriveTab({ outcome }: { outcome: string | null }) {
 
       {[...(loose.length ? [{ sub: 'Not filed yet', rows: loose }] : []), ...bySub].map((g) => (
         <Card key={g.sub} as="section" pad="none" clip>
-          <header className="px-4 py-2.5 bg-sunken border-b border-line text-xs font-semibold uppercase tracking-wide text-muted">
+          <header className="px-4 py-2.5 bg-sunken border-b border-line text-xs font-semibold text-muted">
             {g.sub}
           </header>
           <ul className="divide-y divide-line">

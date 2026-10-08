@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button'
 import { OnboardingCard } from '../components/OnboardingCard'
 import { OnboardingFlow, type FlowScreen } from '../components/OnboardingFlow'
 import { FeedbackModal } from '../components/FeedbackModal'
+import { themeCredit } from '../../../shared/themes'
 
 /**
  * How Scout works, written for the person using it.
@@ -126,6 +127,22 @@ export function HelpPage() {
           actions — adding or removing a passkey, issuing an agent token — ask for your passkey
           again, because they change who can get into your account.
         </p>
+      </Section>
+
+      <Section title="Looking after your eyes">
+        <p>
+          Settings, then Appearance, holds a colour theme, light or dark, text size, a typeface,
+          higher contrast and reduced motion. The themes under the first heading are a matter of
+          taste. The two under Accessible themes are made for a need: High contrast, with the
+          strongest text and firm lines, and Colour-blind safe, which uses blue, gold and rose in
+          place of green, ochre and clay so that the three stay apart for every kind of colour
+          blindness.
+        </p>
+        <p>
+          A device that asks for more contrast gets High contrast until you choose a theme of your
+          own, and the choice is kept on each device you use.
+        </p>
+        <p className="text-xs text-muted">{themeCredit()}</p>
       </Section>
 
       <Section title="Feedback">

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import type { DraftedField } from '../../../shared/reviewParse'
 import type { ReviewFlag, ReviewKind } from '../../../shared/reviewQueue'
 import type { AlertSeverity } from '../../../shared/reviewParse'
+import { flagTone } from '../../../shared/flagTone'
 
 /**
  * A section of the detail pane.
@@ -25,7 +26,7 @@ export function Section({
   return (
     <section className="pt-5">
       <header className="flex items-center justify-between gap-3 border-b border-line pb-1.5 mb-3">
-        <h3 className="text-[0.68rem] font-bold uppercase tracking-[0.11em] text-faint">
+        <h3 className="text-xs font-semibold text-muted">
           {title}
           {count !== undefined && count > 0 && (
             <span className="ml-1.5 font-semibold text-muted">{count}</span>
@@ -59,16 +60,12 @@ export function FactRow({
     <dl className="flex flex-wrap gap-x-8 gap-y-2.5">
       {facts.map((f) => (
         <div key={f.label} className="min-w-0 max-w-full">
-          <dt className="text-[0.68rem] font-bold uppercase tracking-[0.11em] text-faint">
+          <dt className="text-xs font-semibold text-muted">
             {f.label}
           </dt>
           <dd
             className={`mt-0.5 text-sm font-semibold tabular-nums ${
-              f.tone === 'urgent'
-                ? 'text-danger-fg'
-                : f.tone === 'cost'
-                  ? 'text-warn-fg'
-                  : 'text-ink'
+              f.tone === 'urgent' ? 'text-warn-fg' : 'text-ink'
             }`}
           >
             {f.value}
@@ -89,22 +86,29 @@ export function FactRow({
 /**
  * Things standing between you and a decision.
  *
- * One list with a rule down its side, rather than two separately tinted panels
+ * One list on one quiet panel, rather than two separately tinted panels
  * ("Flags & known issues" above "Blocked on you") saying much the same thing in
- * different colours.
+ * different colours. Each line leads with a dot in the colour of what it
+ * means, and the words say it as well.
  */
 export function NeedsYou({ items }: { items: Array<{ text: string; severity?: AlertSeverity }> }) {
   if (items.length === 0) return null
   return (
-    <ul className="space-y-2 border-l-2 border-danger-line pl-3.5">
+    <ul className="space-y-2 rounded-lg bg-sunken px-3.5 py-3">
       {items.map((it, i) => (
         <li
           key={i}
-          className={`text-sm leading-relaxed ${
+          className={`flex gap-2.5 text-sm leading-relaxed ${
             it.severity === 'danger' ? 'text-ink' : 'text-body'
           }`}
         >
-          {it.text}
+          <span
+            aria-hidden
+            className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${
+              it.severity === 'danger' ? 'bg-danger-solid' : it.severity === 'warn' ? 'bg-warn-fg' : 'bg-muted'
+            }`}
+          />
+          <span>{it.text}</span>
         </li>
       ))}
     </ul>
@@ -140,9 +144,15 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
  * flattened the hierarchy the severities exist to express. A warning is now a
  * neutral chip with full-strength ink — present, legible, and visibly not an
  * error.
+ *
+ * A `warn` stays a neutral chip now that ochre exists, on purpose: ochre means
+ * waiting or due soon, and "costs money to enter" is a warning that is neither.
+ * The flags that do mean waiting (a reply owed, a deadline close, a silent
+ * application) are `waiting` by `flagTone`, whatever their severity.
  */
-const SEVERITY_STYLES = {
+const TONE_STYLES = {
   danger: 'bg-danger-bg text-danger-fg border-danger-line',
+  waiting: 'bg-warn-bg text-warn-fg border-warn-line',
   warn: 'bg-raised text-ink border-line-strong',
   info: 'bg-sunken text-muted border-line',
 } as const
@@ -150,7 +160,7 @@ const SEVERITY_STYLES = {
 export function FlagChip({ flag }: { flag: ReviewFlag }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${SEVERITY_STYLES[flag.severity]}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${TONE_STYLES[flagTone(flag)]}`}
     >
       {flag.label}
     </span>
@@ -165,7 +175,7 @@ const KIND_STYLES: Record<ReviewKind, string> = {
 
 export function KindTag({ kind }: { kind: ReviewKind }) {
   return (
-    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${KIND_STYLES[kind]}`}>
+    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium capitalize ${KIND_STYLES[kind]}`}>
       {kind}
     </span>
   )
@@ -227,7 +237,7 @@ export function RawNote({ note }: { note: string }) {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between border-b border-line pb-1.5 text-[0.68rem] font-bold uppercase tracking-[0.11em] text-faint hover:text-muted transition-colors"
+        className="flex w-full items-center justify-between border-b border-line pb-1.5 text-xs font-semibold text-muted hover:text-ink transition-colors"
       >
         <span>{open ? 'Hide' : 'Show'} original note</span>
         <span className="tabular-nums font-semibold normal-case tracking-normal">

@@ -3,6 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f6f1dc" />
+    <script>
+      /* Sets the theme before the first paint, so a dark page does not open
+         light for a frame and a light page does not open dark. The same
+         decision applyAppearance makes later, kept to what it needs: the
+         default is test-pinned to appearance.ts. */
+      try {
+        var a = JSON.parse(localStorage.getItem('musichq.appearance') || '{}')
+        var t = a.theme || 'light'
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        var root = document.documentElement
+        root.dataset.theme = t
+        var more = matchMedia('(prefers-contrast: more)').matches
+        var hc = a.highContrast
+        if (hc === undefined || hc === null) hc = more
+        root.dataset.contrast = hc ? 'high' : 'normal'
+        var p = a.palette
+        if (!p) p = more ? 'high-contrast' : 'sun-dogs'
+        root.dataset.palette = p
+      } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

@@ -53,11 +53,19 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
   // Which freshness the library is narrowed to, or '' for all of it. Driven
   // by the counts below, which were previously a number with nowhere to go.
   const [freshness, setFreshness] = useState('')
-  const [tab, setTab] = useState<'library' | 'stageplot' | 'documents' | 'profile' | 'drive' | EpkAudience>(
-    initialTab === 'drive' || initialTab === 'profile' || initialTab === 'documents' || initialTab === 'stageplot'
+  // The three checklists are one tab with a switch inside it. They were three
+  // tabs of eight, side by side, differing only in which audience the same
+  // library is cut for.
+  const [tab, setTab] = useState<'library' | 'stageplot' | 'documents' | 'profile' | 'drive' | 'checklists'>(
+    initialTab === 'drive' ||
+      initialTab === 'profile' ||
+      initialTab === 'documents' ||
+      initialTab === 'stageplot' ||
+      initialTab === 'checklists'
       ? initialTab
       : 'library',
   )
+  const [audience, setAudience] = useState<EpkAudience>('festival')
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [view, setView] = useState<LibraryView>(loadLibraryView)
@@ -72,9 +80,9 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
   })
 
   const epk = useQuery({
-    queryKey: ['artist-epk', tab],
-    queryFn: () => api.artist.epk(tab as EpkAudience),
-    enabled: tab !== 'library' && tab !== 'documents' && tab !== 'profile' && tab !== 'drive' && tab !== 'stageplot',
+    queryKey: ['artist-epk', audience],
+    queryFn: () => api.artist.epk(audience),
+    enabled: tab === 'checklists',
   })
 
   const invalidate = () => {
@@ -206,7 +214,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
           { id: 'documents', label: 'Documents' },
           { id: 'profile', label: 'Profile page' },
           { id: 'drive', label: 'Drive folder' },
-          ...AUDIENCES.map((a) => ({ id: a.id, label: `Checklist — ${a.label}` })),
+          { id: 'checklists', label: 'Checklists' },
         ]}
       />
       </div>
@@ -268,7 +276,24 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-muted">{AUDIENCES.find((a) => a.id === tab)!.blurb}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div role="group" aria-label="Checklist for" className="inline-flex gap-1 p-1 rounded-lg border border-line bg-surface">
+              {AUDIENCES.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setAudience(a.id)}
+                  aria-pressed={a.id === audience}
+                  className={`h-8 px-3 rounded-md text-sm transition-colors ${
+                    a.id === audience ? 'bg-raised text-ink font-semibold shadow-inset' : 'text-muted hover:text-ink'
+                  }`}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-sm text-muted">{AUDIENCES.find((a) => a.id === audience)!.blurb}</p>
+          </div>
           {epk.isLoading && <p className="text-sm text-muted">Assembling…</p>}
           {epk.data && (
             <>
@@ -299,7 +324,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
             </>
           )}
           {/* Programmers and press want dates; a music supervisor does not. */}
-          {tab !== 'sync' && <ShowsPanel />}
+          {audience !== 'sync' && <ShowsPanel />}
         </div>
       )}
     </div>

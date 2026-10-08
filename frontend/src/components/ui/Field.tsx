@@ -6,9 +6,13 @@ import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes 
  * The same class string was declared five times under three names — `INPUT`,
  * `INPUT_CLASS` and `FILTER_INPUT` — which had already drifted apart by a
  * padding step and a `w-full`. One base, two widths.
+ *
+ * The edge is `border-field`, not `border-line-strong`: the rule around a card
+ * can be soft, but the edge of a box you are meant to type in is the one thing
+ * WCAG asks to reach 3:1, and `line-strong` is about 2:1 on purpose.
  */
 const BASE =
-  'text-sm border border-line-strong rounded-md bg-surface text-ink ' +
+  'text-sm border border-field rounded-md bg-surface text-ink ' +
   'placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-accent ' +
   'focus:border-transparent transition disabled:opacity-40'
 

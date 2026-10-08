@@ -10,6 +10,9 @@
  * interface responds without a single component subscribing to the theme.
  */
 
+import { DEFAULT_PALETTE, HIGH_CONTRAST_PALETTE, isPaletteId, type PaletteId } from '../../shared/themes'
+
+/** Light or dark. Named `theme` for the settings already saved under that key; the colour theme is `palette`. */
 export type ThemeChoice = 'light' | 'dark' | 'system'
 export type TextSize = 'compact' | 'default' | 'large' | 'xlarge'
 export type FontChoice = 'system' | 'humanist' | 'serif' | 'mono' | 'custom'
@@ -17,12 +20,23 @@ export type ShellWidth = 'comfortable' | 'wide' | 'full'
 
 export interface Appearance {
   theme: ThemeChoice
+  /**
+   * The colour theme. `null` means nothing has been chosen: the default, or the
+   * High contrast theme if the device is asking for more contrast. A choice
+   * made in Appearance, whichever it is, replaces that.
+   */
+  palette: PaletteId | null
   textSize: TextSize
   font: FontChoice
   /** Only consulted when `font` is 'custom'. A family name, not a URL. */
   customFont: string
   width: ShellWidth
-  highContrast: boolean
+  /**
+   * `null` means follow the device: the operating system's "increase contrast"
+   * setting, as `prefers-contrast: more` reports it. A choice made here, on or
+   * off, replaces that, because somebody who switched it off meant it.
+   */
+  highContrast: boolean | null
   reduceMotion: boolean
   /** Underline links in body copy, not just on hover. */
   underlineLinks: boolean
@@ -40,14 +54,17 @@ export interface Appearance {
 }
 
 export const DEFAULTS: Appearance = {
-  // Dark by default rather than 'system'. Asked for explicitly, and it is the
-  // ground the palette was designed against — light is the alternate.
-  theme: 'dark',
+  // Light by default rather than 'system', asked for on 2026-10-07 once the
+  // palette had been drawn from sundogsmusic.ca. The same default is written
+  // out in frontend/index.html, which sets it before the first paint, and
+  // test/a11yShell.test.ts fails if the two disagree.
+  theme: 'light',
+  palette: null,
   textSize: 'default',
   font: 'system',
   customFont: '',
   width: 'comfortable',
-  highContrast: false,
+  highContrast: null,
   reduceMotion: false,
   underlineLinks: false,
   showHints: true,
@@ -134,7 +151,10 @@ export function loadAppearance(): Appearance {
     if (!raw) return DEFAULTS
     // Merged over the defaults so a setting added later does not arrive
     // undefined on a browser holding an older shape.
-    return { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Appearance>) }
+    const saved = JSON.parse(raw) as Partial<Appearance>
+    // A palette id this build has never heard of (a theme since removed, or a
+    // hand-edited value) is "nothing chosen", never an error and never a blank page.
+    return { ...DEFAULTS, ...saved, palette: isPaletteId(saved.palette) ? saved.palette : null }
   } catch {
     return DEFAULTS
   }
@@ -146,6 +166,23 @@ export function saveAppearance(a: Appearance): void {
   } catch {
     // Private browsing, or storage full. The setting still applies this session.
   }
+}
+
+export function prefersMoreContrast(): boolean {
+  return (
+    typeof matchMedia !== 'undefined' && matchMedia('(prefers-contrast: more)').matches
+  )
+}
+
+/** The contrast setting as it applies right now, after following the device. */
+export function resolveContrast(a: Appearance): boolean {
+  return a.highContrast ?? prefersMoreContrast()
+}
+
+/** The colour theme as it applies right now, after an unset choice has followed the device. */
+export function resolvePalette(a: Appearance): PaletteId {
+  if (isPaletteId(a.palette)) return a.palette
+  return prefersMoreContrast() ? HIGH_CONTRAST_PALETTE : DEFAULT_PALETTE
 }
 
 export function prefersDark(): boolean {
@@ -162,10 +199,29 @@ export function resolveTheme(a: Appearance): 'light' | 'dark' {
 export function applyAppearance(a: Appearance): void {
   const root = document.documentElement
   root.dataset.theme = resolveTheme(a)
-  root.dataset.contrast = a.highContrast ? 'high' : 'normal'
+  root.dataset.palette = resolvePalette(a)
+  root.dataset.contrast = resolveContrast(a) ? 'high' : 'normal'
   root.dataset.motion = a.reduceMotion ? 'reduced' : 'full'
   root.dataset.links = a.underlineLinks ? 'underline' : 'plain'
   root.style.setProperty('--ui-scale', String(TEXT_SCALE[a.textSize]))
   root.style.setProperty('--font-ui', fontStack(a))
   root.style.setProperty('--shell-width', WIDTHS[a.width])
+  syncThemeColor(root)
+}
+
+/**
+ * The browser's own chrome (the address bar on a phone, the title bar of an
+ * installed app) takes the page's ground, so a dark page does not sit under a
+ * cream bar. Read from the token rather than kept as a second list of colours.
+ */
+function syncThemeColor(root: HTMLElement): void {
+  const channels = getComputedStyle(root).getPropertyValue('--c-canvas').trim()
+  if (!channels) return
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+  if (!meta) {
+    meta = document.createElement('meta')
+    meta.name = 'theme-color'
+    document.head.appendChild(meta)
+  }
+  meta.content = `rgb(${channels.split(/\s+/).join(',')})`
 }

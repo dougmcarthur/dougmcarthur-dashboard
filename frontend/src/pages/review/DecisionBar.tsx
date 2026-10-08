@@ -6,12 +6,14 @@ import { Button, type ButtonVariant } from '../../components/ui/Button'
 
 /**
  * The moves a gig offers, styled by what they mean: forward is primary,
- * recording something they did is info, ending it is danger.
+ * recording something they did is info, ending it is neutral. A pass is a
+ * decision and not a fault, and clay is kept for what is broken or destroys
+ * something, so "Pass" and "Missed the deadline" do not wear it.
  */
 const GIG_VARIANT: Record<GigMove['tone'], ButtonVariant> = {
   go: 'primary',
   record: 'info',
-  no: 'danger',
+  no: 'neutral',
 }
 
 /**
@@ -57,7 +59,7 @@ export function DecisionBar({
       buttons.push({ label: 'Mark pitched', variant: 'neutral', run: () => onSync({ status: 'pitched' }) })
     }
     buttons.push({ label: 'Confirmed', variant: 'primary', run: () => onSync({ status: 'confirmed' }) })
-    buttons.push({ label: 'Declined', variant: 'danger', run: () => onSync({ status: 'declined' }) })
+    buttons.push({ label: 'Declined', variant: 'neutral', run: () => onSync({ status: 'declined' }) })
     buttons.push({ label: 'Archive', variant: 'neutral', run: () => onSync({ status: 'archived' }) })
   }
 

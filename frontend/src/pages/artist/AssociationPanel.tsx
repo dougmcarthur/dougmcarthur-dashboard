@@ -59,7 +59,7 @@ function AssociationPanel({ association, onDone }: { association: AssociationSum
       loading={preview.isLoading}
       error={apply.isError ? 'Could not add them. Nothing was written.' : null}
     >
-      {data && 'error' in data && <p className="text-sm text-warn-fg">{data.error}</p>}
+      {data && 'error' in data && <p className="text-sm text-danger-fg">{data.error}</p>}
 
       {data && 'wouldAdd' in data && data.wouldAdd === 0 && (
         <p className="text-sm text-body">

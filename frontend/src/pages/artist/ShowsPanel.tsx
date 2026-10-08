@@ -26,7 +26,7 @@ function ShowRow({ show }: { show: MergedShow }) {
   return (
     <li className="flex items-start gap-3 px-4 py-2.5">
       <div className="w-11 shrink-0 text-center rounded-md bg-sunken py-1">
-        <div className="text-[11px] font-semibold text-accent uppercase">{MONTH[Number(m) - 1]}</div>
+        <div className="text-xs font-semibold text-accent">{MONTH[Number(m) - 1]}</div>
         <div className="text-base font-semibold text-ink leading-tight">{Number(d)}</div>
       </div>
       <div className="min-w-0 flex-1 space-y-0.5">
@@ -92,7 +92,7 @@ export function ShowsPanel() {
         </span>
       </header>
       {failing.length > 0 && (
-        <ul className="px-4 py-2 text-xs text-warn-fg border-b border-line space-y-0.5">
+        <ul className="px-4 py-2 text-xs text-danger-fg border-b border-line space-y-0.5">
           {failing.map((f) => (
             <li key={f.source}>
               {f.status === 'rejected'

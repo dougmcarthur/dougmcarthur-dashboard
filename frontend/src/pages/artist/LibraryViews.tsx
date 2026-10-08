@@ -478,7 +478,7 @@ export function GridView({
             )}
             <span className="block p-4 space-y-1.5">
               <span className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted">{meta.label}</span>
+                <span className="text-xs font-semibold text-muted">{meta.label}</span>
                 <Mark asset={a} />
               </span>
               <span className="block text-sm font-semibold text-ink">{a.label}</span>

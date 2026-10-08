@@ -183,7 +183,7 @@ export function DigestSettingsCard() {
             <div className="mt-3 space-y-3">
               {d.groups.map((g) => (
                 <div key={g.id}>
-                  <p className="text-[10px] uppercase tracking-wide text-muted mb-1">{g.heading}</p>
+                  <p className="text-xs font-medium text-muted mb-1">{g.heading}</p>
                   <ul className="space-y-1.5">
                     {g.lines.map((l) => (
                       <li key={l.key} className="text-xs">

@@ -115,7 +115,7 @@ export function SnoozeMenu({
           )}
 
           <div className="border-t border-line mt-1 pt-2 px-3 pb-1">
-            <label className="block text-[10px] uppercase tracking-wide text-muted mb-1">
+            <label className="block text-xs text-muted mb-1">
               Or pick a date
             </label>
             <div className="flex gap-1.5">

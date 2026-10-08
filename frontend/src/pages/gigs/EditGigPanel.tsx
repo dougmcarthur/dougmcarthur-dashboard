@@ -181,7 +181,7 @@ export function EditGigPanel({
           estimate with its gaps on screen instead of a confident wrong number.
         */}
         <div className="sm:col-span-2 pt-1">
-          <Explainer as="div" title="The trip" titleClassName="text-xs font-semibold text-muted uppercase tracking-wide">
+          <Explainer as="div" title="The trip" titleClassName="text-xs font-semibold text-muted">
             What it costs to get there. Every field is optional. Leave a band empty and it is
             guessed from the location, and labelled as guessed.
           </Explainer>

@@ -49,6 +49,7 @@ export default {
         sunken: 'rgb(var(--c-sunken) / <alpha-value>)',
         line: 'rgb(var(--c-line) / <alpha-value>)',
         'line-strong': 'rgb(var(--c-line-strong) / <alpha-value>)',
+        field: 'rgb(var(--c-field-line) / <alpha-value>)',
         ink: 'rgb(var(--c-ink) / <alpha-value>)',
         body: 'rgb(var(--c-body) / <alpha-value>)',
         muted: 'rgb(var(--c-muted) / <alpha-value>)',

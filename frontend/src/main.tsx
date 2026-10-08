@@ -5,6 +5,7 @@ import App from './App'
 import { AuthGate } from './components/AuthGate'
 import { AppearanceProvider } from './hooks/useAppearance'
 import { applyAppearance, loadAppearance } from './appearance'
+import './themes.css'
 import './index.css'
 
 // Applied before React mounts. Doing it in an effect instead would paint one

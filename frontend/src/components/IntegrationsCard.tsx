@@ -34,14 +34,25 @@ import { Banner, Card } from './ui/Surface'
 function StatusPill({ state, calm = false }: { state: CredentialState; calm?: boolean }) {
   // `calm` is a grant nobody has connected yet: a choice not yet made, which
   // the warn tone made look like six faults on the day the account is new.
+  // A refusal is broken (clay). Not connected yet is waiting on you (ochre).
+  const attention = needsAttention(state) && !calm
+  const refused = state === 'rejected'
   const tone =
     state === 'working'
       ? 'bg-success-bg text-success-fg'
-      : needsAttention(state) && !calm
-        ? 'bg-warn-bg text-warn-fg'
+      : attention
+        ? refused
+          ? 'bg-danger-bg text-danger-fg'
+          : 'bg-warn-bg text-warn-fg'
         : 'bg-sunken text-muted'
   const dot =
-    state === 'working' ? 'bg-success-solid' : needsAttention(state) && !calm ? 'bg-warn-fg' : 'bg-muted'
+    state === 'working'
+      ? 'bg-success-solid'
+      : attention
+        ? refused
+          ? 'bg-danger-solid'
+          : 'bg-warn-fg'
+        : 'bg-muted'
 
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${tone}`}>
@@ -641,9 +652,12 @@ export function IntegrationsCard() {
   // Not `needsAttention`: on a grant row, `unconfigured` means nobody has
   // pressed Connect, which is a choice not yet made rather than a fault. See
   // `rowNeedsAttention`.
-  const attention = rows.filter(
-    (r) => !r.serverReady || rowNeedsAttention(r.spec, r.state),
-  ).length
+  //
+  // And not `!serverReady` either. A deployment that cannot connect anything
+  // says so once, in the banner below, and counting it again for every row it
+  // blocks put "5 of 6 need attention" over five calm "Not connected" pills,
+  // which is a line that contradicts the list it summarises.
+  const attention = rows.filter((r) => rowNeedsAttention(r.spec, r.state)).length
   const blocked = data?.grantMissingSecrets ?? []
 
   return (

@@ -15,24 +15,36 @@
  * now lands at 4.6:1 or better in both themes.
  */
 /*
- * Direction A.
+ * Direction A, on the Sun Dogs ground.
  *
- * Two hues carry meaning and nothing else does: green means go — approve,
- * live, active — and clay means something is broken. Everything else is a
- * neutral biased slightly green so it sits with them rather than beside them.
+ * Three hues carry meaning and nothing else does. Green means go: approve,
+ * live, active. Ochre means waiting or due soon: the next move is somebody
+ * else's, or the clock's. Clay means something is broken. Everything else is a
+ * neutral biased toward the cream and green-black ink of sundogsmusic.ca, so the
+ * app sits with the website rather than beside it.
  *
- * The two are separated by LIGHTNESS as well as hue, because a muted green and
- * a muted red collapse to about ΔE 3 under deuteranopia; muting is exactly
- * what removes the difference that would otherwise save them. Checked with a
- * CVD validator rather than by eye.
+ * `warn` and `danger` were one clay on purpose, because the older palette ran
+ * four hues at once and none of them read. They are two again because waiting
+ * and broken are different news, and a screen that paints both the same clay
+ * makes a quiet Tuesday look like an outage. An icon and a label still carry
+ * the distinction for anybody who cannot see the hue.
  *
- * `warn` and `danger` deliberately resolve to the same clay. The old palette
- * ran four hues at once — violet accent, amber warnings, red errors, blue
- * links, plus five categorical tints — so colour was doing four different jobs
- * and none of them read. Collapsing them is the point, not an oversight; an
- * icon and a label carry the distinction instead.
+ * The three TEXT colours were chosen against a colour-blind simulation (Machado
+ * 2009, deuteranopia and protanopia, CIELAB ΔE76) rather than by eye, and the
+ * search moved every one of them: green leans toward jade, clay is a deep
+ * brick and ochre is golden. Under the worse of the two simulations the light
+ * pairs score 17 for green against clay, 26 for clay against ochre and 36 for
+ * green against ochre. The earlier light pair, a muted green against a muted
+ * red, scored 2, and the first ochre tried against that clay scored 4. Muting
+ * is exactly what removes the difference that would otherwise save them.
+ * Yellow cannot carry text on cream unless it is nearly brown, so ochre is
+ * mostly a fill with dark ink on it, and its text value is a deep gold.
  *
- * Dark is the default. Light is the alternate, reached by choosing it.
+ * The tokens themselves are in themes.css, which is generated from shared/themes.ts
+ * (npm run themes:css), one block per theme and mode. Which theme is the default
+ * is set in appearance.ts. The default's light palette is the base :root there,
+ * so a page that has not yet run a script already matches it, and every other
+ * theme is a [data-palette] block that overrides it.
  *
  * Each colour is stored as bare RGB channels — `11 12 11`, not `#0b0c0b` — so
  * Tailwind can put an alpha after it. A token that resolves to a finished
@@ -41,163 +53,14 @@
  * header and every warning banner rendered with no background for as long as
  * the tokens were hex. Reading one directly therefore means `rgb(var(--c-x))`.
  */
+
 :root {
-  color-scheme: dark;
-
-  --c-canvas: 11 12 11;
-  --c-surface: 20 22 19;
-  --c-raised: 29 31 27;
-  --c-sunken: 15 17 14;
-  --c-line: 40 43 38;
-  --c-line-strong: 58 64 56;
-
-  --c-ink: 237 239 234;
-  --c-body: 179 184 174;
-  --c-muted: 138 144 131;
-  --c-faint: 107 113 103;
-
-  --c-accent: 143 201 138;
-  --c-accent-hover: 166 215 160;
-  --c-accent-fg: 13 26 12;
-  --c-accent-soft: 24 37 26;
-
-  /* clay */
-  --c-danger-bg: 36 23 21;
-  --c-danger-bg-hover: 48 32 28;
-  --c-danger-line: 74 44 35;
-  --c-danger-fg: 217 154 134;
-  --c-danger-solid: 180 87 63;
-
-  /* green */
-  --c-success-bg: 21 34 26;
-  --c-success-bg-hover: 29 47 35;
-  --c-success-line: 43 68 48;
-  --c-success-fg: 143 201 138;
-  --c-success-solid: 79 154 84;
-
-  /* warn is clay: two hues, not three */
-  --c-warn-bg: 36 23 21;
-  --c-warn-line: 74 44 35;
-  --c-warn-fg: 217 154 134;
-
-  /* info is not a hue — links take the green, surfaces stay neutral */
-  --c-info-bg: 29 31 27;
-  --c-info-bg-hover: 37 40 34;
-  --c-info-line: 40 43 38;
-  --c-info-fg: 143 201 138;
-
-  /* Categorical tints are gone. A kind is named, not coloured. */
-  --c-cat-violet-bg: 29 31 27; --c-cat-violet-line: 40 43 38; --c-cat-violet-fg: 138 144 131;
-  --c-cat-sky-bg: 29 31 27;    --c-cat-sky-line: 40 43 38;    --c-cat-sky-fg: 138 144 131;
-  --c-cat-teal-bg: 29 31 27;   --c-cat-teal-line: 40 43 38;   --c-cat-teal-fg: 138 144 131;
-  --c-cat-orange-bg: 29 31 27; --c-cat-orange-line: 40 43 38; --c-cat-orange-fg: 138 144 131;
-  --c-cat-rose-bg: 29 31 27;   --c-cat-rose-line: 40 43 38;   --c-cat-rose-fg: 138 144 131;
-
-  /* Connection colours on the stage plot, the one place a kind *is* coloured:
-     telling a DI from a mic across a table is the job. Screen only — the
-     printed sheet is monochrome (StageCards.tsx). */
-  --c-conn-mic-fg: 183 160 240;   --c-conn-mic-bg: 40 34 58;
-  --c-conn-di-fg: 125 190 240;    --c-conn-di-bg: 26 40 54;
-  --c-conn-wedge-fg: 110 210 190; --c-conn-wedge-bg: 22 48 44;
-  --c-conn-iem-fg: 240 140 170;   --c-conn-iem-bg: 56 30 40;
-  --c-conn-power-fg: 240 170 90;  --c-conn-power-bg: 56 40 22;
-
-  /* What a modal lays over the page: a tint that dims it, never a wash that
-     hides it. Dark in both themes, so the page recedes rather than fading to
-     white. How strong it is belongs to the class's alpha, not to this value. */
-  --c-scrim: 0 0 0;
-
-  --shadow-card: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5);
-  --shadow-raised: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px -6px rgba(0,0,0,.7);
-  --shadow-pop: 0 1px 0 rgba(255,255,255,.05) inset, 0 12px 34px -10px rgba(0,0,0,.82);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,.04);
-
   --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
   --font-ui: "Public Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-
   --shell-width: 1280px;
   --motion-fast: 150ms;
   --motion-slow: 260ms;
-}
-
-[data-theme='light'] {
-  color-scheme: light;
-
-  --c-canvas: 243 244 241;
-  --c-surface: 255 255 255;
-  --c-raised: 247 248 245;
-  --c-sunken: 238 240 235;
-  --c-line: 223 226 219;
-  --c-line-strong: 194 200 189;
-
-  --c-ink: 20 23 18;
-  --c-body: 69 74 65;
-  --c-muted: 95 102 89;
-  --c-faint: 125 132 119;
-
-  /* The lightness relationship inverts: green is the dark one on a light
-     ground, which is what keeps it apart from the clay for a CVD reader. */
-  --c-accent: 53 112 61;
-  --c-accent-hover: 42 92 49;
-  --c-accent-fg: 255 255 255;
-  --c-accent-soft: 234 242 234;
-
-  --c-danger-bg: 253 243 240;
-  --c-danger-bg-hover: 248 228 221;
-  --c-danger-line: 236 201 188;
-  --c-danger-fg: 164 67 47;
-  --c-danger-solid: 164 67 47;
-
-  --c-success-bg: 238 245 238;
-  --c-success-bg-hover: 224 236 224;
-  --c-success-line: 197 220 197;
-  --c-success-fg: 44 97 52;
-  --c-success-solid: 53 112 61;
-
-  --c-warn-bg: 253 243 240;
-  --c-warn-line: 236 201 188;
-  --c-warn-fg: 164 67 47;
-
-  --c-info-bg: 247 248 245;
-  --c-info-bg-hover: 236 238 231;
-  --c-info-line: 223 226 219;
-  --c-info-fg: 53 112 61;
-
-  --c-cat-violet-bg: 247 248 245; --c-cat-violet-line: 223 226 219; --c-cat-violet-fg: 95 102 89;
-  --c-cat-sky-bg: 247 248 245;    --c-cat-sky-line: 223 226 219;    --c-cat-sky-fg: 95 102 89;
-  --c-cat-teal-bg: 247 248 245;   --c-cat-teal-line: 223 226 219;   --c-cat-teal-fg: 95 102 89;
-  --c-cat-orange-bg: 247 248 245; --c-cat-orange-line: 223 226 219; --c-cat-orange-fg: 95 102 89;
-  --c-cat-rose-bg: 247 248 245;   --c-cat-rose-line: 223 226 219;   --c-cat-rose-fg: 95 102 89;
-  --c-conn-mic-fg: 106 76 196;    --c-conn-mic-bg: 241 236 252;
-  --c-conn-di-fg: 30 110 170;     --c-conn-di-bg: 232 243 251;
-  --c-conn-wedge-fg: 18 130 112;  --c-conn-wedge-bg: 228 246 242;
-  --c-conn-iem-fg: 180 50 90;     --c-conn-iem-bg: 252 236 241;
-  --c-conn-power-fg: 176 96 20;   --c-conn-power-bg: 253 241 228;
-
-  --c-scrim: 20 23 18;
-
-  --shadow-card: 0 1px 2px rgba(20,23,18,.06);
-  --shadow-raised: 0 2px 4px rgba(20,23,18,.06), 0 10px 26px -10px rgba(20,23,18,.16);
-  --shadow-pop: 0 8px 12px -4px rgba(20,23,18,.10), 0 18px 36px -12px rgba(20,23,18,.20);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,.7);
-}
-
-/* Raises borders and pulls tertiary text toward primary. */
-[data-contrast='high'] {
-  --c-line: 74 83 71;
-  --c-line-strong: 107 117 103;
-  --c-body: 223 228 218;
-  --c-muted: 200 207 195;
-  --c-faint: 170 178 164;
-}
-
-[data-theme='light'][data-contrast='high'] {
-  --c-line: 154 163 148;
-  --c-line-strong: 107 117 103;
-  --c-body: 27 31 24;
-  --c-muted: 43 49 40;
-  --c-faint: 61 68 57;
 }
 
 @layer base {
@@ -234,6 +97,11 @@
     outline: 2px solid rgb(var(--c-info-fg));
     outline-offset: 2px;
     border-radius: 3px;
+  }
+
+  /* The High contrast theme draws the one mark that says where you are a step thicker. */
+  [data-palette='high-contrast'] :focus-visible {
+    outline-width: 3px;
   }
 
   ::selection {
@@ -340,31 +208,40 @@
 }
 
 /*
- * Printing is how a stage plot or an EPK becomes a PDF, and paper is white.
- * The dark theme's pale text would print as near-invisible grey on it, so a
- * printout always uses the light palette's surfaces, lines and text.
+ * Forced colours (Windows High Contrast and its kin). The browser replaces our
+ * palette with the system's, which is what the person asked for, and two things
+ * then stop saying what they said. A selected control was told apart by its
+ * fill, which forced colours removes, so it gets an outline in the system's own
+ * highlight. And the small status dots are backgrounds, which also go; each sits
+ * beside the words that say the same thing, so they are kept as drawn rather
+ * than turned into a block of window colour. Written from the specification and
+ * not yet seen in a forced-colours browser.
+ */
+@media (forced-colors: active) {
+  [aria-pressed='true'],
+  [aria-checked='true'],
+  [aria-selected='true'],
+  [aria-current='page'],
+  [aria-current='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  [class*='bg-danger-solid'],
+  [class*='bg-warn-fg'],
+  [class*='bg-success-solid'] {
+    forced-color-adjust: none;
+  }
+}
+
+/*
+ * Printing is how a stage plot or an EPK becomes a PDF, and paper is white. The
+ * dark theme's pale text would print as near-invisible grey on it, so a printout
+ * is always the default theme's light palette: that block is at the end of
+ * themes.css, with enough specificity to out-rank any theme and any contrast
+ * setting, and this is the page background beside it.
  */
 @media print {
-  :root {
-    color-scheme: light;
-    --c-canvas: 255 255 255;
-    --c-surface: 255 255 255;
-    --c-raised: 247 248 245;
-    --c-sunken: 238 240 235;
-    --c-line: 223 226 219;
-    --c-line-strong: 160 166 155;
-    --c-ink: 20 23 18;
-    --c-body: 45 49 42;
-    --c-muted: 80 86 75;
-    --c-faint: 110 116 104;
-    --c-accent: 53 112 61;
-    --c-accent-soft: 234 242 234;
-    --c-warn-bg: 253 243 240;
-    --c-warn-line: 236 201 188;
-    --c-warn-fg: 164 67 47;
-  }
   body {
     background: white;
   }
 }
-
