@@ -54,6 +54,42 @@ describe('every surface that offers a sync pitch asks the gate first', () => {
   })
 })
 
+describe('reading every unread site from the Sync page', () => {
+  const sync = read('frontend/src/pages/SyncPage.tsx')
+  const terms = read('frontend/src/components/SyncTerms.tsx')
+  const component = terms.slice(terms.indexOf('export function CheckAllTerms'))
+
+  it('is on the Sync page, ahead of the drafts panel that leaves unread targets out', () => {
+    expect(sync).toContain('<CheckAllTerms />')
+    expect(sync.indexOf('<CheckAllTerms />')).toBeLessThan(sync.indexOf('<GmailDraftsPanel />'))
+  })
+
+  it("picks its targets with the nightly pass's rule rather than a filter of its own", () => {
+    expect(component).toContain('targetsToRead(')
+    expect(component).not.toMatch(/policyCheckedAt|submissionPolicy|\.filter\(/)
+  })
+
+  it('asks for the whole list, so a status filter on the page cannot hide an unread target', () => {
+    expect(component).toContain("queryKey: ['sync', '']")
+    expect(component).toContain('api.sync.list()')
+  })
+
+  it("reads one site at a time through the row's own route, and gives up when every request fails", () => {
+    expect(component).toContain('api.sync.checkTerms(target.id)')
+    expect(component).not.toMatch(/Promise\.(all|allSettled)/)
+    expect(component).toContain('GIVE_UP_AFTER')
+  })
+
+  it('can be stopped, and stops by itself when the page goes', () => {
+    expect(component).toContain('stop.current = true')
+    expect(component).toMatch(/return \(\) => \{\s*stop\.current = true/)
+  })
+
+  it('changes no status and sends nothing: it only reads', () => {
+    expect(component).not.toMatch(/api\.sync\.patch|api\.gmail|status:/)
+  })
+})
+
 describe('the Worker holds the line a screen cannot', () => {
   it('hands the terms to the bulk draft plan, so seven pitches cannot go out at once to a refusal', () => {
     const route = read('src/routes/gmailDrafts.ts')

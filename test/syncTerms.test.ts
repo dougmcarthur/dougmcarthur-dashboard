@@ -4,11 +4,13 @@ import {
   NO_SITE,
   UNREACHABLE,
   bulkSkipReason,
+  checkRunLines,
   foldFinding,
   normaliseWebsite,
   pitchGate,
   readSubmissionPolicy,
   startingTerms,
+  targetsToRead,
   termsDue,
   termsOf,
   termsSentence,
@@ -347,6 +349,90 @@ describe('which targets the nightly pass reads', () => {
     const failed = { policyCheckedAt: '2026-10-03T00:00:00Z', policyEvidence: `${UNREACHABLE} friends.example. It will be tried again.` }
     expect(termsDue(row(failed), TODAY)).toBe('retry')
     expect(termsDue(row({ ...failed, policyCheckedAt: '2026-10-05T00:00:00Z' }), TODAY)).toBeNull()
+  })
+})
+
+describe('reading every site on file in one go', () => {
+  const target = (name: string, over: Record<string, unknown> = {}) =>
+    ({ name, status: 'draft_ready', ...over }) as Parameters<typeof targetsToRead>[0][number] & { name: string }
+  const unreachable = { policyCheckedAt: '2026-10-03T00:00:00Z', policyEvidence: `${UNREACHABLE} friends.example.` }
+
+  it('covers what the nightly pass would, never-read first, and leaves the rest', () => {
+    const rows = [
+      target('stale', { policyCheckedAt: '2026-08-07T00:00:00Z' }),
+      target('fresh', { policyCheckedAt: '2026-10-01T00:00:00Z' }),
+      target('retry', unreachable),
+      target('archived', { status: 'archived' }),
+      target('never'),
+      target('just failed', { ...unreachable, policyCheckedAt: '2026-10-06T00:00:00Z' }),
+    ]
+    const names = targetsToRead(rows, TODAY).map((r) => r.name)
+    expect(names).toEqual(['never', 'retry', 'stale'])
+    // Whatever the nightly pass would take is what the button takes: the two share one rule.
+    expect(new Set(names)).toEqual(new Set(rows.filter((r) => termsDue(r, TODAY)).map((r) => r.name)))
+  })
+
+  it('keeps the order it was given within a kind, and returns nothing when everything is read', () => {
+    expect(targetsToRead([target('b'), target('a')], TODAY).map((r) => r.name)).toEqual(['b', 'a'])
+    expect(targetsToRead([target('read', { policyCheckedAt: '2026-10-06T00:00:00Z' })], TODAY)).toEqual([])
+  })
+
+  const closed = (name: string) => target(name, { submissionPolicy: 'closed', policyCheckedAt: '2026-10-07T00:00:00Z', policyEvidence: 'NO unsolicited material please.' })
+  const open = (name: string) => target(name, { submissionPolicy: 'open', policyCheckedAt: '2026-10-07T00:00:00Z', policyEvidence: 'Send us your music.' })
+  const silent = (name: string) => target(name, { policyCheckedAt: '2026-10-07T00:00:00Z', policyEvidence: 'Read 6 pages and found nothing about submissions.' })
+  const noSite = (name: string) => target(name, { policyCheckedAt: '2026-10-07T00:00:00Z', policyEvidence: NO_SITE })
+
+  it('names the refusals, because that is the answer the pass exists for', () => {
+    const lines = checkRunLines({ total: 3, failed: 0, read: [closed('Imaginary Friends'), closed('Friendly Faces'), open('Lakeside')] })
+    expect(lines[0]).toBe('Read 3 sites.')
+    expect(lines).toContain('2 say they take no unsolicited pitches: Imaginary Friends, Friendly Faces.')
+    expect(lines).toContain('1 says they take submissions.')
+  })
+
+  it('never words silence, or a site that would not open, as permission', () => {
+    const lines = checkRunLines({ total: 3, failed: 0, read: [silent('A'), silent('B'), noSite('C')] })
+    expect(lines).toContain('None of the pages read refuse unsolicited pitches.')
+    expect(lines.join(' ')).toMatch(/2 have nothing about submissions on the pages read\. That is not permission/)
+    expect(lines).toContain('1 could not be opened, or had no website on file.')
+    expect(lines.join(' ')).not.toMatch(/(fine|safe|clear|ok|okay)/i)
+  })
+
+  it('does not call a refusal "none refuse" when one was found, and counts a pitch-anyway target as a refusal', () => {
+    const overridden = target('Pitching', { submissionPolicy: 'closed', policyOverriddenAt: '2026-10-01T00:00:00Z', policyCheckedAt: '2026-10-07T00:00:00Z', policyEvidence: 'No unsolicited.' })
+    const lines = checkRunLines({ total: 1, failed: 0, read: [overridden] })
+    expect(lines.join(' ')).not.toMatch(/None of the pages/)
+    expect(lines).toContain('1 says they take no unsolicited pitches: Pitching.')
+  })
+
+  it('says what was not read, and that tonight will try again', () => {
+    const lines = checkRunLines({ total: 4, failed: 2, read: [closed('A'), silent('B')] })
+    expect(lines).toContain('2 could not be checked just now. The nightly check will try them again.')
+    expect(checkRunLines({ total: 1, failed: 1, read: [] })).toEqual([
+      'No sites were read.',
+      '1 could not be checked just now. The nightly check will try it again.',
+    ])
+  })
+
+  it('counts a reply that is not a finished check as unread rather than as silence', () => {
+    const lines = checkRunLines({ total: 2, failed: 0, read: [silent('A'), target('B')] })
+    expect(lines[0]).toBe('Read 1 site.')
+    expect(lines).toContain('1 could not be checked just now. The nightly check will try it again.')
+    expect(lines.join(' ')).not.toMatch(/2 have nothing/)
+  })
+
+  it('names the targets a pass gave up before reaching', () => {
+    const lines = checkRunLines({ total: 4, failed: 3, read: [] })
+    expect(lines).toContain('1 was not tried. The nightly check will take it.')
+    expect(checkRunLines({ total: 6, failed: 3, read: [] })).toContain('3 were not tried. The nightly check will take them.')
+  })
+
+  it('says so when it was stopped', () => {
+    expect(checkRunLines({ total: 9, failed: 0, stopped: true, read: [closed('A'), silent('B')] })[0]).toBe('Stopped after 2 of 9.')
+  })
+
+  it('has no em dash in anything it says', () => {
+    const lines = checkRunLines({ total: 6, failed: 1, read: [closed('A'), open('B'), silent('C'), noSite('D'), target('E')] })
+    expect(lines.filter((l) => l.includes('—'))).toEqual([])
   })
 })
 
