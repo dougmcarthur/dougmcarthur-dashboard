@@ -1606,6 +1606,49 @@ not rewrite what every artist sees — and linking is best-effort so a catalog
 failure never costs a filed gig. Sync targets are catalogued only when they
 are organisations; a supervisor's name stays on the artist's own row.
 
+**Scout reads the pages that list calls, and agents are for finding new ones.**
+A research sweep spends most of its effort opening pages already known to list
+calls and reading what is on them, which is mechanical, and a Worker doing it
+costs a request. `src/lib/sourcePoll.ts` does it on the hourly cron — three
+sources a tick, one at a time, with the same honest user agent as every other
+fetch here — from `catalog_sources` (migration 0037), seeded from
+`shared/musicAssociations.ts`, which stays the truth for the ones it names. What
+an agent is for is *finding* a page nobody knew about; once found it belongs in
+the registry and is read from there on. `docs/catalog-ingestion.md` has what the
+first real reads showed, and it is worth reading before changing a rule.
+
+Two readers, both **found by markup and never by host**: `shared/feedParse.ts`
+(RSS, Atom, iCal) and `shared/listingParse.ts`, which reads a linked headline
+with a `Deadline:` line beneath it — SaskMusic's page has forty-six, thirty with
+dates — and a dated list of linked headlines, as MusicOntario's news is. Neither
+reads prose: a deadline is taken only from a line that says *deadline* beside a
+date, and a year-less "November 20" stays the words, through `splitDeadline`.
+`shared/callClassifier.ts` gives each item one of three verdicts and **the
+sentence that decided it** — `unclear` is a real answer, since "mentions a grant
+and says nothing is open" is neither of the other two. Its table in
+`test/callClassifier.test.ts` is almost all real titles, hand-labelled by the
+person who wrote the rules, so it is a regression guard and not a measure of accuracy:
+accuracy is read from the owner's **Ignored** tab, because a rule missing real
+calls only shows from that side.
+
+**A candidate is not an opportunity, and nothing here reaches the catalog.** An
+announcement is usually not the programme's own page — SaskMusic's "Read More"
+goes to SaskMusic — so publishing it would key the catalog on the wrong address
+and duplicate the entry the day the real one is found. Following the link is the
+next step. **A source that answers is not a source that works**: the first reads
+found Music BC's "feed" (a republished newsletter, newest item nineteen months
+old), Music PEI's calendar (200, empty body) and MusicNL's "member
+opportunities" (a login wall), and `sourceState` reads what came *back*, so each
+says so — `stale`, `empty` — instead of reading as healthy. A refusal (401, 403,
+429) is a verdict on our access and a timeout is none, as in
+`shared/credentialHealth.ts`. First sight sets a baseline, so a feed's last ten
+items are stale when they are more than ninety days old and not news. A broken
+source is read less, not more: one failure retries at the usual time, then 2×,
+4×, up to a week. An unchanged one costs a 304, or a hash compared and nothing
+written. The body is capped at 3 MB (Music BC's feed is 1.6 MB for ten items)
+and a stranger's markup only ever becomes strings: it is never followed, run or
+passed to a model.
+
 **The logged-out page shows the catalog, and publishing is conservative.**
 Strangers see `LandingPage` (a browser that has signed in before still gets
 the sign-in screen; `#welcome` and `#signin` cross over). It shows a small

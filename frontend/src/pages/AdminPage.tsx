@@ -7,6 +7,7 @@ import { Disclosure } from '../components/ui/Disclosure'
 import { InvitesPanel } from '../components/InvitesPanel'
 import { FeedbackInbox } from '../components/FeedbackInbox'
 import { InviteRequestsPanel } from '../components/InviteRequestsPanel'
+import { CatalogSourcesPanel } from '../components/CatalogSourcesPanel'
 import { PublicListingsPanel } from '../components/PublicListingsPanel'
 import { SurveyPanel } from '../components/SurveyPanel'
 import { relativeTime, shortDate } from '../format'
@@ -107,6 +108,10 @@ export function AdminPage() {
       <hr className="border-line" />
 
       <FeedbackInbox />
+
+      <hr className="border-line" />
+
+      <CatalogSourcesPanel />
 
       <hr className="border-line" />
 

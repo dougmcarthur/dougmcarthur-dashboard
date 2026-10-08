@@ -916,6 +916,13 @@ export const api = {
     listings: () => apiFetch<{ items: ListingItem[] }>('/admin/listings'),
     setListingPublic: (id: number, isPublic: boolean) =>
       apiFetch<{ ok: boolean }>(`/admin/listings/${id}`, { method: 'PATCH', body: JSON.stringify({ public: isPublic }) }),
+    /** The pages Scout reads for calls, how each is doing, and what it found there. */
+    catalogSources: () => apiFetch<CatalogSources>('/admin/catalog/sources'),
+    catalogCandidates: (view: CandidateView) =>
+      apiFetch<{ view: CandidateView; items: CatalogCandidateItem[] }>(`/admin/catalog/candidates?view=${view}`),
+    pollCatalog: () => apiFetch<CatalogPollReport>('/admin/catalog/poll', { method: 'POST' }),
+    setSourceEnabled: (id: number, enabled: boolean) =>
+      apiFetch<{ ok: boolean }>(`/admin/catalog/sources/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
     markFeedbackRead: (id: number) =>
       apiFetch<{ ok: boolean }>(`/admin/feedback/${id}/read`, { method: 'POST' }),
     invite: (body: { email: string; displayName?: string; send?: boolean }) =>
@@ -1351,6 +1358,59 @@ export interface InviteRequestItem {
   status: InviteRequestStatus
   createdAt: string
   handledAt: string | null
+}
+
+export type SourceStateId = 'off' | 'never' | 'working' | 'overdue' | 'stale' | 'empty' | 'refused' | 'unreachable'
+
+/** A page Scout reads for calls, as the owner's panel shows it. */
+export interface CatalogSourceItem {
+  id: number
+  label: string
+  kind: 'feed' | 'calendar' | 'page'
+  url: string
+  enabled: boolean
+  addedBy: string
+  lastOkAt: string | null
+  lastFetchedAt: string | null
+  nextDueAt: string | null
+  itemCount: number | null
+  newestItemAt: string | null
+  state: SourceStateId
+  /** A sentence: what the last read says about it. */
+  note: string
+  counts: { calls: number; unclear: number; past: number; ignored: number }
+}
+
+export interface CatalogSources {
+  lastPoll: { at: string; polled: number; ok: number; failed: number; added: number } | null
+  items: CatalogSourceItem[]
+}
+
+export type CandidateView = 'calls' | 'unclear' | 'ignored' | 'past'
+
+export interface CatalogCandidateItem {
+  id: number
+  title: string
+  url: string | null
+  verdict: 'opportunity' | 'unclear' | 'not_opportunity'
+  category: string | null
+  kind: string | null
+  /** The sentence that decided the verdict. */
+  reason: string
+  deadline: string | null
+  deadlineNote: string | null
+  placeText: string | null
+  publishedAt: string | null
+  firstSeenAt: string
+  source: string
+}
+
+export interface CatalogPollReport {
+  polled: number
+  ok: number
+  failed: number
+  added: number
+  results: Array<{ source: string; ok: boolean; items: number; added: number; note: string }>
 }
 
 /** A catalog entry as the admin listings panel shows it. */
