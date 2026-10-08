@@ -8,6 +8,7 @@ import { scoped, withTenant } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
 import { syncNoteColumns } from '../../shared/noteColumns'
 import { linkSync } from '../lib/catalog'
+import { decisionActor, recordSyncDecision } from '../lib/decisionLog'
 
 const sync = new Hono<AppEnv>()
 
@@ -91,10 +92,24 @@ sync.patch('/:id', zValidator('json', SyncPatchSchema), async (c) => {
   const b = c.req.valid('json')
 
   const tenant = tenantOf(c)
+  // Read first, so a status change can be logged against what the row was.
+  const before = await db.select().from(syncTargets).where(scoped(syncTargets, tenant, eq(syncTargets.id, id))).get()
+  const at = new Date().toISOString()
   await db
     .update(syncTargets)
-    .set({ ...b, updatedAt: new Date().toISOString() })
+    .set({ ...b, updatedAt: at })
     .where(scoped(syncTargets, tenant, eq(syncTargets.id, id)))
+
+  if (before && b.status !== undefined && b.status !== before.status) {
+    await recordSyncDecision(c.env, tenant, before, {
+      action: 'move',
+      from: before.status,
+      to: b.status,
+      via: 'sync_patch',
+      actor: decisionActor(c.get('actor')),
+      at,
+    })
+  }
 
   const row = await db.select().from(syncTargets).where(scoped(syncTargets, tenant, eq(syncTargets.id, id))).get()
   if (!row) return c.json({ error: 'not found' }, 404)

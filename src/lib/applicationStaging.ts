@@ -6,6 +6,7 @@ import { readGig, gigStatusColumns } from '../db/gigRows'
 import { normaliseAnswerState, stageAnswer } from '../../shared/application'
 import { normaliseGigStatus, isGigTransitionAllowed } from '../../shared/gigStatus'
 import { readApplicationForm, isReadableFormUrl, type PrepOutcome } from './applicationPrep'
+import { recordGigDecision } from './decisionLog'
 import type { ArtistAsset } from '../../shared/artistAssets'
 import type { Env } from '../types'
 
@@ -176,6 +177,7 @@ export async function prepareApplication(
   // nobody could open has not been started. Every other status is left alone —
   // a submitted application does not go backwards because you re-read the form
   // to check what you sent.
+  let started = false
   if (
     options.requested &&
     outcome.status === 'ready' &&
@@ -183,6 +185,7 @@ export async function prepareApplication(
     isGigTransitionAllowed(gig.status, 'preparing')
   ) {
     Object.assign(updates, gigStatusColumns('preparing'))
+    started = true
   }
 
   if (!options.requested) delete updates.updatedAt
@@ -191,6 +194,19 @@ export async function prepareApplication(
     .update(gigOpportunities)
     .set(updates)
     .where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, gigId)))
+
+  // Logged, but as a step: the choice was `shortlisted`, and this follows it.
+  // `via` is how a reader tells the two apart. See shared/decisionLog.ts.
+  if (started) {
+    await recordGigDecision(env, tenant, gig, {
+      action: 'move',
+      from: normaliseGigStatus(gig.status),
+      to: 'preparing',
+      via: 'application_start',
+      actor: 'user',
+      at: now,
+    })
+  }
 
   return { ok: true, outcome, previous: { status: gig.prepStatus ?? null, note: gig.prepNote ?? null } }
 }

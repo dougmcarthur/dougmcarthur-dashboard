@@ -5,7 +5,8 @@ import { desc, eq, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets, promoDrafts, reminders } from '../db/schema'
 import { scoped } from '../db/scope'
-import { readGigs } from '../db/gigRows'
+import { readGig, readGigs } from '../db/gigRows'
+import { decisionActor, recordGigDecision, recordSyncDecision } from '../lib/decisionLog'
 import { tenantOf, type AppEnv } from '../context'
 import { buildReviewQueue, deckItems, matchesFilter, summariseQueue, type ReviewFilter } from '../../shared/reviewQueue'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
@@ -176,14 +177,42 @@ review.post('/snooze', zValidator('json', SnoozeSchema), async (c) => {
     ? { snoozedUntil: null, snoozedAt: null, updatedAt: ts }
     : { snoozedUntil: until, snoozedAt: ts, updatedAt: ts }
 
+  // Read first: deferring something is a decision, and the snapshot has to be
+  // of the row as it stood, before this write moves `updated_at` under it.
+  const tenant = tenantOf(c)
+  const priorGig =
+    kind === 'gig'
+      ? readGig(await db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant, eq(gigOpportunities.id, id))).get())
+      : undefined
+  const priorSync =
+    kind === 'sync'
+      ? await db.select().from(syncTargets).where(scoped(syncTargets, tenant, eq(syncTargets.id, id))).get()
+      : undefined
+
   const table = kind === 'gig' ? gigOpportunities : syncTargets
   const [row] = await db
     .update(table)
     .set(values)
-    .where(scoped(table, tenantOf(c), eq(table.id, id)))
+    .where(scoped(table, tenant, eq(table.id, id)))
     .returning({ id: table.id })
 
   if (!row) return c.json({ error: `no ${kind} with id ${id}` }, 404)
+
+  // Waking something that was not asleep changes nothing and is not logged.
+  const was = (priorGig ?? priorSync)?.snoozedUntil ?? null
+  if (until !== null || was !== null) {
+    const move = {
+      action: until === null ? ('wake' as const) : ('snooze' as const),
+      from: was,
+      to: until,
+      via: 'snooze' as const,
+      actor: decisionActor(c.get('actor')),
+      at: ts,
+    }
+    if (priorGig) await recordGigDecision(c.env, tenant, priorGig, move)
+    else if (priorSync) await recordSyncDecision(c.env, tenant, priorSync, move)
+  }
+
   return c.json({ kind, id, snoozedUntil: until })
 })
 

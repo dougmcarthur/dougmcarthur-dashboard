@@ -224,7 +224,7 @@ tenant-scoped, and none of them ask. Admin mode is the next thing that will
 (`docs/multi-tenant-plan.md`); the client tries first and re-asserts only on
 refusal, so a burst of removals costs one touch, and retries exactly once.
 
-**A request resolves to an artist before any route runs.** Sixteen tables
+**A request resolves to an artist before any route runs.** Seventeen tables
 hold rows that belong to one person, and `src/db/scope.ts` is the only way to
 reach them: `scoped(table, tenant, ...rest)` builds the `WHERE`, `withTenant`
 builds the values, and `TenantId` is a **branded** type with one constructor,
@@ -240,7 +240,7 @@ and `TenantId` is not nullable — so an admin-mode request reaching for
 `gig_opportunities` fails to compile rather than returning a stranger's rows.
 
 **A missing filter is a test failure, not a leak.**
-`test/tenantScope.test.ts` reads the source and fails when one of the sixteen
+`test/tenantScope.test.ts` reads the source and fails when one of the seventeen
 is named in a query that does not pass through `scoped` or `withTenant`. It
 has to be source-level: an unscoped query typechecks, runs, and returns the
 right rows for as long as there is one artist — it starts being wrong on the
@@ -367,10 +367,10 @@ vocabulary, or links to a route that surface cannot reach.
 the `usage_daily` rollup — the counts are written by the cron running *as the
 tenant*, which emits a number, and the owner reads the number. The one write
 that crosses the line is removing an artist: a tenant-scoped delete across the
-sixteen, previewed first as a **count per table**, which names no column and
+seventeen, previewed first as a **count per table**, which names no column and
 returns no row. The owner's own tenant is refused, because deleting it takes
 the account holding the surface with it. `test/adminMode.test.ts` fails if the
-admin router names one of the sixteen, or uses `asTenantId` more than the
+admin router names one of the seventeen, or uses `asTenantId` more than the
 once that removal needs.
 
 **Three of the rollup's seven counters have no writer, and the API says so.**
@@ -772,6 +772,38 @@ status does not offer. A same-status target counts as refused too: *"Keep for
 next cycle"* on an already-shortlisted gig wrote nothing and dealt the
 identical card straight back. `test/uiConsistency.test.ts` fails if either
 surface starts naming statuses again.
+
+**Every choice is logged with what the screen showed, and nothing reads it
+yet.** A gig's status says where it ended up, not what the artist was looking
+at: a gig passed on because it closed in a week and one passed on because it
+cost $2,400 to reach are the same row afterwards, and the deadline was a week
+away *then*. Scoring opportunities for an artist, and finding out later
+whether a score was any good, needs that second fact, and it cannot be
+reconstructed — so `decision_log` (migration 0036, the seventeenth scoped
+table) is written first and read later. One row per move: a status change on a
+gig or sync target, a snooze set or cleared, a row removed. The snapshot
+(`shared/decisionLog.ts`) is built **field by field from the row as it was
+before the move**, with the review queue's own flags, `parseDeadline`'s days
+and `estimateGigCost`'s range — what the screen derived, not a second opinion
+about it. No spread: notes, drafts, links, addresses and everything the artist
+or an agent wrote are absent by construction, which is what lets the log live
+as long as the account and go with it. A missing input stays missing (a null
+cost is not a zero range; `unknowns` counts what could not be counted), and
+`score` is reserved and null until opportunities are scored.
+
+`via` records which door the move came through, because **a step is not a
+choice**: starting an application after saying yes (`application_start`)
+follows a decision already made, and a research agent PATCHing a row
+(`actor = agent`) is not the artist at all. `isChoice` says which. The write is
+append-only — `test/decisionLog.test.ts` fails if anything updates the table or
+deletes from it by name — and **best-effort**, like `linkGig`: the status has
+already changed, so a log row that will not insert is logged and swallowed
+rather than refusing the artist's pass. The same file fails when a new writer of
+a gig status or a sync target appears that neither logs nor has a written
+reason, which is the only way a hole in a log nobody reads yet gets noticed.
+Not logged on purpose: filing a gig (nobody decided anything about an offered
+item), the nightly revisit (it moves nothing), and edits that leave the status
+alone.
 
 **Two statuses mean the ball is back with you.** `info_requested` and `invited`
 sit in the follow-up phase, so `hasBeenSubmitted` was filing them under

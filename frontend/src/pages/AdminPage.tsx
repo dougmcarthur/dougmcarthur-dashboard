@@ -278,6 +278,7 @@ const TABLE_LABELS: Record<string, string> = {
   notification_marks: 'Notification marks',
   notification_events: 'Notifications',
   google_grants: 'Google connections',
+  decision_log: 'Decision history',
 }
 
 function tableLabel(name: string): string {

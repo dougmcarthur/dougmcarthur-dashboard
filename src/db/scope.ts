@@ -1,7 +1,7 @@
 /**
  * Tenant scoping: the one way a domain table is allowed to be reached.
  *
- * Step 2 of docs/multi-tenant-plan.md. Fourteen tables hold rows that belong
+ * Step 2 of docs/multi-tenant-plan.md. Seventeen tables hold rows that belong
  * to one artist, and every read and write against them has to say which. The
  * argument for putting that here rather than trusting each route is the same
  * one that put authentication in a single middleware: a router added next
@@ -48,6 +48,7 @@ import {
   taskRuns,
   tenantSettings,
   artistConnectors,
+  decisionLog,
 } from './schema'
 
 declare const TENANT_BRAND: unique symbol
@@ -69,7 +70,7 @@ export function asTenantId(raw: string): TenantId {
   return value as TenantId
 }
 
-/** Anything carrying the column. Every one of the sixteen does. */
+/** Anything carrying the column. Every one of the seventeen does. */
 interface Scopable {
   tenantId: AnySQLiteColumn
 }
@@ -104,7 +105,7 @@ export function withTenant<T extends object>(tenant: TenantId, values: T): T & {
 }
 
 /**
- * The sixteen, by their `src/db/schema.ts` export name.
+ * The seventeen, by their `src/db/schema.ts` export name.
  *
  * Here rather than in the test so that adding a tenant-scoped table means
  * adding it in the place the scoping lives, and the test that enforces the
@@ -130,12 +131,13 @@ export const SCOPED_TABLES = [
   'googleGrants',
   'tenantSettings',
   'artistConnectors',
+  'decisionLog',
 ] as const
 
 export type ScopedTableName = (typeof SCOPED_TABLES)[number]
 
 /**
- * The same sixteen as table objects, for the two jobs that have to visit all
+ * The same seventeen as table objects, for the two jobs that have to visit all
  * of them rather than name one: counting a tenant's rows, and deleting them.
  *
  * A second list is a second place to forget a table, so
@@ -160,7 +162,8 @@ export const DOMAIN_TABLES = [
   googleGrants,
   tenantSettings,
   artistConnectors,
+  decisionLog,
 ] as const
 
-/** One of the sixteen, as a table a query can name. */
+/** One of the seventeen, as a table a query can name. */
 export type DomainTable = (typeof DOMAIN_TABLES)[number]
