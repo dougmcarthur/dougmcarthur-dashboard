@@ -232,7 +232,53 @@ const syncTargets = [
   // Already pitched — the "skipped: already pitched" branch.
   { name: 'Foxglove Trailers', contact_email: 'team@example.test', contact_role: 'Creative Director', agency_type: 'trailer', status: 'pitched', pitch_draft: SHORT_PITCH, pitch_sent: stamp(-20), notes: 'Pitched last month, no reply yet.' },
   { name: 'Standing Stone Games', contact_email: 'audio@example.test', contact_role: 'Audio Lead', agency_type: 'games', status: 'draft_ready', pitch_draft: SHORT_PITCH, notes: null, snoozed_until: day(10), snoozed_at: stamp(-1) },
+  // The one this was built for: a target filed as ready to pitch, with a note
+  // calling its route "confirmed and simple", whose own About page says no.
+  { name: 'Friendly Faces Music Partners', contact_email: 'beth@friendlyfaces.example', contact_role: 'Founder', agency_type: 'library', status: 'draft_ready', pitch_draft: SHORT_PITCH, notes: 'LA one-stop library placing indie artists in TV and film. Submission route is confirmed and simple: email directly, no portal.' },
+  // A site that could not be opened: retried in days, never recorded as "read it".
+  { name: 'Lakeside Library', contact_email: 'sync@lakeside.example', contact_role: 'Sync Manager', agency_type: 'library', status: 'draft_ready', pitch_draft: SHORT_PITCH, notes: 'Small Vancouver library.' },
 ]
+
+// What each target's own site says about pitches from people it does not know,
+// by name. Every state the screens draw: refused, refused and overridden,
+// invited, read-and-silent, could-not-open, and never checked.
+const terms = {
+  'Friendly Faces Music Partners': {
+    website: 'friendlyfaces.example',
+    submission_policy: 'closed',
+    policy_evidence: 'NO unsolicited material please.',
+    policy_url: 'https://friendlyfaces.example/about.html',
+    policy_checked_at: stamp(-1),
+  },
+  'Standing Stone Games': {
+    submission_policy: 'closed',
+    policy_evidence: 'Submissions are by referral only.',
+    policy_url: 'https://standingstone.example/contact',
+    policy_checked_at: stamp(-9),
+    policy_overridden_at: stamp(-2),
+  },
+  'Greenroom Sync Agency': {
+    website: 'greenroom.example',
+    submission_policy: 'open',
+    policy_evidence: 'We welcome unsolicited submissions from independent artists.',
+    policy_url: 'https://greenroom.example/submit',
+    policy_checked_at: stamp(-4),
+  },
+  'Northline Pictures — Music Supervision': {
+    policy_evidence: 'Read 6 pages on northline.example. None says whether they take pitches from people they do not know.',
+    policy_checked_at: stamp(-3),
+  },
+  'Foxglove Trailers': {
+    policy_evidence: 'Read 3 pages on foxglove.example. None says whether they take pitches from people they do not know.',
+    policy_checked_at: stamp(-25),
+  },
+  'Lakeside Library': {
+    policy_evidence: 'Could not open lakeside.example. It will be tried again in a few days.',
+    policy_checked_at: stamp(-1),
+  },
+  // Prairie Public Broadcasting and Harbour Lights Media: never checked.
+}
+
 
 const syncRows = syncTargets.map((s, i) => ({
   name: s.name,
@@ -247,6 +293,12 @@ const syncRows = syncTargets.map((s, i) => ({
   updated_at: stamp(-(i % 14)),
   snoozed_until: s.snoozed_until ?? null,
   snoozed_at: s.snoozed_at ?? null,
+  website: terms[s.name]?.website ?? null,
+  submission_policy: terms[s.name]?.submission_policy ?? null,
+  policy_evidence: terms[s.name]?.policy_evidence ?? null,
+  policy_url: terms[s.name]?.policy_url ?? null,
+  policy_checked_at: terms[s.name]?.policy_checked_at ?? null,
+  policy_overridden_at: terms[s.name]?.policy_overridden_at ?? null,
   tenant_id: OWNER,
 }))
 

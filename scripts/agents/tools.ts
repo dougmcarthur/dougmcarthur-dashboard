@@ -127,8 +127,10 @@ export const TOOL_SPECS = {
   create_sync_target: {
     name: 'create_sync_target',
     description:
-      'Record one new sync-licensing target with a drafted pitch. The draft is text for the ' +
-      'artist to review and send; nothing here sends email.',
+      'Record one new sync-licensing target, with a drafted pitch when they take pitches. The draft is ' +
+      'text for the artist to review and send; nothing here sends email. A target whose own site says ' +
+      'it takes no unsolicited material is still filed, with submissionPolicy closed and no pitchDraft, ' +
+      'so it is on record and nobody pitches it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -136,10 +138,34 @@ export const TOOL_SPECS = {
         agencyType: { type: 'string', description: 'publisher, library, supervisor, platform' },
         contactEmail: { type: 'string' },
         contactRole: { type: 'string' },
+        website: {
+          type: 'string',
+          description:
+            'Their own website, the home page address. Scout reads it for their submission rules, ' +
+            'so give the real one even when you found them somewhere else',
+        },
+        submissionPolicy: {
+          type: 'string',
+          description:
+            'Whether they take pitches from people they do not know, from their OWN pages: open, ' +
+            'closed or unknown. closed is "no unsolicited material", referral or invitation only, ' +
+            'agent or attorney only, or not accepting submissions. open needs policyQuote. unknown ' +
+            'is an honest answer. A listed email address is how to reach them, not permission',
+        },
+        policyQuote: {
+          type: 'string',
+          description:
+            'The sentence on their site that says so, copied exactly. Required when submissionPolicy is open; ' +
+            'give it for closed too',
+        },
+        policyUrl: { type: 'string', description: 'The page the sentence is on' },
         notes: { type: 'string', description: 'What they place, terms, why this is a fit, and what is unconfirmed' },
-        pitchDraft: { type: 'string', description: 'A drafted pitch for the artist to review' },
+        pitchDraft: {
+          type: 'string',
+          description: 'A drafted pitch for the artist to review. Leave it out when submissionPolicy is closed',
+        },
       },
-      required: ['name', 'notes'],
+      required: ['name', 'notes', 'submissionPolicy'],
       additionalProperties: false,
     },
   },
@@ -250,6 +276,35 @@ export function inputProblem(spec: ToolSpec, input: unknown): string | null {
     if (typeof value !== want) return `${key} should be a ${want}, not ${value === null ? 'null' : `a ${typeof value}`}.`
   }
   return null
+}
+
+/**
+ * What to tell the agent about the rules it reported for a target.
+ *
+ * The same move `pitchLengthNote` makes: a correction it can act on for the
+ * *next* target in the same run beats a rule it read once at the start. Two
+ * cases are worth saying out loud. A pitch written for a target that says it
+ * takes none is work nobody will use, and a target filed `unknown` has not had
+ * its rules found, which the artist will be told on the screen.
+ */
+export function termsNote(input: Record<string, unknown>): { termsNote?: string } {
+  const policy = input.submissionPolicy
+  const pitch = typeof input.pitchDraft === 'string' && input.pitchDraft.trim() !== ''
+  if (policy === 'closed' && pitch) {
+    return {
+      termsNote:
+        'You drafted a pitch for a target that takes no unsolicited material. Scout will not offer it to ' +
+        'the artist to send. File closed targets with no pitchDraft and move on to the next one.',
+    }
+  }
+  if (policy === 'unknown') {
+    return {
+      termsNote:
+        'Filed with unknown rules, so the artist will see "no policy found" on it. Before the next one, read its ' +
+        'submissions, contact, about and FAQ pages, and search the site for "unsolicited": old pages outlive redesigns.',
+    }
+  }
+  return {}
 }
 
 /**

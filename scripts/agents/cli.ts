@@ -61,6 +61,7 @@ import {
   inputProblem,
   isAgentId,
   pitchLengthNote,
+  termsNote,
   type AgentId,
   type ToolName,
 } from './tools'
@@ -142,7 +143,7 @@ async function call(tool: ToolName, cfg: ApiConfig, body: Record<string, unknown
       return createGig(cfg, { ...body, status: 'discovered' })
     case 'create_sync_target': {
       const result = await createSyncTarget(cfg, body)
-      return { ...result, ...pitchLengthNote(body.pitchDraft as string | undefined) }
+      return { ...result, ...pitchLengthNote(body.pitchDraft as string | undefined), ...termsNote(body) }
     }
     case 'create_promo_draft':
       return createPromoDraft(cfg, body)

@@ -92,6 +92,13 @@ export const AgentSyncSchema = z
     agencyType: text(MAX.short).optional(),
     contactEmail: z.string().email().max(MAX.email).optional().or(z.literal('')),
     contactRole: text(MAX.name).optional(),
+    website: webAddress.optional(),
+    // Required: a target filed without anyone saying what its own pages say
+    // about unsolicited pitches is how a refusal reached the artist's inbox
+    // as a draft. `unknown` is an allowed, honest answer; silence is not.
+    submissionPolicy: z.enum(['open', 'closed', 'unknown']),
+    policyQuote: text(MAX.note).optional(),
+    policyUrl: webAddress.optional(),
     notes: text(MAX.prose).optional(),
     pitchDraft: text(MAX.pitch).optional(),
   })

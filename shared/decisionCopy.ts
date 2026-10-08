@@ -22,6 +22,7 @@ import {
   nextGigStatuses,
 } from './gigStatus'
 import { gigMoves, gigStage, gigStageLabel, settledByAward } from './gigStage'
+import { termsSentence } from './syncTerms'
 
 /** Everything the copy needs — an item before its own sentence is attached. */
 export type DecisionInput = Omit<ReviewItem, 'decision'>
@@ -77,6 +78,8 @@ export interface Decision {
 /** Flags that can drive the copy, most decisive first. */
 const PRECEDENCE: FlagId[] = [
   'conflict',
+  // Ahead of every sentence that assumes the target is worth pitching.
+  'no_unsolicited',
   // Second, because it is the only flag that can say the opportunity is not
   // possible rather than not yet done. Every sentence below this one assumes
   // the date is reachable.
@@ -444,6 +447,21 @@ export function decisionFor(item: DecisionInput): Decision {
       }
     }
 
+    case 'no_unsolicited': {
+      const said = item.source.kind === 'sync' ? item.source.row.policyEvidence?.trim() : null
+      return {
+        badge: 'No pitches',
+        rationale:
+          `Their own site says they take no unsolicited pitches${said ? `: “${condense(said, 110).replace(/[.!]+$/, '')}”.` : '.'} ` +
+          `Sending one anyway risks being ignored, or remembered as somebody who did not read it. ` +
+          `Archive it unless you have a way in that is not a cold email.`,
+        // One button, and it is the negative one. The affirmative is to pitch
+        // anyway, which is a decision made on the row with the quote beside it
+        // and not a check mark on a card.
+        actions: [{ label: 'Archive', intent: 'archive', tone: 'no' }],
+      }
+    }
+
     case 'visa_risk': {
       const uncertain = item.flags.some((f) => f.id === 'visa_risk' && f.severity === 'warn')
       if (uncertain) {
@@ -598,9 +616,13 @@ export function decisionFor(item: DecisionInput): Decision {
       // Sync targets are described rather than named — their subtitle is often
       // an email address, which reads badly mid-sentence.
       if (kind === 'sync') {
+        // Where their terms stand goes in the sentence, because "worth
+        // pitching?" with nothing said about whether they take pitches at all
+        // is the question this card used to ask about a company that did not.
+        const terms = item.source.kind === 'sync' && status === 'draft_ready' ? ` ${termsSentence(item.source.row)}` : ''
         return {
           badge: status === 'draft_ready' ? 'New' : 'Open',
-          rationale: 'A sync target with nothing outstanding on it. Worth pitching, or let it go?',
+          rationale: `A sync target with nothing outstanding on it.${terms} Worth pitching, or let it go?`,
           actions: SYNC_PITCH,
         }
       }

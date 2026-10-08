@@ -3,6 +3,7 @@ import type { ReviewItem } from '../../../../shared/reviewQueue'
 import { gigMoves, gigStageLabel, type GigMove } from '../../../../shared/gigStage'
 import { promoMoves } from '../../../../shared/decisionCopy'
 import { Button, type ButtonVariant } from '../../components/ui/Button'
+import { mayPitch } from '../../components/SyncTerms'
 
 /**
  * The moves a gig offers, styled by what they mean: forward is primary,
@@ -53,7 +54,11 @@ export function DecisionBar({
 
   if (item.source.kind === 'sync') {
     const { status } = item.source.row
-    if (status !== 'pitched') {
+    // Not offered for a target whose own site refuses cold pitches: recording a
+    // send the app has just advised against is the shortcut that matters most
+    // to remove. Recording one the artist chose to make goes through "pitch
+    // anyway" on the row, which lifts this.
+    if (status !== 'pitched' && mayPitch(item.source.row)) {
       buttons.push({ label: 'Mark pitched', variant: 'neutral', run: () => onSync({ status: 'pitched' }) })
     }
     buttons.push({ label: 'Confirmed', variant: 'primary', run: () => onSync({ status: 'confirmed' }) })
