@@ -130,7 +130,15 @@ function build(spec, mode) {
   const dir = dark ? 1 : -1
   const g = spec.ground
   const T = {}
-  const ground = (L, k = 1) => oklch(L, g.C * k, g.h)
+  // Two options only some specs use. `mono` drops every chroma, for a theme in which no token carries
+  // a hue. `cap` is a ceiling on lightness for the mode, for a theme that must contain no white (or,
+  // in dark, no bright text): it applies to every token the builder makes, so a fill cannot slip past.
+  const ceiling = spec.cap?.[mode] ?? 1
+  const ok = (L, C, h) => oklch(Math.min(L, ceiling), spec.mono ? 0 : C, h)
+  // Meaning colours are held to their own floor where a theme says so. Greyscale tells go, waiting
+  // and broken apart by lightness, which leaves room for 4.5:1 and not for 7:1 on every ground.
+  const mneed = spec.meaningNeed ?? spec.need
+  const ground = (L, k = 1) => ok(L, g.C * k, g.h)
   const [Lc, Ls, Lr, Lu] = spec.grounds[mode]
   T.canvas = ground(Lc, dark ? 0.6 : 1)
   T.surface = ground(Ls, dark ? 0.6 : 0.5)
@@ -141,11 +149,11 @@ function build(spec, mode) {
   // The accent's soft fill is a ground too: the active row of a list is painted with it, and text
   // sits on it. Fitted before the text so that text clears the floor there as well.
   const A = spec.accent
-  T['accent-soft'] = oklch(dark ? 0.25 : 0.92, A.C * 0.28 * (dark ? 1.25 : 1), A.h)
+  T['accent-soft'] = ok(dark ? 0.25 : (spec.accentSoftL ?? 0.92), A.C * 0.28 * (dark ? 1.25 : 1), A.h)
   const textGrounds = [...grounds, T['accent-soft']]
   // Ochre and clay are fitted on it too in the accessible themes, where every colour that carries
   // text is held to the strict floor. The aesthetic themes keep to the four grounds, as recorded.
-  const meaningGrounds = spec.need >= 7 ? textGrounds : grounds
+  const meaningGrounds = spec.need >= 7 || spec.meaningNeed ? textGrounds : grounds
 
   // Rules. Soft where the theme is allowed to be soft, and fitted where it is not.
   const lineNeed = spec.lineNeed ?? 0
@@ -157,44 +165,44 @@ function build(spec, mode) {
   const th = spec.text.h
   const tc = spec.text.C
   const need = spec.need
-  const ladder = dark ? [0.94, 0.8, 0.69, 0.63] : [0.24, 0.345, 0.46, 0.5]
+  const ladder = spec.ladder?.[mode] ?? (dark ? [0.94, 0.8, 0.69, 0.63] : [0.24, 0.345, 0.46, 0.5])
   const names = ['ink', 'body', 'muted', 'faint']
   names.forEach((n, i) => {
     const floor = n === 'ink' || n === 'body' ? Math.max(need, 4.5) : need
-    T[n] = fit((L) => oklch(L, tc * (i === 0 ? 1 : 0.9), th), ladder[i], dir, floor, textGrounds)
+    T[n] = fit((L) => ok(L, tc * (i === 0 ? 1 : 0.9), th), ladder[i], dir, floor, textGrounds)
   })
 
   // The three meaning colours. Green is the palette's, ochre and clay keep their hues.
   const pick = spec.pick[mode]
-  const mk = (h, C) => (L) => oklch(L, C, h)
-  T.accent = fit(mk(A.h, A.C), pick.accent, dir, need, textGrounds)
+  const mk = (h, C) => (L) => ok(L, C, h)
+  T.accent = fit(mk(A.h, A.C), pick.accent, dir, mneed, textGrounds)
   const aL = rgbToOklch(T.accent).L
-  T['accent-hover'] = oklch(clamp(aL + (dark ? 0.06 : -0.07), 0, 1), A.C, A.h)
-  T['accent-fg'] = dark ? oklch(0.2, g.C * 0.6, g.h) : oklch(0.985, g.C * 0.5, g.h)
+  T['accent-hover'] = ok(clamp(aL + (dark ? 0.06 : -0.07), 0, 1), A.C, A.h)
+  T['accent-fg'] = dark ? ok(0.2, g.C * 0.6, g.h) : ok(0.985, g.C * 0.5, g.h)
 
   const fills = {
-    danger: { bg: oklch(dark ? 0.24 : 0.95, dark ? 0.035 : 0.025, spec.clayH ?? CLAY_H), h: spec.clayH ?? CLAY_H },
-    warn: { bg: oklch(dark ? 0.25 : 0.93, dark ? 0.04 : 0.07, (spec.ochreH ?? OCHRE_H) + (dark ? 0 : 5)), h: spec.ochreH ?? OCHRE_H },
-    success: { bg: oklch(dark ? 0.24 : 0.94, A.C * (dark ? 0.3 : 0.25), A.h), h: A.h },
+    danger: { bg: ok(dark ? 0.24 : 0.95, dark ? 0.035 : 0.025, spec.clayH ?? CLAY_H), h: spec.clayH ?? CLAY_H },
+    warn: { bg: ok(dark ? 0.25 : 0.93, dark ? 0.04 : 0.07, (spec.ochreH ?? OCHRE_H) + (dark ? 0 : 5)), h: spec.ochreH ?? OCHRE_H },
+    success: { bg: ok(dark ? 0.24 : 0.94, A.C * (dark ? 0.3 : 0.25), A.h), h: A.h },
   }
   T['danger-bg'] = fills.danger.bg
-  T['danger-bg-hover'] = oklch(dark ? 0.28 : 0.91, dark ? 0.04 : 0.035, fills.danger.h)
-  T['danger-line'] = oklch(dark ? 0.34 : 0.85, 0.06, fills.danger.h)
-  T['danger-fg'] = fit(mk(fills.danger.h, spec.clayC ?? 0.1), pick.clay, dir, need, [...meaningGrounds, T['danger-bg']])
-  T['danger-solid'] = oklch(dark ? 0.58 : 0.52, 0.13, fills.danger.h)
+  T['danger-bg-hover'] = ok(dark ? 0.28 : 0.91, dark ? 0.04 : 0.035, fills.danger.h)
+  T['danger-line'] = ok(dark ? 0.34 : 0.85, 0.06, fills.danger.h)
+  T['danger-fg'] = fit(mk(fills.danger.h, spec.clayC ?? 0.1), pick.clay, dir, mneed, [...meaningGrounds, T['danger-bg']])
+  T['danger-solid'] = ok(dark ? 0.58 : 0.52, 0.13, fills.danger.h)
 
   T['success-bg'] = fills.success.bg
-  T['success-bg-hover'] = oklch(dark ? 0.28 : 0.9, A.C * (dark ? 0.33 : 0.3), A.h)
-  T['success-line'] = oklch(dark ? 0.32 : 0.82, A.C * 0.35, A.h)
+  T['success-bg-hover'] = ok(dark ? 0.28 : 0.9, A.C * (dark ? 0.33 : 0.3), A.h)
+  T['success-line'] = ok(dark ? 0.32 : 0.82, A.C * 0.35, A.h)
   T['success-fg'] = T.accent
-  T['success-solid'] = dark ? oklch(0.6, A.C, A.h) : T.accent
+  T['success-solid'] = dark ? ok(0.6, A.C, A.h) : T.accent
 
   T['warn-bg'] = fills.warn.bg
-  T['warn-line'] = oklch(dark ? 0.36 : 0.8, dark ? 0.06 : 0.09, fills.warn.h)
-  T['warn-fg'] = fit(mk(fills.warn.h, spec.ochreC ?? 0.105), pick.ochre, dir, need, [...meaningGrounds, T['warn-bg']])
+  T['warn-line'] = ok(dark ? 0.36 : 0.8, dark ? 0.06 : 0.09, fills.warn.h)
+  T['warn-fg'] = fit(mk(fills.warn.h, spec.ochreC ?? 0.105), pick.ochre, dir, mneed, [...meaningGrounds, T['warn-bg']])
 
   T['info-bg'] = T.raised
-  T['info-bg-hover'] = oklch(dark ? 0.27 : 0.94, g.C * (dark ? 0.6 : 0.9), g.h)
+  T['info-bg-hover'] = ok(dark ? 0.27 : 0.94, g.C * (dark ? 0.6 : 0.9), g.h)
   T['info-line'] = T.line
   T['info-fg'] = T.accent
   for (const kind of ['violet', 'sky', 'teal', 'orange', 'rose']) {
@@ -226,7 +234,24 @@ function highContrast(spec, mode, T) {
   }
 }
 
-function shadows(T, dark) {
+function shadows(T, dark, spec = {}) {
+  if (spec.softShadows) {
+    // No white edge-light and no hard highlight: a bright hairline is what a glare-sensitive eye finds first.
+    const i = T.ink.join(',')
+    return dark
+      ? {
+          card: '0 2px 8px rgba(0,0,0,.35)',
+          raised: '0 6px 20px -6px rgba(0,0,0,.5)',
+          pop: '0 12px 34px -10px rgba(0,0,0,.6)',
+          inset: 'inset 0 0 0 rgba(0,0,0,0)',
+        }
+      : {
+          card: `0 1px 2px rgba(${i},.05)`,
+          raised: `0 2px 4px rgba(${i},.04), 0 10px 26px -10px rgba(${i},.12)`,
+          pop: `0 8px 12px -4px rgba(${i},.07), 0 18px 36px -12px rgba(${i},.16)`,
+          inset: 'inset 0 0 0 rgba(0,0,0,0)',
+        }
+  }
   if (dark) {
     return {
       card: '0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5)',
@@ -373,6 +398,68 @@ const ACCESSIBLE = {
   },
 }
 
+/**
+ * Greyscale: for a person who sees no colour, or a monochrome display. No token has a hue, so go,
+ * waiting and broken are told apart by lightness alone, at least 15 CIELAB L* apart (dark: clay the
+ * lightest, ochre the dimmest; light: clay the darkest, ochre the lightest). The three are held to
+ * 4.5:1, not 7:1, because there is no room for three steps that are 15 apart *and* 7:1 on every
+ * ground; ink, body, muted and faint keep 7:1. Icons and labels carry the rest.
+ */
+ACCESSIBLE.greyscale = {
+  name: 'Greyscale',
+  mono: true,
+  ground: { h: 0, C: 0 },
+  text: { h: 0, C: 0 },
+  accent: { h: 0, C: 0 },
+  clayH: 0,
+  clayC: 0,
+  ochreH: 0,
+  ochreC: 0,
+  grounds: { light: [0.97, 0.995, 0.98, 0.94], dark: [0.15, 0.185, 0.215, 0.125] },
+  need: 7,
+  meaningNeed: 4.5,
+  fieldNeed: 3.1,
+  pick: { light: {}, dark: {} },
+  search: {
+    accentL: { light: [0.36, 0.4, 0.43], dark: [0.64, 0.68, 0.72, 0.76] },
+    clayL: { light: [0.22, 0.25, 0.28], dark: [0.88, 0.92, 0.96] },
+    ochreL: { light: [0.46, 0.49, 0.52], dark: [0.48, 0.52, 0.56, 0.6] },
+  },
+}
+
+/**
+ * Low glare: for light sensitivity and migraine. A dim, warm ground with no white in it, text
+ * that is readable and never stark (4.5:1 up to 12:1, a ceiling as well as a floor), softened
+ * highlights and no thin bright lines. Every lightness the builder makes is capped (`cap`), so a
+ * tinted fill cannot be whiter than the ground it sits on.
+ */
+ACCESSIBLE['low-glare'] = {
+  name: 'Low glare',
+  ground: { h: 72, C: 0.022 },
+  text: { h: 55, C: 0.02 },
+  accent: { h: 150, C: 0.075 },
+  clayH: 30,
+  clayC: 0.085,
+  ochreH: 78,
+  ochreC: 0.09,
+  grounds: { light: [0.865, 0.9, 0.885, 0.825], dark: [0.2, 0.235, 0.265, 0.18] },
+  cap: { light: 0.905, dark: 0.89 },
+  accentSoftL: 0.875,
+  ladder: { light: [0.31, 0.38, 0.43, 0.46], dark: [0.83, 0.76, 0.7, 0.66] },
+  softShadows: true,
+  need: 4.5,
+  fieldNeed: 3.1,
+  pick: { light: {}, dark: {} },
+  search: {
+    accentL: { light: [0.34, 0.38, 0.42], dark: [0.68, 0.72, 0.76] },
+    clayL: { light: [0.26, 0.3, 0.34], dark: [0.7, 0.76, 0.82] },
+    ochreL: { light: [0.4, 0.43, 0.46], dark: [0.74, 0.79, 0.84] },
+    accentH: [-15, 0, 15],
+    clayH: [-8, 0, 8],
+    ochreH: [-8, 0, 8],
+  },
+}
+
 export function buildThemeData() {
   const out = {}
   const measures = {}
@@ -394,7 +481,7 @@ export function buildThemeData() {
       out[id][mode] = {
         tokens: T,
         highContrast: id === 'high-contrast' ? null : highContrast(tuned, mode, T),
-        shadow: shadows(T, mode === 'dark'),
+        shadow: shadows(T, mode === 'dark', spec),
       }
       measures[id][mode] = m
     }

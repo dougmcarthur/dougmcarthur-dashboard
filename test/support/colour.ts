@@ -53,6 +53,21 @@ function lab(c: Rgb): Rgb {
   return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))]
 }
 
+/** CIELAB lightness, 0 to 100. */
+export const lstar = (c: Rgb): number => lab(c)[0]
+
+/** The widest gap between two channels: 0 is a pure grey. */
+export const chroma8 = (c: Rgb): number => Math.max(...c) - Math.min(...c)
+
+/** HSL hue in degrees, 0 to 360. Only meaningful where there is some colour. */
+export function hue(c: Rgb): number {
+  const [r, g, b] = c
+  const d = Math.max(r, g, b) - Math.min(r, g, b)
+  if (d === 0) return 0
+  const h = Math.max(r, g, b) === r ? ((g - b) / d) % 6 : Math.max(r, g, b) === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return (h * 60 + 360) % 360
+}
+
 export const deltaE = (a: Rgb, b: Rgb) => Math.hypot(...(lab(a).map((v, i) => v - lab(b)[i]) as Rgb))
 
 /** How far apart two colours stay in the worst of the listed kinds of colour blindness. */

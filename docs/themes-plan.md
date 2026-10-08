@@ -1,8 +1,9 @@
 # Themes
 
 Appearance has two independent colour choices: a **colour theme**, and light or
-dark on top of it. Six themes ship: Sun Dogs (the default), Pebble, Opal and
-Harvest, and two accessible ones, High contrast and Colour-blind safe.
+dark on top of it. Eight themes ship: Sun Dogs (the default), Pebble, Opal and
+Harvest, and four accessible ones, High contrast, Colour-blind safe, Greyscale and
+Low glare.
 
 There are two kinds of theme, and they are held to different standards on
 purpose. **Aesthetic themes** are chosen for how they look, and the design wins
@@ -35,6 +36,8 @@ a mic across a table depends on distinct hues.
 | Harvest | aesthetic | Emerald Harvest Twilight: `#397234` `#283F23` `#3F2617` `#0B0F08` `#ACBD5E` `#B78449` | woodland, with a near-black green that suits dark mode |
 | High contrast | accessible | none | black and white, firm lines, the strongest text |
 | Colour-blind safe | accessible | none | blue, gold and rose in place of green, ochre and clay |
+| Greyscale | accessible | none | no colour at all; go, waiting and broken differ in lightness |
+| Low glare | accessible | none | a dim, warm page with no white and no stark text |
 
 The palettes are Figma's, from its earthy colour palettes page as listed on
 2026-10-07 (the name follows its colours there). The themes carry our own names
@@ -87,7 +90,33 @@ serves all three kinds, so Colour-blind safe is one theme and not three.
   meaning colours at least ΔE 33 apart under all three kinds in light and 40 in
   dark. The three are deliberately level in lightness at 7:1, which is why this
   theme does not help a person who sees no colour at all. Labels and icons already
-  accompany every status, and a Greyscale theme would answer that need.
+  accompany every status, and Greyscale answers that need.
+- **Greyscale.** For a person who sees no colour, or a monochrome display. Every
+  token is achromatic (the three channels within three units of each other, the
+  Higher contrast tokens too). Green, ochre and clay are told apart by lightness
+  alone, at least 15 CIELAB L* apart each pair: in light, clay is the darkest and
+  ochre the lightest; in dark, clay the lightest and ochre the dimmest, so broken
+  is always the strongest. Ink, body, muted and faint hold 7:1; the three meaning
+  colours hold 4.5:1. Both bounds together could not be met: in dark mode 7:1 on
+  the tinted fills puts every meaning colour above about L* 72, which leaves under
+  30 L* for three colours that must be 15 apart, and the top of that range is
+  white. In light mode 7:1 would push clay to near black. The pair of bounds that
+  was kept is the one that serves a person who sees no colour. Measured as built:
+  16 L* apart in light, 15 in dark. The blurb says icons and labels carry the
+  rest, which they already do.
+- **Low glare.** For light sensitivity and migraine. A warm ground (hue about
+  30 to 35 degrees) with no white in it: light grounds top out at L* 88 and no
+  light-mode token is brighter than L* 91, including the tinted fills and the
+  text on the accent. Dark is dim rather than black (canvas L* 7) and no text is
+  brighter than L* 88. Text is held to 4.5:1 and to a ceiling as well: ink and
+  body stay under 12:1 on every ground, because stark contrast is the thing to
+  avoid, and no text token is pure black or white. Rules are soft (a rule under
+  2:1 against the page, a strong rule under 3:1), shadows carry no white edge
+  light, and the form field edge keeps the 3:1 that WCAG asks of a control, which
+  is the one line that is not dimmed. Green, ochre and clay keep their hues, kept
+  apart by at least ΔE 15 for deuteranopia and protanopia (as built, 24 in light
+  and 16 in dark). The Higher contrast modifier still applies on top and is the
+  person's own request to leave the dim.
 
 Starting values, as built (canvas and card are the two grounds; "closest pair"
 is the closest two of green, ochre and clay in the worst of the three kinds of
@@ -105,6 +134,10 @@ colour blindness; "lowest text" is the lowest of ink, body, muted and faint):
 | High contrast | dark | `#000000` | `#030303` | `#EBEBEB` | `#AEAEAE` | `#80C7F8` | `#FBDA8B` | `#F49191` | 28 | 8.8 |
 | Colour-blind safe | light | `#F5F3EF` | `#FCFCF9` | `#1B1F29` | `#464A54` | `#084A89` | `#594900` | `#680835` | 33 | 7.4 |
 | Colour-blind safe | dark | `#100F0E` | `#181715` | `#E5EBF9` | `#A8AEBA` | `#88ACFB` | `#D1C95D` | `#F78C9E` | 40 | 7.3 |
+| Greyscale | light | `#F5F5F5` | `#FDFDFD` | `#1F1F1F` | `#484848` | `#3D3D3D` | `#666666` | `#1B1B1B` | 16 | 7.2 |
+| Greyscale | dark | `#0B0B0B` | `#131313` | `#EBEBEB` | `#AEAEAE` | `#B1B1B1` | `#898989` | `#E4E4E4` | 15 | 7.2 |
+| Low glare | light | `#DCD1C3` | `#E3DDD6` | `#392E27` | `#584D47` | `#1B5A43` | `#644C09` | `#440F00` | 24 | 4.6 |
+| Low glare | dark | `#1A1510` | `#221D17` | `#D2C4BB` | `#A89C94` | `#84A374` | `#D4B776` | `#F7AFAB` | 15 | 4.9 |
 
 ## How it works
 
@@ -155,11 +188,20 @@ Two standards, both enforced by tests (`test/themes.test.ts`,
   none defines a `conn-*`.
 - Sun Dogs: text 4.5:1 on every ground and on its own fill, field edges 3:1, and
   green, ochre and clay at least ΔE 15 apart for deuteranopia and protanopia.
-- Accessible themes: text 7:1 on every ground and on the soft accent fill, text on
-  each tinted fill 7:1, text on the accent fill 7:1, field edges 3:1 (4.5:1 in
+- Accessible themes: each states its own standard in `STANDARD` in
+  `test/themes.test.ts`, and a test fails if one is added without it. High contrast
+  and Colour-blind safe: text 7:1 on every ground and on the soft accent fill, text
+  on each tinted fill 7:1, text on the accent fill 7:1, field edges 3:1 (4.5:1 in
   High contrast), rules 3:1 in High contrast, and the closest pair of the three
   meaning colours at least ΔE 20 in High contrast and ΔE 30 in Colour-blind safe,
-  both measured under all three kinds.
+  both measured under all three kinds. Greyscale: ink, body, muted and faint 7:1,
+  the three meaning colours 4.5:1 (on the grounds, the soft accent fill and their
+  own tinted fills), every token achromatic, each pair of the three at least 15 L*
+  apart. Low glare: every text colour 4.5:1, ink and body at most 12:1 on every
+  ground, no pure black or white text, nothing lighter than L* 91 in light mode,
+  canvas at most L* 16 and text at most L* 88 in dark, warm grounds, soft rules
+  and shadows with no white, and green, ochre and clay at least ΔE 15 apart for
+  deuteranopia and protanopia.
 
 **A ratchet, for Pebble, Opal and Harvest.** `shared/themeBaselines.ts` records
 every measure of each theme in each mode when it was added. A test fails if a later
@@ -207,13 +249,15 @@ device: they describe one pair of eyes on one screen.
 
 ## What is not done
 
-- **Greyscale and Low glare.** Greyscale tells the meaning colours apart by
-  lightness steps and weight alone, for achromatopsia or a monochrome display.
-  Low glare is a dim, warm ground with no white in it and softened highlights, for
-  light sensitivity, still at 4.5:1 for text.
-- **Seen in a real browser.** Pebble in light, Opal in dark, High contrast in light
-  and Colour-blind safe in light were looked at on the seeded screens. The other
-  combinations were scanned and not looked at. `forced-colors` and live changes of
+- **Seen in a real browser.** On 2026-10-08 the rendered scan was run for all
+  sixteen theme and mode combinations (641 text elements each, no failures) and the
+  Review screen was looked at in every one but Pebble light and Colour-blind light,
+  which were looked at the day before. The scan found one fault, the bell count in
+  the accessible themes, now fixed. The rest looked right; a few things are taste
+  and were left. Selected rows in the dark themes are a quiet tint, and in Harvest
+  dark a card sits close to the page and is told apart mostly by its rule. In Low
+  glare light the selected row is a cool grey-green on a warm ground. Greyscale
+  shows broken, waiting and go as three greys, which is what it promises. `forced-colors` and live changes of
   `prefers-contrast` have been written from the specification and unit-tested but
   not seen.
 - **The public EPK page** always renders the default. An artist-chosen theme for

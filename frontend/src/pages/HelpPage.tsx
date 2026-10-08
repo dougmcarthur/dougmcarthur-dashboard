@@ -133,10 +133,12 @@ export function HelpPage() {
         <p>
           Settings, then Appearance, holds a colour theme, light or dark, text size, a typeface,
           higher contrast and reduced motion. The themes under the first heading are a matter of
-          taste. The two under Accessible themes are made for a need: High contrast, with the
-          strongest text and firm lines, and Colour-blind safe, which uses blue, gold and rose in
+          taste. The four under Accessible themes are made for a need: High contrast, with the
+          strongest text and firm lines; Colour-blind safe, which uses blue, gold and rose in
           place of green, ochre and clay so that the three stay apart for every kind of colour
-          blindness.
+          blindness; Greyscale, with no colour at all, where go, waiting and broken differ in
+          lightness; and Low glare, a dim, warm page with no white and no stark text, for light
+          sensitivity and migraine.
         </p>
         <p>
           A device that asks for more contrast gets High contrast until you choose a theme of your

@@ -63,7 +63,16 @@ export interface Theme {
 }
 
 /** Order is the order the picker shows them in, and the default comes first. */
-export const PALETTE_IDS = ['sun-dogs', 'pebble', 'opal', 'harvest', 'high-contrast', 'colour-blind'] as const
+export const PALETTE_IDS = [
+  'sun-dogs',
+  'pebble',
+  'opal',
+  'harvest',
+  'high-contrast',
+  'colour-blind',
+  'greyscale',
+  'low-glare',
+] as const
 export type PaletteId = (typeof PALETTE_IDS)[number]
 
 export const DEFAULT_PALETTE: PaletteId = 'sun-dogs'
@@ -93,6 +102,16 @@ const META: Record<PaletteId, { name: string; kind: ThemeKind; blurb: string }> 
     name: 'Colour-blind safe',
     kind: 'accessible',
     blurb: 'Blue, gold and rose in place of green, ochre and clay. For every kind of colour blindness.',
+  },
+  greyscale: {
+    name: 'Greyscale',
+    kind: 'accessible',
+    blurb: 'No colour at all, for a person who sees none or a monochrome display. Go, waiting and broken differ in lightness, and icons and labels carry the rest.',
+  },
+  'low-glare': {
+    name: 'Low glare',
+    kind: 'accessible',
+    blurb: 'A dim, warm page with no white and no stark text, for light sensitivity and migraine.',
   },
 }
 

@@ -16,12 +16,12 @@ import {
 import { generateThemesCss } from '../shared/themeCss'
 import { THEME_BASELINES, type RatchetedTheme } from '../shared/themeBaselines'
 import { DEFAULTS, loadAppearance, resolvePalette, type Appearance } from '../frontend/src/appearance'
-import { ALL_KINDS, GROUNDS, contrast, lowest, measure, rgb, separation, tok } from './support/colour'
+import { ALL_KINDS, GROUNDS, chroma8, contrast, hue, lowest, lstar, measure, rgb, separation, tok } from './support/colour'
 
 /**
  * The themes, held to two standards on purpose (docs/themes-plan.md).
  *
- *  - The default and the two accessible themes are held to fixed, strict
+ *  - The default and the accessible themes are held to fixed, strict
  *    standards, because the first is what everybody gets and the others exist
  *    for a need.
  *  - The other aesthetic themes are held by a ratchet: they may be softer than
@@ -37,11 +37,11 @@ describe('the theme list', () => {
   it('has the default first, then the aesthetic themes, then the accessible ones', () => {
     expect(THEMES.map((t) => t.id)).toEqual([...PALETTE_IDS])
     expect(THEMES[0].id).toBe(DEFAULT_PALETTE)
-    expect(THEMES.map((t) => t.kind)).toEqual(['aesthetic', 'aesthetic', 'aesthetic', 'aesthetic', 'accessible', 'accessible'])
+    expect(THEMES.map((t) => t.kind)).toEqual(['aesthetic', 'aesthetic', 'aesthetic', 'aesthetic', 'accessible', 'accessible', 'accessible', 'accessible'])
   })
 
   it('names them in our own words, not the palette names they were adapted from', () => {
-    expect(THEMES.map((t) => t.name)).toEqual(['Sun Dogs', 'Pebble', 'Opal', 'Harvest', 'High contrast', 'Colour-blind safe'])
+    expect(THEMES.map((t) => t.name)).toEqual(['Sun Dogs', 'Pebble', 'Opal', 'Harvest', 'High contrast', 'Colour-blind safe', 'Greyscale', 'Low glare'])
     for (const t of THEMES) expect(t.name + t.blurb).not.toMatch(/Morning|Twilight/)
   })
 
@@ -117,29 +117,55 @@ describe('aesthetic themes are on a ratchet', () => {
   })
 })
 
+/**
+ * What each accessible theme promises, stated by the theme and not inherited.
+ *
+ * `text` is the floor for ink, body, muted and faint; `meaning` for green, ochre and clay as text, on
+ * every ground and on the tinted fill each sits on; `onAccent` for text on the accent fill. Greyscale
+ * holds its three meaning colours to 4.5:1 because three steps 15 L* apart do not fit at 7:1; Low
+ * glare holds everything to 4.5:1 and adds a ceiling (see its own tests).
+ */
+const STANDARD: Record<string, { text: number; meaning: number; onAccent: number; field: number }> = {
+  'high-contrast': { text: 7, meaning: 7, onAccent: 7, field: 4.5 },
+  'colour-blind': { text: 7, meaning: 7, onAccent: 7, field: 3 },
+  greyscale: { text: 7, meaning: 4.5, onAccent: 4.5, field: 3 },
+  'low-glare': { text: 4.5, meaning: 4.5, onAccent: 4.5, field: 3 },
+}
+
 describe('accessible themes are held to a strict standard', () => {
-  const TEXT = ['ink', 'body', 'muted', 'faint', 'accent', 'danger-fg', 'warn-fg', 'success-fg'] as const
+  const TEXT = ['ink', 'body', 'muted', 'faint'] as const
+  const MEANING = ['accent', 'danger-fg', 'warn-fg', 'success-fg'] as const
   const accessible = THEMES.filter((t) => t.kind === 'accessible')
 
+  it('states a standard for every accessible theme, so a new one cannot skip it', () => {
+    expect(Object.keys(STANDARD).sort()).toEqual(accessible.map((t) => t.id).sort())
+  })
+
   describe.each(accessible.map((t) => [t.id, t] as const))('%s', (id, theme) => {
+    const std = STANDARD[id]
+
     // The soft accent fill is painted behind the active row of a list, so text sits on it too.
-    it.each(MODES)('%s: every text colour reaches 7:1 on every ground and on the soft accent fill', (mode) => {
-      for (const name of TEXT) expect(lowest(theme, mode, name, ['accent-soft']), `${id} ${mode} ${name}`).toBeGreaterThanOrEqual(7)
+    it.each(MODES)('%s: ink, body, muted and faint reach their floor on every ground and on the soft accent fill', (mode) => {
+      for (const name of TEXT) expect(lowest(theme, mode, name, ['accent-soft']), `${id} ${mode} ${name}`).toBeGreaterThanOrEqual(std.text)
     })
 
-    it.each(MODES)('%s: text on its own tinted fill reaches 7:1', (mode) => {
-      expect(contrast(tok(theme, mode, 'danger-fg'), tok(theme, mode, 'danger-bg'))).toBeGreaterThanOrEqual(7)
-      expect(contrast(tok(theme, mode, 'warn-fg'), tok(theme, mode, 'warn-bg'))).toBeGreaterThanOrEqual(7)
-      expect(contrast(tok(theme, mode, 'accent'), tok(theme, mode, 'accent-soft'))).toBeGreaterThanOrEqual(7)
-      expect(contrast(tok(theme, mode, 'success-fg'), tok(theme, mode, 'success-bg'))).toBeGreaterThanOrEqual(7)
+    it.each(MODES)('%s: green, ochre and clay reach their floor on every ground and on the soft accent fill', (mode) => {
+      for (const name of MEANING) expect(lowest(theme, mode, name, ['accent-soft']), `${id} ${mode} ${name}`).toBeGreaterThanOrEqual(std.meaning)
     })
 
-    it.each(MODES)('%s: text on the accent fill reaches 7:1', (mode) => {
-      expect(contrast(tok(theme, mode, 'accent-fg'), tok(theme, mode, 'accent'))).toBeGreaterThanOrEqual(7)
+    it.each(MODES)('%s: text on its own tinted fill reaches the floor', (mode) => {
+      expect(contrast(tok(theme, mode, 'danger-fg'), tok(theme, mode, 'danger-bg'))).toBeGreaterThanOrEqual(std.meaning)
+      expect(contrast(tok(theme, mode, 'warn-fg'), tok(theme, mode, 'warn-bg'))).toBeGreaterThanOrEqual(std.meaning)
+      expect(contrast(tok(theme, mode, 'accent'), tok(theme, mode, 'accent-soft'))).toBeGreaterThanOrEqual(std.meaning)
+      expect(contrast(tok(theme, mode, 'success-fg'), tok(theme, mode, 'success-bg'))).toBeGreaterThanOrEqual(std.meaning)
+    })
+
+    it.each(MODES)('%s: text on the accent fill reaches the floor', (mode) => {
+      expect(contrast(tok(theme, mode, 'accent-fg'), tok(theme, mode, 'accent'))).toBeGreaterThanOrEqual(std.onAccent)
     })
 
     it.each(MODES)('%s: a form field edge is seen', (mode) => {
-      expect(lowest(theme, mode, 'field-line')).toBeGreaterThanOrEqual(id === HIGH_CONTRAST_PALETTE ? 4.5 : 3)
+      expect(lowest(theme, mode, 'field-line')).toBeGreaterThanOrEqual(std.field)
     })
   })
 
@@ -180,6 +206,82 @@ describe('accessible themes are held to a strict standard', () => {
       expect(wait, `${mode} waiting`).toBeGreaterThan(40)
       expect(wait, `${mode} waiting`).toBeLessThan(75)
       expect(broken > 320 || broken < 20, `${mode} broken ${broken}`).toBe(true)
+    }
+  })
+})
+
+describe('Greyscale has no colour, and tells the meaning colours apart by lightness', () => {
+  const t = byId('greyscale')
+
+  it.each(MODES)('%s: every token, and every Higher contrast token, is achromatic', (mode) => {
+    const data = t.modes[mode]
+    for (const name of THEME_TOKENS) expect(chroma8(rgb(data.tokens[name])), `${mode} ${name}`).toBeLessThanOrEqual(3)
+    for (const name of HIGH_CONTRAST_TOKENS) expect(chroma8(rgb(data.highContrast![name])), `${mode} higher contrast ${name}`).toBeLessThanOrEqual(3)
+  })
+
+  it.each(MODES)('%s: go, waiting and broken are at least 15 L* apart, each pair', (mode) => {
+    const [g, o, c] = [tok(t, mode, 'accent'), tok(t, mode, 'warn-fg'), tok(t, mode, 'danger-fg')].map(lstar)
+    for (const [a, b, label] of [[g, o, 'go and waiting'], [g, c, 'go and broken'], [o, c, 'waiting and broken']] as const) {
+      expect(Math.abs(a - b), `${mode}: ${label}`).toBeGreaterThanOrEqual(15)
+    }
+  })
+
+  it('says in its blurb that icons and labels carry the rest', () => {
+    expect(t.blurb).toMatch(/icons and labels/i)
+  })
+})
+
+describe('Low glare is dim, warm and never stark', () => {
+  const t = byId('low-glare')
+  const TEXTS = ['ink', 'body', 'muted', 'faint', 'accent', 'danger-fg', 'warn-fg', 'success-fg'] as const
+  const WARM = [20, 75] // degrees of hue: from red-orange to yellow
+
+  it.each(MODES)('%s: ink and body are readable and no more than 12:1 on any ground, a ceiling as well as a floor', (mode) => {
+    for (const name of ['ink', 'body'] as const) {
+      for (const g of [...GROUNDS, 'accent-soft'] as const) {
+        const c = contrast(tok(t, mode, name), tok(t, mode, g))
+        expect(c, `${mode} ${name} on ${g}`).toBeLessThanOrEqual(12)
+        expect(c, `${mode} ${name} on ${g}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  it.each(MODES)('%s: no text token is pure black or white', (mode) => {
+    for (const name of TEXTS) {
+      const [r, g, b] = tok(t, mode, name)
+      expect(r + g + b, `${mode} ${name}`).toBeGreaterThan(24)
+      expect(r + g + b, `${mode} ${name}`).toBeLessThan(3 * 235)
+    }
+  })
+
+  it('has no white in light mode: nothing is lighter than about L* 91', () => {
+    for (const name of THEME_TOKENS) expect(lstar(tok(t, 'light', name)), name).toBeLessThanOrEqual(91)
+  })
+
+  it('is genuinely dim in dark mode: the ground is at most L* 16 and text no brighter than L* 88', () => {
+    expect(lstar(tok(t, 'dark', 'canvas'))).toBeLessThanOrEqual(16)
+    for (const name of TEXTS) expect(lstar(tok(t, 'dark', name)), name).toBeLessThanOrEqual(88)
+  })
+
+  it.each(MODES)('%s: the grounds are warm', (mode) => {
+    for (const g of GROUNDS) {
+      const c = tok(t, mode, g)
+      expect(chroma8(c), `${mode} ${g} has some colour`).toBeGreaterThanOrEqual(4)
+      expect(hue(c), `${mode} ${g} hue`).toBeGreaterThan(WARM[0])
+      expect(hue(c), `${mode} ${g} hue`).toBeLessThan(WARM[1])
+    }
+  })
+
+  it.each(MODES)('%s: rules are soft, with no thin bright line', (mode) => {
+    expect(contrast(tok(t, mode, 'line'), tok(t, mode, 'canvas')), `${mode} line`).toBeLessThanOrEqual(2)
+    expect(contrast(tok(t, mode, 'line-strong'), tok(t, mode, 'canvas')), `${mode} line-strong`).toBeLessThanOrEqual(3)
+    for (const shadow of Object.values(t.modes[mode].shadow)) expect(shadow).not.toContain('255,255,255')
+  })
+
+  it.each(MODES)('%s: green, ochre and clay stay apart for deuteranopia and protanopia (at least 15)', (mode) => {
+    const [g, o, c] = [tok(t, mode, 'accent'), tok(t, mode, 'warn-fg'), tok(t, mode, 'danger-fg')]
+    for (const [a, b, label] of [[g, c, 'green and clay'], [g, o, 'green and ochre'], [c, o, 'clay and ochre']] as const) {
+      expect(separation(a, b), `${mode}: ${label}`).toBeGreaterThanOrEqual(15)
     }
   })
 })

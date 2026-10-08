@@ -1879,10 +1879,14 @@ The questionnaire, the method and every reason are in
   avoids): the survey names Sun Dogs Music and no product, and a test walks every
   string.
 
-**Colour themes are data, and the stylesheet is generated from them.** Six ship:
+**Colour themes are data, and the stylesheet is generated from them.** Eight ship:
 Sun Dogs (the default, drawn by hand in `shared/themeSunDogs.ts`), Pebble, Opal and
 Harvest (aesthetic, derived from Figma palettes by `scripts/themes/derive.mjs` into
-`shared/themeData.ts`) and High contrast and Colour-blind safe (accessible). The file
+`shared/themeData.ts`) and four accessible themes: High contrast, Colour-blind safe, Greyscale (no colour
+at all; go, waiting and broken differ by at least 15 L*, held to 4.5:1 where the
+others hold 7:1) and Low glare (dim and warm, no white, and a ceiling of 12:1 on ink
+and body as well as a floor). Each accessible theme states its own standard in
+`STANDARD` in `test/themes.test.ts`. The file
 `frontend/src/themes.css` is written from them by `npm run themes:css`, and a test
 fails if it is edited by hand. Two standards, on purpose: the default and the
 accessible themes are held to strict contrast and colour-blind gates, while an

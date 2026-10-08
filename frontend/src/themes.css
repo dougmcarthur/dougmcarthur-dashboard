@@ -811,6 +811,274 @@
   --c-faint: 184 190 202;
 }
 
+/* Greyscale */
+
+[data-palette='greyscale'][data-theme='light'] {
+  color-scheme: light;
+  --c-canvas: 245 245 245;
+  --c-surface: 253 253 253;
+  --c-raised: 248 248 248;
+  --c-sunken: 235 235 235;
+  --c-line: 212 212 212;
+  --c-line-strong: 174 174 174;
+  --c-field-line: 131 131 131;
+  --c-ink: 31 31 31;
+  --c-body: 57 57 57;
+  --c-muted: 72 72 72;
+  --c-faint: 72 72 72;
+  --c-accent: 61 61 61;
+  --c-accent-hover: 43 43 43;
+  --c-accent-fg: 250 250 250;
+  --c-accent-soft: 228 228 228;
+  --c-danger-bg: 238 238 238;
+  --c-danger-bg-hover: 225 225 225;
+  --c-danger-line: 206 206 206;
+  --c-danger-fg: 27 27 27;
+  --c-danger-solid: 105 105 105;
+  --c-success-bg: 235 235 235;
+  --c-success-bg-hover: 222 222 222;
+  --c-success-line: 196 196 196;
+  --c-success-fg: 61 61 61;
+  --c-success-solid: 61 61 61;
+  --c-warn-bg: 232 232 232;
+  --c-warn-line: 190 190 190;
+  --c-warn-fg: 102 102 102;
+  --c-info-bg: 248 248 248;
+  --c-info-bg-hover: 235 235 235;
+  --c-info-line: 212 212 212;
+  --c-info-fg: 61 61 61;
+  --c-cat-violet-bg: 248 248 248;
+  --c-cat-violet-line: 212 212 212;
+  --c-cat-violet-fg: 72 72 72;
+  --c-cat-sky-bg: 248 248 248;
+  --c-cat-sky-line: 212 212 212;
+  --c-cat-sky-fg: 72 72 72;
+  --c-cat-teal-bg: 248 248 248;
+  --c-cat-teal-line: 212 212 212;
+  --c-cat-teal-fg: 72 72 72;
+  --c-cat-orange-bg: 248 248 248;
+  --c-cat-orange-line: 212 212 212;
+  --c-cat-orange-fg: 72 72 72;
+  --c-cat-rose-bg: 248 248 248;
+  --c-cat-rose-line: 212 212 212;
+  --c-cat-rose-fg: 72 72 72;
+  --c-scrim: 31 31 31;
+
+  --shadow-card: 0 1px 2px rgba(31,31,31,.07);
+  --shadow-raised: 0 2px 4px rgba(31,31,31,.06), 0 10px 26px -10px rgba(31,31,31,.17);
+  --shadow-pop: 0 8px 12px -4px rgba(31,31,31,.10), 0 18px 36px -12px rgba(31,31,31,.22);
+  --shadow-inset: inset 0 1px 0 rgba(253,253,253,.8);
+}
+
+[data-palette='greyscale'][data-theme='light'][data-contrast='high'] {
+  --c-line: 128 128 128;
+  --c-line-strong: 99 99 99;
+  --c-field-line: 99 99 99;
+  --c-body: 38 38 38;
+  --c-muted: 61 61 61;
+  --c-faint: 69 69 69;
+}
+
+[data-palette='greyscale'][data-theme='dark'] {
+  color-scheme: dark;
+  --c-canvas: 11 11 11;
+  --c-surface: 19 19 19;
+  --c-raised: 25 25 25;
+  --c-sunken: 6 6 6;
+  --c-line: 46 46 46;
+  --c-line-strong: 72 72 72;
+  --c-field-line: 105 105 105;
+  --c-ink: 235 235 235;
+  --c-body: 190 190 190;
+  --c-muted: 174 174 174;
+  --c-faint: 174 174 174;
+  --c-accent: 177 177 177;
+  --c-accent-hover: 196 196 196;
+  --c-accent-fg: 22 22 22;
+  --c-accent-soft: 34 34 34;
+  --c-danger-bg: 31 31 31;
+  --c-danger-bg-hover: 41 41 41;
+  --c-danger-line: 56 56 56;
+  --c-danger-fg: 228 228 228;
+  --c-danger-solid: 122 122 122;
+  --c-success-bg: 31 31 31;
+  --c-success-bg-hover: 41 41 41;
+  --c-success-line: 51 51 51;
+  --c-success-fg: 177 177 177;
+  --c-success-solid: 128 128 128;
+  --c-warn-bg: 34 34 34;
+  --c-warn-line: 61 61 61;
+  --c-warn-fg: 137 137 137;
+  --c-info-bg: 25 25 25;
+  --c-info-bg-hover: 38 38 38;
+  --c-info-line: 46 46 46;
+  --c-info-fg: 177 177 177;
+  --c-cat-violet-bg: 25 25 25;
+  --c-cat-violet-line: 46 46 46;
+  --c-cat-violet-fg: 174 174 174;
+  --c-cat-sky-bg: 25 25 25;
+  --c-cat-sky-line: 46 46 46;
+  --c-cat-sky-fg: 174 174 174;
+  --c-cat-teal-bg: 25 25 25;
+  --c-cat-teal-line: 46 46 46;
+  --c-cat-teal-fg: 174 174 174;
+  --c-cat-orange-bg: 25 25 25;
+  --c-cat-orange-line: 46 46 46;
+  --c-cat-orange-fg: 174 174 174;
+  --c-cat-rose-bg: 25 25 25;
+  --c-cat-rose-line: 46 46 46;
+  --c-cat-rose-fg: 174 174 174;
+  --c-scrim: 0 0 0;
+
+  --shadow-card: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5);
+  --shadow-raised: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px -6px rgba(0,0,0,.7);
+  --shadow-pop: 0 1px 0 rgba(255,255,255,.05) inset, 0 12px 34px -10px rgba(0,0,0,.82);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+[data-palette='greyscale'][data-theme='dark'][data-contrast='high'] {
+  --c-line: 111 111 111;
+  --c-line-strong: 140 140 140;
+  --c-field-line: 140 140 140;
+  --c-body: 222 222 222;
+  --c-muted: 202 202 202;
+  --c-faint: 190 190 190;
+}
+
+/* Low glare */
+
+[data-palette='low-glare'][data-theme='light'] {
+  color-scheme: light;
+  --c-canvas: 220 209 195;
+  --c-surface: 227 221 214;
+  --c-raised: 224 216 206;
+  --c-sunken: 208 196 181;
+  --c-line: 223 210 194;
+  --c-line-strong: 185 172 156;
+  --c-field-line: 114 103 90;
+  --c-ink: 57 46 39;
+  --c-body: 74 64 57;
+  --c-muted: 88 77 71;
+  --c-faint: 91 80 73;
+  --c-accent: 27 90 67;
+  --c-accent-hover: 7 70 49;
+  --c-accent-fg: 228 223 216;
+  --c-accent-soft: 202 218 210;
+  --c-danger-bg: 239 218 212;
+  --c-danger-bg-hover: 246 216 207;
+  --c-danger-line: 242 193 178;
+  --c-danger-fg: 68 15 0;
+  --c-danger-solid: 165 73 43;
+  --c-success-bg: 213 228 220;
+  --c-success-bg-hover: 209 227 218;
+  --c-success-line: 181 202 192;
+  --c-success-fg: 27 90 67;
+  --c-success-solid: 27 90 67;
+  --c-warn-bg: 241 223 171;
+  --c-warn-line: 216 186 121;
+  --c-warn-fg: 100 76 9;
+  --c-info-bg: 224 216 206;
+  --c-info-bg-hover: 232 222 210;
+  --c-info-line: 223 210 194;
+  --c-info-fg: 27 90 67;
+  --c-cat-violet-bg: 224 216 206;
+  --c-cat-violet-line: 223 210 194;
+  --c-cat-violet-fg: 88 77 71;
+  --c-cat-sky-bg: 224 216 206;
+  --c-cat-sky-line: 223 210 194;
+  --c-cat-sky-fg: 88 77 71;
+  --c-cat-teal-bg: 224 216 206;
+  --c-cat-teal-line: 223 210 194;
+  --c-cat-teal-fg: 88 77 71;
+  --c-cat-orange-bg: 224 216 206;
+  --c-cat-orange-line: 223 210 194;
+  --c-cat-orange-fg: 88 77 71;
+  --c-cat-rose-bg: 224 216 206;
+  --c-cat-rose-line: 223 210 194;
+  --c-cat-rose-fg: 88 77 71;
+  --c-scrim: 57 46 39;
+
+  --shadow-card: 0 1px 2px rgba(57,46,39,.05);
+  --shadow-raised: 0 2px 4px rgba(57,46,39,.04), 0 10px 26px -10px rgba(57,46,39,.12);
+  --shadow-pop: 0 8px 12px -4px rgba(57,46,39,.07), 0 18px 36px -12px rgba(57,46,39,.16);
+  --shadow-inset: inset 0 0 0 rgba(0,0,0,0);
+}
+
+[data-palette='low-glare'][data-theme='light'][data-contrast='high'] {
+  --c-line: 115 103 89;
+  --c-line-strong: 89 78 64;
+  --c-field-line: 89 78 64;
+  --c-body: 46 36 30;
+  --c-muted: 58 49 42;
+  --c-faint: 58 49 42;
+}
+
+[data-palette='low-glare'][data-theme='dark'] {
+  color-scheme: dark;
+  --c-canvas: 26 21 16;
+  --c-surface: 34 29 23;
+  --c-raised: 41 36 30;
+  --c-sunken: 21 17 11;
+  --c-line: 51 45 37;
+  --c-line-strong: 77 70 63;
+  --c-field-line: 123 112 98;
+  --c-ink: 210 196 187;
+  --c-body: 187 174 166;
+  --c-muted: 168 156 148;
+  --c-faint: 155 144 136;
+  --c-accent: 132 163 116;
+  --c-accent-hover: 150 182 134;
+  --c-accent-fg: 26 21 16;
+  --c-accent-soft: 28 37 24;
+  --c-danger-bg: 46 24 24;
+  --c-danger-bg-hover: 58 33 32;
+  --c-danger-line: 83 43 42;
+  --c-danger-fg: 247 175 171;
+  --c-danger-solid: 187 87 87;
+  --c-success-bg: 27 34 23;
+  --c-success-bg-hover: 36 44 31;
+  --c-success-line: 45 54 41;
+  --c-success-fg: 132 163 116;
+  --c-success-solid: 109 139 93;
+  --c-warn-bg: 42 32 9;
+  --c-warn-line: 75 59 19;
+  --c-warn-fg: 212 183 118;
+  --c-info-bg: 41 36 30;
+  --c-info-bg-hover: 43 37 31;
+  --c-info-line: 51 45 37;
+  --c-info-fg: 132 163 116;
+  --c-cat-violet-bg: 41 36 30;
+  --c-cat-violet-line: 51 45 37;
+  --c-cat-violet-fg: 168 156 148;
+  --c-cat-sky-bg: 41 36 30;
+  --c-cat-sky-line: 51 45 37;
+  --c-cat-sky-fg: 168 156 148;
+  --c-cat-teal-bg: 41 36 30;
+  --c-cat-teal-line: 51 45 37;
+  --c-cat-teal-fg: 168 156 148;
+  --c-cat-orange-bg: 41 36 30;
+  --c-cat-orange-line: 51 45 37;
+  --c-cat-orange-fg: 168 156 148;
+  --c-cat-rose-bg: 41 36 30;
+  --c-cat-rose-line: 51 45 37;
+  --c-cat-rose-fg: 168 156 148;
+  --c-scrim: 0 0 0;
+
+  --shadow-card: 0 2px 8px rgba(0,0,0,.35);
+  --shadow-raised: 0 6px 20px -6px rgba(0,0,0,.5);
+  --shadow-pop: 0 12px 34px -10px rgba(0,0,0,.6);
+  --shadow-inset: inset 0 0 0 rgba(0,0,0,0);
+}
+
+[data-palette='low-glare'][data-theme='dark'][data-contrast='high'] {
+  --c-line: 123 111 97;
+  --c-line-strong: 154 141 126;
+  --c-field-line: 154 141 126;
+  --c-body: 232 219 211;
+  --c-muted: 212 200 192;
+  --c-faint: 199 187 179;
+}
+
 @media print {
   :root,
   :root[data-theme],
