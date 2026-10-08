@@ -33,6 +33,7 @@ import documentReadings from './routes/documentReadings'
 import publicSite from './routes/publicSite'
 import surveyRoute from './routes/survey'
 import { relinkMissing, runCatalogBackfillOnce } from './lib/catalog'
+import { pollSources, pruneCandidates } from './lib/sourcePoll'
 import { pruneInviteRequests } from './lib/inviteRequests'
 import connectors from './routes/connectors'
 import manitobaMusic from './routes/manitobaMusic'
@@ -408,6 +409,16 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
   // answer, and no longer — the landing page says as much.
   await pruneInviteRequests(env, new Date())
 
+  // Platform-level, like event retention: what the source poller read is not
+  // any artist's. Ignored items are kept two months so the verdicts can be
+  // audited for what they missed; closed and stale ones six.
+  try {
+    const gone = await pruneCandidates(env, new Date())
+    if (gone) console.log(`pruned ${gone} source candidates`)
+  } catch (err) {
+    console.error('candidate pruning failed:', err)
+  }
+
   // Ask Google whether the stored credentials are still accepted.
   //
   // This is the part that makes a dead credential *findable*. A refresh token
@@ -638,6 +649,12 @@ async function runScheduled(env: Env): Promise<void> {
     // One-shot too: links every row that predates the shared catalog.
     runCatalogBackfillOnce(env, tenants).catch((err) => {
       console.error('catalog backfill failed:', err)
+    }),
+    // Platform-level: the pages Scout reads for calls belong to nobody, so
+    // there is no tenant to loop over. A few sources per tick, one at a time;
+    // which are due is each source's own back-off. See src/lib/sourcePoll.ts.
+    pollSources(env).catch((err) => {
+      console.error('source poll failed:', err)
     }),
     owner
       ? runReplyScanIfDue(env, owner).catch((err) => {

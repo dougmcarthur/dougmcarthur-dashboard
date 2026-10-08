@@ -728,3 +728,70 @@ export const surveyResponses = sqliteTable('survey_responses', {
 })
 
 export type SurveyResponseRow = typeof surveyResponses.$inferSelect
+
+/**
+ * Pages Scout keeps reading for calls: a feed, a calendar or a listing page.
+ * See migration 0037 and `shared/catalogSources.ts`.
+ *
+ * A platform table, not a scoped one: a source belongs to nobody. Seeds follow
+ * `shared/musicAssociations.ts`; an agent or the owner can add more.
+ */
+export const catalogSources = sqliteTable('catalog_sources', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  /** `<association>:<label slug>`. Never shown. */
+  sourceKey: text('source_key').notNull(),
+  association: text('association'),
+  region: text('region'),
+  label: text('label').notNull(),
+  url: text('url').notNull(),
+  /** `feed`, `calendar` or `page`. */
+  kind: text('kind').notNull(),
+  enabled: integer('enabled').notNull().default(1),
+  /** `seed`, `agent` or `owner`. A seed follows the code. */
+  addedBy: text('added_by').notNull().default('seed'),
+  cadenceHours: integer('cadence_hours').notNull().default(24),
+  nextDueAt: text('next_due_at'),
+  lastFetchedAt: text('last_fetched_at'),
+  lastOkAt: text('last_ok_at'),
+  lastStatus: integer('last_status'),
+  lastError: text('last_error'),
+  etag: text('etag'),
+  lastModified: text('last_modified'),
+  contentHash: text('content_hash'),
+  /** Consecutive reads that failed or found nothing. Drives the back-off. */
+  failures: integer('failures').notNull().default(0),
+  lastItemCount: integer('last_item_count'),
+  newestItemAt: text('newest_item_at'),
+  createdAt: text('created_at').notNull(),
+})
+
+/**
+ * One item read from a source, and a verdict on whether it looks like a call.
+ * Not a catalog entry: see migration 0037 for why nothing here reaches
+ * `opportunities` yet.
+ */
+export const catalogCandidates = sqliteTable('catalog_candidates', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sourceId: integer('source_id').notNull(),
+  itemKey: text('item_key').notNull(),
+  title: text('title').notNull(),
+  url: text('url'),
+  publishedAt: text('published_at'),
+  eventAt: text('event_at'),
+  deadline: text('deadline'),
+  deadlineNote: text('deadline_note'),
+  placeText: text('place_text'),
+  /** `opportunity`, `unclear` or `not_opportunity`. */
+  verdict: text('verdict').notNull(),
+  category: text('category'),
+  kind: text('kind'),
+  /** The sentence that decided the verdict, so it can be argued with. */
+  reason: text('reason').notNull(),
+  /** `new`, `ignored`, `stale` or `closed`. */
+  status: text('status').notNull(),
+  firstSeenAt: text('first_seen_at').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
+})
+
+export type CatalogSourceRow = typeof catalogSources.$inferSelect
+export type CatalogCandidateRow = typeof catalogCandidates.$inferSelect

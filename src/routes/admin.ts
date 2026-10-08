@@ -25,9 +25,19 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { getDb } from '../db'
-import { feedback, inviteRequests, opportunities, surveyResponses, tenants, usageDaily, users } from '../db/schema'
+import {
+  catalogCandidates,
+  catalogSources,
+  feedback,
+  inviteRequests,
+  opportunities,
+  surveyResponses,
+  tenants,
+  usageDaily,
+  users,
+} from '../db/schema'
 import { asTenantId } from '../db/scope'
 import { adminOf, type AdminEnv } from '../context'
 import { elevationState } from '../../shared/auth'
@@ -36,6 +46,8 @@ import { issueInvite, listInvites, revokeInvite } from '../lib/invites'
 import { mailerConfigured, sendMail, senderIdentity } from '../lib/mailer'
 import { inviteEmail } from '../lib/authMail'
 import { readTenantHealth } from '../lib/tenantHealth'
+import { pollSources, readLastPoll } from '../lib/sourcePoll'
+import { sourceState } from '../../shared/catalogSources'
 import { MEASURED_FIELDS } from '../lib/usage'
 import { isFeedbackKind } from '../../shared/feedback'
 import { readSurveyConfig, writeSurveySettings } from '../lib/surveySettings'
@@ -263,6 +275,126 @@ admin.patch(
       .set({ status, handledAt: status === 'new' ? null : new Date().toISOString() })
       .where(eq(inviteRequests.id, id))
     return c.json({ ok: true })
+  },
+)
+
+/**
+ * The pages Scout reads for calls, with how each is doing, and what it found.
+ *
+ * Platform tables, like the catalog: a source belongs to nobody and a candidate
+ * is a fact about a call, so none of this reaches an artist's rows. The state
+ * says what came *back* and not how it was answered — a feed whose newest item
+ * is nineteen months old is `stale`, not healthy — and the counts are how the
+ * owner finds out whether reading the pages without a model finds what the
+ * agents do. See `shared/catalogSources.ts`.
+ */
+admin.get('/catalog/sources', async (c) => {
+  const db = getDb(c.env.DB)
+  const now = new Date()
+  const [sources, tallies, lastPoll] = await Promise.all([
+    db.select().from(catalogSources).orderBy(asc(catalogSources.label)),
+    db
+      .select({
+        sourceId: catalogCandidates.sourceId,
+        verdict: catalogCandidates.verdict,
+        status: catalogCandidates.status,
+        n: sql<number>`count(*)`,
+      })
+      .from(catalogCandidates)
+      .groupBy(catalogCandidates.sourceId, catalogCandidates.verdict, catalogCandidates.status),
+    readLastPoll(c.env),
+  ])
+
+  const countFor = (sourceId: number) => {
+    const mine = tallies.filter((t) => t.sourceId === sourceId)
+    const sum = (pick: (t: (typeof mine)[number]) => boolean) => mine.filter(pick).reduce((n, t) => n + Number(t.n), 0)
+    return {
+      calls: sum((t) => t.verdict === 'opportunity' && t.status === 'new'),
+      unclear: sum((t) => t.verdict === 'unclear' && t.status === 'new'),
+      past: sum((t) => t.status === 'closed' || t.status === 'stale'),
+      ignored: sum((t) => t.status === 'ignored'),
+    }
+  }
+
+  return c.json({
+    lastPoll,
+    items: sources.map((s) => ({
+      id: s.id,
+      label: s.label,
+      kind: s.kind,
+      url: s.url,
+      enabled: s.enabled === 1,
+      addedBy: s.addedBy,
+      lastOkAt: s.lastOkAt,
+      lastFetchedAt: s.lastFetchedAt,
+      nextDueAt: s.nextDueAt,
+      itemCount: s.lastItemCount,
+      newestItemAt: s.newestItemAt,
+      ...sourceState({ ...s, enabled: s.enabled === 1 }, now),
+      counts: countFor(s.id),
+    })),
+  })
+})
+
+const CANDIDATE_VIEWS = {
+  calls: and(eq(catalogCandidates.verdict, 'opportunity'), eq(catalogCandidates.status, 'new')),
+  unclear: and(eq(catalogCandidates.verdict, 'unclear'), eq(catalogCandidates.status, 'new')),
+  // What it threw away, shown so a wrong verdict can be found: a rule that is
+  // missing real calls is only visible from this side.
+  ignored: eq(catalogCandidates.status, 'ignored'),
+  past: inArray(catalogCandidates.status, ['closed', 'stale']),
+} as const
+
+admin.get('/catalog/candidates', async (c) => {
+  const view = c.req.query('view') ?? 'calls'
+  if (!(view in CANDIDATE_VIEWS)) return c.json({ error: `unknown view: ${view}` }, 400)
+  const rows = await getDb(c.env.DB)
+    .select({
+      id: catalogCandidates.id,
+      title: catalogCandidates.title,
+      url: catalogCandidates.url,
+      verdict: catalogCandidates.verdict,
+      category: catalogCandidates.category,
+      kind: catalogCandidates.kind,
+      reason: catalogCandidates.reason,
+      deadline: catalogCandidates.deadline,
+      deadlineNote: catalogCandidates.deadlineNote,
+      placeText: catalogCandidates.placeText,
+      publishedAt: catalogCandidates.publishedAt,
+      firstSeenAt: catalogCandidates.firstSeenAt,
+      source: catalogSources.label,
+    })
+    .from(catalogCandidates)
+    .innerJoin(catalogSources, eq(catalogSources.id, catalogCandidates.sourceId))
+    .where(CANDIDATE_VIEWS[view as keyof typeof CANDIDATE_VIEWS])
+    .orderBy(desc(catalogCandidates.firstSeenAt), desc(catalogCandidates.id))
+    .limit(80)
+  return c.json({ view, items: rows })
+})
+
+/**
+ * Read the sources now, rather than waiting for the cron. A handful at a time —
+ * the same politeness the cron keeps — and the ones that were read most
+ * recently are not read again until their turn, so pressing it twice reads the
+ * next six, not the same six.
+ */
+admin.post('/catalog/poll', async (c) => {
+  const report = await pollSources(c.env, { limit: 6 })
+  return c.json(report)
+})
+
+admin.patch(
+  '/catalog/sources/:id',
+  zValidator('json', z.object({ enabled: z.boolean() })),
+  async (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isInteger(id)) return c.json({ error: 'not found' }, 404)
+    const [row] = await getDb(c.env.DB)
+      .update(catalogSources)
+      .set({ enabled: c.req.valid('json').enabled ? 1 : 0 })
+      .where(eq(catalogSources.id, id))
+      .returning({ id: catalogSources.id })
+    return row ? c.json({ ok: true }) : c.json({ error: 'not found' }, 404)
   },
 )
 
