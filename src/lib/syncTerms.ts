@@ -1,12 +1,13 @@
 import { eq } from 'drizzle-orm'
 import { getDb } from '../db'
-import { syncTargets } from '../db/schema'
+import { notificationEvents, syncTargets } from '../db/schema'
 import { scoped, type TenantId } from '../db/scope'
 import {
   NO_SITE,
   UNREACHABLE,
   foldFinding,
   readSubmissionPolicy,
+  refusalRetracted,
   termsDue,
   termsState,
   type PolicyReading,
@@ -131,6 +132,11 @@ export function htmlToText(html: string): string {
     html
       .replace(/<!--[\s\S]*?-->/g, ' ')
       .replace(/<(script|style|noscript|svg|head)\b[\s\S]*?<\/\1>/gi, ' ')
+      // A newline in the source is where an editor wrapped a line, not where a sentence
+      // ends. Hard-wrapped paragraphs are common on the old static pages these
+      // policies live on, and read line by line "We do not" and "accept unsolicited
+      // material." refuse nothing. Only a block tag is a break.
+      .replace(/\s*[\r\n]+\s*/g, ' ')
       .replace(/<\/?(?:p|br|li|ul|ol|div|tr|td|th|table|section|article|header|footer|nav|main|h[1-6]|blockquote|dd|dt)\b[^>]*>/gi, '\n')
       .replace(/<[^>]*>/g, ' '),
   )
@@ -369,6 +375,52 @@ const columnsOf = (row: StoredTarget): TermsColumns => ({
   policyOverriddenAt: row.policyOverriddenAt,
 })
 
+/**
+ * Clear a refusal the current rules would not have made, and say so.
+ *
+ * Re-reading cannot do it: automation moves toward caution, so a stored refusal
+ * outlasts every read that no longer finds one. That is right for a site that
+ * dropped its policy and wrong for a sentence that never was one, and a first
+ * version of the reader wrote down "We NEVER send unsolicited texts about job
+ * opportunities" as a refusal. The row goes back to unread, the artist's choice to
+ * pitch anyway goes with it (it was made about a sentence that says nothing of the
+ * kind), and the bell's earlier "takes no unsolicited pitches" is replaced by an
+ * honest one. The site is read again by the pass that called this.
+ */
+export async function retractFalseRefusal(env: Env, tenant: TenantId, row: StoredTarget): Promise<StoredTarget | null> {
+  if (row.submissionPolicy !== 'closed' || !refusalRetracted(row.policyEvidence)) return null
+
+  const db = getDb(env.DB)
+  const cleared = { submissionPolicy: null, policyEvidence: null, policyUrl: null, policyCheckedAt: null, policyOverriddenAt: null }
+  await db.update(syncTargets).set(cleared).where(scoped(syncTargets, tenant, eq(syncTargets.id, row.id)))
+  await db
+    .delete(notificationEvents)
+    .where(scoped(notificationEvents, tenant, eq(notificationEvents.dedupeKey, `sync:terms:${row.id}:closed`)))
+  await recordEvent(env, tenant, {
+    kind: 'automation',
+    tier: 'info',
+    title: `${row.name} is no longer marked as refusing pitches`,
+    body: `“${row.policyEvidence}” is not a refusal, so the mark was wrong. Their site is being read again.`,
+    href: '#sync',
+    action: 'Open',
+    dedupeKey: `sync:terms:${row.id}:retracted`,
+  })
+  return { ...row, ...cleared }
+}
+
+/** Every refusal on file for the artist, checked against the current rules. Cheap: no network. */
+export async function retractFalseRefusals(env: Env, tenant: TenantId): Promise<number> {
+  const rows = await getDb(env.DB)
+    .select()
+    .from(syncTargets)
+    .where(scoped(syncTargets, tenant, eq(syncTargets.submissionPolicy, 'closed')))
+  let retracted = 0
+  for (const row of rows) {
+    if (await retractFalseRefusal(env, tenant, row)) retracted++
+  }
+  return retracted
+}
+
 export interface CheckResult {
   row: StoredTarget
   /** It was not refused before and is now, and the artist has not overridden it. */
@@ -389,8 +441,9 @@ export async function checkTarget(
   options: { now?: string; fetchImpl?: typeof fetch; announce?: boolean } = {},
 ): Promise<CheckResult | null> {
   const db = getDb(env.DB)
-  const row = await db.select().from(syncTargets).where(scoped(syncTargets, tenant, eq(syncTargets.id, id))).get()
-  if (!row) return null
+  const stored = await db.select().from(syncTargets).where(scoped(syncTargets, tenant, eq(syncTargets.id, id))).get()
+  if (!stored) return null
+  const row = (await retractFalseRefusal(env, tenant, stored)) ?? stored
 
   const now = options.now ?? new Date().toISOString()
   const scan = await scanSite(row, options.fetchImpl)
@@ -438,6 +491,8 @@ export interface TermsRun {
   due: number
   checked: number
   closed: number
+  /** Refusals cleared because the current rules would not have made them. */
+  retracted: number
 }
 
 /** Per tenant per night. A backlog this size clears in a week, and the sites are small ones. */
@@ -458,6 +513,8 @@ export async function checkPendingTerms(
   options: { limit?: number; fetchImpl?: typeof fetch; now?: string } = {},
 ): Promise<TermsRun> {
   const db = getDb(env.DB)
+  // First, so a row it clears is unread again and goes to the front of this same pass.
+  const retracted = await retractFalseRefusals(env, tenant)
   const rows = await db.select().from(syncTargets).where(scoped(syncTargets, tenant))
 
   const order = { never: 0, retry: 1, stale: 2 } as const
@@ -466,7 +523,7 @@ export async function checkPendingTerms(
     .filter((d): d is { row: StoredTarget; why: 'never' | 'retry' | 'stale' } => d.why !== null)
     .sort((a, b) => order[a.why] - order[b.why] || a.row.id - b.row.id)
 
-  const run: TermsRun = { due: due.length, checked: 0, closed: 0 }
+  const run: TermsRun = { due: due.length, checked: 0, closed: 0, retracted }
   for (const { row } of due.slice(0, options.limit ?? TERMS_LIMIT)) {
     try {
       const result = await checkTarget(env, tenant, row.id, {

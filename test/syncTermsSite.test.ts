@@ -7,6 +7,7 @@ import {
   htmlToText,
   isFetchable,
   relevantLinks,
+  retractFalseRefusals,
   scanSite,
   siteOrigins,
 } from '../src/lib/syncTerms'
@@ -253,13 +254,15 @@ function database() {
     notes?: string | null
     checkedAt?: string | null
     policy?: string | null
+    evidence?: string | null
+    url?: string | null
     overriddenAt?: string | null
   }) =>
     Number(
       db
         .prepare(
-          `INSERT INTO sync_targets (tenant_id, name, contact_email, status, notes, policy_checked_at, submission_policy, policy_overridden_at, discovered_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`,
+          `INSERT INTO sync_targets (tenant_id, name, contact_email, status, notes, policy_checked_at, submission_policy, policy_evidence, policy_url, policy_overridden_at, discovered_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`,
         )
         .run(
           o.tenant ?? OWNER,
@@ -269,6 +272,8 @@ function database() {
           o.notes ?? null,
           o.checkedAt ?? null,
           o.policy ?? null,
+          o.evidence ?? null,
+          o.url ?? null,
           o.overriddenAt ?? null,
         ).lastInsertRowid,
     )
@@ -367,7 +372,7 @@ describe('the nightly pass', () => {
     const calls: string[] = []
     const run = await checkPendingTerms(t.env, OWNER, TODAY, { limit: 3, now: NOW, fetchImpl: fakeFetch({}, calls) })
 
-    expect(run).toEqual({ due: 5, checked: 3, closed: 0 })
+    expect(run).toEqual({ due: 5, checked: 3, closed: 0, retracted: 0 })
     expect(ids.slice(0, 3).every((id) => t.row(id).policy_checked_at === NOW)).toBe(true)
     expect(ids.slice(3).every((id) => t.row(id).policy_checked_at === null)).toBe(true)
   })
@@ -386,7 +391,7 @@ describe('the nightly pass', () => {
     const t = database()
     t.add({})
     const run = await checkPendingTerms(t.env, OWNER, TODAY, { now: NOW, fetchImpl: fakeFetch(REBUILT) })
-    expect(run).toEqual({ due: 1, checked: 1, closed: 1 })
+    expect(run).toEqual({ due: 1, checked: 1, closed: 1, retracted: 0 })
     expect(t.events()).toHaveLength(1)
   })
 
@@ -403,6 +408,107 @@ describe('the nightly pass', () => {
     expect(run.checked).toBe(2)
     expect(t.row(first).policy_checked_at).toBe(NOW)
     expect(t.row(second).policy_checked_at).toBe(NOW)
+  })
+})
+
+describe('a page that was hard-wrapped by whoever wrote it', () => {
+  const WRAPPED = [
+    '<html><body><p>We license music to film and television.</p>',
+    '<p>We do not',
+    'accept   unsolicited',
+    'material of any kind.</p>',
+    '<p>Next paragraph.<br>After a break.</p></body></html>',
+  ].join('\n')
+
+  it('reads a source newline as a space, and only a block tag as the end of a line', () => {
+    const text = htmlToText(WRAPPED)
+    expect(text).toContain('We do not accept unsolicited material of any kind.')
+    expect(text).toContain('Next paragraph.\nAfter a break.')
+  })
+
+  it('finds the refusal that a line wrap used to hide in two fragments', async () => {
+    const scan = await scanSite({ website: 'https://wrapped.example' }, fakeFetch({ 'https://wrapped.example/': WRAPPED }))
+    expect(scan.closed?.quote).toBe('We do not accept unsolicited material of any kind.')
+  })
+})
+
+describe('withdrawing a refusal the rules no longer make', () => {
+  const TEXTS = 'Important Notice: We NEVER send unsolicited texts about job opportunities and do not work with staffing agencies.'
+  const QUIET = { 'https://friends.example/': '<p>We license music. Our review process can take time but we do our best to screen all submissions.</p>' }
+  const INVITES = { 'https://friends.example/': '<p>Have a demo?</p><p>Send it to demos@friends.example</p>' }
+  const falseRefusal = { policy: 'closed', evidence: TEXTS, checkedAt: '2026-10-06T03:00:00.000Z', overriddenAt: '2026-10-06T10:00:00.000Z' }
+
+  function withBellEntry(t: ReturnType<typeof database>, id: number) {
+    t.db
+      .prepare(
+        "INSERT INTO notification_events (tenant_id, kind, tier, title, body, dedupe_key, created_at) VALUES ('tnt_0001', 'automation', 'attention', 'Friends Music Partners takes no unsolicited pitches', ?, ?, '2026-10-06T03:00:01.000Z')",
+      )
+      .run(TEXTS, 'sync:terms:' + id + ':closed')
+  }
+
+  it('puts the row back to unread, takes the artist\'s "pitch anyway" with it, and replaces the bell entry', async () => {
+    const t = database()
+    const id = t.add(falseRefusal)
+    withBellEntry(t, id)
+
+    const cleared = await retractFalseRefusals(t.env, OWNER)
+
+    expect(cleared).toBe(1)
+    expect(t.row(id)).toMatchObject({
+      submission_policy: null,
+      policy_evidence: null,
+      policy_url: null,
+      policy_checked_at: null,
+      policy_overridden_at: null,
+    })
+    const events = t.events()
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ tier: 'info', title: 'Friends Music Partners is no longer marked as refusing pitches', dedupe_key: 'sync:terms:' + id + ':retracted' })
+    expect(events[0].body).toContain('is not a refusal')
+  })
+
+  it('does it before a read, so Check again on the row ends with the right answer', async () => {
+    const t = database()
+    const id = t.add(falseRefusal)
+    const result = await checkTarget(t.env, OWNER, id, { now: NOW, fetchImpl: fakeFetch(QUIET) })
+
+    expect(result?.row.submissionPolicy).toBeNull()
+    expect(t.row(id)).toMatchObject({ submission_policy: null, policy_overridden_at: null, policy_checked_at: NOW })
+    expect(t.row(id).policy_evidence).toMatch(/^Read 1 page on friends\.example\./)
+  })
+
+  it('reads the site again in the same nightly pass, and may find an invitation where it thought it saw a refusal', async () => {
+    const t = database()
+    const id = t.add(falseRefusal)
+    const run = await checkPendingTerms(t.env, OWNER, TODAY, { now: NOW, fetchImpl: fakeFetch(INVITES) })
+
+    expect(run).toEqual({ due: 1, checked: 1, closed: 0, retracted: 1 })
+    expect(t.row(id)).toMatchObject({ submission_policy: 'open', policy_evidence: 'Send it to demos@friends.example' })
+  })
+
+  it('leaves a real refusal alone, and one in words these rules do not recognise', async () => {
+    const t = database()
+    const real = t.add({ policy: 'closed', evidence: 'NO unsolicited material please.', checkedAt: '2026-10-06T03:00:00.000Z' })
+    const agent = t.add({ name: 'Agent Filed', policy: 'closed', evidence: 'Pitches go through their A&R department first.', checkedAt: '2026-10-06T03:00:00.000Z' })
+
+    expect(await retractFalseRefusals(t.env, OWNER)).toBe(0)
+    expect(t.row(real).submission_policy).toBe('closed')
+    expect(t.row(agent).submission_policy).toBe('closed')
+  })
+
+  it('does not touch another artist\'s rows', async () => {
+    const t = database()
+    const theirs = t.add({ tenant: 'tnt_0002', ...falseRefusal })
+    expect(await retractFalseRefusals(t.env, OWNER)).toBe(0)
+    expect(t.row(theirs).submission_policy).toBe('closed')
+  })
+
+  it('is quiet once there is nothing to withdraw', async () => {
+    const t = database()
+    t.add(falseRefusal)
+    await retractFalseRefusals(t.env, OWNER)
+    expect(await retractFalseRefusals(t.env, OWNER)).toBe(0)
+    expect(t.events()).toHaveLength(1)
   })
 })
 

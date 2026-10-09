@@ -487,8 +487,10 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
   for (const tenant of tenants) {
     try {
       const run = await checkPendingTerms(env, tenant, today)
-      if (run.checked) {
-        console.log(`sync terms for ${tenant}: ${run.checked} read of ${run.due} due, ${run.closed} newly refusing pitches`)
+      if (run.checked || run.retracted) {
+        console.log(
+          `sync terms for ${tenant}: ${run.checked} read of ${run.due} due, ${run.closed} newly refusing pitches, ${run.retracted} refusals withdrawn`,
+        )
       }
     } catch (err) {
       console.error('sync terms check failed:', err)

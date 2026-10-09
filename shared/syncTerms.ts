@@ -46,8 +46,110 @@ export interface PolicyReading {
 const UNCERTAIN =
   /\b(?:whether|could\s?n[o']?t|could not|unable to|not able to|unconfirmed|unverified|unclear|unsure|not sure|unknown|not confirm\w*|no (?:public |clear |stated |explicit )?(?:statement|information|mention|policy|word)|(?:does|did|do)(?:\s?n[o']?t| not) (?:say|state|mention|specify)|check (?:if|whether)|find out|if (?:they|it|the company|the label|she|he)\b|ask (?:if|whether|them))/i
 
-/** Refusals. Any one of these in a sentence, outside a doubt, closes the target. */
-const CLOSED: RegExp[] = [
+/**
+ * What an unsolicited *thing* has to be for a sentence about it to refuse a
+ * pitch. The word alone proved too weak: "We NEVER send unsolicited texts about
+ * job opportunities" is a company promising not to message anyone, and it closed
+ * a target whose own page says it screens submissions. Texts, calls, offers,
+ * links and attachments are left out on purpose, since a notice about those is
+ * about scams and malware. Email stays in, because a pitch is one.
+ */
+const THING =
+  '(?:material|materials|submissions?|demos?|music|songs?|tracks?|pitch(?:es)?|recordings?|cds?|mp3s?|' +
+  'press kits?|epks?|packages?|catalog(?:ue)?s?|artists?|bands?|writers?|proposals?|inquiries|enquiries|' +
+  'queries|e-?mails?|content|works?|releases?|albums?|singles?|eps?)'
+const UNSOLICITED = String.raw`unsolicited\s+(?:[a-z-]+\s+)?${THING}\b`
+
+/**
+ * Phrases that mean something else when nothing in the sentence is about
+ * submitting. "By invitation only" is as often a private show as a policy.
+ */
+const ABOUT_SUBMITTING =
+  /\b(?:submissions?|submit\w*|demos?|material|music|artists?|pitch\w*|roster|accept\w*|consider\w*|review\w*|listen\w*|sign\w*|represent\w*|work\w*|catalog\w*|writers?|songs?|tracks?)\b/
+
+/**
+ * A route, not a refusal. "Please do not send demos to this address" sits on a
+ * page that goes on to say "Have a demo? Send it to demos@...": it is the
+ * postal address, and it asks for a different way in.
+ */
+const A_CHANNEL =
+  /\bto\s+(?:this|that|our|the|any)\b[^.;]{0,20}\b(?:address|office|mailbox|p\.?o\.? ?box|studio|location)\b|\b(?:by|via|through|in)\s+(?:the\s+)?(?:mail|post|snail mail|phone|person|dms?|direct messages?|social media|instagram|facebook|twitter|text|sms)\b|\b(?:physical|hard\s?copy|hard copies|printed|vinyl|tapes?|usb|flash drives?)\b|\binstead\b|\buse\s+(?:the|our)\s+(?:submission\s+)?(?:form|portal|page|link)\b/
+
+/**
+ * The company saying what *it* will not do to *you*, which is a notice about
+ * scams and staffing and says nothing about what it takes from you.
+ */
+const THEY_SEND =
+  /\b(?:we|i|our)\b[^.;,]{0,20}\b(?:never|do not|don't|will not|won't|would never|promise not to)\s+(?:send|email|e-?mail|call|text|message|contact|phone|dm|solicit|ask|approach|reach out)\b/
+
+/** "Do not hesitate to send unsolicited demos" is the opposite of what its words say first. */
+const WELCOMING = /\b(?:do not|don't)\s+(?:hesitate|be shy|be afraid|worry)\b|\bfeel free\b/
+
+/** Splits a sentence where it turns to a second statement, so a refusal is not lost behind a notice. */
+const CLAUSES = /;|,\s+(?:and|but|however|while)\s+|\s+(?:but|however)\s+|\s+and\s+(?=(?:we|i|do|don't|please|never|will|no)\b)/
+
+interface Rule {
+  re: RegExp
+  /** Must also hold somewhere in the sentence. */
+  with?: RegExp
+  /** Must not hold in the clause. */
+  unless?: RegExp
+}
+
+/** Refusals. Any one of these in a clause, outside a doubt, closes the target. */
+const CLOSED: Rule[] = [
+  // "no unsolicited material please", "no unsolicited submissions"
+  { re: new RegExp(String.raw`\bno ${UNSOLICITED}`) },
+  { re: /\bno unsolicited\s*(?:please\b|[.!,;:]|$)/ },
+  // "does not accept unsolicited ...", "we don't take unsolicited", "cannot consider unsolicited"
+  { re: new RegExp(String.raw`(?:\bnot\b|\bnever\b|n't\b|\bcannot\b|\bunable to\b)[^.;]{0,50}\b${UNSOLICITED}`) },
+  // "unsolicited submissions will not be reviewed", "... are deleted unread". Not "will not be returned":
+  // that is a note on a process, and it is as common on a page that invites submissions.
+  {
+    re: new RegExp(
+      String.raw`\b${UNSOLICITED}[^.;]{0,40}?(?:(?:\bnot|n't)\s+(?:be\s+)?(?:accepted|reviewed|read|listened to|considered|opened|heard|welcome)\b|\bnever\s+(?:be\s+)?(?:accepted|reviewed|read|listened to|considered|opened|heard)\b|\b(?:ignored|discarded|deleted|disregarded|destroyed|thrown away|trashed|unopened|unread|unheard)\b)`,
+    ),
+  },
+  // "by referral only", "on invitation only", "through an introduction only"
+  { re: /\b(?:by|via|through|on)\s+(?:a\s+|an\s+|the\s+)?(?:referral|referrals|invitation|invite|introduction|recommendation)\b[^.;]{0,15}\bonly\b/, with: ABOUT_SUBMITTING },
+  // "referral only", "represented artists only"
+  { re: /\b(?:referral|referrals|invitation|invitations|invite|representation)\s+only\b/, with: ABOUT_SUBMITTING },
+  { re: /\brepresented\s+(?:artists?|writers?|acts?|clients?)\s+only\b/ },
+  // "we only accept submissions from agents, attorneys or managers"
+  { re: /\bonly\s+(?:accept|accepts|accepting|consider|considers|considering|review|reviews|reviewing|listen\s+to|work\s+with|works\s+with|working\s+with|take|takes|taking)\b[^.;]{0,70}\b(?:referral|referrals|referred|invited|invitation|represented|recommended|agent|agents|attorney|attorneys|lawyer|lawyers|manager|managers)\b/ },
+  { re: /\b(?:through|via|from)\s+(?:an?\s+)?(?:agent|attorney|lawyer|manager|publisher)s?\s+only\b/ },
+  // "not currently accepting submissions", "no longer taking new artists". Requests and
+  // inquiries are not here: a library "not taking new requests" means its own clients.
+  { re: /(?:\bnot\b|\bno longer\b|\bnever\b)\s+(?:currently\s+|presently\s+|at this time\s+)?(?:accept|accepting|taking|considering|reviewing|receiving|open to|looking at|listening to)\s+(?:any\s+|new\s+|further\s+|more\s+|outside\s+|external\s+|unsolicited\s+)?(?:submissions?|artists?|demos?|music|material|pitches|songs|tracks|catalogs?|catalogues?|writers?|talent)\b/ },
+  // "submissions are closed", "our roster is full" is not matched on purpose
+  { re: /\b(?:submissions?|submission window|roster|catalog(?:ue)?)\s+(?:is|are)\s+(?:currently\s+|now\s+|temporarily\s+)?closed\b/ },
+  { re: /\bclosed\s+to\s+(?:new\s+|outside\s+)?(?:submissions?|artists?|material|music)\b/ },
+  // "please do not send music", "do not email us demos". Not when it names a route instead.
+  { re: /\b(?:please\s+)?(?:do not|don't|never)\s+(?:send|email|e-?mail|submit|pitch|forward)\b[^.;]{0,60}\b(?:music|demos?|songs?|tracks?|material|submissions?|pitch(?:es)?)\b/, unless: A_CHANNEL },
+  { re: /\bnot\s+(?:currently\s+)?(?:looking|seeking|searching)\s+for\s+(?:any\s+)?(?:new\s+)?(?:artists?|material|music|songs|submissions?|talent)\b/ },
+  { re: /\bno\s+(?:new\s+)?(?:demos?|submissions?|pitches)\s+(?:please|accepted|at this time|are being accepted|will be (?:accepted|considered))\b/ },
+]
+
+/** Whether a lower-cased sentence refuses a pitch. */
+function refuses(folded: string): boolean {
+  if (WELCOMING.test(folded)) return false
+  return folded
+    .split(CLAUSES)
+    .some(
+      (clause) =>
+        !THEY_SEND.test(clause) &&
+        CLOSED.some((rule) => rule.re.test(clause) && (!rule.with || rule.with.test(folded)) && !rule.unless?.test(clause)),
+    )
+}
+
+/**
+ * The rules before they were made precise, kept for one job: finding a refusal
+ * they wrote down that the current ones would not. A stored "refusal" nobody
+ * can clear is worse than a missed one, since automation only ever moves toward
+ * caution and so nothing re-reading the site would undo it. Delete this with
+ * refusalRetracted once every row has been read again under the current rules.
+ */
+const RETIRED_CLOSED: RegExp[] = [
   // "no unsolicited material please", "no unsolicited submissions"
   /\bno unsolicited\b/,
   // "does not accept unsolicited ...", "we don't take unsolicited", "cannot consider unsolicited"
@@ -73,6 +175,7 @@ const CLOSED: RegExp[] = [
   /\bno\s+(?:new\s+)?(?:demos?|submissions?|pitches)\s+(?:please|accepted|at this time|are being accepted|will be (?:accepted|considered))\b/,
 ]
 
+
 /** Invitations. Only trusted from a page, and only when nothing in the sentence negates it. */
 const OPEN: RegExp[] = [
   /\b(?:we|they|i)\s+(?:do\s+)?(?:gladly\s+|happily\s+|always\s+|also\s+|currently\s+)?(?:accept|accepts|welcome|welcomes|take|takes|review|reviews|consider|considers|listen\s+to|listens\s+to)\b[^.;]{0,50}\b(?:unsolicited|submissions?|demos?|pitches|new music|new material)\b/,
@@ -80,6 +183,8 @@ const OPEN: RegExp[] = [
   /\bunsolicited\s+(?:submissions?|material|demos?|music|pitches)\s+(?:are|is)\s+(?:welcome|accepted|encouraged|okay|ok)\b/,
   /\bsubmit\s+your\s+(?:music|songs?|tracks?|demos?|catalog(?:ue)?)\b/,
   /\bsend\s+us\s+your\s+(?:music|songs?|tracks?|demos?|material)\b/,
+  // "Have a demo? Send it to demos@..." Only when the address names what it is for.
+  /\bsend\s+(?:it|them|your\s+(?:demos?|music|submissions?|songs?|tracks?))\s+to\s+(?:demos?|submissions?|submit|music|a&r|pitch(?:es)?|sync)@/,
 ]
 
 /** Any of these in a sentence means an invitation is conditional, so it is not read as one. */
@@ -126,7 +231,7 @@ export function readSubmissionPolicy(
   const folded = sentences.map((s) => ({ s, f: s.toLowerCase().replace(/[’‘]/g, "'") }))
 
   for (const { s, f } of folded) {
-    if (CLOSED.some((re) => re.test(f))) return { policy: 'closed', quote: trimQuote(s) }
+    if (refuses(f)) return { policy: 'closed', quote: trimQuote(s) }
   }
   if (options.only === 'closed') return null
 
@@ -134,6 +239,21 @@ export function readSubmissionPolicy(
     if (!NEGATES.test(f) && OPEN.some((re) => re.test(f))) return { policy: 'open', quote: trimQuote(s) }
   }
   return null
+}
+
+/**
+ * Whether a stored refusal is one the current rules no longer make.
+ *
+ * True only for a sentence the retired rules read as a refusal and these do not,
+ * so a quote nobody can account for (an agent's wording, say, which these rules
+ * merely do not recognise) is never cleared by it. A quote cut short for the card
+ * is left alone too: what is left of it is not the sentence that was read.
+ */
+export function refusalRetracted(evidence: string | null | undefined): boolean {
+  const quote = evidence?.trim()
+  if (!quote || quote.endsWith('…')) return false
+  const folded = quote.toLowerCase().replace(/[’‘]/g, "'")
+  return RETIRED_CLOSED.some((re) => re.test(folded)) && readSubmissionPolicy(quote, { only: 'closed' }) === null
 }
 
 /* --------------------------------------------------------------------- */

@@ -9,6 +9,7 @@ import {
   normaliseWebsite,
   pitchGate,
   readSubmissionPolicy,
+  refusalRetracted,
   startingTerms,
   targetsToRead,
   termsDue,
@@ -98,6 +99,74 @@ describe('not reading a refusal where there is none', () => {
   })
 })
 
+describe('a refusal needs somebody refusing, and something refused', () => {
+  // Real sentences from real sites, each of which an earlier version of the
+  // reader filed as "no unsolicited pitches" on a company that takes them.
+  it.each([
+    // A company promising not to text anyone, on a site that screens submissions.
+    'Important Notice: We NEVER send unsolicited texts about job opportunities and do not work with staffing agencies.',
+    // A postal address, on a page that goes on to say "Have a demo? Send it to demos@...".
+    'Our address is (please, do not send demos to this or any address):',
+    // A label asking for links by email instead of audio files.
+    'PLEASE DO NOT SEND AUDIO FILES TO THIS ADDRESS, simply send links to your audio hosted elsewhere on the cyberweb.',
+    // Notices about scams and malware say what the company will not do, or what you should not open.
+    'We will never send you unsolicited emails asking for payment.',
+    'We do not make unsolicited phone calls.',
+    'Beware of unsolicited job offers claiming to be from us.',
+    'Never open unsolicited attachments.',
+    // A note on a process, as common on a page that invites submissions.
+    'Unsolicited submissions will not be returned.',
+    'We accept unsolicited submissions but do not accept phone calls.',
+    'Do not hesitate to send us your unsolicited demos.',
+    // A route, not a refusal.
+    'Please do not send demos by mail, use our submission form.',
+    'Please do not send physical CDs.',
+    // Not about submitting at all.
+    'Our events are by invitation only.',
+    'We are not accepting new requests at this time.',
+  ])('does not close on "%s"', (sentence) => {
+    expect(readSubmissionPolicy(sentence)?.policy).not.toBe('closed')
+  })
+
+  it.each([
+    'We NEVER send unsolicited texts and do not accept unsolicited demos.',
+    'We never send unsolicited texts; no unsolicited demos please.',
+    'Please do not send unsolicited material.',
+    'Please DO NOT send us your demos.',
+    'Do not email us demos or links.',
+    'We do not accept unsolicited emails.',
+    'Unsolicited demos are ignored.',
+    'Our shows are private. We are not accepting submissions.',
+  ])('still closes on "%s"', (sentence) => {
+    expect(readSubmissionPolicy(sentence)?.policy).toBe('closed')
+  })
+
+})
+
+describe('retracting a refusal the rules no longer make', () => {
+  it.each([
+    'Important Notice: We NEVER send unsolicited texts about job opportunities and do not work with staffing agencies.',
+    'Our address is (please, do not send demos to this or any address):',
+    'PLEASE DO NOT SEND AUDIO FILES TO',
+  ])('retracts "%s"', (quote) => {
+    expect(refusalRetracted(quote)).toBe(true)
+  })
+
+  it.each([
+    'NO unsolicited material please.',
+    'We do not accept unsolicited submissions.',
+    // A real refusal in words these rules merely do not recognise, as an agent might file it.
+    'Pitches go through their A&R department first.',
+    // Cut short for the card: what is left is not the sentence that was read.
+    'Important Notice: We NEVER send unsolicited texts about job opportunities and do not work with staffing…',
+    '',
+    null,
+    undefined,
+  ])('keeps %j', (quote) => {
+    expect(refusalRetracted(quote as string | null | undefined)).toBe(false)
+  })
+})
+
 describe('reading an invitation', () => {
   it.each([
     'We welcome unsolicited submissions from independent artists.',
@@ -105,6 +174,7 @@ describe('reading an invitation', () => {
     'We are open to submissions all year.',
     'Submit your music to our team.',
     'Unsolicited submissions are welcome.',
+    'Send it to demos@bankrobbermusic.com',
   ])('opens on "%s"', (sentence) => {
     expect(readSubmissionPolicy(sentence)?.policy).toBe('open')
   })

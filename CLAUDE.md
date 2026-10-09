@@ -641,6 +641,36 @@ looked (`policy_checked_at`) and the artist's own decision to go ahead anyway
   send is not blocked, because refusing to write down what happened would make the
   app lie. `test/syncTermsUi.test.ts` fails if a surface that renders a pitch
   draft beside Copy or a mail link stops asking `mayPitch`.
+- **A refusal needs somebody refusing and something refused.** The word
+  "unsolicited" beside a "never" was enough at first, and the first night's
+  History showed what that costs: *We NEVER send unsolicited texts about job
+  opportunities* closed a company that screens submissions, a postal address
+  saying *do not send demos to this or any address* closed one whose next line
+  was "Send it to demos@…", and *PLEASE DO NOT SEND AUDIO FILES TO THIS ADDRESS*
+  closed a label that asks for links by email. Every rule in `CLOSED` now needs a
+  thing a pitch is made of (`THING`, which leaves out texts, calls, offers and
+  attachments, since a notice about those is about scams), skips a clause where
+  the company is the one sending (`THEY_SEND`), and takes an instruction about
+  the route (`A_CHANNEL`: by mail, to this address, use the form) for what it is.
+  "By invitation only" needs a submission in the sentence too, since it is as
+  often a private show. A refusal is looked for clause by clause, so a notice
+  beside one does not hide it. The same pass fixed a miss in the other direction:
+  page text kept a newline from the source as a line break, so a hard-wrapped
+  paragraph ("We do not" / "accept unsolicited material.") read as two fragments
+  and refused nothing. Only a block tag ends a line now. Precision was measured on
+  real sites rather than on sentences made up for the rules, and a sentence that
+  taught something is a test.
+- **A refusal on file that the rules would not make now is withdrawn, because
+  nothing else could.** Automation only moves toward caution, so no later read
+  of the site could undo a wrong refusal, and "pitch anyway" would have left a
+  made-up quote labelled as the artist's choice. `retractFalseRefusal` runs first
+  in every check and in the nightly pass: a row whose refusal the retired rules
+  read and the current ones do not goes back to unread (the override with it,
+  since it was a decision about a sentence that said nothing of the kind), its
+  earlier bell entry is replaced by a plain correction, and the site is read again.
+  It touches only that difference, so a refusal in an agent's own words, which the
+  rules merely do not recognise, is never cleared by it. `RETIRED_CLOSED` and
+  `refusalRetracted` are deleted once every row has been read again.
 - **Agents must say.** `create_sync_target` requires `submissionPolicy`
   (`unknown` is an honest answer, silence is not); the prompt tells it to read the
   target's own pages, search the domain for the phrase because old pages outlive
