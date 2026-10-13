@@ -102,20 +102,20 @@ const OTHER = 'tnt_0002'
 // built to show; the comment says which.
 
 const tenants = [
-  { id: OWNER, display_name: 'Doug McArthur', created_at: stamp(-400) },
+  { id: OWNER, display_name: 'Jane Smith', created_at: stamp(-400) },
   // A second tenant so the oversight screen and usage rollup have more than one
   // row, and so a scoping mistake shows up as somebody else's data appearing.
   { id: OTHER, display_name: 'Test Artist', created_at: stamp(-30) },
 ]
 
 const users = [
-  { id: 'usr_owner', role: 'owner', tenant_id: OWNER, display_name: 'Doug McArthur', email: 'owner@example.test', created_at: stamp(-400) },
+  { id: 'usr_owner', role: 'owner', tenant_id: OWNER, display_name: 'Jane Smith', email: 'owner@example.test', created_at: stamp(-400) },
   { id: 'usr_other', role: 'artist', tenant_id: OTHER, display_name: 'Test Artist', email: 'artist@example.test', created_at: stamp(-30) },
 ]
 
 const gigs = [
   // Prose deadline — splitDeadline returns null and the screen must show words.
-  { name: 'Prairie Roots Collective — Artist Roster', type: 'venue', deadline: 'None — rolling artist roster intake', deadline_note: null, status: 'shortlisted', location: 'Brandon, MB', country: 'CA', travel_band: null, fit_notes: 'Rolling intake, so no date to miss. Pending Doug’s review of the set list before applying.' },
+  { name: 'Prairie Roots Collective — Artist Roster', type: 'venue', deadline: 'None — rolling artist roster intake', deadline_note: null, status: 'shortlisted', location: 'Brandon, MB', country: 'CA', travel_band: null, fit_notes: 'Rolling intake, so no date to miss. Pending Jane’s review of the set list before applying.' },
   // Prose deadline that names a month with no day.
   { name: 'Riverbend Songwriter Weekend', type: 'festival', deadline: 'TBC — usually opens in March', deadline_note: 'Site says "applications open in the spring"', status: 'discovered', location: 'Selkirk, MB', country: 'CA', travel_band: null, fit_notes: null },
   // Due soon: inside DUE_SOON_DAYS (14).
@@ -312,14 +312,14 @@ const monthKey = (offset) => {
 }
 
 const promoRows = [
-  { month: monthKey(0), title: 'New single announcement', content: 'Draft copy for the single announcement. Doug will want to add the credits before this goes out.', status: 'draft', created_at: stamp(-6), tenant_id: OWNER },
+  { month: monthKey(0), title: 'New single announcement', content: 'Draft copy for the single announcement. Jane will want to add the credits before this goes out.', status: 'draft', created_at: stamp(-6), tenant_id: OWNER },
   { month: monthKey(-1), title: 'House concert season wrap', content: 'Thanks to everyone who hosted a show this winter.', status: 'published', created_at: stamp(-38), tenant_id: OWNER },
   { month: monthKey(1), title: 'Festival season preview', content: 'Placeholder — needs the confirmed dates first.', status: 'draft', created_at: stamp(-1), tenant_id: OWNER },
 ]
 
 const assets = [
   // Healthy, reviewed recently.
-  { kind: 'bio', label: 'Short bio (100 words)', value: 'Doug McArthur is a folk songwriter from Winnipeg.', question_kind: 'bio', variant: '100 words', char_count: 49, review_by: day(200), source: 'manual' },
+  { kind: 'bio', label: 'Short bio (100 words)', value: 'Jane Smith is a folk songwriter from Winnipeg.', question_kind: 'bio', variant: '100 words', char_count: 49, review_by: day(200), source: 'manual' },
   { kind: 'bio', label: 'Long bio (300 words)', value: 'A longer biography used for programmes and press kits.', question_kind: 'bio', variant: '300 words', char_count: 54, review_by: day(150), source: 'manual' },
   // Overdue — review_by in the past.
   { kind: 'fact', label: 'Monthly listeners', value: '4,200', question_kind: 'stat', review_by: day(-30), source: 'manual' },
@@ -342,13 +342,13 @@ const assets = [
   { kind: 'video', label: 'Live session video', value: 'https://example.test/video', question_kind: 'video', review_by: null, source: 'reference_docs' },
   // The shapes the document sourcing really writes: multi-line facts filed under
   // the vocabulary's own keys, which is what the Answers panel is built to cut.
-  { kind: 'fact', label: 'Artist Name', value: 'Doug McArthur\nFolk songwriter, Winnipeg, MB\n45-minute solo set', question_kind: 'artist_name', review_by: day(300), source: 'reference_docs' },
+  { kind: 'fact', label: 'Artist Name', value: 'Jane Smith\nFolk songwriter, Winnipeg, MB\n45-minute solo set', question_kind: 'artist_name', review_by: day(300), source: 'reference_docs' },
   { kind: 'fact', label: 'Genre', value: 'Folk and Americana singer-songwriter, rooted in prairie storytelling.\n\nFor fans of: Gillian Welch, Ron Sexsmith\n\nInfluences: Gordon Lightfoot, Neil Young', question_kind: 'genre', review_by: day(300), source: 'reference_docs' },
   { kind: 'fact', label: 'Hometown', value: 'Winnipeg, Manitoba, Canada', question_kind: 'hometown', review_by: day(300), source: 'manual' },
   { kind: 'fact', label: 'Line-up', value: 'Solo: voice and guitar. Sometimes joined by a cellist.', question_kind: 'lineup', review_by: day(300), source: 'manual' },
   { kind: 'fact', label: 'Contact email', value: 'booking@example.test', question_kind: 'email', review_by: null, source: 'reference_docs' },
   { kind: 'bio', label: 'One-line description', value: 'A plainspoken Winnipeg songwriter with a dry sense of humour and an unhurried voice.', question_kind: 'one_liner', review_by: day(200), source: 'manual' },
-  { kind: 'bio', label: 'Medium bio (150 words)', value: 'Doug McArthur is a folk songwriter from Winnipeg, Manitoba. He writes slowly and plays quietly, and his songs are about the prairie, the people on it and the weather that decides most of their plans. His last record was made in a barn over one cold February, with the doors open for the sound of the room. He has played house concerts, folk festivals and a good many church basements, and he prefers the quiet ones.', question_kind: 'bio', variant: '150 words', review_by: day(180), source: 'manual' },
+  { kind: 'bio', label: 'Medium bio (150 words)', value: 'Jane Smith is a folk songwriter from Winnipeg, Manitoba. Jane writes slowly and plays quietly, and the songs are about the prairie, the people on it and the weather that decides most of their plans. His last record was made in a barn over one cold February, with the doors open for the sound of the room. Jane has played house concerts, folk festivals and a good many church basements, and he prefers the quiet ones.', question_kind: 'bio', variant: '150 words', review_by: day(180), source: 'manual' },
   { kind: 'fact', label: 'Press quote', value: '"A quiet knockout of a record." — Prairie Folk Weekly', question_kind: 'press_quote', review_by: day(300), source: 'manual' },
   { kind: 'fact', label: 'Technical requirements', value: 'Two DI lines, one vocal mic, a small monitor.', question_kind: 'tech_requirements', review_by: null, source: 'reference_docs' },
 ]
@@ -411,7 +411,7 @@ const referenceDocs = [
     content: [
       '## Short bio (100 words)',
       '',
-      'Doug McArthur is a folk songwriter from Winnipeg, Manitoba.',
+      'Jane Smith is a folk songwriter from Winnipeg, Manitoba.',
       '',
       '## Where can people hear you?',
       '',

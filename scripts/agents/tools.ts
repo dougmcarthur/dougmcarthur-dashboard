@@ -33,6 +33,8 @@ export type ToolName =
   | 'read_reference_docs'
   | 'list_existing_gigs'
   | 'list_existing_sync_targets'
+  | 'list_existing_promo_drafts'
+  | 'list_shows'
   | 'create_gig_opportunity'
   | 'create_sync_target'
   | 'create_promo_draft'
@@ -71,12 +73,33 @@ export const TOOL_SPECS = {
     name: 'list_existing_gigs',
     description:
       'Every gig opportunity already on file, as id, name, url, status and deadline. ' +
+      'A gig with show dates on it also carries performanceStart, performanceEnd and location. ' +
       'Call this before adding anything so you do not create a duplicate.',
     inputSchema: NO_INPUT,
   },
   list_existing_sync_targets: {
     name: 'list_existing_sync_targets',
     description: 'Every sync-licensing target already on file. Check before adding.',
+    inputSchema: NO_INPUT,
+  },
+  list_existing_promo_drafts: {
+    name: 'list_existing_promo_drafts',
+    description:
+      'Every promo draft already on file, newest first, as id, month, title, status, createdAt and ' +
+      'the opening of the copy. Status is what the artist did with it: draft is not yet read, approved ' +
+      'is liked and not yet marked posted, published is posted. Call this before writing anything so you ' +
+      'do not draft what is already waiting or already went out.',
+    inputSchema: NO_INPUT,
+  },
+  list_shows: {
+    name: 'list_shows',
+    description:
+      "Every show the artist has, from every place it is listed: Bandsintown, their Manitoba Music profile " +
+      'and the province\'s live calendar, and gigs booked in Scout, with one row per night. Returns today, ' +
+      'the upcoming shows, the recent ones from the last 45 days, and which sources answered. Each show has ' +
+      'date, time, title, venue, location, withArtists, a link, listedOn and missingFrom. A show on this list ' +
+      'is a show the artist is billed on, including ones that were never filed as a gig in Scout. A source ' +
+      'that failed is named under sources, and the list may then be short.',
     inputSchema: NO_INPUT,
   },
   create_gig_opportunity: {
@@ -184,7 +207,9 @@ export const TOOL_SPECS = {
   },
   create_promo_draft: {
     name: 'create_promo_draft',
-    description: 'File one promo draft for the artist to review, edit and post themselves.',
+    description:
+      'File one promo draft for the artist to review, edit and post themselves. A draft that repeats one ' +
+      'already on file is refused with the one it repeats; skip it and carry on.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -233,6 +258,8 @@ export const TOOLS_BY_AGENT: Record<AgentId, readonly ToolName[]> = {
     'read_reference_docs',
     'list_existing_gigs',
     'list_existing_sync_targets',
+    'list_existing_promo_drafts',
+    'list_shows',
     'create_promo_draft',
   ],
   'document-reader': ['list_documents_to_read', 'file_document_reading'],

@@ -255,16 +255,21 @@ the tenant filter beside it is not redundant, it is the whole check.
 
 **The cron has no request to read a scope from, and gives three answers.**
 Housekeeping runs per tenant, because which notification marks are dead is
-derived from that artist's own feed; event retention runs once beside it. The
-digest and the reply scan run for the **owner's tenant only**, because their
-inputs are platform configuration rather than the tenant's — the schedule and
-recipient live in `app_settings`, and the mailbox is one `GMAIL_REFRESH_TOKEN`
-pointing at one inbox. Looping those over every tenant would mail the owner N
-times and scan his mailbox on a stranger's behalf. Per-artist digests and
-mailbox grants are real work with schema behind them, and are not pretended to
-exist. The notes backfill runs for every tenant under one marker, because the
-marker is platform state and writing it after the first would record the job
-as done.
+derived from that artist's own feed; event retention runs once beside it. **The
+digest is every account's own**: its switch and schedule live in
+`tenant_settings`, off until the artist turns it on, and an artist's goes to the
+address they sign in with. That address is never typed into a settings row, for
+the reason a recovery address is never typed, so the `tenant` mail audience
+reaches only an address on an account in that artist's tenant, and the owner's
+digest keeps its configurable recipient (`src/lib/digestSettings.ts`). The
+owner's old `app_settings` rows still answer where the owner has set nothing of
+their own, which is why nothing was migrated and their digest never stopped.
+**The reply scan runs for the owner's tenant only**, because the mailbox is one
+`GMAIL_REFRESH_TOKEN` pointing at one inbox, and looping it over every tenant
+would scan the owner's mail on a stranger's behalf. An artist's own mailbox is
+a grant they would make, like Gmail drafting, and is not built. The notes
+backfill runs for every tenant under one marker, because the marker is platform
+state and writing it after the first would record the job as done.
 
 **An `ON CONFLICT` target is part of an interface.** Four uniqueness
 constraints had to grow a leading `tenant_id` (`gig_correspondents(kind,
@@ -546,8 +551,8 @@ Things about it that are not obvious:
   token is an API credential on the cloud environment, added by Anthropic's
   proxy after a request leaves the VM, so the session cannot leak it — but the
   proxy attaches it to *any* request for the host, so hiding it does not stop
-  `curl -X DELETE`. `shared/agentRoutes.ts` limits an issued token to seven
-  routes: three reads, three creates and the run log. The legacy `API_TOKEN`
+  `curl -X DELETE`. `shared/agentRoutes.ts` limits an issued token to eleven
+  routes: six reads, four creates and the run log. The legacy `API_TOKEN`
   is not limited — the CI runner has no shell and the route tests use it to
   reach every router — and nothing that reads untrusted pages is given it.
 - **Which routes is half of it; what they carry is the other half.** The
@@ -560,13 +565,42 @@ Things about it that are not obvious:
   issued token only, requires the body to be exactly the tool's fields
   (`.strict()`, with `status` limited to `discovered`), bounds each text field,
   refuses past a trailing day's ceiling (`AGENT_DAILY_LIMITS` in
-  `shared/agentWrites.ts`), and answers 409 with the row it repeats. Rows carry
+  `shared/agentWrites.ts`), and answers 409 with the row it repeats (a promo
+  draft repeats on the same title in the same month, or the same words under
+  another title; a recurring heading across months is not one). Rows carry
   no record of who filed them, so the ceiling counts the tenant's rows of that
   kind rather than the token's; a person adding sixty gigs in a day holds the
   agent off until tomorrow. `test/agentWrites.test.ts` checks the schemas
   against `TOOL_SPECS`, so a field added to a tool and not to the Worker fails
   there rather than as a 400 in a routine nobody is watching. A task run's
   `run_at` is ignored for every agent credential, the legacy secret included.
+- **The promo check-in is shown the artist's shows and its own history,
+  because its prompt asks for both.** It was told to write about "an upcoming
+  show" while `list_existing_gigs` returned id, name, url, status and deadline,
+  so it could only guess one from a name; and it had no way to read its earlier
+  drafts, so a single announcement still sitting at `draft` was written again
+  the next month. Shows come from `list_shows` (`GET /api/shows`): Bandsintown,
+  the Manitoba Music profile and calendar, and booked gigs, one row per night,
+  so a house concert that was never filed as a gig is written about like any
+  other. A routine has no calendar connector and must not get one for this —
+  the Google Calendar connector has create and delete tools it would use
+  without asking, and connectors bypass the route list — so "my calendar" means
+  this list. A personal Google Calendar is not readable by the routine, and
+  Scout's own calendar grant (`calendar.app.created`) can only see what Scout
+  put there. A gig carries `performanceStart`, `performanceEnd` and `location`
+  in `list_existing_gigs` when it has show dates (and only then, so the
+  research agents' list is the size it was); that is how the check-in knows a
+  dated gig is *not* a show yet. Dates alone do not settle one — only `booked`
+  gigs reach `list_shows`, and the prompt tells the agent not to announce the
+  rest, since an announcement of a show that then falls through is worse than
+  none. `list_existing_promo_drafts` (`GET /api/promo`) gives each draft's
+  status and the opening of its copy; status is the only account it gets of
+  what the artist did: `draft` unread, `approved` liked, `published` posted.
+  `/api/shows` is a read, but it uses the artist's Bandsintown key inside the
+  Worker and records a failed probe on the connector row; the key is never
+  returned. Still unseen, and where the next gains are: the morning profile
+  scan's new releases and videos, and radio and playlist calls the classifier
+  files as `kind: 'radio'`.
 - **The agents get named, typed tools and never a general HTTP tool.**
   `create_gig_opportunity` is one prompt injection away from being safe;
   `http_request` would be one away from `DELETE /api/gigs/12`.
@@ -1115,11 +1149,23 @@ which is the cost the button exists to avoid. Both purposes return to
 (`src/lib/googleOAuth.ts`) — the path is named after the feature that
 registered it rather than what it now does, deliberately.
 
-The secrets path still works. `calendarTarget` in `src/lib/gigCalendar.ts`
+The secrets path still works. `calendarTarget` in `src/lib/gigNudges.ts`
 prefers a grant and falls back to it, the same "read both spellings" move
 `normaliseGigStatus` makes. A grant that exists but is refused writes nowhere
 rather than falling back — the artist connected a calendar, and writing to the
 owner's instead would be worse than writing nothing.
+
+**"Is the calendar connected" has one answer, and the bell asks it too.**
+`calendarWay` in the same file is the choice `calendarTarget` acts on, made from
+stored rows alone so it costs two D1 reads and never a refresh token. The
+bell's `connection:calendar` row used to ask `calendarConfigured(env)` — the
+Worker secrets, which were never set in production — so a calendar connected
+with the button read *Working* in Settings and *Google Calendar disconnected*
+on the bell, with a Reconnect that reconnected nothing. `test/calendarWay.test.ts`
+runs both against the production schema. Gmail's and Email's rows are still
+the deployment's secrets and binding, which is right for the owner's mailbox
+scan and the mailer, but is the same shape of mistake the day an invited
+artist's own grant is what a screen should be reading.
 
 **Bandsintown is read with the artist's own key, and the key never reaches a
 page.** Bandsintown issues one API key per artist, so a deployment-wide key
@@ -1435,7 +1481,7 @@ for the rest: no news from an undated window is the expected answer.
 
 **Why a cron and not a research routine.** A routine could search the web for a
 form the listing does not link to. It would cost plan allowance, need an agent
-token that can write an address into a gig (none of the seven routes does), and
+token that can write an address into a gig (none of its routes does), and
 leave nothing behind when a run crashed — the heartbeat is the agent's job. The
 cron is free and cannot be skipped. What it cannot reach — a form the listing
 does not link to, and a `ready` read that was really a newsletter box from before
@@ -1731,13 +1777,113 @@ wrong. Cards show `decision.badge` rather than the sentence, and the sentence
 moved to the Review detail, which had never shown it; `test/uiConsistency.test.ts`
 fails if either half goes.
 
-**Note prose names the artist.** The research agents wrote "pending Doug's
-review", so `depersonalise` rewrites the name into the second person on the way
-to the screen; the stored text is untouched. Two rules it must keep: pronouns
-are only rewritten inside sentences that named him, or "his deadline" in a
-sentence about an organiser becomes yours; and drafted field *values* are
-exempt, because "Contact Name: Doug McArthur" is the answer that goes on the
-form, not the app talking.
+**Note prose names the artist, and the name comes from the account.** The
+research agents wrote their notes about whoever they were working for, so the
+prose reads "pending Jane's review". `depersonalise` rewrites that name into the
+second person on the way to the screen; the stored text is untouched. The name
+is `tenants.display_name`, handed in as `ArtistNames` (`artistNames()` in
+`shared/reviewParse.ts`, read by `artistNamesFor` in `src/lib/artistName.ts`) to
+`parseNote`, `buildReviewQueue` and `gigNoteColumns`. It is never in this
+repository: `test/noPersonInCode.test.ts` fails on a first or last name in
+source, and on a flag or function named after a person. What needs the artist
+is `needsArtist`. An account with no name set matches "the artist" and nothing
+more, so a note written about somebody by name keeps the name until the account
+has one, and the welcome questions ask for it. Two rules it must keep:
+pronouns are only rewritten inside sentences that named them, or "his deadline"
+in a sentence about an organiser becomes yours; and drafted field *values* are
+exempt, because "Contact Name: Jane Smith" is the answer that goes on the form,
+not the app talking. A first name that is a day or a month ("Sun Dogs") is not
+used on its own, or "Sat/Sun" would become "Sat/you".
+
+**Scout is for Canadian artists, and says so where it is first read.** Costs
+are in Canadian dollars, the P-2 rule assumes a Canadian act going to the US,
+and the funding and associations are Canadian. That is a statement of who it
+serves, not a restriction on what is shown: an opportunity abroad is never
+left out, it comes with what it takes to get there. The landing page, the
+welcome questions, Help and the page description say it, and
+`test/canadianCopy.test.ts` fails if they stop.
+
+**The privacy policy is a page of its own, and each number in it is the code's.**
+`/privacy/` is `frontend/privacy/index.html`, a second Vite entry
+(`vite.config.ts`) of plain HTML, so it reads with JavaScript off and has an
+address a regulator, a search engine or Google's OAuth review can fetch. The
+Worker names no route for it: static assets serve it, and `/privacy` redirects
+to the slash. It is not a hash route, which is what `/survey-results` is, on
+purpose: a redirect onto a client-rendered page is not a document.
+
+- **Who it names.** Sun Dogs Music Manitoba, a sole proprietorship Doug McArthur
+  registered on 2024-12-30 under the Business Names Registration Act (registry
+  number 10219396, three years from filing, so renew it before December 2027).
+  He is the privacy officer, which PIPEDA's openness principle and Quebec's
+  Law 25 both want named. The postal address is his residence and the
+  registered place of business, and it was already in every email footer.
+- **Which law.** PIPEDA, which covers a Manitoba business and anything crossing
+  a border. Manitoba's own Act (S.M. 2013, c. 17) says it comes into force "on a
+  day to be fixed by proclamation" and nothing found says one was fixed. Bill
+  C-36 (tabled 2026-06-15) would replace PIPEDA and is not law: reread the page
+  when it passes. Quebec residents' Law 25 rights are named, and the page is
+  English only, which the Charter of the French language may not forgive for
+  Quebec users. That is a known gap, not a decision.
+- **Four decisions the owner made.** 18 or older. The AI paragraph states
+  today's practice (the operator's routines on Anthropic's Claude, public pages
+  and the operator's own account) and promises notice and consent before it
+  changes, rather than a flat promise, because per-artist model matching is
+  planned (`docs/matching-gaps.md`). Fonts are self-hosted
+  (`frontend/src/fonts.ts`) so the page can say no company except Cloudflare
+  sees a visitor's address; emails link no web font either, since a client
+  fetching one tells the font service the message was opened. English only.
+- **What pins it.** `test/privacyPolicy.test.ts` ties the page to the session,
+  challenge, setup-code, elevation, notification, invitation and usage lengths,
+  to the Google connection cookie's ten minutes, to the absence of any outside
+  host, analytics or web font, to the Limited Use sentence, and to account
+  removal reaching the invitation row. Change a number in code and the test
+  fails until the page says the new one. Change the page and its date together.
+- **Gaps it says out loud rather than hides.** There is no self-service export
+  or deletion: both are a request by email, answered within 30 days, and the
+  removal is `removeTenant`. An invitation nobody used is never pruned, so its
+  name and address stay, and the retention list says that. If the document
+  reader is ever pointed at a file in an artist's Drive, "what we receive from
+  Google is never passed to an AI service" stops being true, and Google's
+  Limited Use rules need explicit consent for that transfer.
+
+**Goals and reach order what is undecided, and remove nothing.** The welcome
+questions are read in `shared/artistFocus.ts`, and the queue carries the result
+on each item (`ReviewItem.focus`). Two rules: *what was asked for outranks how
+far it is* (a grant when they said gigs sorts below a festival a flight away),
+and a deadline outranks both, because a date that bites is not a preference.
+Only items nobody has decided on are ordered; a gig already sent is left where
+it is. "My province" is the province in the home base set in Settings, never a
+guess, and with no home base a Canadian place is neither within reach nor
+beyond it. Something beyond the reach they chose gets a note saying so and
+sorts later; it is never hidden, since a ranker that hides what it scores low
+never learns it was wrong. The routes read the two settings (`focusFor`) and
+hand them in, like `today`.
+
+**A trip is income, an investment, or could be either.** `estimateGigCost`
+returns the estimated total cost (`gross`), the pay itemised (`payLines`) and an
+`outlook`, decided from the range and never a midpoint: *Income* when it pays
+more than it costs even at the expensive end, *Investment* when it costs more
+than it pays even at the cheap end, and *Could pay its way* when the two
+overlap. The words are chosen. A showcase that does not break even is spending
+on being heard, and "loss" makes the most useful rooms look like mistakes, so
+`test/gigCost.test.ts` fails if a word of loss comes back. No pay recorded is
+not zero pay: an investment then says so. Lines say what they are, with a
+sentence of what is inside (flights, accommodation, meals, local transport),
+and food is split from getting around without moving the total.
+
+**The deployment's mailbox, calendar and sending address are the owner's.**
+`GMAIL_REFRESH_TOKEN` is one inbox, `GOOGLE_REFRESH_TOKEN` and
+`GOOGLE_CALENDAR_ID` one calendar. Anything that reads them on a tenant's
+behalf is reading the owner's, so it asks `isOwnerTenant` first
+(`src/lib/actor.ts`): the reply scan and the sent-mail reconcile
+(`refuseUnlessMailboxOwner`), the calendar's secrets path (`calendarWay`), the
+bell's Gmail and email rows, and the Settings rows that describe them. An
+artist's own mailbox is a grant they would make, like Gmail drafting, and is
+not built. Publishing to the shared catalog is the owner's agents only
+(`agentMayPublish`): any artist can issue themselves an agent token, and what
+their agent files is a stranger's claim about a page, catalogued and linked to
+their own row and not shown to anybody else until the owner shows it.
+`test/ownerOnly.test.ts` fails on a route that reads the mailbox without asking.
 
 **A bulk write previews first, and the shell that does it is shared.**
 `Disclosure` in `components/ui/` is the closed-row → open → preview → apply

@@ -8,7 +8,7 @@
  * redirects to — so the artist's name finds those.
  *
  * **The keyword search matches substrings, so its results are candidates, not
- * shows.** `keyword:McArthur` would return a Mary McArthur too. An event
+ * shows.** `keyword:Smith` would return a Mary Smith too. An event
  * counts only when a name in its *line-up* is the artist's name exactly —
  * case, accents and punctuation aside. A name in the description ("hosted by
  * …") is prose and does not count; that is the same restraint the rest of

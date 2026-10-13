@@ -8,7 +8,7 @@
  * Name" fact is three lines of markdown, "Genre" is a paragraph plus an FFO
  * list plus an influences list, and the press quote carries its attribution on
  * a dash line. Printed verbatim that is a wall of uppercase text over a
- * heading reading "Doug" — which is what the first version shipped.
+ * heading reading "Jane" — which is what the first version shipped.
  *
  * So this module takes each value apart along the seams the documents
  * actually use — lines, blank-line paragraphs, `Label:` prefixes, a closing

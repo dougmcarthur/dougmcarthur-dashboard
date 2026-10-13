@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { buildReviewQueue, isNew } from '../shared/reviewQueue'
+import { buildReviewQueue as buildQueue, isNew } from '../shared/reviewQueue'
+import { artistNames } from '../shared/reviewParse'
 import { GIG_STATUS_BY_INTENT, actionGlyph, inlineGigMoves, promoMoves } from '../shared/decisionCopy'
 import { GIG_STATUSES, isGigTransitionAllowed, normaliseGigStatus } from '../shared/gigStatus'
 import type { GigOpportunity, SyncTarget, PromoDraft } from '../shared/types'
+
+// The notes below name the artist, as agents wrote them. The name is the account's.
+const JANE = artistNames('Jane Smith')
+const buildReviewQueue = (input: Parameters<typeof buildQueue>[0]) => buildQueue({ artist: JANE, ...input })
 
 function gig(o: Partial<GigOpportunity> & { id: number; name: string }): GigOpportunity {
   return {
@@ -47,7 +52,7 @@ describe('decision copy — the sentence names the decision', () => {
     const item = first({
       gigs: [gig({
         id: 1, name: 'Home Routes', status: 'submitted',
-        fitNotes: 'Submission status: NOT submitted. Contact Phone: needs Doug, not on file.',
+        fitNotes: 'Submission status: NOT submitted. Contact Phone: needs Jane, not on file.',
       })],
     })
     // The stage, not the stored status: the screens say "Applied".
@@ -167,7 +172,7 @@ describe('decision copy — the sentence names the decision', () => {
     const item = first({
       sync: [sync({
         id: 4, name: 'ThinkSync Music',
-        notes: 'IMPORTANT: a separate ThinkSync Music row already exists in this table. Doug should pick one to actually send.',
+        notes: 'IMPORTANT: a separate ThinkSync Music row already exists in this table. Jane should pick one to actually send.',
       })],
     })
     expect(item.decision.rationale).toContain('Pick one to send.')
@@ -179,7 +184,7 @@ describe('decision copy — the sentence names the decision', () => {
     const item = first({
       gigs: [gig({
         id: 20, name: 'Home Routes', status: 'submitted',
-        fitNotes: "Submission status: NOT submitted. Drafted field values: Contact Phone: needs Doug, not on file; Mailing Address: needs Doug, only 'Winnipeg, MB' on file.",
+        fitNotes: "Submission status: NOT submitted. Drafted field values: Contact Phone: needs Jane, not on file; Mailing Address: needs Jane, only 'Winnipeg, MB' on file.",
       })],
     })
     expect(item.decision.rationale).toContain('It still needs your contact phone and mailing address.')
@@ -188,13 +193,13 @@ describe('decision copy — the sentence names the decision', () => {
 
   it('names what it is waiting on when the blocker is the point', () => {
     const item = first({
-      gigs: [gig({ id: 5, name: 'Sofar', fitNotes: 'Doug should pick the video and submit himself when ready.' })],
+      gigs: [gig({ id: 5, name: 'Sofar', fitNotes: 'Jane should pick the video and submit himself when ready.' })],
     })
     // The Overview deck builds its sentence from the same parsed prose the
     // Review pane shows, and went on naming him for a day after that pane was
     // fixed — which is why the rewrite moved into the parser.
     expect(item.decision.rationale).toMatch(/^Waiting on you: you should pick the video/)
-    expect(item.decision.rationale).not.toMatch(/Doug/)
+    expect(item.decision.rationale).not.toMatch(/Jane/)
   })
 
   it('reads differently for an unapproved promo draft than an approved one', () => {
@@ -263,7 +268,7 @@ describe('decision copy — invariants that hold for every item', () => {
       sync({ id: 17, name: 'Dupe', notes: 'IMPORTANT: a separate row already exists in this table.' }),
       sync({
         id: 18, name: 'Missing fields', status: 'sent',
-        notes: "Submission status: NOT submitted. Drafted values: Contact Phone: needs Doug, not on file; Mailing Address: needs Doug, only 'Winnipeg, MB' on file.",
+        notes: "Submission status: NOT submitted. Drafted values: Contact Phone: needs Jane, not on file; Mailing Address: needs Jane, only 'Winnipeg, MB' on file.",
       }),
     ],
     // Every promo status, including one the column is free to hold and no

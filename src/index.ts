@@ -21,6 +21,9 @@ import { enrichTravel } from './lib/travelEnrich'
 import digest, { composeDigest, recordDigest } from './routes/digest'
 import syncReconcile from './routes/syncReconcile'
 import replies, { runReplyScan } from './routes/replies'
+import matching from './routes/matching'
+import catalogAgent from './routes/catalogAgent'
+import { matchNewForTenant } from './lib/catalogMatch'
 import backfill, { runNotesBackfillOnce } from './routes/backfill'
 import auth from './routes/auth'
 import gmailDrafts from './routes/gmailDrafts'
@@ -44,7 +47,8 @@ import showsRoute from './routes/shows'
 import driveRoute from './routes/drive'
 import googleAccounts from './routes/googleAccounts'
 import { epk as epkRoute, publicEpk } from './routes/epk'
-import { readDigestSettings, writeSetting, DIGEST_KEYS } from './lib/settings'
+import { readDigestSettings } from './lib/settings'
+import { readAccountDigest, recordDigestSent } from './lib/digestSettings'
 import { isDigestDue } from '../shared/digestSchedule'
 import { sendMail, mailerConfigured } from './lib/mailer'
 import { gmailConfigured } from './lib/gmail'
@@ -253,6 +257,8 @@ app.route('/api/calendar', calendarConnect)
 app.route('/api/tasks', tasksConnect)
 app.route('/api/nudges', nudgeRouting)
 app.route('/api/replies', replies)
+app.route('/api/matching', matching)
+app.route('/api/catalog', catalogAgent)
 app.route('/api/notifications', notifications)
 app.route('/api/digest', digest)
 app.route('/api/travel', travel)
@@ -290,10 +296,14 @@ app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))
  * except as a retry.
  */
 async function runDigest(env: Env, tenant: TenantId): Promise<void> {
-  const settings = await readDigestSettings(env)
+  const settings = await readAccountDigest(env, tenant)
   if (!settings.enabled) return
   if (!mailerConfigured(env)) {
     console.error('digest: enabled but no email binding — nothing sent')
+    return
+  }
+  if (!settings.recipient) {
+    console.error('digest: enabled but no recipient is set — nothing sent')
     return
   }
 
@@ -313,7 +323,8 @@ async function runDigest(env: Env, tenant: TenantId): Promise<void> {
   try {
     await sendMail(env, {
       to: settings.recipient,
-      audience: 'owner',
+      audience: settings.audience,
+      tenant,
       from: settings.sender,
       subject,
       text,
@@ -340,7 +351,7 @@ async function runDigest(env: Env, tenant: TenantId): Promise<void> {
   // Written only after the send resolves, for the same reason the reporting
   // marks are: a failed send must be retried on the next tick, not counted as
   // this week's.
-  await writeSetting(env, DIGEST_KEYS.lastSentAt, new Date().toISOString())
+  await recordDigestSent(env, tenant, new Date())
 
   await recordEvent(env, tenant, {
     kind: 'digest',
@@ -530,6 +541,21 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
       console.error('profile scan failed:', err)
     }
   }
+
+  // Match what research collected since yesterday to each artist, a few at a
+  // time and only what they asked for, with a bell event saying so. Per tenant,
+  // because what matches is that artist's own: their goals, their reach, their
+  // province. Reads the shared catalog and writes only to this tenant's rows. See
+  // src/lib/catalogMatch.ts.
+  const now = new Date().toISOString()
+  for (const tenant of tenants) {
+    try {
+      const done = await matchNewForTenant(env, tenant, today, now)
+      if (done.added) console.log(`matching: ${done.added} new for ${tenant}`)
+    } catch (err) {
+      console.error('catalog matching failed:', err)
+    }
+  }
 }
 
 /** The daily reconcile, with its queries. See `reconcileAllGigs`. */
@@ -617,15 +643,14 @@ async function runReplyScanIfDue(env: Env, tenant: TenantId): Promise<void> {
  * question — which conditions are still live is derived from that artist's own
  * feed. Event retention is not, and is done once beside it.
  *
- * **The digest and the reply scan are the owner's tenant only**, because their
- * inputs are platform configuration rather than the tenant's: the schedule and
- * recipient live in `app_settings`, and the mailbox is `GMAIL_REFRESH_TOKEN`,
- * one Worker secret pointing at one inbox. Looping those over every tenant
- * would mail the owner N times and scan the owner's mailbox on a stranger's
- * behalf, which is worse than not running. Giving each artist their own digest
- * schedule and their own mailbox grant is real work with a schema behind it
- * (`docs/multi-tenant-plan.md` — it is not in this step, and it is not
- * pretended to be).
+ * **The digest is every tenant's own.** Each account has its switch and
+ * schedule in `tenant_settings`, off until they turn it on, and an artist's
+ * goes to the address they sign in with, never one typed into a settings row
+ * (`src/lib/digestSettings.ts`). **The reply scan is the owner's tenant only**,
+ * because its input is `GMAIL_REFRESH_TOKEN`, one Worker secret pointing at
+ * one inbox: looping it over every tenant would scan the owner's mailbox on a
+ * stranger's behalf, which is worse than not running. An artist's own mailbox
+ * is a grant they would make, like Gmail drafting, and is not built.
  *
  * **The notes backfill is every tenant under one marker**, because it is a
  * one-shot over rows that predate the extractor.
@@ -639,11 +664,16 @@ async function runScheduled(env: Env): Promise<void> {
   const owner = await ownerTenant(env)
 
   await Promise.all([
-    owner
-      ? runDigest(env, owner).catch((err) => {
+    // Every account's own digest, one after another. Each is a few reads to
+    // decide whether its hour has come, and a compose only when it has; the
+    // switch is off until the artist turns it on, so most ticks find nothing.
+    (async () => {
+      for (const tenant of tenants) {
+        await runDigest(env, tenant).catch((err) => {
           console.error('digest run failed:', err)
         })
-      : Promise.resolve(),
+      }
+    })(),
     runHousekeeping(env, tenants).catch((err) => {
       console.error('housekeeping failed:', err)
     }),

@@ -79,7 +79,15 @@ export function OnboardingCard({
 
   /** Where the welcome questions open for a step that is asked there. */
   const flowFor = (step: OnboardingStep): FlowScreen | null =>
-    step.id === 'name' ? 'name' : step.id === 'goals' ? (step.done ? 'goals' : 'welcome') : null
+    step.id === 'name'
+      ? 'name'
+      : step.id === 'about'
+        ? 'where'
+        : step.id === 'goals'
+          ? step.done
+            ? 'goals'
+            : 'welcome'
+          : null
 
   if (!open) {
     const upNext = next ?? optional.find((s) => !s.done)

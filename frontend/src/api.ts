@@ -1,6 +1,6 @@
 import type { CredentialHealth } from '../../shared/credentialHealth'
 import type { FeedbackContext, FeedbackKind } from '../../shared/feedback'
-import type { GoalId, Goals, OnboardingStep, ReachId } from '../../shared/onboarding'
+import type { GenreId, GoalId, Goals, OnboardingStep, Profile, ReachId, RegionId } from '../../shared/onboarding'
 import type { StagePlot } from '../../shared/stagePlot'
 import type { PaletteId } from '../../shared/themes'
 import type { DocumentReading } from '../../shared/documentReadings'
@@ -329,6 +329,12 @@ export interface HealthStatus {
   gmailMissingSecrets: string[]
   emailConfigured: boolean
   /**
+   * Whether the connections above are about this account at all. False for an
+   * artist, whose Gmail mailbox and sending address do not exist: those are the
+   * owner's server secrets.
+   */
+  platform: boolean
+  /**
    * Whether each connection actually *works*, as last checked.
    *
    * The booleans above say the secrets are set, which a credential Google
@@ -386,6 +392,8 @@ export interface DigestSettings {
   enabled: boolean
   recipient: string
   sender: string
+  /** Only the owner's digest has a recipient that can be changed. An artist's goes to the address they sign in with. */
+  recipientEditable: boolean
 }
 
 export interface DigestSchedule {
@@ -396,6 +404,8 @@ export interface DigestSchedule {
   describes: string
   nextRun: string | null
   lastSentAt: string | null
+  /** The account picked its time zone, as opposed to being handed the platform's. */
+  zoneChosen: boolean
 }
 
 export interface DigestLine {
@@ -1096,8 +1106,19 @@ export const api = {
     read: () => apiFetch<OnboardingState>('/onboarding'),
     saveGoals: (goals: { goals: GoalId[]; reach: ReachId[]; note: string | null }) =>
       apiFetch<{ goals: Goals | null }>('/onboarding/goals', { method: 'PUT', body: JSON.stringify(goals) }),
+    saveProfile: (profile: { region?: RegionId | null; city?: string | null; genres?: GenreId[] }) =>
+      apiFetch<{ profile: Profile | null }>('/onboarding/profile', { method: 'PUT', body: JSON.stringify(profile) }),
     hide: () => apiFetch<{ hidden: boolean }>('/onboarding/hide', { method: 'POST' }),
     show: () => apiFetch<{ hidden: boolean }>('/onboarding/show', { method: 'POST' }),
+  },
+  matching: {
+    starter: () => apiFetch<StarterPreview>(`/matching/starter?today=${localToday()}`),
+    addStarter: () =>
+      apiFetch<{ added: number; names: string[] }>(`/matching/starter?today=${localToday()}`, { method: 'POST' }),
+    decline: () => apiFetch<{ ok: boolean }>('/matching/starter/decline', { method: 'POST' }),
+    settings: () => apiFetch<{ enabled: boolean }>('/matching/settings'),
+    setEnabled: (enabled: boolean) =>
+      apiFetch<{ enabled: boolean }>('/matching/settings', { method: 'PUT', body: JSON.stringify({ enabled }) }),
   },
   /** The logged-out landing page. Public routes: no session needed or sent. */
   publicSite: {
@@ -1381,6 +1402,40 @@ export interface BackfillResult {
   byColumn: Record<string, number>
 }
 
+/** One opportunity from the shared catalog, as the preview shows it. */
+export interface StarterMatch {
+  id: number
+  name: string
+  category: string
+  kind: string | null
+  location: string | null
+  deadline: string | null
+  deadlineNote: string | null
+  url: string | null
+  /** Why it is here, in sentences. */
+  reasons: string[]
+  /** What the listing does not say. */
+  unknowns: string[]
+}
+
+/** What Scout found for this artist, before any of it is added. */
+export interface StarterPreview {
+  /** They have told Scout something to match on. */
+  said: boolean
+  /** They have already added the set or said not now. */
+  answered: boolean
+  /** They switched suggestions off. */
+  off: boolean
+  limit: number
+  willAdd: StarterMatch[]
+  /** Matched, and not in the set. */
+  rest: number
+  /** Still in the holding period. */
+  held: number
+  skipped: Array<{ reason: string; count: number; example: string }>
+  unknowns: Record<string, number>
+}
+
 /** The first-run checklist. See shared/onboarding.ts. */
 export interface OnboardingState {
   steps: OnboardingStep[]
@@ -1388,11 +1443,16 @@ export interface OnboardingState {
   total: number
   complete: boolean
   goals: Goals | null
+  /** Where they are based and what they play. Null until they have said. */
+  profile: Profile | null
   next: Array<{ label: string; href: string }>
   hidden: boolean
   options: {
     goals: ReadonlyArray<{ id: GoalId; label: string }>
     reach: ReadonlyArray<{ id: ReachId; label: string }>
+    regions: ReadonlyArray<{ id: RegionId; label: string }>
+    genres: ReadonlyArray<{ id: GenreId; label: string }>
+    maxGenres: number
   }
 }
 

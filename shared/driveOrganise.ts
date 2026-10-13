@@ -6,7 +6,7 @@
  * stage plot called `Untitled document`. Scout builds that folder instead —
  * see `src/routes/drive.ts` — and this module is the part that decides:
  * which subfolder a file goes in, and a predictable name for it, so a juror
- * who downloads everything gets `DougMcArthur_Photo_01.jpg` rather than a
+ * who downloads everything gets `ArtistName_Photo_01.jpg` rather than a
  * pile they have to open to identify.
  *
  * It **plans**; it never writes. `planOrganise` returns every rename and move
@@ -49,7 +49,7 @@ export function subfolderFor(f: { name: string; mimeType: string }): Subfolder {
   return 'Other'
 }
 
-/** "Doug McArthur" → "DougMcArthur"; accents dropped, nothing but letters and digits. */
+/** "Jane Smith" → "JaneSmith"; accents dropped, nothing but letters and digits. */
 export function artistSlug(name: string): string {
   const words = name
     .normalize('NFKD')

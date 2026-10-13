@@ -12,6 +12,8 @@
  * `docs/passkey-login.md` for why the agents have one at all.
  */
 
+import { SOURCE_LABELS, type MergedShow, type ShowSource } from '../../shared/showMerge'
+
 export interface ApiConfig {
   baseUrl: string
   /**
@@ -91,14 +93,166 @@ function compact(row: Record<string, unknown>): ExistingRow {
   }
 }
 
-export async function listGigs(cfg: ApiConfig): Promise<ExistingRow[]> {
+/**
+ * A gig that has a stage date on it.
+ *
+ * Only those rows carry the extra three fields, so the list stays the size it
+ * was for the research agents: a row nobody has put show dates on is a lead,
+ * and what the check-in needs to know about a lead is that it exists. The
+ * promo check-in is told to write about a show, and without these it could
+ * only guess one from a name and a `booked` status. `status` is still the
+ * word that says whether the dates are confirmed — the dates alone are not.
+ */
+export interface ExistingGig extends ExistingRow {
+  performanceStart?: string
+  performanceEnd?: string | null
+  location?: string | null
+}
+
+function text(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null
+}
+
+function compactGig(row: Record<string, unknown>): ExistingGig {
+  const base = compact(row)
+  const start = text(row.performanceStart)
+  if (!start) return base
+  return { ...base, performanceStart: start, performanceEnd: text(row.performanceEnd), location: text(row.location) }
+}
+
+export async function listGigs(cfg: ApiConfig): Promise<ExistingGig[]> {
   const rows = await request<Array<Record<string, unknown>>>(cfg, '/gigs')
-  return rows.map(compact)
+  return rows.map(compactGig)
 }
 
 export async function listSyncTargets(cfg: ApiConfig): Promise<ExistingRow[]> {
   const rows = await request<Array<Record<string, unknown>>>(cfg, '/sync')
   return rows.map(compact)
+}
+
+/**
+ * An earlier promo draft, as the check-in sees it.
+ *
+ * Without this the monthly run starts every month not knowing what it wrote the
+ * last one: a single announcement still sitting at `draft` gets drafted again.
+ * `status` is the only account it gets of what the artist did with a draft
+ * (`draft` unread, `approved` liked, `published` posted), so it travels; the
+ * body does not, because a title and the opening of the copy settle "have I
+ * written about this" and a year of full drafts would not.
+ */
+export interface ExistingPromoDraft {
+  id: number
+  month: string
+  title: string
+  status: string | null
+  createdAt: string | null
+  opening: string
+}
+
+export const PROMO_OPENING_CHARS = 160
+
+/** The first words of a draft, on one line, cut at a word. */
+function opening(content: unknown): string {
+  const flat = String(content ?? '').replace(/\s+/g, ' ').trim()
+  if (flat.length <= PROMO_OPENING_CHARS) return flat
+  const cut = flat.slice(0, PROMO_OPENING_CHARS)
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), 1)).trimEnd()}...`
+}
+
+export async function listPromoDrafts(cfg: ApiConfig): Promise<ExistingPromoDraft[]> {
+  const rows = await request<Array<Record<string, unknown>>>(cfg, '/promo')
+  return rows.map((row) => ({
+    id: Number(row.id),
+    month: String(row.month ?? ''),
+    title: String(row.title ?? ''),
+    status: (row.status as string) ?? null,
+    createdAt: (row.createdAt as string) ?? null,
+    opening: opening(row.content),
+  }))
+}
+
+/**
+ * A show, as the promo check-in sees it.
+ *
+ * `/api/shows` folds Bandsintown, the Manitoba Music profile and calendar, and
+ * the gigs booked in Scout into one row per night. What it keeps that the
+ * agent has a use for is where each show is listed (a show on the province's
+ * calendar and nowhere the artist keeps is a post waiting to be written) and
+ * which listings it is missing from. Everything else the screen uses to draw a
+ * row (a React key, a gig id, every source's link) stays behind.
+ */
+export interface ShowForPromo {
+  date: string
+  time: string | null
+  title: string | null
+  venue: string | null
+  location: string | null
+  withArtists: string[]
+  /** A ticket link when one exists, else an event page. */
+  link: string | null
+  linkIsTickets: boolean
+  /** Where it is listed, by name: "Booked in Scout", "Bandsintown", ... */
+  listedOn: string[]
+  /** Listings the artist keeps that an upcoming show is not on. */
+  missingFrom: string[]
+}
+
+export interface ShowList {
+  /** The date the list was cut at, so "upcoming" has an anchor. */
+  today: string
+  upcoming: ShowForPromo[]
+  /** Shows in the last `RECENT_SHOW_DAYS` days, newest first. */
+  recent: ShowForPromo[]
+  /**
+   * Which sources answered. A source that failed is reported here and does not
+   * fail the list, so a short list with a failed source is not the whole story.
+   */
+  sources: Array<{ source: string; status: string; note: string | null }>
+}
+
+/** Far enough back for a thank-you after a show, not a year of Bandsintown history. */
+export const RECENT_SHOW_DAYS = 45
+
+function daysBefore(day: string, days: number): string {
+  const d = new Date(`${day}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - days)
+  return d.toISOString().slice(0, 10)
+}
+
+function forPromo(show: MergedShow): ShowForPromo {
+  return {
+    date: show.date,
+    time: show.time,
+    title: show.title,
+    venue: show.venue,
+    location: show.location,
+    withArtists: show.withArtists,
+    link: show.ticketUrl ?? show.links[0]?.url ?? null,
+    linkIsTickets: show.ticketUrl !== null,
+    listedOn: show.sources.map((s) => SOURCE_LABELS[s]),
+    missingFrom: show.missingFrom.map((s) => SOURCE_LABELS[s]),
+  }
+}
+
+/**
+ * Cut at the UTC date. The route would default to the same one; it is stated
+ * here so the list carries the date it was cut at. The monthly run fires at
+ * 12:00 UTC, which is morning in Winnipeg, so UTC and local agree.
+ */
+export async function listShows(cfg: ApiConfig, now: Date = new Date()): Promise<ShowList> {
+  const today = now.toISOString().slice(0, 10)
+  const body = await request<{
+    upcoming: MergedShow[]
+    past: MergedShow[]
+    sources: Array<{ source: string; status: string; note: string | null }>
+  }>(cfg, `/shows?today=${today}`)
+  const since = daysBefore(today, RECENT_SHOW_DAYS)
+  return {
+    today,
+    upcoming: body.upcoming.map(forPromo),
+    recent: body.past.filter((s) => s.date >= since).map(forPromo),
+    sources: body.sources.map(({ source, status, note }) => ({ source: SOURCE_LABELS[source as ShowSource] ?? source, status, note })),
+  }
 }
 
 export async function listReferenceDocs(

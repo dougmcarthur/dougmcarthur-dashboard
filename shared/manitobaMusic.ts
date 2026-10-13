@@ -9,7 +9,7 @@
  * have one. So it is read, the way the reference documents are read.
  *
  * **The artist gives the address; Scout never looks one up.** A search by
- * name would find the wrong Doug on the day there are two, and would file a
+ * name would find the wrong Jane on the day there are two, and would file a
  * stranger's bio as yours. `profileUrl` accepts a profile address and nothing
  * else, and connecting shows the name and photo first so the artist confirms
  * it is them.

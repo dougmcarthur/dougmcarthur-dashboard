@@ -8,7 +8,9 @@ import {
   createPromoDraft,
   createSyncTarget,
   listGigs,
+  listPromoDrafts,
   listReferenceDocs,
+  listShows,
   listSyncTargets,
   logRun,
   resolveBaseUrl,
@@ -19,7 +21,7 @@ import {
 import { TOOL_SPECS, fieldLines, inputProblem } from '../scripts/agents/tools'
 
 /**
- * An issued agent token reaches nine routes and nothing else.
+ * An issued agent token reaches eleven routes and nothing else.
  *
  * The routines that hold one are Claude Code sessions with a shell, and the
  * proxy attaches their credential to any request for the host — so the list in
@@ -43,6 +45,16 @@ describe('what an issued agent token may call', () => {
       ['POST', '/api/gigs/12/application'],
       ['POST', '/api/sync/reconcile'],
       ['DELETE', '/api/sync/3'],
+      // The promo list is exact-path: reading drafts is not editing or removing them.
+      ['PATCH', '/api/promo/3'],
+      ['DELETE', '/api/promo/3'],
+      ['GET', '/api/promo/3'],
+      // The show list is a read. The Bandsintown key lives behind the connectors
+      // route, which is the artist's alone.
+      ['POST', '/api/shows'],
+      ['GET', '/api/shows/1'],
+      ['GET', '/api/connectors'],
+      ['PUT', '/api/connectors/bandsintown'],
       ['GET', '/api/task-runs'],
       ['GET', '/api/agent-tokens'],
       ['POST', '/api/agent-tokens'],
@@ -76,8 +88,11 @@ describe('the agent runners ask only for what the Worker allows', () => {
       'fetch',
       vi.fn(async (url: string, init?: RequestInit) => {
         const method = init?.method ?? 'GET'
-        seen.push({ method, path: new URL(url).pathname, headers: (init?.headers ?? {}) as Record<string, string> })
-        return new Response(JSON.stringify(method === 'POST' ? { id: 1 } : []), { status: 200 })
+        const path = new URL(url).pathname
+        seen.push({ method, path, headers: (init?.headers ?? {}) as Record<string, string> })
+        // The show list is an object, not a list of rows.
+        const body = method === 'POST' ? { id: 1 } : path === '/api/shows' ? { upcoming: [], past: [], sources: [] } : []
+        return new Response(JSON.stringify(body), { status: 200 })
       }),
     )
     return seen
@@ -91,6 +106,8 @@ describe('the agent runners ask only for what the Worker allows', () => {
     await listReferenceDocs(cfg)
     await listGigs(cfg)
     await listSyncTargets(cfg)
+    await listPromoDrafts(cfg)
+    await listShows(cfg)
     await createGig(cfg, { name: 'x' })
     await createSyncTarget(cfg, { name: 'x' })
     await createPromoDraft(cfg, { title: 'x' })
@@ -98,7 +115,7 @@ describe('the agent runners ask only for what the Worker allows', () => {
     await listDocumentsToRead(cfg).catch(() => {})
     await fileDocumentReading(cfg, { assetId: 1, url: 'https://x.test/plot.pdf', text: 't' })
 
-    expect(seen).toHaveLength(9)
+    expect(seen).toHaveLength(11)
     for (const { method, path } of seen) expect(agentMayCall(method, path), `${method} ${path}`).toBe(true)
   })
 

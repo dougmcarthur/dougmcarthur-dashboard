@@ -1,4 +1,5 @@
-import { type GigOpportunity, type GigStatus } from '../../api'
+import { useQuery } from '@tanstack/react-query'
+import { api, type GigOpportunity, type GigStatus } from '../../api'
 import { normaliseGigStatus } from '../../../../shared/gigStatus'
 import { gigFlag, gigMoves, gigStage } from '../../../../shared/gigStage'
 import { formatPerformanceSpan } from '../../../../shared/performance'
@@ -8,7 +9,7 @@ import { ApplicationPanel } from './ApplicationPanel'
 import { CostPanel } from './CostPanel'
 import { Caption } from '../../components/ui/Surface'
 import { DraftedMessage } from '../../components/DraftedMessage'
-import { depersonalise, splitDraftedMessage } from '../../../../shared/reviewParse'
+import { artistNames, depersonalise, splitDraftedMessage } from '../../../../shared/reviewParse'
 import { mappablePlace, mapsLink } from '../../../../shared/travelDistance'
 
 /** The read-only expansion under a table row. */
@@ -48,6 +49,10 @@ export function GigDetail({
   // the message out so it can be read and copied on its own; the rest is the
   // reasoning, in the second person like the Review screen shows it.
   const why = splitDraftedMessage(gig.fitRationale ?? gig.fitNotes ?? '')
+  // The note was written about whoever owns this account, by name. The name is
+  // theirs, from the account, and is what gets rewritten into "you".
+  const profile = useQuery({ queryKey: ['profile'], queryFn: api.profile.read })
+  const names = artistNames(profile.data?.displayName)
   const whoseMove =
     stage === 'closed' ? null : stage === 'applied' && !gigFlag(status) ? 'Their move' : 'Your move'
 
@@ -56,7 +61,7 @@ export function GigDetail({
       {why.rest && (
         <div>
           <Caption spaced>Why it fits</Caption>
-          <p className="text-sm text-body leading-relaxed">{depersonalise(why.rest)}</p>
+          <p className="text-sm text-body leading-relaxed">{depersonalise(why.rest, names)}</p>
         </div>
       )}
 

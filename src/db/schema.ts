@@ -122,6 +122,8 @@ export const gigOpportunities = sqliteTable('gig_opportunities', {
   updatedAt: text('updated_at').notNull(),
   /** The shared catalog entry for this listing. See migration 0033. */
   opportunityId: integer('opportunity_id'),
+  /** 'catalog' for a row Scout added from the shared catalog; null otherwise. See migration 0040. */
+  origin: text('origin'),
 })
 
 export const syncTargets = sqliteTable('sync_targets', {
@@ -725,6 +727,18 @@ export const opportunities = sqliteTable('opportunities', {
   /** The fee the listing states, uninterpreted. Migration 0034. */
   feeAmount: real('fee_amount'),
   feeCurrency: text('fee_currency'),
+  /** What matching needs about the listing. All nullable, and null is "no claim". Migration 0040. */
+  region: text('region'),
+  genres: text('genres'), // JSON array of genre ids
+  eligibility: text('eligibility'), // JSON, see shared/catalogMatch.ts
+  opensAt: text('opens_at'),
+  paysAmount: real('pays_amount'),
+  paysCurrency: text('pays_currency'),
+  foundBy: text('found_by'), // agent | poller | artist | owner
+  sourceId: integer('source_id'),
+  /** null = after the holding period, 'approved' = now, 'blocked' = never. */
+  delivery: text('delivery'),
+  checkedAt: text('checked_at'),
   firstSeenAt: text('first_seen_at').notNull(),
   lastSeenAt: text('last_seen_at').notNull(),
 })
@@ -838,6 +852,8 @@ export const catalogCandidates = sqliteTable('catalog_candidates', {
   reason: text('reason').notNull(),
   /** `new`, `ignored`, `stale` or `closed`. */
   status: text('status').notNull(),
+  /** Set when this became a catalog entry, so it is not promoted twice. Migration 0040. */
+  opportunityId: integer('opportunity_id'),
   firstSeenAt: text('first_seen_at').notNull(),
   lastSeenAt: text('last_seen_at').notNull(),
 })

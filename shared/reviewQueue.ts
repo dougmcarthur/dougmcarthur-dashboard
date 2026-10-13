@@ -10,9 +10,9 @@
  * production not one gig carries that status, not one sync target carries
  * `draft_ready`, and not one promo draft carries `draft` — so the Overview
  * page's "Needs review" section is permanently empty even though most rows
- * are, in fact, waiting on Doug. What actually records that state is the
+ * are, in fact, waiting on the artist. What actually records that state is the
  * prose in the note column ("Submission status: NOT submitted", "pending
- * Doug's review", "⚠️ PAID ENTRY"), so the queue is built from the parsed
+ * Jane's review", "⚠️ PAID ENTRY"), so the queue is built from the parsed
  * note and the workflow status together.
  *
  * Where the two disagree — status says `submitted`, note says NOT submitted —
@@ -26,9 +26,12 @@ import type { GigOpportunity, SyncTarget, PromoDraft } from './types'
 import { decisionFor, type Decision } from './decisionCopy'
 import { visaLead } from './gigCost'
 import { withStoredColumns } from './noteColumns'
+import { focusOfItem, type Focus, type ItemFocus } from './artistFocus'
 import { pitchGate, termsOf } from './syncTerms'
 import {
   parseNote,
+  ANONYMOUS,
+  type ArtistNames,
   parseFee,
   parseDeadline,
   daysUntil,
@@ -95,6 +98,11 @@ export interface ReviewItem {
   snooze: SnoozeState
   /** How long a sent application has gone unanswered. Null unless it was sent. */
   silence: SubmissionSilence | null
+  /**
+   * How this sits against what the artist said they want. Null when they have
+   * not said, and then nothing is ordered by it. See `shared/artistFocus.ts`.
+   */
+  focus: ItemFocus | null
   /** The sentence and buttons for this item — see decisionCopy.ts. */
   decision: Decision
   source: ReviewSource
@@ -366,7 +374,7 @@ function flagsFor(
   if (parsed.alerts.some((a) => a.severity === 'danger')) {
     flags.push({ id: 'issue', label: 'Flagged issue', severity: 'danger', kind: 'warning' })
   }
-  if (parsed.blockers.length > 0 || parsed.draftedFields.some((f) => f.needsDoug)) {
+  if (parsed.blockers.length > 0 || parsed.draftedFields.some((f) => f.needsArtist)) {
     flags.push({ id: 'blocked', label: 'Needs you', severity: 'warn', kind: 'warning' })
   }
   if (fee.required) {
@@ -393,11 +401,11 @@ function score(flags: ReviewFlag[], deadline: ParsedDeadline): number {
   return base + urgency
 }
 
-function gigItem(row: GigOpportunity, today: string): Omit<ReviewItem, 'decision'> {
+function gigItem(row: GigOpportunity, today: string, names: ArtistNames): Omit<ReviewItem, 'decision' | 'focus'> {
   // The columns first, the prose only where they are empty. Until this the
   // screen re-derived on every render, so a `submission_state` you corrected
   // by hand changed the database and nothing you could see.
-  const parsed = withStoredColumns(parseNote(row.fitRationale ?? row.fitNotes), row)
+  const parsed = withStoredColumns(parseNote(row.fitRationale ?? row.fitNotes, names), row)
   const fee = parseFee(row.fee, row.paid)
   const deadline = parseDeadline(row.deadline, {
     note: row.deadlineNote,
@@ -424,8 +432,8 @@ function gigItem(row: GigOpportunity, today: string): Omit<ReviewItem, 'decision
   }
 }
 
-function syncItem(row: SyncTarget, today: string): Omit<ReviewItem, 'decision'> {
-  const parsed = withStoredColumns(parseNote(row.notes), {
+function syncItem(row: SyncTarget, today: string, names: ArtistNames): Omit<ReviewItem, 'decision' | 'focus'> {
+  const parsed = withStoredColumns(parseNote(row.notes, names), {
     submissionMethod: row.confirmationMethod,
   })
   const fee = parseFee(null, 0)
@@ -449,7 +457,7 @@ function syncItem(row: SyncTarget, today: string): Omit<ReviewItem, 'decision'> 
   }
 }
 
-function promoItem(row: PromoDraft): Omit<ReviewItem, 'decision'> {
+function promoItem(row: PromoDraft): Omit<ReviewItem, 'decision' | 'focus'> {
   const parsed = parseNote(null)
   const fee = parseFee(null, 0)
   const deadline = parseDeadline(null)
@@ -474,24 +482,48 @@ function promoItem(row: PromoDraft): Omit<ReviewItem, 'decision'> {
   }
 }
 
+/** The fields `focusOfItem` reads, from whichever row an item came from. */
+function focusInput(item: Omit<ReviewItem, 'decision' | 'focus'>) {
+  return item.source.kind === 'gig'
+    ? { kind: 'gig' as const, type: item.source.row.type, location: item.source.row.location, country: item.source.row.country }
+    : { kind: item.source.kind }
+}
+
+const undecidedPenalty = (item: ReviewItem): number => (isNew(item) ? (item.focus?.penalty ?? 0) : 0)
+
 export function buildReviewQueue(input: {
   gigs?: GigOpportunity[]
   sync?: SyncTarget[]
   promo?: PromoDraft[]
   /** Today, as YYYY-MM-DD. Injectable so snooze boundaries are testable. */
   today?: string
+  /**
+   * Whose notes these are, so their name in an agent's prose is read as them.
+   * Handed in like `today`: see `artistNames`. Absent matches `the artist` only.
+   */
+  artist?: ArtistNames
+  /**
+   * What the artist asked Scout for and how far they would go. Orders what is
+   * undecided and removes nothing. See `shared/artistFocus.ts`.
+   */
+  focus?: Focus | null
 }): ReviewItem[] {
   const today = input.today ?? new Date().toISOString().slice(0, 10)
+  const names = input.artist ?? ANONYMOUS
 
   // Snoozed items stay IN the queue rather than being filtered out here. A
   // queue that hides things with no way to look at them is worse than one that
   // nags, so they are carried through, excluded from every filter but
   // "snoozed", and left visible and reversible there.
   return [
-    ...(input.gigs ?? []).filter((g) => g.status !== 'archived').map((g) => gigItem(g, today)),
-    ...(input.sync ?? []).filter((s) => s.status !== 'archived').map((s) => syncItem(s, today)),
+    ...(input.gigs ?? []).filter((g) => g.status !== 'archived').map((g) => gigItem(g, today, names)),
+    ...(input.sync ?? []).filter((s) => s.status !== 'archived').map((s) => syncItem(s, today, names)),
     ...(input.promo ?? []).map(promoItem),
   ]
+    // What the artist asked for, read against each item, once and here for the
+    // reason the sentence below is: one place where an item is joined to
+    // something about the artist.
+    .map((item) => ({ ...item, focus: focusOfItem(focusInput(item), input.focus ?? null) }))
     // Copy is attached here rather than in each *Item builder so there is
     // exactly one place where an item and its sentence are joined.
     .map((item) => ({ ...item, decision: decisionFor(item) }))
@@ -502,6 +534,12 @@ export function buildReviewQueue(input: {
     .sort(
       (a, b) =>
         b.score - a.score ||
+        // What is undecided is ordered by what the artist asked for, after
+        // urgency and before anything else: a date that bites outranks a
+        // preference, and a preference outranks the alphabet. Decided items
+        // are left where they are, since a stated reach is no reason to
+        // reshuffle an application already sent.
+        undecidedPenalty(a) - undecidedPenalty(b) ||
         (b.silence?.days ?? 0) - (a.silence?.days ?? 0) ||
         a.title.localeCompare(b.title),
     )

@@ -25,10 +25,11 @@
  * line stays enforced outside this code.
  */
 
-import { isNull } from 'drizzle-orm'
+import { eq, isNull } from 'drizzle-orm'
 import { getDb } from '../db'
 import { invites, users } from '../db/schema'
 import type { Env } from '../types'
+import type { TenantId } from '../db/scope'
 import { PRODUCT_NAME, type SenderIdentity } from './emailTemplate'
 import { recipientAllowed, type AddressBook, type Audience } from '../../shared/recipients'
 import { inviteState } from '../../shared/invites'
@@ -37,6 +38,8 @@ export interface Mail {
   to: string
   /** Who this is for, which decides which addresses it may reach. */
   audience: Audience
+  /** Whose account the mail is for. Required for the `tenant` audience, which reaches nobody without it. */
+  tenant?: TenantId
   /** The bare address. The display name is always the product's. */
   from: string
   subject: string
@@ -70,9 +73,9 @@ export class UndeliverableRecipient extends Error {
  * Fresh rather than cached because the answer changes exactly when it matters:
  * an invitation withdrawn a minute ago must stop being mailable a minute ago.
  */
-export async function addressBook(env: Env, now = new Date()): Promise<AddressBook> {
+export async function addressBook(env: Env, now = new Date(), tenant?: TenantId): Promise<AddressBook> {
   const db = getDb(env.DB)
-  const accounts = await db.select({ email: users.email, role: users.role }).from(users)
+  const accounts = await db.select({ email: users.email, role: users.role, tenantId: users.tenantId }).from(users)
   const pending = await db
     .select()
     .from(invites)
@@ -80,6 +83,7 @@ export async function addressBook(env: Env, now = new Date()): Promise<AddressBo
   return {
     owner: [env.AUTH_EMAIL, ...accounts.filter((a) => a.role === 'owner').map((a) => a.email)],
     accounts: accounts.map((a) => a.email),
+    tenant: tenant ? accounts.filter((a) => a.tenantId === tenant).map((a) => a.email) : [],
     liveInvites: pending.filter((row) => inviteState({ now, invite: row }) === 'valid').map((row) => row.email),
   }
 }
@@ -91,7 +95,7 @@ export async function sendMail(env: Env, mail: Mail): Promise<{ messageId?: stri
   }
   // The boundary. See shared/recipients.ts for why each audience has its own
   // list, and why this is the only place the binding is called.
-  if (!recipientAllowed({ to: mail.to, audience: mail.audience, book: await addressBook(env) })) {
+  if (!recipientAllowed({ to: mail.to, audience: mail.audience, book: await addressBook(env, new Date(), mail.tenant) })) {
     throw new UndeliverableRecipient(mail.audience)
   }
   // Both bodies are sent. Plain text is not a fallback nobody sees: it is what

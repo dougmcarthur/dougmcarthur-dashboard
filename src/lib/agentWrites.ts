@@ -36,6 +36,7 @@ import {
   AGENT_FEE_MAX,
   AGENT_TEXT_MAX as MAX,
   duplicateGig,
+  duplicatePromoDraft,
   duplicateSyncTarget,
   overDailyLimit,
   windowStart,
@@ -180,11 +181,19 @@ async function rowsSince(env: AppEnv['Bindings'], kind: AgentWriteKind, tenant: 
 
 async function repeatOf(
   env: AppEnv['Bindings'],
-  kind: 'gig' | 'sync',
+  kind: 'gig' | 'sync' | 'promo',
   tenant: TenantId,
   body: Record<string, any>,
 ): Promise<string | null> {
   const db = getDb(env.DB)
+  if (kind === 'promo') {
+    const known = await db
+      .select({ id: promoDrafts.id, month: promoDrafts.month, title: promoDrafts.title, content: promoDrafts.content })
+      .from(promoDrafts)
+      .where(scoped(promoDrafts, tenant))
+    const same = duplicatePromoDraft(body as { month: string; title: string; content: string }, known)
+    return same ? `Already on file as promo draft #${same.id}, "${same.title}" (${same.month}). Not filed again.` : null
+  }
   if (kind === 'gig') {
     const known = await db
       .select({
@@ -237,7 +246,7 @@ export function agentWrite(kind: AgentWriteKind): MiddlewareHandler<AppEnv> {
       )
     }
 
-    if (kind === 'gig' || kind === 'sync') {
+    if (kind === 'gig' || kind === 'sync' || kind === 'promo') {
       const repeat = await repeatOf(c.env, kind, actor.tenant, parsed.data as Record<string, any>)
       if (repeat) return c.json({ error: repeat }, 409)
     }

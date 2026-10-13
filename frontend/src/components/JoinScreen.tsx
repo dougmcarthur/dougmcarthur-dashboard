@@ -123,6 +123,19 @@ export function JoinScreen({ token, onJoined }: { token: string; onJoined: () =>
                 Your device asks for Touch ID, Face ID or your screen lock. Nothing is typed and
                 nothing is emailed. This link works once.
               </p>
+
+              <p className="text-xs text-muted">
+                Setting up a passkey creates your account. What we collect and why is in the{' '}
+                <a
+                  href="/privacy/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-ink"
+                >
+                  privacy policy
+                </a>
+                .
+              </p>
             </>
           )}
 

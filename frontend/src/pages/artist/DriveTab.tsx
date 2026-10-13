@@ -119,7 +119,7 @@ function OrganisePanel({ onDone }: { onDone: () => void }) {
       onOpen={() => setOpen(true)}
       onClose={() => setOpen(false)}
       teaser="Give every file a predictable name and a subfolder."
-      hint="A juror who downloads everything gets DougMcArthur_Photo_01.jpg, not IMG_4471.JPG."
+      hint="A juror who downloads everything gets ArtistName_Photo_01.jpg, not IMG_4471.JPG."
       openLabel="Tidy the folder"
       title="Tidy the folder"
       subtitle="Nothing is renamed or moved until you say so. Files stay in your Drive; only their names and subfolders change."

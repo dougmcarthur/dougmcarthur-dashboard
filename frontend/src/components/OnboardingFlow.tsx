@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type OnboardingState } from '../api'
-import { GOAL_NOTE_MAX, type GoalId, type ReachId } from '../../../shared/onboarding'
+import { CITY_MAX, GOAL_NOTE_MAX, type GenreId, type GoalId, type ReachId, type RegionId } from '../../../shared/onboarding'
 import { Button, buttonClass } from './ui/Button'
 import {
   Continue,
@@ -17,8 +17,8 @@ import {
  * The welcome questions, one per screen, full screen, driven from the keyboard
  * (the shell and its keys are `flow/QuestionFlow.tsx`).
  *
- * Four questions — name, goals, reach, anything else — and a last screen that
- * says what is left. One question at a time because the checklist's inline
+ * Six questions — name, where you are, what you play, goals, reach, anything else —
+ * and a last screen that says what is left. One question at a time because the checklist's inline
  * form put eleven checkboxes and a textarea in front of somebody who had not
  * seen the product yet; one at a time, each is a sentence and a choice.
  *
@@ -27,9 +27,9 @@ import {
  * app: the checklist offers the questions again until the goals are answered.
  */
 
-export type FlowScreen = 'welcome' | 'name' | 'goals' | 'reach' | 'note' | 'done'
-const ORDER: FlowScreen[] = ['welcome', 'name', 'goals', 'reach', 'note', 'done']
-const QUESTIONS: FlowScreen[] = ['name', 'goals', 'reach', 'note']
+export type FlowScreen = 'welcome' | 'name' | 'where' | 'play' | 'goals' | 'reach' | 'note' | 'done'
+const ORDER: FlowScreen[] = ['welcome', 'name', 'where', 'play', 'goals', 'reach', 'note', 'done']
+const QUESTIONS: FlowScreen[] = ['name', 'where', 'play', 'goals', 'reach', 'note']
 
 function toggled<T>(set: Set<T>, value: T): Set<T> {
   const next = new Set(set)
@@ -55,6 +55,9 @@ export function OnboardingFlow({
   const [goals, setGoals] = useState<Set<GoalId>>(new Set(state.goals?.goals ?? []))
   const [reach, setReach] = useState<Set<ReachId>>(new Set(state.goals?.reach ?? []))
   const [note, setNote] = useState(state.goals?.note ?? '')
+  const [region, setRegion] = useState<RegionId | null>(state.profile?.region ?? null)
+  const [city, setCity] = useState(state.profile?.city ?? '')
+  const [genres, setGenres] = useState<Set<GenreId>>(new Set(state.profile?.genres ?? []))
   const [nudge, setNudge] = useState<string | null>(null)
 
   // Seeded once, when the server answers, so typing is never overwritten.
@@ -79,10 +82,18 @@ export function OnboardingFlow({
     onSuccess: () => qc.invalidateQueries({ queryKey: ['onboarding'] }),
   })
 
+  const saveProfile = useMutation({
+    mutationFn: () =>
+      api.onboarding.saveProfile({ region, city: city.trim() || null, genres: [...genres] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['onboarding'] }),
+  })
+
   const index = ORDER.indexOf(screen)
   // What is left once the questions are answered. Name and goals are this
   // flow's own, so they never appear as "left" at its end.
-  const remaining = state.steps.filter((s) => !s.optional && !s.done && s.id !== 'name' && s.id !== 'goals')
+  const remaining = state.steps.filter(
+    (s) => !s.optional && !s.done && s.id !== 'name' && s.id !== 'goals' && s.id !== 'about',
+  )
   const step = `${QUESTIONS.indexOf(screen) + 1} of ${QUESTIONS.length}`
 
   /** Save what the screen being left collected. Never blocks moving on. */
@@ -92,12 +103,15 @@ export function OnboardingFlow({
         const value = name.trim()
         if (value !== (profile.data?.displayName ?? '')) saveName.mutate(value)
       }
+      if ((leaving === 'where' || leaving === 'play') && (region !== null || city.trim() || genres.size > 0)) {
+        saveProfile.mutate()
+      }
       if ((leaving === 'goals' || leaving === 'reach' || leaving === 'note') && goals.size > 0) {
         saveGoals.mutate()
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [name, goals, reach, note, profile.data],
+    [name, goals, reach, note, region, city, genres, profile.data],
   )
 
   const go = useCallback(
@@ -133,15 +147,33 @@ export function OnboardingFlow({
   }, [persist, screen, onClose])
 
   const options =
-    screen === 'goals' ? state.options.goals : screen === 'reach' ? state.options.reach : []
+    screen === 'goals'
+      ? state.options.goals
+      : screen === 'reach'
+        ? state.options.reach
+        : screen === 'where'
+          ? state.options.regions
+          : screen === 'play'
+            ? state.options.genres
+            : []
 
   const choose = useCallback(
     (id: string) => {
       setNudge(null)
       if (screen === 'goals') setGoals((prev) => toggled(prev, id as GoalId))
       else if (screen === 'reach') setReach((prev) => toggled(prev, id as ReachId))
+      else if (screen === 'where') setRegion((prev) => (prev === id ? null : (id as RegionId)))
+      else if (screen === 'play') {
+        setGenres((prev) => {
+          if (!prev.has(id as GenreId) && prev.size >= state.options.maxGenres) {
+            setNudge(`Choose up to ${state.options.maxGenres}. Untick one to pick another.`)
+            return prev
+          }
+          return toggled(prev, id as GenreId)
+        })
+      }
     },
-    [screen],
+    [screen, state.options.maxGenres],
   )
 
   const failed = saveName.error ?? saveGoals.error
@@ -168,9 +200,13 @@ export function OnboardingFlow({
             <li>Scout gathers gigs, grants and sync opportunities in one place.</li>
             <li>It drafts your applications and pitches from your profile.</li>
             <li>It keeps track of deadlines and who you’re waiting to hear from.</li>
+            <li>
+              It’s built for Canadian artists: funding, music associations and costs are Canadian, and
+              playing abroad is welcome.
+            </li>
           </ul>
           <p className="text-body">
-            Four quick questions help it decide what to show you first. It takes about a minute.
+            A few quick questions help it decide what to show you first. It takes about a minute.
           </p>
           <Continue label="Start" onClick={next} />
         </>
@@ -196,6 +232,52 @@ export function OnboardingFlow({
         </>
       )}
 
+      {screen === 'where' && (
+        <>
+          <Question step={step} title="Where are you based?">
+            Your province or territory, and your city if you like. Scout uses it to tell which
+            opportunities are close and which are a trip. It is never shown to anyone else.
+          </Question>
+          <OptionList
+            label="Province or territory"
+            options={state.options.regions}
+            selected={new Set(region ? [region] : [])}
+            onChoose={choose}
+            multiple={false}
+          />
+          <label className="block">
+            <span className="sr-only">City</span>
+            <input
+              value={city}
+              maxLength={CITY_MAX}
+              placeholder="City (optional)"
+              onChange={(e) => setCity(e.target.value)}
+              className={FLOW_INPUT}
+            />
+          </label>
+          <Continue
+            label={region === null && !city.trim() ? 'Skip' : 'OK'}
+            onClick={next}
+            hint={<>Press a letter to choose, <Kbd>Enter</Kbd> to continue</>}
+          />
+        </>
+      )}
+
+      {screen === 'play' && (
+        <>
+          <Question step={step} title="What do you play?">
+            Up to {state.options.maxGenres}. It helps Scout tell which opportunities suit your music.
+          </Question>
+          <OptionList label="Genres" options={state.options.genres} selected={genres} onChoose={choose} />
+          <Continue
+            label={genres.size === 0 ? 'Skip' : 'OK'}
+            onClick={next}
+            hint={<>Press a letter to choose, <Kbd>Enter</Kbd> to continue</>}
+          />
+          {nudge && <p className="text-sm text-danger-fg">{nudge}</p>}
+        </>
+      )}
+
       {(screen === 'goals' || screen === 'reach') && (
         <>
           {screen === 'goals' ? (
@@ -204,7 +286,8 @@ export function OnboardingFlow({
             </Question>
           ) : (
             <Question step={step} title="How far would you travel for the right opportunity?">
-              Choose all that apply, or skip if you’re not sure yet.
+              Choose all that apply, or skip if you’re not sure yet. Nothing is hidden: opportunities beyond
+              what you choose still appear, after the ones within it.
             </Question>
           )}
           <OptionList

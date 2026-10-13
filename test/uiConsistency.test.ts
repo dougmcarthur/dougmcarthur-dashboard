@@ -235,8 +235,35 @@ describe('the cost panel shows a range, and never a blended score', () => {
     // A midpoint on screen is the failure this whole module is shaped to
     // avoid: `$1,847` is a lie with a decimal place. Any number reaching the
     // page goes through the formatter that cannot print one.
-    expect(src).toContain('formatCostRange(estimate.net)')
+    expect(src).toContain('formatCostRange(estimate.gross)')
+    expect(src).toContain('formatCostRange(estimate.income)')
     expect(src).toContain('formatCostRange(line.amount)')
+    expect(src).toContain('formatCostRange(pay.amount)')
+  })
+
+  it('shows an estimated total for the costs and for the pay', () => {
+    // The sum is the answer a reader came for. Without it they add the rows up
+    // themselves, and a range added by eye is how a $4,000 trip looks like $400.
+    expect(src).toContain('Estimated total cost')
+    expect(src).toContain('Estimated pay')
+  })
+
+  it('says investment and income, and never frames a showcase as a loss', () => {
+    // Spending on being heard is not losing money, and the words on this panel
+    // are what decides whether a showcase reads as a mistake. The wording
+    // itself lives in `outlookOf`, which `gigCost.test.ts` holds to the same.
+    expect(src).not.toMatch(/(loss|losses|lose|losing|lost|deficit|shortfall)/i)
+    expect(src).toContain('outlook.label')
+    expect(src).toContain('outlook.summary')
+  })
+
+  it('draws where the trip falls on a scale rather than adding more labels', () => {
+    // The scale takes its positions from `outlookScale`, so the page never does
+    // its own arithmetic on a range, and it carries no figures of its own.
+    expect(src).toContain('outlookScale(net)')
+    expect(src).toContain('Bigger investment')
+    expect(src).toContain('Bigger payout')
+    expect(src).toMatch(/role="img"/)
   })
 
   it('names no score, value or efficiency', () => {

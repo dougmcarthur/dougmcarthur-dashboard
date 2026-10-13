@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en-CA">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f6f1dc" />
+    <script>
+      /* The same early theme the app sets, so this page opens in the theme the
+         reader chose rather than flashing the default first. */
+      try {
+        var a = JSON.parse(localStorage.getItem('musichq.appearance') || '{}')
+        var t = a.theme || 'light'
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        var root = document.documentElement
+        root.dataset.theme = t
+        var more = matchMedia('(prefers-contrast: more)').matches
+        var hc = a.highContrast
+        if (hc === undefined || hc === null) hc = more
+        root.dataset.contrast = hc ? 'high' : 'normal'
+        var p = a.palette
+        if (!p) p = more ? 'high-contrast' : 'sun-dogs'
+        root.dataset.palette = p
+      } catch (e) {}
+    </script>
+    <title>Privacy policy | Sun Dogs Music Scout</title>
+    <link rel="canonical" href="https://scout.sundogsmusic.ca/privacy/" />
+    <meta
+      name="description"
+      content="How Sun Dogs Music Scout collects, uses, shares and protects personal information, and how to see, correct or delete yours."
+    />
+    <script type="module" src="/src/privacy.ts"></script>
+  </head>
+  <body>
+    <a
+      href="#policy"
+      class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:text-ink"
+    >
+      Skip to the policy
+    </a>
+
+    <header class="border-b border-line">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+        <a href="/" class="font-semibold text-ink">Sun Dogs Music Scout</a>
+        <a href="/" class="text-sm text-muted underline underline-offset-2 hover:text-ink">Back to the app</a>
+      </div>
+    </header>
+
+    <main id="policy" class="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-10 text-body leading-relaxed">
+      <div class="space-y-3">
+        <h1 class="text-3xl font-semibold text-ink tracking-tight">Privacy policy for Sun Dogs Music Scout</h1>
+        <p class="text-sm text-muted">Last updated October 13, 2026.</p>
+        <p>
+          This page explains what personal information Sun Dogs Music Scout holds, why we hold it,
+          who else touches it, how long it stays, and what you can do about it. It is written for
+          Canadian musicians in plain language, and it follows Canada&rsquo;s Personal Information
+          Protection and Electronic Documents Act, usually called PIPEDA.
+        </p>
+      </div>
+
+      <nav aria-label="On this page" class="rounded-lg border border-line bg-surface p-5">
+        <h2 class="text-base font-semibold text-ink">Jump to a section</h2>
+        <ol class="mt-3 space-y-1 text-sm sm:columns-2 sm:gap-8">
+          <li><a class="text-info-fg underline underline-offset-2" href="#short">The short version</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#who">Who is responsible</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#collect">What we collect</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#use">How we use it</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#ai">AI services</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#share">Who else handles it</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#abroad">Storage outside Canada</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#keep">How long we keep it</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#protect">How we protect it</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#google">Google data</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#browser">Cookies and browser storage</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#rights">Your choices and rights</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#age">Age</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#changes">Changes to this policy</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#contact">How to reach us</a></li>
+        </ol>
+      </nav>
+
+      <section id="short" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">The short version is that we keep what you give us to run your account and nothing more</h2>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li>We collect your name, your email address and what you put into your account, and we use it to run the service.</li>
+          <li>We do not sell your information, show advertising, or run analytics or tracking tools.</li>
+          <li>A few companies handle data for us. Cloudflare always does. Google, Bandsintown and others do only if you connect them. All are named below.</li>
+          <li>Your information may be stored outside Canada.</li>
+          <li>You can see it, correct it, take back your consent and have it deleted by writing to us. We answer within 30 days.</li>
+          <li>You must be 18 or older to have an account.</li>
+        </ul>
+      </section>
+
+      <section id="who" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">Sun Dogs Music Manitoba runs this service, and Doug McArthur answers for your privacy</h2>
+        <p>
+          Sun Dogs Music Scout is run by Sun Dogs Music Manitoba, a sole proprietorship that Doug
+          McArthur registered in Manitoba under The Business Names Registration Act (registry
+          number 10219396). In this policy, &ldquo;we&rdquo; and &ldquo;us&rdquo; mean Sun Dogs
+          Music Manitoba.
+        </p>
+        <p>
+          Doug McArthur is the person responsible for how we handle personal information, and the
+          person who answers your questions and requests. How to reach Doug is at the end of this
+          page.
+        </p>
+        <p>
+          The privacy law that applies to a business like ours is the federal PIPEDA, which covers
+          businesses in Manitoba and personal information that crosses provincial or national
+          borders. If you live in Quebec, Law 25 also gives you some rights, which are described
+          below.
+        </p>
+      </section>
+
+      <section id="collect" class="space-y-4">
+        <h2 class="text-xl font-semibold text-ink">What we collect depends on what you do here</h2>
+        <p>
+          We collect personal information only from you or from the services you choose to
+          connect, and only what the service needs to work.
+        </p>
+
+        <h3 class="text-base font-semibold text-ink">If you have an account</h3>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li><strong class="font-medium text-ink">Who you are:</strong> your name and email address, which come from your invitation or from you.</li>
+          <li><strong class="font-medium text-ink">How you sign in:</strong> a public key and an identifier for each passkey you add, and a record of each signed-in session. The fingerprint, face or screen lock that unlocks a passkey never leaves your device.</li>
+          <li><strong class="font-medium text-ink">What you track and write:</strong> the opportunities you follow and your decisions on them, your notes and drafts, pitch targets, reminders, the answers and documents in your library (such as your bio, quotes, links, photo credits and set lengths), application answers, stage plot answers, your goals and a home base city.</li>
+          <li><strong class="font-medium text-ink">What happened in your account:</strong> a history of research runs and notifications, and a record of each choice you make together with what the screen showed you at that moment, such as the deadline and the estimated cost. We keep that record so it can later be used to check whether our ranking was any good. Nothing uses it yet, and we will say so here before anything does.</li>
+          <li><strong class="font-medium text-ink">Connections you switch on:</strong> encrypted access for a Google account, and your Bandsintown key. The companies involved are listed below.</li>
+          <li><strong class="font-medium text-ink">Messages to us:</strong> feedback you send, with the page you were on, the pages before it, failed requests from the last half hour, the app version and your browser. The form lists all of it before you press send, and it never includes what was on your screen.</li>
+        </ul>
+        <p>
+          The library stores links to your documents, not the files. A link is only as private as
+          the place the file lives, so keep tax forms and anything else sensitive somewhere only
+          you control.
+        </p>
+
+        <h3 class="text-base font-semibold text-ink">If you ask for an invitation</h3>
+        <p>
+          We keep your name, email address and message, and a salted one-way scramble (a hash) of
+          your network address that is used only to stop one sender from filling in the form over
+          and over. We do not email you automatically. A person reads the request and replies.
+        </p>
+
+        <h3 class="text-base font-semibold text-ink">If you take the artist survey</h3>
+        <p>
+          The survey has its own notice, shown before you start. It collects no name, email address
+          or network address. Cloudflare&rsquo;s bot check sees your address while it runs, and we
+          never receive it.
+        </p>
+
+        <h3 class="text-base font-semibold text-ink">If you only visit this site</h3>
+        <p>
+          Cloudflare, which delivers the site, sees your network address and the details of each
+          request as part of delivering and protecting it. We add no analytics, advertising or
+          tracking tools, and this site loads nothing from other companies.
+        </p>
+
+        <h3 class="text-base font-semibold text-ink">If you are not a user at all</h3>
+        <p>
+          To help artists pursue opportunities, the service holds the names, roles, organisations,
+          email addresses and websites of festival organisers, programmers, music supervisors and
+          similar contacts. Artists file them, or our research finds them on public websites. We
+          use them only to help an artist reach that person about their work. If you are one of
+          these people and want your details corrected or removed, write to us.
+        </p>
+        <p>
+          The service can also scan the operator&rsquo;s own business mailbox for replies to the
+          operator&rsquo;s own applications. It never reads an artist&rsquo;s mailbox. For each
+          reply it matches it keeps the sender, the subject, a short excerpt and the sentence that
+          settled it. When the reply is dismissed, all of that is erased.
+        </p>
+
+        <h3 class="text-base font-semibold text-ink">From pages you point us to</h3>
+        <p>
+          If you give us the address of your Manitoba Music or other provincial association
+          profile, we read that public page and show you a preview before anything is copied into
+          your library. With your own Bandsintown key we read your listed shows.
+        </p>
+      </section>
+
+      <section id="use" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">We use your information to run the service and for nothing else</h2>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li><strong class="font-medium text-ink">To provide the service you asked for:</strong> to list, rank and remind you of opportunities, draft paperwork, and keep your calendar, tasks, drafts and files in step.</li>
+          <li><strong class="font-medium text-ink">To keep it secure:</strong> to sign you in, recover your account and stop abuse.</li>
+          <li><strong class="font-medium text-ink">To talk to you:</strong> sign-in codes, invitations, replies to what you send us, and a summary email only if you turn it on.</li>
+          <li><strong class="font-medium text-ink">To fix and improve the service:</strong> to read your feedback, and to count how many records each account holds each day so we know there is room.</li>
+        </ul>
+        <p>
+          We do not sell or rent personal information, and we do not use it for advertising. We
+          will not send promotional email without asking you first. Nothing about you is decided
+          by a machine: ranking helps you choose, and every decision is yours.
+        </p>
+        <p>
+          By creating an account and using the service you agree to the uses on this page.
+          Connecting a Google account is a separate choice that you make on Google&rsquo;s own
+          consent screen, where you can say no to each service. If we want to use your information
+          for something new, we will tell you and ask first.
+        </p>
+      </section>
+
+      <section id="ai" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">AI services read public pages for us, and nothing of yours without asking</h2>
+        <p>
+          Our research is done by software agents that run as scheduled routines on Anthropic&rsquo;s
+          Claude. They read public web pages, such as festival sites, association listings and
+          grant pages, and file what they find into a shared catalogue of opportunities. The
+          catalogue holds facts about each call and nothing an artist decided.
+        </p>
+        <p>
+          Today those routines work only against the operator&rsquo;s own account. They read the
+          operator&rsquo;s own lists and, for stage plots, riders and input lists the operator has
+          linked in the operator&rsquo;s own library, the file itself so that it can be transcribed.
+          No other artist&rsquo;s lists, notes or library are sent to Anthropic or to any other AI
+          service.
+        </p>
+        <p>
+          If we ever want to run matching or drafting over artists&rsquo; own information, we will
+          say so here, tell you, and ask first. You can also run an agent of your own with a token
+          you issue in Settings. What your agent receives goes to the AI service you choose, under
+          your arrangement with them and not ours.
+        </p>
+      </section>
+
+      <section id="share" class="space-y-4">
+        <h2 class="text-xl font-semibold text-ink">A few other companies handle some of your information, and these are the ones</h2>
+        <dl class="divide-y divide-line border-y border-line">
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Cloudflare</dt>
+            <dd>Hosts this site and its database, delivers the site, sends our email, and runs a bot check on the survey. It sees your network address and request details, and it holds everything stored in your account.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Google</dt>
+            <dd>Only if you connect a Google account: Calendar, Tasks, Gmail drafts and Drive, as described under Google data below. If you open a pre-filled application form link, the answers in that link go to the form&rsquo;s host when you open it.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Bandsintown</dt>
+            <dd>Only if you add your Bandsintown key. We use it to read your listed shows. The key is stored encrypted and is never shown on any page.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">OpenStreetMap services</dt>
+            <dd>When you have set a home base, the place of an opportunity and your home base city are sent to Nominatim and to the OSRM routing service to measure the driving distance. Nothing else is sent. A measured distance is kept so we do not ask again.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Anthropic</dt>
+            <dd>Runs the research routines described under AI services above.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Websites we read</dt>
+            <dd>Organisers&rsquo; sites, association listings and the public profile pages you point us to see an ordinary web request that identifies itself as Sun Dogs Music Scout. They are told nothing about you.</dd>
+          </div>
+        </dl>
+        <p>
+          We disclose information when the law requires it, for example under a court order, and
+          we will tell you unless we are forbidden to. If the business is sold, your information
+          goes to the new owner, who must follow this policy and honour what you agreed to.
+        </p>
+        <p>
+          Artists cannot see each other&rsquo;s records. Our administration screen is built so it
+          cannot show your content: it lists that an account exists, its name and email address,
+          when it joined, daily counts of records, and any feedback you send. We read your content
+          only with your permission, to investigate a security problem or a fault you asked us to
+          look into, or when the law requires it. If you publish a press kit link, the people who
+          hold that link see what you chose to publish and nothing else.
+        </p>
+      </section>
+
+      <section id="abroad" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">Your information may be stored and read outside Canada</h2>
+        <p>
+          Cloudflare stores and processes data mainly in the United States and the European
+          Economic Area, and can reach it from other places where it operates. It chooses the
+          database region automatically and does not offer a Canada-only setting. Google,
+          Anthropic and Bandsintown are also based outside Canada.
+        </p>
+        <p>
+          Information held in another country is subject to that country&rsquo;s laws, and courts,
+          police and national security authorities there may be able to get access to it. We
+          choose providers that protect information by contract and by technical safeguards, but
+          we cannot promise that foreign law will never apply.
+        </p>
+      </section>
+
+      <section id="keep" class="space-y-4">
+        <h2 class="text-xl font-semibold text-ink">This is how long we keep each kind of information</h2>
+        <dl class="divide-y divide-line border-y border-line">
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Your account and what is in it</dt>
+            <dd>Until you ask us to delete it. We do not remove inactive accounts on a schedule. Run history and the record of your choices stay as long as the account does.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">A signed-in session</dt>
+            <dd>30 days from signing in, then it expires and is swept away each day.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Sign-in checks and setup codes</dt>
+            <dd>A sign-in check lasts 5 minutes. An emailed setup code lasts 15 minutes, works once and allows five guesses.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Notifications</dt>
+            <dd>30 days.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Dismissed replies</dt>
+            <dd>Their content is erased the moment they are dismissed.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Invitations we issue</dt>
+            <dd>The name and email address typed for an invitation stay with its record. An invitation that was used goes when the account does. One that was never used is kept until you ask us to remove it.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Invitation requests</dt>
+            <dd>90 days after we answer one, or one year if it is never answered.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Daily record counts</dt>
+            <dd>90 days.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Backups</dt>
+            <dd>The database can be restored to any moment in the last 30 days, so deleted information ages out of backups within 30 days.</dd>
+          </div>
+        </dl>
+        <p>
+          When we remove an account we delete everything it holds in one operation: its records,
+          passkeys, sessions, tokens, share links, invitation, feedback and usage counts. There is
+          no archive and no soft delete.
+        </p>
+      </section>
+
+      <section id="protect" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">We protect your information in the ways listed here, and no system is perfect</h2>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li>There are no passwords. You sign in with a passkey. A code emailed to you can only add a passkey and can never sign you in on its own.</li>
+          <li>Changing who can sign in, by adding or removing a passkey, needs a passkey touch within the last 15 minutes even when you have a valid session.</li>
+          <li>Google access tokens and Bandsintown keys are encrypted in the database. Agent tokens, share links and invitations are stored only as one-way hashes, so a copy of the database holds no working one.</li>
+          <li>Every record belongs to one account and every request is checked against it.</li>
+          <li>Connections to this site are encrypted in transit.</li>
+        </ul>
+        <p>
+          If a breach puts you at real risk of significant harm, we will tell you and the Privacy
+          Commissioner of Canada as soon as feasible, and we keep a record of every breach for at
+          least two years.
+        </p>
+      </section>
+
+      <section id="google" class="space-y-4">
+        <h2 class="text-xl font-semibold text-ink">Google data is used only for the features you can see</h2>
+        <p>
+          If you connect a Google account, Sun Dogs Music Scout asks Google for permission to use
+          the services below. Each has its own checkbox on Google&rsquo;s screen, and you can leave
+          any of them out.
+        </p>
+        <dl class="divide-y divide-line border-y border-line">
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Gmail drafts</dt>
+            <dd>Creates drafts in your Drafts folder from pitches you choose. It never sends a message, and this permission does not let us read your inbox.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Calendar</dt>
+            <dd>Creates a separate calendar called Sun Dogs Music Scout and adds your confirmed shows to it. It cannot see your other calendars.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Tasks</dt>
+            <dd>Adds deadlines and replies you owe to one task list. Google&rsquo;s Tasks permission technically reaches every list in your account, and we use only that one.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Drive</dt>
+            <dd>Reaches the press kit folder we create and the files you pick in Google&rsquo;s file picker, and nothing else in your Drive. Picked files are copied, not moved, and nothing is deleted.</dd>
+          </div>
+        </dl>
+        <p>
+          We use what we receive from Google only to provide those features. We do not use it for
+          advertising, we do not sell it, we do not use it to train AI models, and what we receive
+          from Google is never passed to an AI service. Nobody reads it except with your
+          permission, to investigate a security problem, or where the law requires. We do not
+          transfer it to anyone else except to provide a feature you asked for, for security, or as
+          the law requires.
+        </p>
+        <p>
+          Sun Dogs Music Scout&rsquo;s use and transfer of information received from Google APIs to
+          any other app will adhere to the
+          <a
+            class="text-info-fg underline underline-offset-2"
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            rel="noreferrer"
+            >Google API Services User Data Policy</a
+          >, including the Limited Use requirements.
+        </p>
+        <p>
+          To stop, use Disconnect in Settings, which also withdraws our access at Google, or
+          remove Sun Dogs Music Scout at
+          <a
+            class="text-info-fg underline underline-offset-2"
+            href="https://myaccount.google.com/permissions"
+            rel="noreferrer"
+            >myaccount.google.com/permissions</a
+          >.
+        </p>
+      </section>
+
+      <section id="browser" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">Your browser keeps a few things, and none of them track you</h2>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li><strong class="font-medium text-ink">A session cookie</strong> keeps you signed in for up to 30 days. It is set only when you sign in, page scripts cannot read it, and it is sent only to this site.</li>
+          <li><strong class="font-medium text-ink">A short-lived cookie</strong> exists for ten minutes while you connect a Google account, so we can be sure the answer coming back is to your request.</li>
+          <li><strong class="font-medium text-ink">Browser storage</strong> remembers your appearance settings, whether this browser has signed in before, whether the side panel is pinned, the library and stage plot views you chose, and the progress of a survey you started.</li>
+        </ul>
+        <p>
+          There are no advertising or analytics cookies. Cloudflare&rsquo;s bot check on the survey
+          may use its own storage while it runs. You can clear all of this in your browser at any
+          time, which signs you out.
+        </p>
+      </section>
+
+      <section id="rights" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">You can see it, correct it, take back your consent and have it deleted</h2>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li><strong class="font-medium text-ink">See it.</strong> Most of what we hold appears on your own screens. For a full copy in a readable format, write to us.</li>
+          <li><strong class="font-medium text-ink">Correct it.</strong> Edit it in the service, or tell us what is wrong.</li>
+          <li><strong class="font-medium text-ink">Take back your consent.</strong> Disconnect any service in Settings, switch off the summary email, or ask us to delete your account. Some features need the information to work, so withdrawing may mean we cannot provide them.</li>
+          <li><strong class="font-medium text-ink">Have it deleted.</strong> Write to us and we will remove the account and its records and confirm when it is done. Before you do, use Disconnect for Google so that Google also stops honouring our access.</li>
+          <li><strong class="font-medium text-ink">Challenge how we handle it.</strong> Write to us first. If our answer does not settle it, you can complain to the Office of the Privacy Commissioner of Canada.</li>
+        </ul>
+        <p>
+          We answer within 30 days. We may need to confirm who you are first, and we do not charge
+          to answer. If we refuse a request we will tell you why and how to challenge the decision.
+        </p>
+        <p>
+          If you live in Quebec, Law 25 adds rights, including receiving your computerized
+          information in a structured, commonly used format and asking that we stop sharing it.
+          Write to us and we will treat your request under that Act. This policy is available only
+          in English for now.
+        </p>
+      </section>
+
+      <section id="age" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">You must be 18 or older to have an account</h2>
+        <p>
+          The service is for working musicians and handles agreements and tax paperwork. We do not
+          knowingly collect information from anyone under 18, and if we learn that we have, we will
+          delete the account.
+        </p>
+      </section>
+
+      <section id="changes" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">We will tell you before a change that matters</h2>
+        <p>
+          The date at the top of this page says when it last changed. When a change adds a new
+          use, a new kind of information or a new company, we will tell signed-in people in the
+          service and by email before the change takes effect, and ask for your consent where the
+          law requires it. Earlier versions are available on request.
+        </p>
+      </section>
+
+      <section id="contact" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">Write to us with any question, request or concern</h2>
+        <address class="not-italic rounded-lg border border-line bg-surface p-5 space-y-0.5">
+          <p class="font-medium text-ink">Doug McArthur, Privacy Officer</p>
+          <p>Sun Dogs Music Manitoba</p>
+          <p>55 Tunis Bay, Winnipeg, Manitoba R3T 2X2</p>
+          <p>
+            <a class="text-info-fg underline underline-offset-2" href="mailto:hello@sundogsmusic.ca">hello@sundogsmusic.ca</a>
+          </p>
+        </address>
+        <p>
+          The regulator is the Office of the Privacy Commissioner of Canada, 30 Victoria Street,
+          Gatineau, Quebec K1A 1H3, telephone 1-800-282-1376,
+          <a
+            class="text-info-fg underline underline-offset-2"
+            href="https://www.priv.gc.ca/en/report-a-concern/"
+            rel="noreferrer"
+            >priv.gc.ca</a
+          >.
+        </p>
+      </section>
+    </main>
+
+    <footer class="border-t border-line">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
+        <p>Sun Dogs Music Scout is a product of Sun Dogs Music Manitoba.</p>
+        <a href="/" class="underline underline-offset-2 hover:text-ink">Back to the app</a>
+      </div>
+    </footer>
+  </body>
+</html>

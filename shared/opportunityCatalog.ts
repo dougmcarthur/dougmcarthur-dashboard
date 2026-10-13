@@ -22,6 +22,8 @@
  * Pure: no clock, no database. `today` is an argument.
  */
 
+import { regionOf } from './regions'
+
 export type CatalogCategory = 'festival' | 'showcase' | 'funding' | 'sync' | 'other'
 
 export const PUBLIC_CATEGORIES = [
@@ -133,6 +135,18 @@ export interface CatalogFacts {
    */
   feeAmount: number | null
   feeCurrency: string | null
+  /**
+   * What matching needs, all optional and all "no claim" when absent. The
+   * province or state the place names, the genres as a JSON array of closed ids,
+   * who may apply as JSON, the day the window opens, and what it pays. See
+   * migration 0040.
+   */
+  region?: string | null
+  genres?: string | null
+  eligibility?: string | null
+  opensAt?: string | null
+  paysAmount?: number | null
+  paysCurrency?: string | null
 }
 
 function clip(s: string | null | undefined, max: number): string | null {
@@ -153,6 +167,7 @@ export function factsFromGig(gig: {
   country?: string | null
   feeAmount?: number | null
   feeCurrency?: string | null
+  opensAt?: string | null
 }): CatalogFacts {
   const deadline = isoDate(gig.deadline)
   const amount =
@@ -173,6 +188,10 @@ export function factsFromGig(gig: {
     // The artist's row defaults its currency to USD whether or not there is
     // an amount, so it is only carried beside a real one.
     feeCurrency: amount !== null ? clip(gig.feeCurrency, 3) : null,
+    // Read from the place, so a row an agent filed carries where it is. A place
+    // that does not name a region stays null.
+    region: regionOf(gig.location)?.code ?? null,
+    opensAt: isoDate(gig.opensAt),
   }
 }
 
@@ -270,8 +289,17 @@ export function publicSample(rows: CatalogRow[], today: string, size = SAMPLE_SI
 /** Fill what the catalog is missing from a later sighting; never overwrite. */
 export function fillMissing(existing: CatalogFacts, next: CatalogFacts): Partial<CatalogFacts> {
   const patch: Partial<CatalogFacts> = {}
-  for (const key of ['organizer', 'kind', 'url', 'deadline', 'deadlineNote', 'location', 'country'] as const) {
+  for (const key of [
+    'organizer', 'kind', 'url', 'deadline', 'deadlineNote', 'location', 'country',
+    'region', 'genres', 'eligibility', 'opensAt',
+  ] as const) {
     if (!existing[key] && next[key]) patch[key] = next[key]
+  }
+  // What it pays is one fact in two columns, filled as a unit for the reason
+  // the fee is.
+  if ((existing.paysAmount ?? null) === null && (next.paysAmount ?? null) !== null) {
+    patch.paysAmount = next.paysAmount
+    patch.paysCurrency = next.paysCurrency ?? null
   }
   // The fee is one fact in three columns, so it is filled as a unit: an
   // amount from one sighting beside a currency from another would be a figure

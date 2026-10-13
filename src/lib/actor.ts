@@ -231,6 +231,21 @@ export async function ownerTenant(env: Env): Promise<TenantId | null> {
 }
 
 /**
+ * Whether this tenant is the owner's, which is the one that holds the
+ * deployment's own mailbox and calendar.
+ *
+ * `GMAIL_REFRESH_TOKEN` is one inbox, `GOOGLE_REFRESH_TOKEN` and
+ * `GOOGLE_CALENDAR_ID` are one calendar, and all three are Worker secrets that
+ * belong to whoever set the deployment up. Anything that reads them on a
+ * tenant's behalf is reading the owner's, so it asks this first: a route that
+ * does not is one an invited artist can use to see the owner's mail, or to put
+ * their bookings on the owner's calendar. See `docs/multi-tenant-plan.md`.
+ */
+export async function isOwnerTenant(env: Env, tenant: TenantId): Promise<boolean> {
+  return (await ownerTenant(env)) === tenant
+}
+
+/**
  * One account by id, with the label a passkey prompt should show.
  *
  * The label is the recovery address when there is one, then the display name,

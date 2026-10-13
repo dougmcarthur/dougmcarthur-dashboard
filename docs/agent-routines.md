@@ -47,7 +47,7 @@ reads festival pages written by strangers.
    session into printing.
 2. **The Worker limits what the token can do.** The proxy attaches the
    credential to *any* request for `scout.sundogsmusic.ca`, so hiding it does
-   not stop `curl -X DELETE`. An issued token (`agent_tokens`) reaches seven
+   not stop `curl -X DELETE`. An issued token (`agent_tokens`) reaches eleven
    routes and nothing else — see `shared/agentRoutes.ts` — and what it may send
    through the create routes is limited too (`src/lib/agentWrites.ts`): only the
    tool's own fields, a row only ever `discovered`, bounded text, a daily

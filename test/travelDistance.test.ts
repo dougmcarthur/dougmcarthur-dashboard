@@ -109,7 +109,7 @@ describe('the trip cost, with a distance', () => {
       distanceSource: 'route',
     }))
     const travel = estimate.lines.find((l) => l.id === 'travel')!
-    expect(travel.label).toBe('Drive, 119 km each way (about 1 h 40 min)')
+    expect(travel.label).toBe('Driving, 119 km each way (about 1 h 40 min)')
     expect(travel.amount).toEqual({ low: 40, high: 60 })
     expect(travel.basis).toBe('route')
     // A day trip: no lodging line at all.
@@ -143,7 +143,7 @@ describe('the trip cost, with a distance', () => {
     const travel = estimate.lines.find((l) => l.id === 'travel')!
     expect(travel.amount).toEqual(TRAVEL_BANDS.regional.cost)
     // A flight says how far away, not how far by road.
-    expect(travel.label).toBe('Regional flight, 1,510 km away')
+    expect(travel.label).toBe('Flights, about 1,510 km away')
   })
 })
 

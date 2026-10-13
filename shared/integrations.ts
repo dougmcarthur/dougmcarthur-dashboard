@@ -56,6 +56,13 @@ export interface IntegrationSpec {
   /** What stops working when this is not connected. */
   breaks: string
   /**
+   * About the deployment rather than the account: the owner's mailbox and the
+   * sending address. Listed for the owner and for nobody else, because an
+   * artist reading "Gmail mailbox: Working" reasonably believes Scout is
+   * reading theirs.
+   */
+  ownerOnly?: boolean
+  /**
    * A row that is not offered unless the deployment says so, and the sentence
    * explaining why anybody would want it.
    *
@@ -159,6 +166,7 @@ export const INTEGRATIONS: IntegrationSpec[] = [
     access: ['Read mail in the mailbox the server credential belongs to.'],
     cannot: ['Send, delete or change anything — the credential is read-only.'],
     breaks: 'Organiser replies are never noticed, and sent pitches are never reconciled.',
+    ownerOnly: true,
   },
   {
     id: 'email.sending',
@@ -173,6 +181,7 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       'Send from any address but the two it is configured with — that limit is enforced by Cloudflare.',
     ],
     breaks: 'No digest, and no way back in if you lose every passkey.',
+    ownerOnly: true,
   },
 ]
 

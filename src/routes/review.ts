@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { desc, eq, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import { gigOpportunities, syncTargets, promoDrafts, reminders } from '../db/schema'
+import { artistNamesFor } from '../lib/artistName'
+import { focusFor } from '../lib/focus'
 import { scoped } from '../db/scope'
 import { readGig, readGigs } from '../db/gigRows'
 import { decisionActor, recordGigDecision, recordSyncDecision } from '../lib/decisionLog'
@@ -112,6 +114,8 @@ review.get('/', async (c) => {
     gigs: gigs as GigOpportunity[],
     sync: sync as SyncTarget[],
     promo: promo as PromoDraft[],
+    artist: await artistNamesFor(c.env, tenant),
+    focus: await focusFor(c.env, tenant),
   })
 
   const counts = Object.fromEntries(

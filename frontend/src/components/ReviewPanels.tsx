@@ -191,7 +191,7 @@ export function FieldTable({ fields }: { fields: DraftedField[] }) {
           </dt>
           <dd
             className={`min-w-0 flex-1 text-sm break-words ${
-              field.needsDoug ? 'text-warn-fg font-medium' : 'text-ink'
+              field.needsArtist ? 'text-warn-fg font-medium' : 'text-ink'
             }`}
           >
             {field.value}

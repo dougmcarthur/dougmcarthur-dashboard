@@ -17,9 +17,11 @@ const BOOK: AddressBook = {
   owner: ['owner@example.com', null],
   accounts: [null, 'Artist@Example.com '],
   liveInvites: ['invited@example.com'],
+  // The accounts in the one tenant being mailed: here, the artist's own.
+  tenant: ['Artist@Example.com '],
 }
 
-const allowed = (to: string, audience: 'owner' | 'account' | 'invite') =>
+const allowed = (to: string, audience: 'owner' | 'tenant' | 'account' | 'invite') =>
   recipientAllowed({ to, audience, book: BOOK })
 
 describe('recipientAllowed', () => {
@@ -29,6 +31,19 @@ describe('recipientAllowed', () => {
     // digest may go — otherwise an artist could redirect it to themselves.
     expect(allowed('artist@example.com', 'owner')).toBe(false)
     expect(allowed('invited@example.com', 'owner')).toBe(false)
+  })
+
+  it("sends an artist's own digest only to an address on their own account", () => {
+    expect(allowed('artist@example.com', 'tenant')).toBe(true)
+    // The owner's address is on file and is somebody else's: an artist's digest
+    // is not a way to mail the owner, and the owner's is not a way to mail them.
+    expect(allowed('owner@example.com', 'tenant')).toBe(false)
+    expect(allowed('invited@example.com', 'tenant')).toBe(false)
+    expect(allowed('stranger@example.com', 'tenant')).toBe(false)
+  })
+
+  it('reaches nobody on the tenant audience when no tenant was named', () => {
+    expect(recipientAllowed({ to: 'artist@example.com', audience: 'tenant', book: { ...BOOK, tenant: [] } })).toBe(false)
   })
 
   it('sends a setup code only to an address already on an account', () => {

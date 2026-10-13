@@ -36,6 +36,7 @@
 
 import {
   parseNote,
+  type ArtistNames,
   parseFee,
   type ParsedNote,
   type SubmissionState,
@@ -84,8 +85,8 @@ export function gigNoteColumns(row: {
   fitNotes?: string | null
   fee?: string | null
   paid?: number | null
-}): GigNoteColumns & { submissionState: SubmissionState; storedSubmissionState: string | null } {
-  const parsed = parseNote(row.fitRationale ?? row.fitNotes)
+}, names?: ArtistNames): GigNoteColumns & { submissionState: SubmissionState; storedSubmissionState: string | null } {
+  const parsed = parseNote(row.fitRationale ?? row.fitNotes, names)
   const fee = parseFee(row.fee ?? null, row.paid ?? 0)
 
   return {

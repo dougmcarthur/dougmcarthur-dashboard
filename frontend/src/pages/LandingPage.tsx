@@ -27,11 +27,11 @@ const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'O
 const WHAT_IT_DOES: Array<{ title: string; body: string }> = [
   {
     title: 'Finds the opportunities',
-    body: 'Festivals, showcases, grants and sync libraries, gathered from calls for submissions, arts councils and music associations across the country.',
+    body: 'Festivals, showcases, grants and sync libraries, gathered from calls for submissions, arts councils and music associations across Canada, and from further afield when they are worth the trip.',
   },
   {
     title: 'Tells you which are worth it',
-    body: 'Every opportunity arrives as a card to apply to or pass on, with the deadline, the cost of getting there, and any paperwork that takes months — like a US work visa.',
+    body: 'Every opportunity arrives as a card to apply to or pass on, with the deadline, the cost of getting there in Canadian dollars, and any paperwork that takes months, like a US work visa for a Canadian act.',
   },
   {
     title: 'Drafts the paperwork',
@@ -66,9 +66,9 @@ export function LandingPage({ onSignIn }: { onSignIn: () => void }) {
             Sun Dogs Music Scout finds the gigs, grants and sync calls worth your time.
           </h1>
           <p className="text-lg text-body max-w-2xl">
-            A research assistant and application desk for independent musicians. It gathers opportunities, helps
-            you decide which to go after, drafts the paperwork from your profile, and keeps track of what you’re
-            waiting to hear back on.
+            A research assistant and application desk for independent Canadian musicians. It gathers opportunities
+            from across Canada and beyond, helps you decide which to go after, drafts the paperwork from your
+            profile, and keeps track of what you’re waiting to hear back on.
           </p>
           <div className="flex flex-wrap gap-3 pt-1">
             <a
@@ -116,7 +116,12 @@ export function LandingPage({ onSignIn }: { onSignIn: () => void }) {
       <footer className="border-t border-line">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
           <p>Sun Dogs Music Scout</p>
-          <p>Questions: hello@sundogsmusic.ca</p>
+          <p className="flex flex-wrap gap-x-4 gap-y-1">
+            <a href="/privacy/" className="underline underline-offset-2 hover:text-ink">
+              Privacy policy
+            </a>
+            <span>Questions: hello@sundogsmusic.ca</span>
+          </p>
         </div>
       </footer>
     </div>
@@ -296,8 +301,8 @@ function RequestInvitation() {
             Request an invitation
           </h2>
           <p className="text-sm text-body">
-            Scout is invite-only while we test it with a small group of artists. Tell us a little about yourself and
-            we’ll reply by email.
+            Scout is invite-only while we test it with a small group of Canadian artists. Tell us a little about
+            yourself and we’ll reply by email.
           </p>
         </div>
 
@@ -349,7 +354,7 @@ function RequestInvitation() {
                 required
                 rows={4}
                 maxLength={INVITE_REQUEST_LIMITS.message}
-                placeholder="What you play, where you’re based, and what you’re hoping it helps with."
+                placeholder="What you play, where in Canada you’re based, and what you’re hoping it helps with."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
               />
@@ -373,7 +378,11 @@ function RequestInvitation() {
             </div>
             <p className="text-xs text-muted">
               We use this only to reply to you. Requests are deleted within {Math.round(UNHANDLED_RETENTION_DAYS / 30)} months,
-              sooner once we’ve answered.
+              sooner once we’ve answered. The{' '}
+              <a href="/privacy/" className="underline underline-offset-2 hover:text-ink">
+                privacy policy
+              </a>{' '}
+              has the rest.
             </p>
           </form>
         )}

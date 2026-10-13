@@ -390,13 +390,13 @@ export function decisionFor(item: DecisionInput): Decision {
   const has = (id: FlagId) => item.flags.some((f) => f.id === id)
   const dominant = PRECEDENCE.find(has)
 
-  const blocker = parsed.blockers[0] ?? parsed.draftedFields.find((f) => f.needsDoug)?.value
+  const blocker = parsed.blockers[0] ?? parsed.draftedFields.find((f) => f.needsArtist)?.value
   const dangerAlert = parsed.alerts.find((a) => a.severity === 'danger')
 
-  // Drafted fields waiting on a person carry placeholder text like "needs Doug,
+  // Drafted fields waiting on a person carry placeholder text like "needs Jane,
   // not on file" — the label is the useful half, the value just repeats itself.
   const missingFields = parsed.draftedFields
-    .filter((f) => f.needsDoug && f.label)
+    .filter((f) => f.needsArtist && f.label)
     .map((f) => f.label)
 
   if (kind === 'promo') {

@@ -22,10 +22,14 @@
  */
 
 import type { GigOpportunity } from './types'
+import { homeRegionOf, regionOf } from './regions'
+import { regionPoint } from './regionDistance'
 import {
   bandFromDistance,
+  crowKm,
   driveCost,
   driveNights,
+  estimateDrive,
   formatDriveTime,
   measuredDistance,
   placeOf,
@@ -45,10 +49,11 @@ export type PerformanceKind = 'showcase' | 'paid'
 export type Country = 'CA' | 'US' | 'other'
 
 /**
- * Return airfare or fuel, one person with gear, banded by distance from
- * Winnipeg. Bands rather than a distance calculation because the input is a
- * prose location and a computed 1,847 km would imply a precision the address
- * "Whitehorse, YT" does not carry.
+ * Return airfare or fuel, one person with gear, banded by distance from the
+ * artist's home. Bands rather than a distance calculation because the input is
+ * a prose location and a computed 1,847 km would imply a precision the address
+ * "Whitehorse, YT" does not carry. Where a home base is set and the place is on
+ * a map, the real distance picks the band instead; see `travelDistance.ts`.
  */
 export const TRAVEL_BANDS: Record<TravelBand, { label: string; note: string; cost: CostRange }> = {
   // The band that was missing, and its absence was not cosmetic: a show at
@@ -56,22 +61,47 @@ export const TRAVEL_BANDS: Record<TravelBand, { label: string; note: string; cos
   // $450–850, and one in Winnipeg itself as a $120–400 drive. Both are wrong
   // in the direction that matters most here — they make home-town gigs look
   // expensive, for an artist whose stated goal is expanding beyond Winnipeg.
-  local: { label: 'Local', note: 'In or beside Winnipeg — fuel and parking', cost: { low: 0, high: 40 } },
-  drive: { label: 'Drive', note: 'Within about 800 km of Winnipeg', cost: { low: 120, high: 400 } },
-  regional: { label: 'Regional flight', note: 'Elsewhere in Canada, or the near US', cost: { low: 450, high: 850 } },
-  transcontinental: { label: 'Transcontinental flight', note: 'A coast, or the far US', cost: { low: 700, high: 1400 } },
-  international: { label: 'International flight', note: 'Overseas', cost: { low: 1300, high: 2600 } },
+  local: { label: 'Local, in town', note: 'In or beside your home town. Fuel and parking.', cost: { low: 0, high: 40 } },
+  drive: { label: 'Driving', note: 'Within about 800 km of home. Fuel and wear, there and back.', cost: { low: 120, high: 400 } },
+  regional: {
+    label: 'Flights within Canada or the near US',
+    note: 'Return airfare for you and your gear, elsewhere in Canada or the near US.',
+    cost: { low: 450, high: 850 },
+  },
+  transcontinental: {
+    label: 'Flights coast to coast, or the far US',
+    note: 'Return airfare for you and your gear, to a coast or the far US.',
+    cost: { low: 700, high: 1400 },
+  },
+  international: { label: 'Flights overseas', note: 'Return airfare for you and your gear, overseas.', cost: { low: 1300, high: 2600 } },
 }
 
-/** Per night. `none` is for a drive you sleep at home either side of, or a billet. */
-export const LODGING_TIERS: Record<LodgingTier, { label: string; perNight: CostRange }> = {
-  none: { label: 'Hosted or no overnight', perNight: { low: 0, high: 0 } },
-  standard: { label: 'Standard', perNight: { low: 130, high: 200 } },
-  major: { label: 'Major city', perNight: { low: 190, high: 330 } },
+/**
+ * Per night. `none` is for a drive you sleep at home either side of, or a billet.
+ *
+ * `stay` finishes the sentence "Accommodation, 2 nights ___", so a line says
+ * what kind of room it priced rather than a bare tier name.
+ */
+export const LODGING_TIERS: Record<LodgingTier, { label: string; stay: string; perNight: CostRange }> = {
+  none: { label: 'Hosted or no overnight', stay: 'with a host, at no cost', perNight: { low: 0, high: 0 } },
+  standard: { label: 'Standard hotel', stay: 'in a standard hotel', perNight: { low: 130, high: 200 } },
+  major: { label: 'Major-city hotel', stay: 'in a major-city hotel', perNight: { low: 190, high: 330 } },
 }
 
-/** Food and ground transport, per day. Days are nights + 1: you eat on the way home. */
-export const PER_DIEM: CostRange = { low: 55, high: 95 }
+/**
+ * Food, and getting around once you are there, per day. Days are nights + 1:
+ * you eat on the way home.
+ *
+ * Two lines on screen because they are two different things to a reader, and
+ * one number labelled "food and ground" was neither. `PER_DIEM` is their sum
+ * and is unchanged, so splitting them moved no total.
+ */
+export const MEALS_PER_DAY: CostRange = { low: 40, high: 70 }
+export const GROUND_PER_DAY: CostRange = { low: 15, high: 25 }
+export const PER_DIEM: CostRange = {
+  low: MEALS_PER_DAY.low + GROUND_PER_DAY.low,
+  high: MEALS_PER_DAY.high + GROUND_PER_DAY.high,
+}
 
 /**
  * How many nights a trip of each band usually takes, when nobody has said.
@@ -176,45 +206,6 @@ export function normaliseCountry(raw: string | null | undefined): Country | null
   return 'other'
 }
 
-/**
- * Places close enough to drive, and places far enough that "elsewhere in
- * Canada" is the wrong band for them.
- *
- * A convenience, not a gazetteer. `travel_band` is the column that decides;
- * these lists only stop the estimate being empty on the 34 rows that predate
- * the column, and every estimate says which of its bands were guessed.
- */
-/**
- * Home, and the ring around it you would not sleep away from.
- *
- * Birds Hill Park is on this list because the Winnipeg Folk Festival is held
- * there and it is a half-hour drive, not because the list is trying to be a
- * gazetteer.
- */
-const LOCAL_PLACES = [
-  'winnipeg', 'birds hill', 'east st paul', 'west st paul', 'headingley',
-  'oak bluff', 'lorette', 'niverville', 'st norbert', 'charleswood', 'transcona',
-]
-
-const DRIVE_PLACES = [
-  'manitoba', 'winnipeg', 'brandon', 'gimli', 'dauphin', 'steinbach', 'selkirk', 'morden', 'winkler',
-  'saskatchewan', 'regina', 'saskatoon', 'yorkton',
-  'thunder bay', 'kenora', 'dryden', 'fort frances',
-  'north dakota', 'fargo', 'grand forks', 'minot',
-  'minneapolis', 'saint paul', 'st paul', 'duluth', 'minnesota',
-]
-
-const FAR_PLACES = [
-  'british columbia', 'vancouver', 'victoria', 'kelowna', 'whistler',
-  'yukon', 'whitehorse', 'northwest territories', 'yellowknife', 'nunavut', 'iqaluit',
-  'nova scotia', 'halifax', 'new brunswick', 'moncton', 'fredericton', 'prince edward island',
-  'charlottetown', 'newfoundland', "st john's", 'st johns',
-  'california', 'los angeles', 'san francisco', 'oakland', 'san diego',
-  'new york', 'brooklyn', 'boston', 'philadelphia', 'washington',
-  'texas', 'austin', 'houston', 'dallas', 'florida', 'miami', 'georgia', 'atlanta',
-  'seattle', 'portland', 'oregon', 'washington state', 'arizona', 'phoenix', 'new orleans', 'louisiana',
-]
-
 /** Cities where a room is a different animal. Same caveat as above. */
 const MAJOR_CITIES = [
   'toronto', 'vancouver', 'montreal', 'montréal', 'calgary', 'ottawa',
@@ -227,22 +218,67 @@ const mentions = (haystack: string, needles: string[]): boolean =>
   needles.some((n) => haystack.includes(n))
 
 /**
- * A band guessed from the location string. Null means it could not be
- * guessed, which is a better answer than a default.
+ * Where an artist travels from, as far as a guess needs to know it.
+ *
+ * Just the province: the guess below works between regions, and a city is
+ * for the measured path. `place` is as the artist typed it, so a gig in the
+ * same town can be told from a gig somewhere else in the province.
  */
-export function inferTravelBand(location: string | null | undefined, country: Country | null): TravelBand | null {
-  const t = (location ?? '').toLowerCase()
-  if (t && mentions(t, LOCAL_PLACES)) return 'local'
-  if (t && mentions(t, DRIVE_PLACES)) return 'drive'
-  if (t && mentions(t, FAR_PLACES)) return 'transcontinental'
-  // A Manitoba address is a drive at worst, whether or not the town is on a
-  // list. The province is about 1,200 km end to end and the far corner of it
-  // is still not a flight — "Birds Hill Park, MB" was banding as a regional
-  // flight purely for not being a place anybody had named.
-  if (/,\s*mb\b|\bmanitoba\b/.test(t)) return 'drive'
+export interface Home {
+  region: string | null
+  place?: string | null
+}
+
+/** The home the guess needs, from the place the artist typed: "Calgary, AB". */
+export function homeFrom(place: string | null | undefined): Home | null {
+  const trimmed = place?.trim()
+  if (!trimmed) return null
+  return { region: homeRegionOf(trimmed), place: trimmed }
+}
+
+const cityOf = (place: string | null | undefined): string =>
+  (place ?? '').split(',')[0].trim().toLowerCase()
+
+/**
+ * A band guessed from the location string and, when it is known, where the
+ * artist lives. Null means it could not be guessed, which is a better answer
+ * than a default.
+ *
+ * It is the rule the measured path uses, applied to a coarser distance: the
+ * straight line between the artist's province and the gig's, through
+ * `bandFromDistance`. A gig in the artist's own province is a drive, and in
+ * their own town is local. With no home it can only say Canada or the US is
+ * elsewhere, which is a flight, and an overseas country is international. It
+ * does not know anybody's home by default: it used to, and the answer was
+ * Winnipeg's for everyone.
+ */
+export function inferTravelBand(
+  location: string | null | undefined,
+  country: Country | null,
+  home?: Home | null,
+): TravelBand | null {
+  const t = (location ?? '').trim()
+  if (/\b(online|virtual|remote)\b/i.test(t)) return null
+
+  const region = regionOf(t)
+  const homeRegion = home?.region ?? null
+
+  if (homeRegion && region) {
+    if (region.country === 'CA' && region.code === homeRegion) {
+      return cityOf(t) && cityOf(t) === cityOf(home?.place) ? 'local' : 'drive'
+    }
+    const from = regionPoint(homeRegion, 'CA')
+    const to = regionPoint(region.code, region.country)
+    if (from && to) {
+      const crow = crowKm(from, to)
+      return bandFromDistance({ roadKm: estimateDrive(crow).km, crowKm: crow, overseas: false })
+    }
+  }
+
   if (country === 'other') return 'international'
   if (country === 'CA' || country === 'US') return 'regional'
-  return null
+  // No country on the row: a place that names a Canadian or US region has one.
+  return region ? 'regional' : null
 }
 
 /** A tier guessed from the location string. Defaults to `standard`, which is the common case. */
@@ -391,8 +427,11 @@ function lodgingTierOf(raw: string | null | undefined): LodgingTier | null {
 }
 
 export interface CostLine {
-  id: 'travel' | 'lodging' | 'per_diem' | 'visa' | 'entry_fee'
+  id: 'travel' | 'lodging' | 'meals' | 'ground' | 'visa' | 'entry_fee'
+  /** What it is, in the words a screen shows: "Flights", "Accommodation". */
   label: string
+  /** What is inside it, in a sentence, so a figure never stands alone. */
+  detail: string
   amount: CostRange
   /** The band came from a guess rather than from the row. Shown as "about". */
   inferred: boolean
@@ -404,12 +443,57 @@ export interface CostLine {
   basis?: 'route' | 'straight_line'
 }
 
+/** Money they pay toward the trip, itemised the way the listing does. */
+export interface PayLine {
+  id: 'guarantee' | 'stipend'
+  label: string
+  detail: string
+  amount: CostRange
+}
+
+/**
+ * How the trip sits against what it pays, in words that do not treat spending
+ * on a career as losing money.
+ *
+ * - `income`: it pays more than it costs, even at the expensive end.
+ * - `even`: the two ranges overlap, so it could come out either way.
+ * - `investment`: it costs more than it pays, even at the cheap end. Showcases,
+ *   festivals and conferences are mostly this, and it is what they are for:
+ *   being seen, in a room, by people who book.
+ *
+ * Decided from the *range*, never a midpoint, like everything else here: a
+ * trip is only called income when the worst case still leaves you ahead.
+ */
+export type OutlookId = 'income' | 'even' | 'investment'
+
+export interface Outlook {
+  id: OutlookId
+  /** The word on the badge. */
+  label: string
+  /** One sentence in dollars. Reads aloud on its own. */
+  summary: string
+  /**
+   * The figure the summary is about, always positive where it can be: how far
+   * ahead, or how much goes in. An `even` outlook keeps its signs, since it
+   * runs from ahead to in.
+   */
+  amount: CostRange
+  /** Whether any pay is recorded. Without it an investment is only the cost of taking part. */
+  payKnown: boolean
+}
+
 export interface CostEstimate {
   lines: CostLine[]
+  /** Every cost added up: the estimated total, before anything they pay. */
+  gross: CostRange
+  /** What they pay toward the trip, itemised. */
+  payLines: PayLine[]
   /** Everything they pay you. */
   income: CostRange
   /** Cost less income. Negative means the trip pays for itself. */
   net: CostRange
+  /** Null when there is nothing to set against anything: no cost counted, no pay recorded. */
+  outlook: Outlook | null
   visa: VisaRequirement
   /**
    * What could not be counted, each as a sentence. A cost estimate missing
@@ -432,6 +516,21 @@ type CostRow = Pick<
 
 
 /**
+ * The travel line's words for a measured trip. A drive says its road distance
+ * and time; a flight says how far away the place is, because the road would
+ * be the wrong number twice over: nobody drives it, and the fare follows the
+ * straight line if it follows anything. Home is "in town", not "0 km (0 min)".
+ */
+function distanceLabel(band: TravelBand, m: MeasuredDistance): string {
+  const km = (n: number) => `${Math.round(n).toLocaleString('en-CA')} km`
+  if (band === 'local' && m.roadKm < 5) return TRAVEL_BANDS.local.label
+  if (band === 'local' || band === 'drive') {
+    return `${TRAVEL_BANDS[band].label}, ${km(m.roadKm)} each way (about ${formatDriveTime(m.roadHours)})`
+  }
+  return `Flights, about ${km(m.crowKm)} away`
+}
+
+/**
  * The whole trip, as a range, with what it could not count named beside it.
  *
  * Nothing is silently defaulted. A missing `nights` leaves lodging and per
@@ -439,22 +538,7 @@ type CostRow = Pick<
  * zero nights, because zero nights is a real answer that some rows genuinely
  * have and this is not one of them.
  */
-/**
- * The travel line's words for a measured trip. A drive says its road distance
- * and time; a flight says how far away the place is, because the road would
- * be the wrong number twice over — nobody drives it, and the fare follows the
- * straight line if it follows anything. Home is "in town", not "0 km (0 min)".
- */
-function distanceLabel(band: TravelBand, m: MeasuredDistance): string {
-  const km = (n: number) => `${Math.round(n).toLocaleString('en-CA')} km`
-  if (band === 'local' && m.roadKm < 5) return `${TRAVEL_BANDS.local.label}, in town`
-  if (band === 'local' || band === 'drive') {
-    return `${TRAVEL_BANDS[band].label}, ${km(m.roadKm)} each way (about ${formatDriveTime(m.roadHours)})`
-  }
-  return `${TRAVEL_BANDS[band].label}, ${km(m.crowKm)} away`
-}
-
-export function estimateGigCost(row: CostRow): CostEstimate {
+export function estimateGigCost(row: CostRow, home?: Home | null): CostEstimate {
   const lines: CostLine[] = []
   const unknowns: string[] = []
 
@@ -467,7 +551,7 @@ export function estimateGigCost(row: CostRow): CostEstimate {
     statedBand ??
     (measured
       ? bandFromDistance({ roadKm: measured.roadKm, crowKm: measured.crowKm, overseas: country === 'other' })
-      : inferTravelBand(placeOf(row), country))
+      : inferTravelBand(placeOf(row), country, home))
 
   if (band) {
     // A drive is priced by its length when the length is known; a flight's
@@ -476,6 +560,7 @@ export function estimateGigCost(row: CostRow): CostEstimate {
     lines.push({
       id: 'travel',
       label: measured ? distanceLabel(band, measured) : TRAVEL_BANDS[band].label,
+      detail: TRAVEL_BANDS[band].note,
       amount: byDistance ? driveCost(measured.roadKm) : TRAVEL_BANDS[band].cost,
       inferred: statedBand === null,
       ...(measured ? { basis: measured.source } : {}),
@@ -485,7 +570,7 @@ export function estimateGigCost(row: CostRow): CostEstimate {
   }
 
   const statedNights = typeof row.nights === 'number' && row.nights >= 0 ? row.nights : null
-  // Stated wins and is exact. Otherwise the band's usual span, as a range —
+  // Stated wins and is exact. Otherwise the band's usual span, as a range,
   // see NIGHTS_BY_BAND for why a range rather than a number.
   const nights: { low: number; high: number } | null =
     statedNights !== null
@@ -506,7 +591,8 @@ export function estimateGigCost(row: CostRow): CostEstimate {
     const tier = statedTier ?? inferLodgingTier(placeOf(row), band)
     lines.push({
       id: 'lodging',
-      label: `${LODGING_TIERS[tier].label}, ${describeNights(nights)}`,
+      label: `Accommodation, ${describeNights(nights)} ${LODGING_TIERS[tier].stay}`,
+      detail: 'A room for each night you are away.',
       // The low end takes the fewest nights and the high end the most, so a
       // guessed span widens the total rather than moving it.
       amount: {
@@ -520,9 +606,17 @@ export function estimateGigCost(row: CostRow): CostEstimate {
   if (nights !== null) {
     const days = { low: nights.low + 1, high: nights.high + 1 }
     lines.push({
-      id: 'per_diem',
-      label: `Food and ground, ${describeNights(days, 'day')}`,
-      amount: { low: PER_DIEM.low * days.low, high: PER_DIEM.high * days.high },
+      id: 'meals',
+      label: `Meals, ${describeNights(days, 'day')}`,
+      detail: 'Food on the way, while you are there, and on the way home.',
+      amount: { low: MEALS_PER_DAY.low * days.low, high: MEALS_PER_DAY.high * days.high },
+      inferred: nightsInferred,
+    })
+    lines.push({
+      id: 'ground',
+      label: `Local transport, ${describeNights(days, 'day')}`,
+      detail: 'Taxis, transit and parking once you are there.',
+      amount: { low: GROUND_PER_DAY.low * days.low, high: GROUND_PER_DAY.high * days.high },
       inferred: nightsInferred,
     })
   }
@@ -533,7 +627,11 @@ export function estimateGigCost(row: CostRow): CostEstimate {
   } else if (visa.cost.high > 0) {
     lines.push({
       id: 'visa',
-      label: visa.kind === 'p2' ? 'P-2 petition' : 'Work permit, if it turns out to be needed',
+      label: visa.kind === 'p2' ? 'US work permit (P-2)' : 'US work permit, if it turns out to be needed',
+      detail:
+        visa.kind === 'p2'
+          ? 'The US petition fee, plus the Canadian Federation of Musicians’ paperwork.'
+          : 'Only a paid booking needs one. A showcase usually does not.',
       amount: visa.cost,
       inferred: visa.kind === 'unknown',
     })
@@ -547,7 +645,8 @@ export function estimateGigCost(row: CostRow): CostEstimate {
     const usd = (row.feeCurrency ?? 'USD').toUpperCase() === 'USD'
     lines.push({
       id: 'entry_fee',
-      label: usd ? `Entry fee, USD ${row.feeAmount}` : `Entry fee, ${row.feeCurrency} ${row.feeAmount}`,
+      label: usd ? `Entry fee (USD ${row.feeAmount})` : `Entry fee (${row.feeCurrency} ${row.feeAmount})`,
+      detail: usd ? 'Paid to apply, converted to Canadian dollars.' : 'Paid to apply.',
       amount: usd ? round(scale(flat(row.feeAmount), USD_CAD)) : flat(row.feeAmount),
       inferred: false,
     })
@@ -555,16 +654,164 @@ export function estimateGigCost(row: CostRow): CostEstimate {
     unknowns.push('There is an entry fee on this one and no amount recorded.')
   }
 
+  const payLines: PayLine[] = []
+  if (row.guaranteeAmount && row.guaranteeAmount > 0) {
+    payLines.push({
+      id: 'guarantee',
+      label: 'Performance fee',
+      detail: 'What they pay you to play.',
+      amount: flat(row.guaranteeAmount),
+    })
+  }
+  if (row.stipendAmount && row.stipendAmount > 0) {
+    payLines.push({
+      id: 'stipend',
+      label: 'Stipend',
+      detail: 'Money toward your costs, whatever you play.',
+      amount: flat(row.stipendAmount),
+    })
+  }
+
   const income = flat((row.stipendAmount ?? 0) + (row.guaranteeAmount ?? 0))
-  const gross = lines.reduce((acc, l) => add(acc, l.amount), flat(0))
+  const gross = round(lines.reduce((acc, l) => add(acc, l.amount), flat(0)))
+  const net = round(less(gross, income))
+  // Recorded as zero is a statement; not recorded is an absence. Only the
+  // second leaves an investment saying it may not be the whole picture.
+  const payKnown = row.guaranteeAmount != null || row.stipendAmount != null
 
   return {
     lines,
+    gross,
+    payLines,
     income,
-    net: round(less(gross, income)),
+    net,
+    outlook: outlookOf({ gross, income, net, payKnown, costed: lines.length > 0 }),
     visa,
     unknowns,
     anyInferred: lines.some((l) => l.inferred),
+  }
+}
+
+/**
+ * Whether this trip is income, an investment, or could be either.
+ *
+ * The words are chosen, not neutral. Playing a showcase or a festival that does
+ * not cover its costs is spending on being heard, and "loss" is the wrong
+ * frame for it: it makes the most useful rooms in this business look like
+ * mistakes. `test/gigCost.test.ts` fails if a word of loss gets back in.
+ *
+ * Null when there is nothing on either side: no cost counted and no pay
+ * recorded. A label there would be a claim about a row that has none of the
+ * inputs.
+ */
+export function outlookOf(input: {
+  gross: CostRange
+  income: CostRange
+  net: CostRange
+  payKnown: boolean
+  /** At least one cost line was counted. */
+  costed: boolean
+}): Outlook | null {
+  const { gross, income, net, payKnown, costed } = input
+  if (!costed && income.high <= 0) return null
+
+  // Pay with nothing counted against it: say what it pays and no more. "You
+  // come out ahead" of costs that were never counted is not a claim to make.
+  if (!costed) {
+    return {
+      id: 'income',
+      label: 'Income',
+      summary: `Pays about ${formatCostRange(income)}. No costs are counted against it yet.`,
+      amount: income,
+      payKnown,
+    }
+  }
+
+  if (gross.high === 0 && income.high === 0) return null
+
+  if (net.low === 0 && net.high === 0) {
+    return { id: 'even', label: 'Pays its way', summary: 'Pays about what it costs.', amount: net, payKnown }
+  }
+
+  if (net.high <= 0) {
+    const ahead = { low: -net.high, high: -net.low }
+    return {
+      id: 'income',
+      label: 'Income',
+      summary: `Pays more than it costs. You come out about ${formatCostRange(ahead)} ahead.`,
+      amount: ahead,
+      payKnown,
+    }
+  }
+
+  if (net.low >= 0) {
+    return {
+      id: 'investment',
+      label: 'Investment',
+      summary: payKnown
+        ? `Costs more than it pays. You put in about ${formatCostRange(net)}, after what they pay you.`
+        : `You put in about ${formatCostRange(net)} to take part. No pay is recorded for this one.`,
+      amount: net,
+      payKnown,
+    }
+  }
+
+  return {
+    id: 'even',
+    label: 'Could pay its way',
+    summary:
+      `Could go either way, from about ${formatCostRange({ low: -net.low, high: -net.low })} ahead ` +
+      `to ${formatCostRange({ low: net.high, high: net.high })} put in.`,
+    amount: net,
+    payKnown,
+  }
+}
+
+/**
+ * Where a trip sits between a big investment and a big payout, for the scale
+ * on the cost panel.
+ *
+ * Positions run 0 to 1 with **0 the bigger-investment end, 1 the bigger-payout
+ * end and 0.5 even**. A trip is a range, so it is a bar and not a point: a bar
+ * that straddles the middle says "could go either way" without a word.
+ *
+ * The scale is not linear, and the reason is the one this graphic exists for. A
+ * $200 trip and a $4,000 one have to read as different sizes, and on a straight
+ * line out to $5,000 the first would be a hairline beside the middle. Each side
+ * is logarithmic from a $100 knee, so the first few hundred dollars get real
+ * room and the ends are for the trips that genuinely are big. Past $5,000 a
+ * bar stops at the edge rather than leaving the track.
+ */
+export const SCALE_LIMIT = 5000
+const SCALE_KNEE = 100
+
+/** `ahead` is positive when the trip pays, negative when it costs. */
+export function scalePosition(ahead: number): number {
+  const side = Math.sign(ahead) * Math.log1p(Math.abs(ahead) / SCALE_KNEE) / Math.log1p(SCALE_LIMIT / SCALE_KNEE)
+  return 0.5 + 0.5 * Math.max(-1, Math.min(1, side))
+}
+
+export interface OutlookScale {
+  /** Left and right edge of the bar, 0 to 1. Always `from <= to`. */
+  from: number
+  to: number
+  /** The range ran past the scale's end, and the bar was stopped there. */
+  clippedLeft: boolean
+  clippedRight: boolean
+  /** Fixed marks, so the track reads as a scale and not a bar in a box. */
+  ticks: Array<{ position: number; ahead: number }>
+}
+
+const SCALE_TICKS = [-2000, -500, 500, 2000]
+
+export function outlookScale(net: CostRange): OutlookScale {
+  // Net is cost less pay, so a bigger net is further toward the investment end.
+  return {
+    from: scalePosition(-net.high),
+    to: scalePosition(-net.low),
+    clippedLeft: -net.high < -SCALE_LIMIT,
+    clippedRight: -net.low > SCALE_LIMIT,
+    ticks: SCALE_TICKS.map((ahead) => ({ position: scalePosition(ahead), ahead })),
   }
 }
 

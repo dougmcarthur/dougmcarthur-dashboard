@@ -29,6 +29,7 @@ import {
   deleteEventOn,
   targetFromEnv,
   calendarConfigured,
+  type CalendarEnv,
   type CalendarTarget,
 } from './googleCalendar'
 import {
@@ -39,6 +40,7 @@ import {
   type TasksTarget,
 } from './googleTasks'
 import { accessTokenForGrant, readGrant } from './googleGrant'
+import { isOwnerTenant } from './actor'
 import type { TenantId } from '../db/scope'
 import { splitDeadline } from '../../shared/reviewParse'
 import { showSpan } from '../../shared/performance'
@@ -70,36 +72,68 @@ import type { Env } from '../types'
  * Null means none of the three, which is a perfectly ordinary state.
  */
 export async function calendarTarget(env: Env, tenant: TenantId | null): Promise<CalendarTarget | null> {
-  if (tenant) {
-    // `primary` is the literal calendar id Google accepts for "the one this
-    // account signs in as". It is not configuration and never has been.
-    const owned = await readGrant(env, tenant, 'calendar.primary')
-    if (owned.connected && owned.canDraft) {
+  const way = await calendarWay(env, tenant)
+  if (!way) return null
+
+  // A refused grant is not a reason to fall back to somebody else's calendar:
+  // the artist connected one, and writing to the owner's instead would be worse
+  // than writing nowhere. `calendarWay` has already chosen, so there is no
+  // fall-through to forget here.
+  switch (way.kind) {
+    case 'primary':
       try {
-        return {
-          accessToken: await accessTokenForGrant(env, tenant, 'calendar.primary'),
-          calendarId: 'primary',
-        }
+        // `primary` is the literal calendar id Google accepts for "the one this
+        // account signs in as". It is not configuration and never has been.
+        return { accessToken: await accessTokenForGrant(env, tenant!, 'calendar.primary'), calendarId: 'primary' }
       } catch (err) {
         console.error('primary calendar grant unusable:', err)
         return null
       }
-    }
-
-    const grant = await readGrant(env, tenant, 'calendar')
-    if (grant.connected && grant.calendarId && grant.canDraft) {
+    case 'grant':
       try {
-        return { accessToken: await accessTokenForGrant(env, tenant, 'calendar'), calendarId: grant.calendarId }
+        return { accessToken: await accessTokenForGrant(env, tenant!, 'calendar'), calendarId: way.calendarId }
       } catch (err) {
-        // A refused grant is not a reason to fall back to somebody else's
-        // calendar: the artist connected one, and writing to the owner's
-        // instead would be worse than writing nowhere.
         console.error('calendar grant unusable:', err)
         return null
       }
-    }
+    case 'secrets':
+      return targetFromEnv(env as CalendarEnv)
   }
-  return calendarConfigured(env) ? targetFromEnv(env) : null
+}
+
+/** Which of the three ways in a request would take. */
+export type CalendarWay =
+  | { kind: 'primary' }
+  | { kind: 'grant'; calendarId: string }
+  | { kind: 'secrets' }
+
+/**
+ * Which way in is open, decided from what is stored and nothing else.
+ *
+ * This is the choice `calendarTarget` makes, pulled out so the bell can ask it
+ * without spending a refresh token. It reads two rows of `google_grants` and
+ * never Google, which is what a thing polled every five minutes can afford.
+ *
+ * The bell used to ask `calendarConfigured(env)` alone — the Worker secrets, a
+ * path nobody in production ever set — while Settings read the grant, so a
+ * calendar connected with the button was *Working* on one screen and
+ * *disconnected* on the other. Two answers to "can a gig reach the calendar"
+ * is one more than there should be.
+ */
+export async function calendarWay(env: Env, tenant: TenantId | null): Promise<CalendarWay | null> {
+  if (tenant) {
+    const owned = await readGrant(env, tenant, 'calendar.primary')
+    if (owned.connected && owned.canDraft) return { kind: 'primary' }
+
+    const grant = await readGrant(env, tenant, 'calendar')
+    if (grant.connected && grant.calendarId && grant.canDraft) return { kind: 'grant', calendarId: grant.calendarId }
+
+    // The secrets are the *owner's* calendar. An artist with no grant of their
+    // own has no calendar, not the owner's: falling through here put a second
+    // artist's bookings on a stranger's diary the day somebody set the secrets.
+    if (!(await isOwnerTenant(env, tenant))) return null
+  }
+  return calendarConfigured(env) ? { kind: 'secrets' } : null
 }
 
 /** The one list Scout made. There is no secrets path here and never was. */

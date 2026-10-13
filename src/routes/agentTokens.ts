@@ -1,5 +1,14 @@
 /**
- * The research agents' credentials, one per artist.
+ * The research agents' credentials, issued by the owner.
+ *
+ * **Only the owner has one.** Opportunities are collected once, by the owner's
+ * routines, for every artist: research is shared, matched and weighed per artist
+ * in the Worker, and no artist runs agents of their own. A credential an artist
+ * could mint would be a way to write into the shared catalog, or to put model
+ * work on this deployment's bill, for a feature nobody asked for. So issuing,
+ * listing and revoking are the owner's, and the card is hidden from everybody
+ * else. A token already issued to an artist's tenant keeps working until it is
+ * revoked; the owner can do that from admin mode.
  *
  * `API_TOKEN` is a Worker secret with no tenant attached, which was right while
  * one artist owned every row and is wrong the moment two do: the agents POST
@@ -44,11 +53,23 @@ const tokens = new Hono<AppEnv>()
  * asking "is this session elevated" of one is a question with no answer, and
  * the honest reading of no answer is no.
  */
+export const OWNER_ONLY_MESSAGE =
+  'Agent tokens are the owner’s. Opportunities are collected once for everybody, so nothing here needs a credential of your own.'
+
+/** Not the owner. Applies to reading the list as much as to changing it. */
+function notOwner(c: Context<AppEnv>) {
+  const actor = c.get('actor')
+  if (actor.kind === 'user' && actor.role !== 'owner') return c.json({ error: OWNER_ONLY_MESSAGE }, 403)
+  return null
+}
+
 function refusal(c: Context<AppEnv>) {
   const actor = c.get('actor')
   if (actor.kind !== 'user') {
     return c.json({ error: 'An agent token cannot manage agent tokens.' }, 403)
   }
+  const owner = notOwner(c)
+  if (owner) return owner
   if (!elevationState({ now: new Date(), elevatedAt: actor.session.elevatedAt }).elevated) {
     return c.json(
       { error: 'Confirm it is you before changing how you sign in.', needsElevation: true },
@@ -60,6 +81,8 @@ function refusal(c: Context<AppEnv>) {
 
 /** What exists, and never what it is. */
 tokens.get('/', async (c) => {
+  const no = notOwner(c)
+  if (no) return no
   const rows = await getDb(c.env.DB)
     .select()
     .from(agentTokens)

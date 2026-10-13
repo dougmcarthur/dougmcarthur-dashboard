@@ -102,6 +102,7 @@ type HealthLike =
       primaryCalendarGrant?: CalendarGrant
       driveGrant?: CalendarGrant
       primaryCalendarOffered?: boolean
+      platform?: boolean
     }
   | undefined
 
@@ -151,6 +152,9 @@ function resolveRows(health: HealthLike): RowState[] {
     // pressing Connect would end at a Google error page rather than a consent
     // screen — so there is nothing useful behind it to show.
     if (spec.gated && !health?.primaryCalendarOffered) return []
+
+    // The owner's mailbox and sending address are not an artist's connections.
+    if (spec.ownerOnly && health?.platform === false) return []
 
     const grantOf = GRANT_ROWS[spec.id]
     if (grantOf) return [fromGrant(spec, grantOf(health))]

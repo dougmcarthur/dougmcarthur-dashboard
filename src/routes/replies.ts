@@ -10,6 +10,7 @@ import { scoped, withTenant, type TenantId } from '../db/scope'
 import { readGigs, readGig } from '../db/gigRows'
 import { tenantOf, type AppEnv } from '../context'
 import { gmailConfigured, type GmailEnv } from '../lib/gmail'
+import { refuseUnlessMailboxOwner } from '../lib/ownerMailbox'
 import { fetchReplies, planReplyScan, sentThreadIds } from '../lib/gmailReplies'
 import { recordEvent } from '../lib/notificationEvents'
 import { FORGOTTEN_ON_DISMISS } from '../lib/replyRetention'
@@ -345,6 +346,8 @@ export type ReplyScanOutcome = ReturnType<typeof planReplyScan> & {
 }
 
 replies.post('/scan', async (c) => {
+  const refused = await refuseUnlessMailboxOwner(c)
+  if (refused) return refused
   if (!gmailConfigured(c.env)) return notConfigured(c)
   return c.json(await runReplyScan(c.env, tenantOf(c), todayOf(c)))
 })

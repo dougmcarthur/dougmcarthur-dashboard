@@ -110,6 +110,11 @@ vi.mock('../src/lib/googleCalendar', () => ({
   },
 }))
 
+// The stored-secret calendar is the owner's, so these are the owner's tenant.
+// Who is and is not the owner is covered against a real database in
+// `ownerOnly.test.ts` and `calendarWay.test.ts`.
+vi.mock('../src/lib/actor', () => ({ isOwnerTenant: async () => true }))
+
 vi.mock('../src/lib/googleTasks', () => ({
   createTaskOn: async (_t: unknown, input: { title: string; due: string }) => {
     if (input.title.includes('BOOM')) throw new Error('tasks exploded')

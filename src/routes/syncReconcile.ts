@@ -8,11 +8,15 @@ import { scoped } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
 import { getSentEmailsForAddresses, gmailConfigured } from '../lib/gmail'
 import { decisionActor, recordSyncDecision } from '../lib/decisionLog'
+import { refuseUnlessMailboxOwner } from '../lib/ownerMailbox'
 
 const reconcile = new Hono<AppEnv>()
 
 // GET /api/sync/reconcile — preview: what would change, plus draft diffs
 reconcile.get('/', async (c) => {
+  // The sent mail it compares against is the owner's. See lib/ownerMailbox.ts.
+  const refused = await refuseUnlessMailboxOwner(c)
+  if (refused) return refused
   if (!gmailConfigured(c.env)) {
     return c.json(
       {
@@ -84,6 +88,8 @@ reconcile.post(
     }),
   ),
   async (c) => {
+    const refused = await refuseUnlessMailboxOwner(c)
+    if (refused) return refused
     const db = getDb(c.env.DB)
     const { updates } = c.req.valid('json')
     const now = new Date().toISOString()

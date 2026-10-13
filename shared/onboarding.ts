@@ -31,7 +31,7 @@ export type GoalId = (typeof GOALS)[number]['id']
 
 /** How far from home somebody is willing to go. Several can be true at once. */
 export const REACH = [
-  { id: 'home', label: 'My province' },
+  { id: 'home', label: 'My province or territory' },
   { id: 'canada', label: 'Across Canada' },
   { id: 'us', label: 'The United States' },
   { id: 'international', label: 'Overseas' },
@@ -39,7 +39,116 @@ export const REACH = [
 
 export type ReachId = (typeof REACH)[number]['id']
 
+/** Where the answers are stored, in `tenant_settings`. Shared so a reader and the writer cannot drift. */
+export const ONBOARDING_KEYS = {
+  goals: 'onboarding.goals',
+  profile: 'onboarding.profile',
+  hiddenAt: 'onboarding.hiddenAt',
+} as const
+
 export const GOAL_NOTE_MAX = 500
+
+/**
+ * Where an artist is based, for the one question that has to be answered in
+ * Canada's terms: which province or territory. Scout is built for Canadian
+ * artists, and a province is what "my province" means, what an association is
+ * called after, and the unit funding is decided in. `abroad` is a real answer
+ * rather than an error, since the product is for Canadians and not only for
+ * people who currently live here.
+ */
+export const REGIONS = [
+  { id: 'AB', label: 'Alberta' },
+  { id: 'BC', label: 'British Columbia' },
+  { id: 'MB', label: 'Manitoba' },
+  { id: 'NB', label: 'New Brunswick' },
+  { id: 'NL', label: 'Newfoundland and Labrador' },
+  { id: 'NS', label: 'Nova Scotia' },
+  { id: 'NT', label: 'Northwest Territories' },
+  { id: 'NU', label: 'Nunavut' },
+  { id: 'ON', label: 'Ontario' },
+  { id: 'PE', label: 'Prince Edward Island' },
+  { id: 'QC', label: 'Quebec' },
+  { id: 'SK', label: 'Saskatchewan' },
+  { id: 'YT', label: 'Yukon' },
+  { id: 'abroad', label: 'Outside Canada' },
+] as const
+
+export type RegionId = (typeof REGIONS)[number]['id']
+
+/**
+ * What an artist plays, from a closed list: a genre is only useful to match on
+ * if two artists who mean the same thing pick the same word. Up to three,
+ * because an artist who ticks eleven has told Scout nothing.
+ */
+export const GENRES = [
+  { id: 'folk', label: 'Folk' },
+  { id: 'roots', label: 'Roots and Americana' },
+  { id: 'country', label: 'Country' },
+  { id: 'singer_songwriter', label: 'Singer-songwriter' },
+  { id: 'rock', label: 'Rock' },
+  { id: 'pop', label: 'Pop' },
+  { id: 'indie', label: 'Indie' },
+  { id: 'jazz', label: 'Jazz' },
+  { id: 'blues', label: 'Blues' },
+  { id: 'classical', label: 'Classical' },
+  { id: 'hip_hop', label: 'Hip-hop' },
+  { id: 'rnb_soul', label: 'R&B and soul' },
+  { id: 'electronic', label: 'Electronic' },
+  { id: 'punk_metal', label: 'Punk and metal' },
+  { id: 'world', label: 'World and traditional' },
+] as const
+
+export type GenreId = (typeof GENRES)[number]['id']
+
+export const MAX_GENRES = 3
+export const CITY_MAX = 60
+
+/** What the artist said about themselves. Every part is optional. */
+export interface Profile {
+  region: RegionId | null
+  city: string | null
+  genres: GenreId[]
+}
+
+const REGION_IDS = new Set<string>(REGIONS.map((r) => r.id))
+const GENRE_IDS = new Set<string>(GENRES.map((g) => g.id))
+
+/**
+ * Read a stored profile back, dropping anything this build does not know.
+ *
+ * Null when nothing usable is stored, for the reason `parseGoals` gives:
+ * "they have not told us" is the honest reading of an answer nobody can read.
+ */
+export function parseProfile(raw: string | null | undefined): Profile | null {
+  if (!raw) return null
+  let value: unknown
+  try {
+    value = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (!value || typeof value !== 'object') return null
+  const v = value as Record<string, unknown>
+  const region = typeof v.region === 'string' && REGION_IDS.has(v.region) ? (v.region as RegionId) : null
+  const city = typeof v.city === 'string' && v.city.trim() ? v.city.trim().slice(0, CITY_MAX) : null
+  const genres = Array.isArray(v.genres)
+    ? ([...new Set(v.genres.filter((g): g is string => typeof g === 'string' && GENRE_IDS.has(g)))].slice(0, MAX_GENRES) as GenreId[])
+    : []
+  if (!region && !city && genres.length === 0) return null
+  return { region, city, genres }
+}
+
+/**
+ * Where they travel from, as far as a guess needs it, from what they said.
+ *
+ * Only a Canadian province counts: "outside Canada" is a real answer that
+ * names no province to measure from. The place is built only when there is a
+ * city, so a guess never claims a town nobody gave.
+ */
+export function profileHome(profile: Profile | null): { region: string; place: string | null } | null {
+  if (!profile?.region || profile.region === 'abroad') return null
+  return { region: profile.region, place: profile.city ? `${profile.city}, ${profile.region}` : null }
+}
 
 export interface Goals {
   goals: GoalId[]
@@ -96,7 +205,7 @@ export interface OnboardingFacts {
   passkeys: number
 }
 
-export type StepId = 'name' | 'goals' | 'profile' | 'google' | 'shows' | 'backup'
+export type StepId = 'name' | 'about' | 'goals' | 'profile' | 'google' | 'shows' | 'backup'
 
 export interface OnboardingStep {
   id: StepId
@@ -128,7 +237,11 @@ export interface OnboardingState {
  * offering: somebody who only pitches to music supervisors has no use for a
  * tour-date connection.
  */
-export function onboardingSteps(facts: OnboardingFacts, goals: Goals | null): OnboardingState {
+export function onboardingSteps(
+  facts: OnboardingFacts,
+  goals: Goals | null,
+  profile: Profile | null = null,
+): OnboardingState {
   const wants = (id: GoalId) => goals?.goals.includes(id) ?? false
   const hasProfile = facts.libraryEntries > 0 || facts.profileConnected || facts.documents > 0
 
@@ -142,6 +255,17 @@ export function onboardingSteps(facts: OnboardingFacts, goals: Goals | null): On
       // Asked in the welcome questions, like goals, rather than on Settings.
       href: null,
       action: 'Add your name',
+    },
+    {
+      id: 'about',
+      title: 'Say where you’re based and what you play',
+      why: 'So Scout can tell which opportunities are close and which are a trip, and what suits your music.',
+      done: profile !== null && (profile.region !== null || profile.genres.length > 0),
+      // Never holds back "you are set up": it sharpens what Scout shows, and an
+      // account without it still works.
+      optional: true,
+      href: null,
+      action: 'Answer',
     },
     {
       id: 'goals',

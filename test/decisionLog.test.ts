@@ -585,13 +585,30 @@ describe('every door a status moves through', () => {
     }
   })
 
+  // Files that put a new row on an artist's list without anybody deciding
+  // anything about it: the item was offered, not chosen. Written for a reason
+  // each, like the exemptions below, and held to the one status a filing may
+  // carry, so a filer cannot start deciding without this test noticing.
+  const GIG_FILERS: Record<string, string> = {
+    'lib/catalogMatch.ts':
+      'adds shared-catalog entries to an artist\'s list as New-stage rows; being offered something is not a decision about it, and every later move goes through routes/gigs.ts and is logged there',
+  }
+
   it('has no other writer of a gig status', () => {
     const writers = sourceFiles()
       .filter((rel) => rel !== 'db/gigRows.ts')
       .filter((rel) => read(rel).includes('gigStatusColumns('))
-    expect(writers.sort(), 'a file writes a gig status without being listed as a decider').toEqual(
-      DECIDERS.filter((f) => read(f).includes('gigStatusColumns(')).sort(),
+    expect(writers.sort(), 'a file writes a gig status without being listed as a decider or a filer').toEqual(
+      [...DECIDERS.filter((f) => read(f).includes('gigStatusColumns(')), ...Object.keys(GIG_FILERS)].sort(),
     )
+  })
+
+  it('lets a filer write the one status nobody has decided on, and no other', () => {
+    for (const file of Object.keys(GIG_FILERS)) {
+      const statuses = [...read(file).matchAll(/gigStatusColumns\(([^)]*)\)/g)].map((m) => m[1].trim())
+      expect(statuses.length, `${file} no longer writes a status; drop it from GIG_FILERS`).toBeGreaterThan(0)
+      expect(statuses, file).toEqual(statuses.map(() => "'discovered'"))
+    }
   })
 
   // Written for a reason each, like the exemptions in tenantScope.test.ts.

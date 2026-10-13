@@ -81,6 +81,9 @@ export const EMAIL_COLOURS = {
 
 const C = EMAIL_COLOURS
 
+// No web font is linked: a mail client that fetches one tells the font service
+// the recipient opened this message, and the privacy policy says it does not.
+// Public Sans is named first so a machine that has it still uses it.
 const FONT = "'Public Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 const MONO = "ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Courier New',monospace"
 
@@ -247,7 +250,6 @@ export function renderEmail(content: EmailContent, footer: EmailFooter, identity
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
 <title>${escapeHtml(subject)}</title>
-<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body style="margin:0;padding:0;background-color:${C.canvas};">
 ${preheader}

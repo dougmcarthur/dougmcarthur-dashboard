@@ -32,9 +32,10 @@ export function HelpPage() {
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold text-ink tracking-tight">Help</h1>
         <p className="text-sm text-body">
-          Scout finds opportunities for musicians — festivals, showcases, grants, sync briefs —
-          helps you decide which are worth it, drafts the paperwork from your profile, and keeps
-          track of what you are waiting on. It never sends or submits anything on your behalf.
+          Scout finds opportunities for independent Canadian musicians: festivals, showcases,
+          grants, sync briefs. It helps you decide which are worth it, drafts the paperwork from
+          your profile, and keeps track of what you are waiting on. It never sends or submits
+          anything on your behalf.
         </p>
         <div className="flex flex-wrap gap-2 pt-1">
           <Button variant="primary" onClick={() => setFeedbackOpen(true)}>
@@ -52,6 +53,26 @@ export function HelpPage() {
       {flow && onboarding.data && (
         <OnboardingFlow state={onboarding.data} startAt={flow} onClose={() => setFlow(null)} />
       )}
+
+      <Section title="Made for Canadian artists">
+        <p>
+          Scout looks first at what Canadian artists apply for: provincial and federal funding,
+          the music associations in each province, and festivals and showcases across the country.
+          Costs are in Canadian dollars, and a date abroad comes with the paperwork it needs,
+          like a US work permit for a paid booking.
+        </p>
+        <p>
+          Playing abroad is welcome. Opportunities outside Canada are never left out; they are
+          shown with what it takes to get there.
+        </p>
+        <p>
+          What you told Scout in the welcome questions decides the order, and nothing else. What you
+          asked it to help with comes first, and within that, what is inside the reach you chose,
+          counting from the place you set as home in Settings. A call beyond your reach is marked
+          and comes after the rest. Nothing is ever hidden because of it, and a deadline that is
+          close still outranks both.
+        </p>
+      </Section>
 
       <Section title="The screens">
         <Entry name="Overview">
@@ -146,6 +167,17 @@ export function HelpPage() {
           dark, text size and the other settings are kept on each device.
         </p>
         <p className="text-xs text-muted">{themeCredit()}</p>
+      </Section>
+
+      <Section title="Your information and privacy">
+        <p>
+          The privacy policy says what Sun Dogs Music Scout collects, which other companies handle
+          it, how long it is kept, and how to see, correct or delete yours.{' '}
+          <a href="/privacy/" className="font-medium text-ink underline hover:text-accent">
+            Read the privacy policy
+          </a>
+          .
+        </p>
       </Section>
 
       <Section title="Feedback">

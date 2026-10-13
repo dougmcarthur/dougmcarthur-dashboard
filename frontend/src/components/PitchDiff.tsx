@@ -1,5 +1,5 @@
 // Line-level diff between a stored draft and the email that was actually sent.
-// Shows what Doug changed — the delta is the "learning".
+// Shows what the artist changed — the delta is the "learning".
 
 interface DiffLine {
   type: 'unchanged' | 'added' | 'removed'

@@ -5,6 +5,7 @@ import App from './App'
 import { AuthGate } from './components/AuthGate'
 import { AppearanceProvider } from './hooks/useAppearance'
 import { applyAppearance, loadAppearance } from './appearance'
+import './fonts'
 import './themes.css'
 import './index.css'
 

@@ -128,6 +128,21 @@ export function GoogleConsentModal({
                 .
               </dd>
             </div>
+            <div>
+              <dt className="font-medium text-ink">Where this is written down</dt>
+              <dd>
+                What we do with Google data, and what we never do, is in the{' '}
+                <a
+                  href="/privacy/#google"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-info-fg underline"
+                >
+                  privacy policy
+                </a>
+                .
+              </dd>
+            </div>
           </dl>
         </div>
 

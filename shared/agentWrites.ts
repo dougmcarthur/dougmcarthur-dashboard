@@ -126,6 +126,37 @@ export function duplicateGig(
   return null
 }
 
+export interface KnownPromoDraft {
+  id: number
+  month: string
+  title: string
+  content: string
+}
+
+/**
+ * The promo draft already on file that this one repeats, if any.
+ *
+ * Two cases, both about a run filing the same thing twice: the same title for
+ * the same month (a run that overlapped, or was retried after a crash), and
+ * the same words under a new title. A title alone is not enough across
+ * months, because "Show roundup" is a heading that recurs honestly. Whether a
+ * *subject* has been written about already is a judgement, and it belongs to
+ * the agent reading `list_existing_promo_drafts`, not to a rule that would
+ * refuse a real follow-up.
+ */
+export function duplicatePromoDraft(
+  incoming: { month: string; title: string; content: string },
+  known: KnownPromoDraft[],
+): KnownPromoDraft | null {
+  const title = slug(incoming.title)
+  const body = slug(incoming.content)
+  for (const row of known) {
+    if (title && row.month === incoming.month && slug(row.title) === title) return row
+    if (body && slug(row.content) === body) return row
+  }
+  return null
+}
+
 /** The sync target already on file: the same name, or the same contact address. */
 export function duplicateSyncTarget(
   incoming: { name: string; contactEmail?: string | null },

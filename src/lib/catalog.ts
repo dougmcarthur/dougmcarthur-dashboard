@@ -40,11 +40,34 @@ import {
 } from '../../shared/opportunityCatalog'
 import { gigStage, gigStatusFromStored } from '../../shared/gigStage'
 import { ONCE_KEYS, readSetting, writeSetting } from './settings'
+import { isOwnerTenant, type Actor } from './actor'
 import type { Env } from '../types'
+
+/**
+ * Whether what this request files may be published to the shared catalog.
+ *
+ * Only research that is the platform's own: an agent writing as the owner's
+ * tenant. Artists are not issued tokens any more, so this is a second lock on
+ * the same door: a token that somehow exists for another tenant (one issued
+ * before that changed) files a stranger's claim about a page, which would reach
+ * the landing page and every artist's queue once the catalog is delivered there.
+ * It is still catalogued, and still linked to their own row; it is only not
+ * shown. The owner can show it from admin mode.
+ */
+export async function agentMayPublish(env: Env, actor: Actor, tenant: TenantId): Promise<boolean> {
+  return actor.kind === 'agent' && (await isOwnerTenant(env, tenant))
+}
 
 async function findByKey(env: Env, key: string) {
   return getDb(env.DB).select().from(opportunities).where(eq(opportunities.catalogKey, key)).get()
 }
+
+/**
+ * Who put an entry in the catalog. The platform's own research (`agent`, the
+ * owner's routines) and an artist typing a row in (`artist`) are different
+ * claims: only the first is a statement about a public page.
+ */
+export type FoundBy = 'agent' | 'artist' | 'poller' | 'owner'
 
 /** The catalog id for these facts, creating the entry the first time. */
 export async function catalogue(
@@ -53,16 +76,35 @@ export async function catalogue(
   keyInput: { applicationUrl?: string | null },
   now: string,
   mayPublish: boolean,
+  foundBy: FoundBy = mayPublish ? 'agent' : 'artist',
 ): Promise<number> {
+  return (await catalogueEntry(env, facts, keyInput, now, mayPublish, foundBy)).id
+}
+
+/** As `catalogue`, and says whether this sighting made the entry or found it already there. */
+export async function catalogueEntry(
+  env: Env,
+  facts: CatalogFacts,
+  keyInput: { applicationUrl?: string | null },
+  now: string,
+  mayPublish: boolean,
+  foundBy: FoundBy = mayPublish ? 'agent' : 'artist',
+): Promise<{ id: number; created: boolean }> {
   const db = getDb(env.DB)
   const key = catalogKey({ ...facts, applicationUrl: keyInput.applicationUrl })
   const existing = await findByKey(env, key)
   if (existing) {
     await db
       .update(opportunities)
-      .set({ ...fillMissing({ ...existing, category: existing.category as CatalogFacts['category'] }, facts), lastSeenAt: now })
+      .set({
+        ...fillMissing({ ...existing, category: existing.category as CatalogFacts['category'] }, facts),
+        lastSeenAt: now,
+        // Seen again on a public page is confirmation that it still stands. An
+        // artist re-typing a row is not.
+        ...(foundBy === 'artist' ? {} : { checkedAt: now }),
+      })
       .where(eq(opportunities.id, existing.id))
-    return existing.id
+    return { id: existing.id, created: false }
   }
   try {
     const [row] = await db
@@ -73,16 +115,18 @@ export async function catalogue(
         // Set once, at first sighting. A later sighting never flips it, so an
         // entry the owner hid stays hidden whoever finds it next.
         public: mayPublish && publishable(facts) ? 1 : 0,
+        foundBy,
+        checkedAt: foundBy === 'artist' ? null : now,
         firstSeenAt: now,
         lastSeenAt: now,
       })
       .returning({ id: opportunities.id })
-    return row.id
+    return { id: row.id, created: true }
   } catch (err) {
     // Two agents filing the same call at once: the other insert won, so
     // this one reads what it wrote.
     const again = await findByKey(env, key)
-    if (again) return again.id
+    if (again) return { id: again.id, created: false }
     throw err
   }
 }
