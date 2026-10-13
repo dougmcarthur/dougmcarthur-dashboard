@@ -79,10 +79,14 @@ describe('what may be published', () => {
       // Fields an artist row has that must not reach the catalog.
       ...({ status: 'passed', fitRationale: 'pending Doug’s review', notes: 'private' } as object),
     })
+    // `opensAt` and `region` joined with migration 0040. Both are facts about
+    // the listing and belong to nobody: the day its window opens, and the
+    // province or state its place names. Neither is read from anything an
+    // artist decided, which is what this list is here to keep true.
     expect(Object.keys(facts).sort()).toEqual(
       [
         'category', 'country', 'deadline', 'deadlineNote', 'feeAmount', 'feeCurrency',
-        'kind', 'location', 'name', 'organizer', 'url',
+        'kind', 'location', 'name', 'opensAt', 'organizer', 'region', 'url',
       ].sort(),
     )
   })
