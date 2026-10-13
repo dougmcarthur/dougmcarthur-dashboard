@@ -11,7 +11,7 @@ import { Caption } from './ui/Surface'
  * one part you act on sat inside the explanation of why the gig fits, with no
  * way to copy it but selecting it by hand. It is lifted out by
  * `splitDraftedMessage` and shown here: the channel it is meant for, the text
- * verbatim — never depersonalised, because "I'm Doug McArthur" is the message —
+ * verbatim — never depersonalised, because "I'm Jane Smith" is the message —
  * and a button that copies it.
  *
  * Copy only, no send and no compose link: the channel is usually a DM, and

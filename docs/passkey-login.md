@@ -165,7 +165,7 @@ their own schedule the symptom is gig rows quietly failing to arrive rather
 than anything announcing itself.
 
 A token issued into `agent_tokens` is narrower than `API_TOKEN`: it reaches the
-nine routes research needs and nothing else (`shared/agentRoutes.ts`). That is
+eleven routes research needs and nothing else (`shared/agentRoutes.ts`). That is
 the credential the Claude Code routines hold, because a routine has a shell and
 its credential rides on every request to this host — see
 `docs/agent-routines.md`.

@@ -19,8 +19,14 @@ const DAYS: Array<{ id: Weekday; label: string }> = [
 const HOURS = Array.from({ length: 24 }, (_, h) => h)
 
 /**
- * The digest's switch, its recipient, and a preview of exactly what would go
+ * The digest's switch, its schedule, and a preview of exactly what would go
  * out right now.
+ *
+ * Every account has one, and it is off until its owner turns it on. An artist's
+ * goes to the address they sign in with and is not editable here; the owner's
+ * keeps its recipient. The time zone is the account's own: it is taken from this
+ * device the first time the digest is switched on, because "Monday at 8" means
+ * nothing without the zone it is in.
  *
  * The preview is the point. A weekly email is otherwise a thing you can only
  * evaluate weekly, and one you cannot check without either waiting or sending
@@ -46,6 +52,9 @@ export function DigestSettingsCard() {
 
   const d = preview.data
   const settings = d?.settings
+  // The device's own zone, which is what somebody means by "my morning".
+  const device = Intl.DateTimeFormat().resolvedOptions().timeZone || null
+  const ownerView = settings?.recipientEditable ?? false
 
   return (
     <Card className="space-y-3">
@@ -54,7 +63,13 @@ export function DigestSettingsCard() {
           Only when something moved. Nothing is sent when there is nothing to say.
         </Explainer>
         <button
-          onClick={() => settings && patch.mutate({ enabled: !settings.enabled })}
+          onClick={() => {
+            if (!settings) return
+            // The first time it goes on, the zone is this device's rather than the
+            // platform's, which is whoever set the deployment up.
+            const takeZone = !settings.enabled && d && !d.schedule.zoneChosen && device
+            patch.mutate({ enabled: !settings.enabled, ...(takeZone ? { timezone: device } : {}) })
+          }}
           disabled={!settings || patch.isPending}
           className={`shrink-0 text-xs px-3 py-1.5 rounded-md font-medium transition-colors disabled:opacity-40 ${
             settings?.enabled
@@ -68,8 +83,14 @@ export function DigestSettingsCard() {
 
       {d && !d.mailerConfigured && (
         <Banner tone="warn" size="sm">
-          No email binding on this deploy — add <code>[[send_email]]</code> to wrangler.toml.
-          Everything below still previews.
+          {ownerView ? (
+            <>
+              No email binding on this deploy — add <code>[[send_email]]</code> to wrangler.toml.
+              Everything below still previews.
+            </>
+          ) : (
+            <>Email sending is not set up on this site yet. Everything below still previews.</>
+          )}
         </Banner>
       )}
 
@@ -122,7 +143,17 @@ export function DigestSettingsCard() {
                 rather than assumed. It is not editable here: there is one
                 reader, in one place, and a zone picker would be a list of 400
                 strings guarding against a move. */}
-            <span className="text-xs text-faint">{d.schedule.timezone.replace('_', ' ')}</span>
+            <span className="text-xs text-muted">{d.schedule.timezone.replace('_', ' ')}</span>
+            {device && device !== d.schedule.timezone && (
+              <button
+                type="button"
+                disabled={patch.isPending}
+                onClick={() => patch.mutate({ timezone: device })}
+                className="text-xs px-2 py-1 rounded-md border border-line text-body hover:bg-sunken hover:text-ink transition-colors disabled:opacity-40"
+              >
+                Use {device.replace('_', ' ')}
+              </button>
+            )}
           </div>
 
           <p className="text-xs text-muted">
@@ -138,7 +169,12 @@ export function DigestSettingsCard() {
       {settings && (
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
           <dt className="text-muted">To</dt>
-          <dd className="text-body">{settings.recipient}</dd>
+          <dd className="text-body">
+            {settings.recipient || <span className="text-muted">No email address on your account</span>}
+            {!ownerView && settings.recipient && (
+              <span className="text-muted"> (the address you sign in with)</span>
+            )}
+          </dd>
           <dt className="text-muted">From</dt>
           <dd className="text-body">{settings.sender}</dd>
         </dl>

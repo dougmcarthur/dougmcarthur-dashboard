@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
-import { depersonalise, splitDraftedMessage } from '../shared/reviewParse'
+import { artistNames, depersonalise as depersonaliseFor, splitDraftedMessage } from '../shared/reviewParse'
+
+const JANE = artistNames('Jane Smith')
+const depersonalise = (text: string) => depersonaliseFor(text, JANE)
 
 /**
  * A message the agent drafted is its own element, with a copy button — never a
@@ -15,8 +18,8 @@ const LISTENING_ROOM =
   'Winnipeg. Features a new MB/Canadian artist every three weeks in a quiet, seated, acoustic-first room — ' +
   'strong match for solo vocals-and-guitar, easy driving distance. No online application — booking runs through ' +
   'their Facebook page or the Lac du Bonnet & District Historical Society. Submission status: NOT sent. No form ' +
-  'to fill — needs a direct message. Drafted outreach message ready for Doug to send via Facebook Messenger: ' +
-  '"Hi hi! I\'m Doug McArthur, a Winnipeg singer-songwriter — solo vocals and guitar, no band. Be cool to come ' +
+  'to fill — needs a direct message. Drafted outreach message ready for Jane to send via Facebook Messenger: ' +
+  '"Hi hi! I\'m Jane Smith, a Winnipeg singer-songwriter — solo vocals and guitar, no band. Be cool to come ' +
   'play The Listening Room sometime. Here\'s a recent show if you wanna get a feel for it: ' +
   'https://www.youtube.com/watch?v=UQ7XRTWmfyA. Links to everything else here: https://links.dougmcarthur.net. ' +
   'Lemme know if there\'s a date that\'d work!"'
@@ -25,7 +28,7 @@ describe('the drafted message, split out of a note', () => {
   const { message, rest } = splitDraftedMessage(LISTENING_ROOM)
 
   it('lifts the message out verbatim, with the channel it is for', () => {
-    expect(message?.body).toMatch(/^Hi hi! I'm Doug McArthur/)
+    expect(message?.body).toMatch(/^Hi hi! I'm Jane Smith/)
     expect(message?.body).toMatch(/Lemme know if there's a date that'd work!$/)
     expect(message?.channel).toBe('via Facebook Messenger')
   })
@@ -45,11 +48,11 @@ describe('the drafted message, split out of a note', () => {
     // The reasoning is rewritten into "you"; the message must never be. This
     // is the hazard, stated: run through depersonalise, the message would ask
     // an organiser to book "you".
-    expect(depersonalise(message!.body)).not.toContain("I'm Doug McArthur")
+    expect(depersonalise(message!.body)).not.toContain("I'm Jane Smith")
     const component = readFileSync('frontend/src/components/DraftedMessage.tsx', 'utf8')
     expect(component).not.toMatch(/depersonalise\(/)
     const row = readFileSync('frontend/src/pages/gigs/GigDetail.tsx', 'utf8')
-    expect(row).toContain('depersonalise(why.rest)')
+    expect(row).toContain('depersonalise(why.rest, names)')
     expect(row).not.toMatch(/depersonalise\(why\.message/)
   })
 })

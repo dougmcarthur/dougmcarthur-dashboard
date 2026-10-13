@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
+import { profileHome } from '../../../shared/onboarding'
 import { FIELD } from './ui/Field'
 import { Button } from './ui/Button'
 import { Explainer } from './ui/Explainer'
@@ -22,6 +23,12 @@ export function HomeBaseCard() {
   const home = useQuery({ queryKey: ['travel-home'], queryFn: api.travel.home })
   const [place, setPlace] = useState('')
   const [saved, setSaved] = useState(false)
+
+  // What they said in the welcome questions, offered as the placeholder so the
+  // answer is one click from being a home base. Never saved on its own: a
+  // distance from a place nobody confirmed is a guess dressed as a measurement.
+  const said = useQuery({ queryKey: ['onboarding'], queryFn: api.onboarding.read })
+  const suggestion = profileHome(said.data?.profile ?? null)?.place ?? null
 
   useEffect(() => {
     if (home.data) setPlace(home.data.home?.place ?? '')
@@ -55,7 +62,7 @@ export function HomeBaseCard() {
         <input
           className={FIELD}
           value={place}
-          placeholder="Winnipeg, MB"
+          placeholder={suggestion ?? 'Calgary, AB'}
           maxLength={120}
           onChange={(e) => {
             setPlace(e.target.value)

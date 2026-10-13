@@ -4,6 +4,7 @@ import { gmailConfigured } from '../lib/gmail'
 import { mailerConfigured } from '../lib/mailer'
 import { readCredentialHealth, runCredentialChecks } from '../lib/credentialCheck'
 import { primaryCalendarOffered, readGrant } from '../lib/googleGrant'
+import { isOwnerTenant } from '../lib/actor'
 import { tenantOf, type AppEnv } from '../context'
 
 const health = new Hono<AppEnv>()
@@ -22,16 +23,20 @@ const health = new Hono<AppEnv>()
  * is answered now.
  */
 health.get('/', async (c) => {
-  const cal = calendarConfigured(c.env)
-  const gmail = gmailConfigured(c.env)
+  // The secrets below are the owner's: their mailbox, their calendar, their
+  // sending address. For anybody else they are not a fact about their account,
+  // and naming the variables would tell a stranger how the deployment is wired.
+  const owner = await isOwnerTenant(c.env, tenantOf(c))
+  const cal = owner && calendarConfigured(c.env)
+  const gmail = owner && gmailConfigured(c.env)
 
-  const calMissing = cal
+  const calMissing = cal || !owner
     ? []
     : (['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REFRESH_TOKEN', 'GOOGLE_CALENDAR_ID'] as const).filter(
         (k) => !c.env[k],
       )
 
-  const gmailMissing = gmail
+  const gmailMissing = gmail || !owner
     ? []
     : (['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN'] as const).filter(
         (k) => !c.env[k],
@@ -52,8 +57,10 @@ health.get('/', async (c) => {
     gmailMissingSecrets: gmailMissing,
     // The digest sender is a binding, not a secret — it is either declared in
     // wrangler.toml or it is not, so there is no list of missing keys.
-    emailConfigured: mailerConfigured(c.env),
-    credentials: await readCredentialHealth(c.env, new Date()),
+    emailConfigured: owner && mailerConfigured(c.env),
+    credentials: owner ? await readCredentialHealth(c.env, new Date()) : [],
+    // Which of the rows above are about this account at all.
+    platform: owner,
     // The calendar has two possible ways in and they answer differently. The
     // secrets above are a deployment fact; this is the artist's own grant, and
     // when it exists it is the one that gets used. Reported separately rather
@@ -87,6 +94,8 @@ health.get('/', async (c) => {
  * already hold.
  */
 health.post('/check', async (c) => {
+  // Probing spends the owner's refresh tokens, which is not an artist's to do.
+  if (!(await isOwnerTenant(c.env, tenantOf(c)))) return c.json({ credentials: [] })
   return c.json({ credentials: await runCredentialChecks(c.env, new Date()) })
 })
 

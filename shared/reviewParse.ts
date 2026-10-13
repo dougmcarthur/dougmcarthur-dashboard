@@ -5,7 +5,7 @@
  * These columns were written as prose by the research task runs, and a lot of
  * genuinely structured information ended up buried in them: entry-fee
  * warnings, drafted application field values, ready-to-send outreach copy,
- * submission requirements, deal terms, "waiting on Doug" blockers, and the
+ * submission requirements, deal terms, "waiting on the artist" blockers, and the
  * dates a submission window opens. Migration 0001 added structured columns
  * for some of this (organizer, submission_method, fee_amount,
  * genre_fit_score, agency_type, contact_role, confirmation_method) but they
@@ -34,8 +34,8 @@ export interface NoteAlert {
 export interface DraftedField {
   label: string
   value: string
-  /** Value is a placeholder waiting on Doug rather than real content. */
-  needsDoug: boolean
+  /** Value is a placeholder waiting on the artist rather than real content. */
+  needsArtist: boolean
 }
 
 export interface DraftedMessage {
@@ -61,37 +61,98 @@ const VERB_TO_SECOND_PERSON: Record<string, string> = {
 /** Both apostrophes: the notes contain typographic ones as well as ASCII. */
 const APOS = "['\u2019]"
 
-const NAME = '(?:Doug McArthur|Doug|the artist)'
+/**
+ * The names an artist is written about by, taken from their own account.
+ *
+ * The notes were written by research agents that were told who they were
+ * writing for, so they read "pending Jane's review". That name has to stay
+ * matchable, since it is what the data says, and it has to come from the
+ * account the notes belong to rather than from this file: a pattern that named
+ * one person would find nothing for anybody else, and would be a stranger's
+ * name in this code. `the artist` is always matched, which is what rows written
+ * for no one in particular say.
+ *
+ * Handed in rather than looked up, like `today` in the queue, so the same note
+ * and the same name give the same answer on every run.
+ */
+export interface ArtistNames {
+  /** A regex alternation, longest spelling first, without its own group. */
+  readonly pattern: string
+  /** The blocker pattern with the names filled in. */
+  readonly blocker: RegExp
+}
+
+const GENERIC_NAME = 'the artist'
+
+/** A first name that is also a day or a month would rewrite "Sat/Sun" into "Sat/you". */
+const NOT_A_FIRST_NAME = new Set([
+  'sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat',
+  'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec',
+])
+
+const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const BLOCKER_SOURCE = String.raw`needs @N@\b|not on file\b|left blank|left unselected|intentionally left|@N@ should\b|Recommend\w* @N@\b|pending @N@'?s?\b|needs @N@'?s\b|requires @N@'?s\b|best left to @N@\b|(?:his|her|their) call\b|@N@'?s decision\b|for @N@ to (?:pick|choose|review|decide)|awaiting (?:your|artist) (?:review|approval|decision)|your (?:review|approval|say-so)\b`
+
+const namesCache = new Map<string, ArtistNames>()
+
+/**
+ * The spellings to look for, from a display name: the whole name, and its first
+ * word when that is long enough and not a day or month. Nothing else, so an
+ * account with no name set matches `the artist` and no more.
+ */
+export function artistNames(displayName?: string | null): ArtistNames {
+  const full = (displayName ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
+  const first = full.split(' ')[0] ?? ''
+  const spellings = [full, first.length >= 3 && !NOT_A_FIRST_NAME.has(first.toLowerCase()) ? first : '']
+    .filter(Boolean)
+    .map(escapeRegex)
+  const alternation = [...new Set([...spellings, GENERIC_NAME])].sort((a, b) => b.length - a.length).join('|')
+
+  const cached = namesCache.get(alternation)
+  if (cached) return cached
+  const built: ArtistNames = {
+    pattern: `(?:${alternation})`,
+    blocker: new RegExp(BLOCKER_SOURCE.split('@N@').join(`(?:${alternation})`), 'i'),
+  }
+  // Bounded, because the key is somebody's typed name.
+  if (namesCache.size > 200) namesCache.clear()
+  namesCache.set(alternation, built)
+  return built
+}
+
+/** For a caller that has no account to ask: matches `the artist` and nothing else. */
+export const ANONYMOUS: ArtistNames = artistNames(null)
 
 /**
  * Rewrites the artist's name out of note prose and into the second person.
  *
  * The notes were written *about* one person by agents told his name, so they
- * read "do not submit without Doug's review" — which, shown to the person who
- * is Doug, is the app talking about him in the third person, and shown to
+ * read "do not submit without Jane's review" — which, shown to the person who
+ * is Jane, is the app talking about her in the third person, and shown to
  * anyone else would be a stranger's name in their dashboard.
  *
  * Pronouns are rewritten **per sentence, and only in sentences that named
- * him**. "his call" in a sentence about Doug means yours; "his deadline" in a
+ * him**. "his call" in a sentence about the artist means yours; "his deadline" in a
  * sentence about a festival organiser does not, and rewriting that would put
  * words in a stranger's mouth.
  *
  * The stored text is left alone; this only changes what reaches the screen, so
  * "Show original note" still shows what was actually written.
  */
-export function depersonalise(text: string): string {
+export function depersonalise(text: string, names: ArtistNames = ANONYMOUS): string {
   // Split on sentence ends, keeping the delimiters, so each clause can be
   // judged on whether it is about the artist.
   const parts = text.split(/(?<=[.!?])(\s+)/)
 
   const rewritten = parts.map((part) => {
-    const named = new RegExp(`\\b${NAME}\\b`, 'i').test(part)
+    const named = new RegExp(`\\b${names.pattern}\\b`, 'i').test(part)
     if (!named) return part
 
     let out = part
-      // Possessives first, or "Doug's" becomes "you's".
-      .replace(new RegExp(`\\b${NAME}${APOS}s\\b`, 'gi'), 'your')
-      .replace(new RegExp(`\\b${NAME}\\b`, 'gi'), 'you')
+      // Possessives first, or "Jane's" becomes "you's".
+      .replace(new RegExp(`\\b${names.pattern}${APOS}s\\b`, 'gi'), 'your')
+      .replace(new RegExp(`\\b${names.pattern}\\b`, 'gi'), 'you')
       // Only now, and only here, the third-person pronouns that referred to him.
       .replace(new RegExp(`\\bhimself\\b`, 'gi'), 'yourself')
       .replace(new RegExp(`\\bhis\\b`, 'gi'), 'your')
@@ -142,12 +203,12 @@ export interface ParsedNote {
 export interface ParsedFee {
   /** Raw contents of the legacy `fee` text column. */
   raw: string | null
-  /** First dollar figure found, when the fee is a cost to Doug. */
+  /** First dollar figure found, when the fee is a cost to the artist. */
   amount: number | null
   currency: string
   /** Money has to change hands to apply. */
   required: boolean
-  /** Fee text that describes money paid *to* Doug, not charged to him. */
+  /** Fee text that describes money paid *to* the artist, not charged to them. */
   payout: string | null
 }
 
@@ -199,12 +260,7 @@ const RE = {
   submissionStatus: /^Submission status\s*[:—-]\s*(.+)$/i,
   notSubmitted: /\b(?:not submitted|not sent|not started|application not filled|nothing to fill out)\b/i,
 
-  // The artist's own name appears throughout the stored notes, because the
-  // research agents that wrote them were told who they were writing for. The
-  // name has to stay matchable — that is what the data says — but a second,
-  // name-free alternation means rows written for anyone else still parse. See
-  // `depersonalise` for why the name never reaches the screen.
-  blocker: /needs (?:Doug|the artist)\b|not on file\b|left blank|left unselected|intentionally left|(?:Doug|the artist) should\b|Recommend\w* (?:Doug|the artist)\b|pending (?:Doug|the artist)'?s?\b|needs (?:Doug|the artist)'?s\b|requires (?:Doug|the artist)'?s\b|best left to (?:Doug|the artist)\b|(?:his|her|their) call\b|(?:Doug|the artist)'?s decision\b|for (?:Doug|the artist) to (?:pick|choose|review|decide)|awaiting (?:your|artist) (?:review|approval|decision)|your (?:review|approval|say-so)\b/i,
+  // The blocker pattern names the artist, so it is built per artist. See `blockerFor`.
 
   // Deliberately narrow: broad tokens like "submission window" also appear in
   // ordinary agency blurbs, which would drag the whole description in here.
@@ -419,7 +475,7 @@ export function parseDeadline(
 
 /**
  * The `fee` column is likewise free text, and `fee_amount` is NULL for every
- * production row. Distinguish "costs Doug money to apply" from "pays Doug if
+ * production row. Distinguish "costs the artist money to apply" from "pays the artist if
  * selected" — both show up in the same column.
  */
 export function parseFee(raw: string | null, paid: number | boolean | null): ParsedFee {
@@ -483,11 +539,11 @@ function uniq(values: string[]): string[] {
  * Splits a "Drafted values: A: 1; B: 2; …" run into labelled fields.
  *
  * The list is always the tail of a paragraph and frequently ends with a
- * trailing sentence of ordinary prose ("Doug should pick the video and submit
+ * trailing sentence of ordinary prose ("Jane should pick the video and submit
  * himself when ready."), so the final segment is cut at its last
  * sentence boundary and the remainder handed back as prose.
  */
-function parseDraftedFields(block: string): { fields: DraftedField[]; trailing: string | null } {
+function parseDraftedFields(block: string, names: ArtistNames): { fields: DraftedField[]; trailing: string | null } {
   const segments = block.split(';')
   let trailing: string | null = null
 
@@ -508,10 +564,10 @@ function parseDraftedFields(block: string): { fields: DraftedField[]; trailing: 
     const text = segment.trim().replace(/\.$/, '')
     if (!text) continue
 
-    // "Contact Name: Doug McArthur" / "bio = the approved 150-word bio".
+    // "Contact Name: Jane Smith" / "bio = the approved 150-word bio".
     // The (?!\/\/) stops the colon in "https://…" being read as a separator.
     let match = text.match(/^([A-Za-z][A-Za-z0-9 /&+'-]{1,44}?)\s*[:=](?!\/\/)\s*(.+)$/s)
-    // "Artist name 'Doug McArthur'" — quoted value, no separator
+    // "Artist name 'Jane Smith'" — quoted value, no separator
     if (!match) match = text.match(/^([A-Za-z][A-Za-z0-9 /&+'-]{1,44}?)\s+['"“]([^'"”]+)['"”]$/s)
     // "contact email doug@…" / "website https://…" — separator is just a space
     if (!match) {
@@ -521,23 +577,23 @@ function parseDraftedFields(block: string): { fields: DraftedField[]; trailing: 
     }
 
     if (!match) {
-      // `needsDoug` is decided *before* the rewrite: the blocker regex matches
+      // `needsArtist` is decided *before* the rewrite: the blocker regex matches
       // the name, which the rewrite is about to remove.
-      const needsDoug = RE.blocker.test(text)
-      fields.push({ label: '', value: needsDoug ? depersonalise(text) : text, needsDoug })
+      const needsArtist = names.blocker.test(text)
+      fields.push({ label: '', value: needsArtist ? depersonalise(text, names) : text, needsArtist })
       continue
     }
 
     const value = match[2].trim()
     // A value is an *answer* unless it is a placeholder saying he still has to
-    // supply something. "Contact Name: Doug McArthur" is what goes on the
+    // supply something. "Contact Name: Jane Smith" is what goes on the
     // festival's form; rewriting it to "you" puts the wrong text on the
     // clipboard. Only the placeholders are the app talking.
-    const needsDoug = RE.blocker.test(value)
+    const needsArtist = names.blocker.test(value)
     fields.push({
       label: match[1].trim(),
-      value: needsDoug ? depersonalise(value) : value,
-      needsDoug,
+      value: needsArtist ? depersonalise(value, names) : value,
+      needsArtist,
     })
   }
 
@@ -571,7 +627,7 @@ export function splitDraftedMessage(text: string): { message: DraftedMessage | n
 }
 
 /** Main entry point — parse one note body into its constituent parts. */
-export function parseNote(note: string | null | undefined): ParsedNote {
+export function parseNote(note: string | null | undefined, names: ArtistNames = ANONYMOUS): ParsedNote {
   const empty: ParsedNote = {
     alerts: [], submissionState: 'unknown', submissionNote: null, submissionMethod: null,
     requirements: [], contactEmails: [], links: [], draftedFields: [], draftedMessage: null,
@@ -609,7 +665,7 @@ export function parseNote(note: string | null | undefined): ParsedNote {
     const paragraphEnd = working.indexOf('\n\n', blockStart)
     const block = working.slice(blockStart, paragraphEnd === -1 ? undefined : paragraphEnd)
 
-    const parsed = parseDraftedFields(block)
+    const parsed = parseDraftedFields(block, names)
     draftedFields = parsed.fields
     working =
       working.slice(0, valuesLead.index) +
@@ -643,7 +699,7 @@ export function parseNote(note: string | null | undefined): ParsedNote {
       continue
     }
 
-    if (RE.blocker.test(sentence)) {
+    if (names.blocker.test(sentence)) {
       blockers.push(sentence)
       if (submissionState === 'unknown' && RE.notSubmitted.test(sentence)) {
         submissionState = 'not_submitted'
@@ -720,29 +776,29 @@ export function parseNote(note: string | null | undefined): ParsedNote {
   //
   // The first attempt did this at the call sites in the Review detail pane —
   // and the Overview deck, which builds its own sentence from `blockers[0]`,
-  // went on saying "needs Doug's review" for another day. Any consumer that
+  // went on saying "needs Jane's review" for another day. Any consumer that
   // gets this object gets prose in the second person; none of them has to
   // remember. `item.note` still carries the original for "Show original note".
   //
   // Field *values* are the exception and are handled in `draftedFields` above:
-  // an answer that is his name is the answer that goes on the form.
+  // an answer that is their name is the answer that goes on the form.
   return {
-    alerts: alerts.map((a) => ({ ...a, text: depersonalise(a.text) })),
+    alerts: alerts.map((a) => ({ ...a, text: depersonalise(a.text, names) })),
     submissionState,
-    submissionNote: submissionNote ? depersonalise(submissionNote) : submissionNote,
+    submissionNote: submissionNote ? depersonalise(submissionNote, names) : submissionNote,
     submissionMethod,
-    requirements: requirements.map(depersonalise),
+    requirements: requirements.map((t) => depersonalise(t, names)),
     contactEmails,
     links,
     draftedFields,
     draftedMessage,
-    blockers: blockers.map(depersonalise),
-    timing: timing.map(depersonalise),
-    dealTerms: dealTerms.map(depersonalise),
+    blockers: blockers.map((t) => depersonalise(t, names)),
+    timing: timing.map((t) => depersonalise(t, names)),
+    dealTerms: dealTerms.map((t) => depersonalise(t, names)),
     tracks,
-    provenance: provenance.map(depersonalise),
+    provenance: provenance.map((t) => depersonalise(t, names)),
     location,
-    summary: depersonalise(summary),
+    summary: depersonalise(summary, names),
     isPlain:
       alerts.length === 0 && requirements.length === 0 && blockers.length === 0 &&
       timing.length === 0 && dealTerms.length === 0 && draftedFields.length === 0 &&

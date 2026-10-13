@@ -138,6 +138,15 @@ export interface Mark {
 
 /** What the generator needs to know about the outside world. */
 export interface HealthInput {
+  /**
+   * Whether this account is the one the deployment's own mailbox and sending
+   * address belong to. False for everybody else, and then the Gmail, email and
+   * credential rows are not raised at all: they describe the owner's server
+   * secrets, which an artist can neither fix nor be harmed by, and a bell that
+   * tells a stranger to "reconnect" somebody else's mailbox is a bell that
+   * leaks how the deployment is wired. Absent means true.
+   */
+  platform?: boolean
   calendarConfigured: boolean
   gmailConfigured: boolean
   emailConfigured: boolean
@@ -237,7 +246,8 @@ function connectionNotes(health: HealthInput): Draft[] {
       action: 'Reconnect',
     })
   }
-  if (!health.gmailConfigured) {
+  const platform = health.platform !== false
+  if (platform && !health.gmailConfigured) {
     out.push({
       key: 'connection:gmail',
       kind: 'connection',
@@ -248,7 +258,7 @@ function connectionNotes(health: HealthInput): Draft[] {
       action: 'Reconnect',
     })
   }
-  if (!health.emailConfigured) {
+  if (platform && !health.emailConfigured) {
     out.push({
       key: 'connection:email',
       kind: 'connection',
@@ -271,7 +281,7 @@ function connectionNotes(health: HealthInput): Draft[] {
   // `unreachable` is a claim about the network; raising either would put a
   // critical row on the bell for something nobody can act on, which is how a
   // bell stops being read. `shared/credentialHealth.ts` holds that reasoning.
-  for (const credential of health.credentials ?? []) {
+  for (const credential of platform ? (health.credentials ?? []) : []) {
     if (credential.state !== 'rejected') continue
     out.push({
       key: `connection:${credential.id}:rejected`,

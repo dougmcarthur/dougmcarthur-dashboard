@@ -1,13 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { gigNoteColumns, syncNoteColumns, changesFor, withStoredColumns } from '../shared/noteColumns'
-import { parseNote } from '../shared/reviewParse'
+import { gigNoteColumns as gigColumnsFor, syncNoteColumns, changesFor, withStoredColumns } from '../shared/noteColumns'
+import { artistNames, parseNote as parseNoteFor } from '../shared/reviewParse'
+
+const JANE = artistNames('Jane Smith')
+const parseNote = (note: string | null | undefined) => parseNoteFor(note, JANE)
+const gigNoteColumns = (row: Parameters<typeof gigColumnsFor>[0]) => gigColumnsFor(row, JANE)
 
 // Verbatim production note bodies, the same ones `reviewParse.test.ts` uses.
 // An extractor tested against prose invented to suit it has been tested
 // against nothing.
-const SOFAR = `Sofar's stripped-down, quiet-room, no-banter format is about as close a match as exists for Doug's solo vocals + acoustic guitar setup. No fee, application open now via web form. NOT SUBMITTED — drafted the field values below for Doug's review since this run can't responsibly drive a live browser unattended overnight. Drafted values: Artist name 'Doug McArthur'; contact email doug@dougmcarthur.net; live performance video left blank for Doug to pick. Doug should pick the video and submit himself when ready.`
+const SOFAR = `Sofar's stripped-down, quiet-room, no-banter format is about as close a match as exists for Jane's solo vocals + acoustic guitar setup. No fee, application open now via web form. NOT SUBMITTED — drafted the field values below for Jane's review since this run can't responsibly drive a live browser unattended overnight. Drafted values: Artist name 'Jane Smith'; contact email doug@dougmcarthur.net; live performance video left blank for Jane to pick. Jane should pick the video and submit himself when ready.`
 
-const CANMORE = `Annual folk festival in Canmore, AB. Genre fit is strong: folk, alt-country, roots, acoustic singer-songwriter. NOTE: submissions not open as of July 2026 — check back in September 2026. Application not filled — pending Doug's review when open.`
+const CANMORE = `Annual folk festival in Canmore, AB. Genre fit is strong: folk, alt-country, roots, acoustic singer-songwriter. NOTE: submissions not open as of July 2026 — check back in September 2026. Application not filled — pending Jane's review when open.`
 
 const LISTENING_ROOM = `Eastern Manitoba listening room in the 117-year-old St. John's Heritage Church, ~100km from Winnipeg. No online application — booking runs through their Facebook page.`
 
@@ -138,24 +142,24 @@ describe('what the dry run against production caught', () => {
     // Home Routes is a national touring circuit. The note drafts a form's
     // answers, one of which is your own address — which was being stored as
     // where the gig is, and would have costed the trip as a drive across town.
-    const note = `Winnipeg-headquartered national network booking regional touring circuits. Drafted field values for Doug to copy in himself: Contact Name: Doug McArthur; Mailing Address: needs Doug, only 'Winnipeg, MB' on file; Country: Canada.`
+    const note = `Winnipeg-headquartered national network booking regional touring circuits. Drafted field values for Jane to copy in himself: Contact Name: Jane Smith; Mailing Address: needs Jane, only 'Winnipeg, MB' on file; Country: Canada.`
     expect(gigNoteColumns({ fitNotes: note }).location).toBeNull()
   })
 
   it('still takes a location the narrative states', () => {
-    const note = `Doug's hometown flagship folk festival at Birds Hill Park, MB — strong genre fit.`
+    const note = `Jane's hometown flagship folk festival at Birds Hill Park, MB — strong genre fit.`
     expect(gigNoteColumns({ fitNotes: note }).location).toBe('Birds Hill Park, MB')
   })
 
   it('does not file the submission state again as a blocker', () => {
     // "Not submitted; needs your review." is the column next to it, not work
     // to do. Three rows would have carried it as both.
-    const note = `Submission window hasn't opened yet. Not submitted; needs Doug's review.`
+    const note = `Submission window hasn't opened yet. Not submitted; needs Jane's review.`
     expect(gigNoteColumns({ fitNotes: note }).blockedOn).toBeNull()
   })
 
   it('keeps a blocker that says something the state does not', () => {
-    const note = `Equity/identity self-disclosure checkboxes intentionally left blank — not filled in on Doug's behalf.`
+    const note = `Equity/identity self-disclosure checkboxes intentionally left blank — not filled in on Jane's behalf.`
     expect(gigNoteColumns({ fitNotes: note }).blockedOn).not.toBeNull()
   })
 
@@ -217,7 +221,7 @@ describe('withStoredColumns — the column wins over the prose', () => {
   // The bug this fixes: until the queue read the columns, correcting
   // `submission_state` by hand changed the database and nothing you could
   // see. The screen re-derived from the note on every render.
-  const NOTE = `Submission status: NOT submitted. Single-page intake form at the URL. Contact Phone: needs Doug, not on file.`
+  const NOTE = `Submission status: NOT submitted. Single-page intake form at the URL. Contact Phone: needs Jane, not on file.`
 
   it('lets a corrected state override what the note implies', () => {
     const parsed = parseNote(NOTE)

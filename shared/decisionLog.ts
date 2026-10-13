@@ -38,7 +38,8 @@
  */
 
 import { gigOutcome, gigStage, type GigOutcome, type GigStage } from './gigStage'
-import { estimateGigCost } from './gigCost'
+import { estimateGigCost, type Home } from './gigCost'
+import type { ArtistNames } from './reviewParse'
 import { buildReviewQueue, type FlagId } from './reviewQueue'
 import { gigCategory, syncCategory, type CatalogCategory } from './opportunityCatalog'
 import type { GigOpportunity, SyncTarget } from './types'
@@ -131,9 +132,14 @@ export interface SyncDecisionContext {
 export type DecisionContext = GigDecisionContext | SyncDecisionContext
 
 /** The row as the code reads it: `status` in the fourteen-value vocabulary. */
-export function gigDecisionContext(row: GigOpportunity, today: string): GigDecisionContext {
-  const item = buildReviewQueue({ gigs: [row], today })[0]
-  const estimate = estimateGigCost(row)
+export function gigDecisionContext(
+  row: GigOpportunity,
+  today: string,
+  artist?: ArtistNames,
+  home?: Home | null,
+): GigDecisionContext {
+  const item = buildReviewQueue({ gigs: [row], today, artist })[0]
+  const estimate = estimateGigCost(row, home)
 
   return {
     v: DECISION_CONTEXT_VERSION,
@@ -171,8 +177,8 @@ export function gigDecisionContext(row: GigOpportunity, today: string): GigDecis
   }
 }
 
-export function syncDecisionContext(row: SyncTarget, today: string): SyncDecisionContext {
-  const item = buildReviewQueue({ sync: [row], today })[0]
+export function syncDecisionContext(row: SyncTarget, today: string, artist?: ArtistNames): SyncDecisionContext {
+  const item = buildReviewQueue({ sync: [row], today, artist })[0]
   return {
     v: DECISION_CONTEXT_VERSION,
     kind: 'sync',

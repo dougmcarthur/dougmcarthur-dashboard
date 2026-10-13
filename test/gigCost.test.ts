@@ -6,11 +6,17 @@ import {
   visaFor,
   visaLead,
   estimateGigCost,
+  homeFrom,
   formatCostRange,
   performanceKindOf,
   TRAVEL_BANDS,
   LODGING_TIERS,
   PER_DIEM,
+  MEALS_PER_DAY,
+  GROUND_PER_DAY,
+  outlookOf,
+  outlookScale,
+  scalePosition,
   P2,
   placeOf,
 } from '../shared/gigCost'
@@ -52,26 +58,57 @@ describe('normaliseCountry', () => {
   })
 })
 
+const WINNIPEG = homeFrom('Winnipeg, MB')!
+const CALGARY = homeFrom('Calgary, AB')!
+const VANCOUVER = homeFrom('Vancouver, BC')!
+
 describe('inferTravelBand', () => {
-  it('drives to the places you can drive to', () => {
-    expect(inferTravelBand('Brandon, MB', 'CA')).toBe('drive')
-    expect(inferTravelBand('Thunder Bay, ON', 'CA')).toBe('drive')
+  it('knows where the artist lives, and does not assume Winnipeg for everybody', () => {
+    // The same place is a different trip from a different home.
+    expect(inferTravelBand('Canmore, AB', 'CA', CALGARY)).toBe('drive')
+    expect(inferTravelBand('Canmore, AB', 'CA', WINNIPEG)).toBe('regional')
+    expect(inferTravelBand('Regina, SK', 'CA', WINNIPEG)).toBe('drive')
+    expect(inferTravelBand('Regina, SK', 'CA', VANCOUVER)).toBe('regional')
+  })
+
+  it('drives to the places you can drive to, across a border as well', () => {
+    expect(inferTravelBand('Brandon, MB', 'CA', WINNIPEG)).toBe('drive')
+    expect(inferTravelBand('Winnipeg, MB', 'CA', homeFrom('Regina, SK'))).toBe('drive')
     // Across the border and still a drive. The band is distance, not country.
-    expect(inferTravelBand('Fargo, ND', 'US')).toBe('drive')
+    expect(inferTravelBand('Fargo, ND', 'US', WINNIPEG)).toBe('drive')
   })
 
   it('does not call a coast "elsewhere in Canada"', () => {
-    expect(inferTravelBand('Halifax, NS', 'CA')).toBe('transcontinental')
-    expect(inferTravelBand('Whitehorse, YT', 'CA')).toBe('transcontinental')
-    expect(inferTravelBand('Austin, TX', 'US')).toBe('transcontinental')
+    expect(inferTravelBand('Halifax, NS', 'CA', WINNIPEG)).toBe('transcontinental')
+    expect(inferTravelBand('Whitehorse, YT', 'CA', WINNIPEG)).toBe('transcontinental')
+    expect(inferTravelBand('Austin, TX', 'US', WINNIPEG)).toBe('transcontinental')
+    // Halifax is not far from Fredericton.
+    expect(inferTravelBand('Halifax, NS', 'CA', homeFrom('Fredericton, NB'))).toBe('drive')
   })
 
-  it('falls back to the country, and to null when there is nothing to go on', () => {
+  it('prices a trip by the same rule the map uses, so the two agree where they overlap', () => {
+    expect(inferTravelBand('Lyons, CO', 'US', WINNIPEG)).toBe('regional')
+    expect(inferTravelBand('Owen Sound, ON', 'CA', WINNIPEG)).toBe('regional')
+  })
+
+  it('says only "elsewhere" when it does not know where home is, and never guesses a home', () => {
+    expect(inferTravelBand('Winnipeg, MB', 'CA', null)).toBe('regional')
+    expect(inferTravelBand('Calgary, AB', 'CA', homeFrom('somewhere'))).toBe('regional')
     expect(inferTravelBand('Ottawa, ON', 'CA')).toBe('regional')
     expect(inferTravelBand('Dublin', 'other')).toBe('international')
     // The honest answer. A default here would report a cheap gig.
     expect(inferTravelBand(null, null)).toBeNull()
     expect(inferTravelBand('Somewhere', null)).toBeNull()
+  })
+
+  it('does not price an online event as a trip', () => {
+    expect(inferTravelBand('Online', null, WINNIPEG)).toBeNull()
+    expect(inferTravelBand('Virtual, ON', 'CA', WINNIPEG)).toBeNull()
+  })
+
+  it('reads a place that carries a country after its region', () => {
+    expect(inferTravelBand('Toronto, ON, Canada', 'CA', homeFrom('Ottawa, ON'))).toBe('drive')
+    expect(inferTravelBand('Toronto, ON, CA', 'CA', homeFrom('Ottawa, ON'))).toBe('drive')
   })
 })
 
@@ -213,17 +250,18 @@ describe('estimateGigCost', () => {
     // marked as guessed, rather than a gap where the lodging should be. All
     // 34 production rows had a null here, so the gap was every row.
     const e = estimateGigCost(gig({ country: 'CA', travelBand: 'regional', nights: null }))
-    expect(e.lines.map((l) => l.id)).toEqual(['travel', 'lodging', 'per_diem'])
+    expect(e.lines.map((l) => l.id)).toEqual(['travel', 'lodging', 'meals', 'ground'])
     expect(e.lines.find((l) => l.id === 'lodging')!.inferred).toBe(true)
-    expect(e.lines.find((l) => l.id === 'per_diem')!.inferred).toBe(true)
+    expect(e.lines.find((l) => l.id === 'meals')!.inferred).toBe(true)
+    expect(e.lines.find((l) => l.id === 'ground')!.inferred).toBe(true)
     // Regional is 1–2 nights, so the low end is not a day trip.
     expect(e.lines.find((l) => l.id === 'lodging')!.amount.low).toBeGreaterThan(0)
     expect(e.anyInferred).toBe(true)
 
     const zero = estimateGigCost(gig({ country: 'CA', travelBand: 'regional', nights: 0 }))
     // Stated wins, is exact, and is not marked as a guess.
-    expect(zero.lines.map((l) => l.id)).toEqual(['travel', 'per_diem'])
-    expect(zero.lines.find((l) => l.id === 'per_diem')!.inferred).toBe(false)
+    expect(zero.lines.map((l) => l.id)).toEqual(['travel', 'meals', 'ground'])
+    expect(zero.lines.find((l) => l.id === 'meals')!.inferred).toBe(false)
     expect(zero.unknowns).toEqual([])
   })
 
@@ -243,7 +281,7 @@ describe('estimateGigCost', () => {
   })
 
   it('marks a band it had to guess', () => {
-    const e = estimateGigCost(gig({ country: 'CA', location: 'Halifax, NS', nights: 1 }))
+    const e = estimateGigCost(gig({ country: 'CA', location: 'Halifax, NS', nights: 1 }), WINNIPEG)
     expect(e.anyInferred).toBe(true)
     expect(e.lines.find((l) => l.id === 'travel')!.inferred).toBe(true)
     expect(e.lines.find((l) => l.id === 'travel')!.amount).toEqual(TRAVEL_BANDS.transcontinental.cost)
@@ -251,7 +289,7 @@ describe('estimateGigCost', () => {
 
   it('names what it could not band at all', () => {
     const e = estimateGigCost(gig({ nights: 0 }))
-    expect(e.lines.map((l) => l.id)).toEqual(['per_diem'])
+    expect(e.lines.map((l) => l.id)).toEqual(['meals', 'ground'])
     expect(e.unknowns.join(' ')).toMatch(/No travel band/)
   })
 
@@ -336,37 +374,41 @@ describe('performanceKindOf', () => {
 describe('the band that was missing', () => {
   // Both of these were live on production rows. Neither is cosmetic: they
   // make home-town gigs look expensive, for an artist whose stated goal is
-  // expanding beyond Winnipeg.
-  it('does not price a show in your own city as a trip', () => {
-    expect(inferTravelBand('Winnipeg, MB', 'CA')).toBe('local')
+  // expanding beyond home.
+  it('does not price a show in your own city as a trip, wherever that is', () => {
+    expect(inferTravelBand('Winnipeg, MB', 'CA', WINNIPEG)).toBe('local')
+    expect(inferTravelBand('Calgary, AB', 'CA', CALGARY)).toBe('local')
     expect(TRAVEL_BANDS.local.cost.high).toBeLessThan(TRAVEL_BANDS.drive.cost.low)
   })
 
   it('does not price a park half an hour away as a regional flight', () => {
     // Birds Hill Park is where the Winnipeg Folk Festival is held. It banded
-    // as a $450–850 flight purely for not being a town anybody had listed.
-    expect(inferTravelBand('Birds Hill Park, MB', 'CA')).toBe('local')
+    // as a $450–850 flight purely for not being a town anybody had listed. The
+    // guess now says a drive, and the map says thirty kilometres once a home
+    // base is set.
+    expect(inferTravelBand('Birds Hill Park, MB', 'CA', WINNIPEG)).toBe('drive')
   })
 
-  it('treats any Manitoba address as a drive at worst', () => {
-    // The province is about 1,200 km end to end and the far corner is still
-    // not a flight. This is the rule that stops the list being a gazetteer.
-    expect(inferTravelBand('Flin Flon, MB', 'CA')).toBe('drive')
-    expect(inferTravelBand('somewhere in Manitoba', 'CA')).toBe('drive')
+  it('treats any address in your own province as a drive at worst', () => {
+    // A province is about 1,200 km end to end and the far corner of it is still
+    // not a flight.
+    expect(inferTravelBand('Flin Flon, MB', 'CA', WINNIPEG)).toBe('drive')
+    expect(inferTravelBand('somewhere in Manitoba', 'CA', WINNIPEG)).toBe('drive')
+    expect(inferTravelBand('Fort McMurray, AB', 'CA', CALGARY)).toBe('drive')
   })
 
   it('books no hotel in the city you live in', () => {
-    const e = estimateGigCost(gig({ country: 'CA', location: 'Winnipeg, MB', nights: null }))
+    const e = estimateGigCost(gig({ country: 'CA', location: 'Winnipeg, MB', nights: null }), WINNIPEG)
     expect(e.lines.find((l) => l.id === 'lodging')).toBeUndefined()
     // A day of food and parking, not a trip.
     expect(e.net.high).toBeLessThan(200)
   })
 
   it('still sends a real trip to a real band', () => {
-    expect(inferTravelBand('Canmore, AB', 'CA')).toBe('regional')
-    expect(inferTravelBand('Owen Sound, ON', 'CA')).toBe('regional')
-    expect(inferTravelBand('Lyons, CO', 'US')).toBe('regional')
-    expect(inferTravelBand('Austin, TX', 'US')).toBe('transcontinental')
+    expect(inferTravelBand('Canmore, AB', 'CA', WINNIPEG)).toBe('regional')
+    expect(inferTravelBand('Owen Sound, ON', 'CA', WINNIPEG)).toBe('regional')
+    expect(inferTravelBand('Lyons, CO', 'US', WINNIPEG)).toBe('regional')
+    expect(inferTravelBand('Austin, TX', 'US', WINNIPEG)).toBe('transcontinental')
   })
 })
 
@@ -391,9 +433,173 @@ describe('placeOf', () => {
   })
 
   it('costs the Listening Room as a drive, not a flight', () => {
-    const estimate = estimateGigCost(gig({ name: 'The Listening Room — Lac du Bonnet, MB', location: null, country: 'CA' }))
+    const estimate = estimateGigCost(
+      gig({ name: 'The Listening Room — Lac du Bonnet, MB', location: null, country: 'CA' }),
+      WINNIPEG,
+    )
     const travel = estimate.lines.find((l) => l.id === 'travel')!
     expect(travel.label).toBe(TRAVEL_BANDS.drive.label)
     expect(travel.inferred).toBe(true)
+  })
+})
+
+describe('the estimate says what each line is, and adds them up', () => {
+  const trip = () =>
+    estimateGigCost(gig({
+      country: 'CA', location: 'Calgary, AB', travelBand: 'regional', lodgingTier: 'standard', nights: 2,
+    }))
+
+  it('names flights, accommodation, meals and local transport as themselves', () => {
+    const labels = Object.fromEntries(trip().lines.map((l) => [l.id, l.label]))
+    expect(labels.travel).toMatch(/^Flights/)
+    expect(labels.lodging).toBe('Accommodation, 2 nights in a standard hotel')
+    expect(labels.meals).toBe('Meals, 3 days')
+    expect(labels.ground).toBe('Local transport, 3 days')
+  })
+
+  it('says what is inside every line, so a figure never stands alone', () => {
+    for (const line of trip().lines) expect(line.detail.length).toBeGreaterThan(10)
+  })
+
+  it('splits food from getting around without moving the total', () => {
+    expect(MEALS_PER_DAY.low + GROUND_PER_DAY.low).toBe(PER_DIEM.low)
+    expect(MEALS_PER_DAY.high + GROUND_PER_DAY.high).toBe(PER_DIEM.high)
+  })
+
+  it('gives an estimated total that is the sum of the lines, as a range', () => {
+    const e = trip()
+    expect(e.gross).toEqual({
+      low: e.lines.reduce((n, l) => n + l.amount.low, 0),
+      high: e.lines.reduce((n, l) => n + l.amount.high, 0),
+    })
+    expect(e.gross.low).toBeLessThan(e.gross.high)
+  })
+
+  it('itemises what they pay, and the total of it', () => {
+    const e = estimateGigCost(gig({
+      country: 'CA', travelBand: 'drive', nights: 0, guaranteeAmount: 400, stipendAmount: 100,
+    }))
+    expect(e.payLines.map((p) => [p.id, p.label, p.amount.low])).toEqual([
+      ['guarantee', 'Performance fee', 400],
+      ['stipend', 'Stipend', 100],
+    ])
+    expect(e.income).toEqual({ low: 500, high: 500 })
+  })
+})
+
+describe('whether a trip is income, an investment, or could be either', () => {
+  const outlook = (o: Partial<GigOpportunity>) => estimateGigCost(gig({ country: 'CA', travelBand: 'drive', nights: 0, ...o })).outlook!
+
+  it('calls a trip that costs more than it pays an investment', () => {
+    // A showcase with a $20 stipend against a drive and two days of food.
+    const o = outlook({ stipendAmount: 20 })
+    expect(o.id).toBe('investment')
+    expect(o.label).toBe('Investment')
+    expect(o.payKnown).toBe(true)
+  })
+
+  it('calls a trip that pays more than it costs even at the expensive end income', () => {
+    const o = outlook({ guaranteeAmount: 5000 })
+    expect(o.id).toBe('income')
+    expect(o.label).toBe('Income')
+    // The figure is how far ahead, positive, in the same range arithmetic.
+    expect(o.amount.low).toBeGreaterThan(0)
+    expect(o.amount.low).toBeLessThanOrEqual(o.amount.high)
+    expect(o.summary).toMatch(/ahead/)
+  })
+
+  it('does not call it income when only the cheap end of the range is ahead', () => {
+    // Drive gross is 175 to 495; a fee of 300 sits inside the range.
+    const o = outlook({ guaranteeAmount: 300 })
+    expect(o.id).toBe('even')
+    expect(o.label).toBe('Could pay its way')
+  })
+
+  it('says an investment may not be the whole picture when no pay is recorded', () => {
+    const o = outlook({})
+    expect(o.id).toBe('investment')
+    expect(o.payKnown).toBe(false)
+    expect(o.summary).toMatch(/No pay is recorded/)
+  })
+
+  it('is silent when there is nothing on either side', () => {
+    const e = estimateGigCost(gig({ country: null, location: null }))
+    expect(e.lines).toEqual([])
+    expect(e.outlook).toBeNull()
+  })
+
+  it('says what a grant pays without claiming to have set it against costs nobody counted', () => {
+    const e = estimateGigCost(gig({ country: null, location: null, guaranteeAmount: 5000 }))
+    expect(e.outlook?.id).toBe('income')
+    expect(e.outlook?.summary).toMatch(/No costs are counted/)
+    expect(e.outlook?.summary).not.toMatch(/ahead/)
+  })
+
+  it('treats an exact match as paying its way', () => {
+    const o = outlookOf({
+      gross: { low: 500, high: 500 }, income: { low: 500, high: 500 }, net: { low: 0, high: 0 }, payKnown: true, costed: true,
+    })!
+    expect(o.label).toBe('Pays its way')
+  })
+
+  it('never uses a word of loss, because a showcase that does not break even is not a mistake', () => {
+    const everything = [
+      outlook({}), outlook({ stipendAmount: 20 }), outlook({ guaranteeAmount: 300 }), outlook({ guaranteeAmount: 5000 }),
+    ].flatMap((o) => [o.label, o.summary])
+    expect(everything.join(' ')).not.toMatch(/(loss|losses|lose|losing|lost|deficit|shortfall|out of pocket)/i)
+  })
+
+  it('shows its amounts as ranges, never a midpoint', () => {
+    for (const o of [outlook({}), outlook({ guaranteeAmount: 300 }), outlook({ guaranteeAmount: 5000 })]) {
+      expect(Object.keys(o)).not.toContain('midpoint')
+      expect(Object.keys(o)).not.toContain('average')
+    }
+  })
+})
+
+describe('the scale from a bigger investment to a bigger payout', () => {
+  it('puts even in the middle, investment on the left and payout on the right', () => {
+    expect(scalePosition(0)).toBe(0.5)
+    expect(scalePosition(-1000)).toBeLessThan(0.5)
+    expect(scalePosition(1000)).toBeGreaterThan(0.5)
+  })
+
+  it('is symmetric, so a payout of a size sits as far right as an investment of that size sits left', () => {
+    expect(scalePosition(800) - 0.5).toBeCloseTo(0.5 - scalePosition(-800), 10)
+  })
+
+  it('keeps going further the bigger it is, and stops at the ends', () => {
+    expect(scalePosition(-3000)).toBeLessThan(scalePosition(-1000))
+    expect(scalePosition(-1000)).toBeLessThan(scalePosition(-200))
+    expect(scalePosition(-5000)).toBeCloseTo(0, 10)
+    expect(scalePosition(-90_000)).toBe(0)
+    expect(scalePosition(90_000)).toBe(1)
+  })
+
+  it('gives a $200 trip and a $4,000 one different places, which is the point of it', () => {
+    // On a straight line out to $5,000 these would be a hairline apart.
+    const small = scalePosition(-200)
+    const big = scalePosition(-4000)
+    expect(small - big).toBeGreaterThan(0.25)
+    expect(0.5 - small).toBeGreaterThan(0.1)
+  })
+
+  it('draws a range as a bar, and a straddling one across the middle', () => {
+    const investment = outlookScale({ low: 855, high: 1515 })
+    expect(investment.to).toBeLessThan(0.5)
+    expect(investment.from).toBeLessThan(investment.to)
+
+    const either = outlookScale({ low: -125, high: 195 })
+    expect(either.from).toBeLessThan(0.5)
+    expect(either.to).toBeGreaterThan(0.5)
+
+    const payout = outlookScale({ low: -4140, high: -3710 })
+    expect(payout.from).toBeGreaterThan(0.5)
+  })
+
+  it('says when the bar was stopped at the edge', () => {
+    expect(outlookScale({ low: 6000, high: 9000 }).clippedLeft).toBe(true)
+    expect(outlookScale({ low: -9000, high: -6000 }).clippedRight).toBe(true)
+    expect(outlookScale({ low: 100, high: 300 }).clippedLeft).toBe(false)
   })
 })

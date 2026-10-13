@@ -24,6 +24,20 @@ export const AGENT_ROUTES = [
   { method: 'GET', path: '/api/reference-docs' },
   { method: 'GET', path: '/api/gigs' },
   { method: 'GET', path: '/api/sync' },
+  // The promo check-in reads its own earlier drafts so it does not write the
+  // same announcement twice. Drafts are the artist's own prose, the same kind
+  // of thing `/api/reference-docs` already hands over.
+  { method: 'GET', path: '/api/promo' },
+  // Every show the artist has, from every place it is listed. The promo
+  // check-in writes about shows that were never filed as a gig in Scout, and
+  // this is where those live. It is a read of listings the artist already
+  // publishes; the Bandsintown key is used inside the Worker and never returned.
+  { method: 'GET', path: '/api/shows' },
+  // The shared catalog: what is already in it, and a new entry. Research is
+  // collected once for every artist, so it files here and not into anybody's
+  // list. The route is the owner's agents only.
+  { method: 'GET', path: '/api/catalog/known' },
+  { method: 'POST', path: '/api/catalog' },
   { method: 'POST', path: '/api/gigs' },
   { method: 'POST', path: '/api/sync' },
   { method: 'POST', path: '/api/promo' },

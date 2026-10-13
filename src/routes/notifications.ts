@@ -30,7 +30,9 @@ import {
   dismissEvents,
 } from '../lib/notificationEvents'
 import { countHistory, readHistoryPage } from '../lib/history'
-import { calendarConfigured } from '../lib/googleCalendar'
+import { calendarWay } from '../lib/gigNudges'
+import { isOwnerTenant } from '../lib/actor'
+import { artistNamesFor } from '../lib/artistName'
 import { gmailConfigured } from '../lib/gmail'
 import { mailerConfigured } from '../lib/mailer'
 import { readCredentialHealth } from '../lib/credentialCheck'
@@ -119,13 +121,20 @@ export async function composeFeed(
     gigs: gigs as GigOpportunity[],
     sync: sync as SyncTarget[],
     promo: promo as PromoDraft[],
+    artist: await artistNamesFor(env, tenant),
   })
 
   const built = buildNotifications({
     items,
     summary: summariseQueue(items, { orphanedReminders: orphans.count }),
     health: {
-      calendarConfigured: calendarConfigured(env),
+      // Gmail, email sending and the credential probes are the owner's server
+      // secrets. See `HealthInput.platform`.
+      platform: await isOwnerTenant(env, tenant),
+      // The same answer the writer acts on and Settings shows. This was the
+      // Worker secrets alone, so a calendar connected with the button read as
+      // disconnected here while Settings said it was working.
+      calendarConfigured: (await calendarWay(env, tenant)) !== null,
       gmailConfigured: gmailConfigured(env),
       emailConfigured: mailerConfigured(env),
       // Read, never probed. The bell is polled every five minutes and a probe

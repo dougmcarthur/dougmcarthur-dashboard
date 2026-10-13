@@ -47,7 +47,9 @@ import {
   fileDocumentReading,
   listDocumentsToRead,
   listGigs,
+  listPromoDrafts,
   listReferenceDocs,
+  listShows,
   listSyncTargets,
   logRun,
   resolveBaseUrl,
@@ -139,6 +141,10 @@ async function call(tool: ToolName, cfg: ApiConfig, body: Record<string, unknown
       return listGigs(cfg)
     case 'list_existing_sync_targets':
       return listSyncTargets(cfg)
+    case 'list_existing_promo_drafts':
+      return listPromoDrafts(cfg)
+    case 'list_shows':
+      return listShows(cfg)
     case 'create_gig_opportunity':
       return createGig(cfg, { ...body, status: 'discovered' })
     case 'create_sync_target': {

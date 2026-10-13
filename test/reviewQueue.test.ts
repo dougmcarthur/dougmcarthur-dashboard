@@ -1,13 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import {
-  buildReviewQueue,
+  buildReviewQueue as buildQueue,
   matchesFilter,
   summariseQueue,
   isSettled,
   awaitingDecision,
   deckItems,
 } from '../shared/reviewQueue'
+import { artistNames } from '../shared/reviewParse'
 import type { GigOpportunity, SyncTarget } from '../shared/types'
+
+const JANE = artistNames('Jane Smith')
+const buildReviewQueue = (input: Parameters<typeof buildQueue>[0]) => buildQueue({ artist: JANE, ...input })
 
 // Minimal rows in the shape the API returns. Notes are trimmed from real
 // production values so the flags under test are the ones the data produces.
@@ -89,7 +93,7 @@ describe('buildReviewQueue — flags from the note and columns', () => {
 
   it('surfaces a blocker waiting on a person', () => {
     const [item] = buildReviewQueue({
-      gigs: [gig({ id: 5, name: 'Sofar', fitNotes: 'Doug should pick the video and submit himself when ready.' })],
+      gigs: [gig({ id: 5, name: 'Sofar', fitNotes: 'Jane should pick the video and submit himself when ready.' })],
     })
     expect(item.flags.some((f) => f.id === 'blocked')).toBe(true)
   })
@@ -373,7 +377,7 @@ describe('snooze — what the filters do with it', () => {
     gigs: [
       gig({ id: 10, name: 'Awake', fitNotes: 'Submission status: NOT submitted.' }),
       gig({
-        id: 11, name: 'Deferred', fitNotes: 'Submission status: NOT submitted. Doug should pick a video.',
+        id: 11, name: 'Deferred', fitNotes: 'Submission status: NOT submitted. Jane should pick a video.',
         snoozedUntil: '2026-09-15', snoozedAt: '2026-08-20T10:00:00.000Z', updatedAt: '2026-08-20T10:00:00.000Z',
       }),
     ],

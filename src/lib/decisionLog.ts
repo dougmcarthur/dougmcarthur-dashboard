@@ -23,6 +23,8 @@
 import { getDb } from '../db'
 import { decisionLog, gigOpportunities, syncTargets } from '../db/schema'
 import { withTenant, type TenantId } from '../db/scope'
+import { artistNamesFor } from './artistName'
+import { readHome } from './travelEnrich'
 import {
   decisionRow,
   gigDecisionContext,
@@ -33,6 +35,7 @@ import {
   type DecisionVia,
 } from '../../shared/decisionLog'
 import type { GigOpportunity, SyncTarget } from '../../shared/types'
+import { homeFrom } from '../../shared/gigCost'
 import type { Actor } from './actor'
 import type { Env } from '../types'
 
@@ -66,7 +69,7 @@ export async function recordDecision(env: Env, tenant: TenantId, input: Decision
 }
 
 /** Log a move on a gig, from the row as it was before the move. */
-export function recordGigDecision(env: Env, tenant: TenantId, before: GigRowForLog, move: Move): Promise<boolean> {
+export async function recordGigDecision(env: Env, tenant: TenantId, before: GigRowForLog, move: Move): Promise<boolean> {
   // One cast, here. The table's column types are wider than the wire type
   // (`submission_method` is text, the wire type a union), and the snapshot
   // reads only fields both agree on.
@@ -76,18 +79,25 @@ export function recordGigDecision(env: Env, tenant: TenantId, before: GigRowForL
     entity: 'gig',
     entityId: before.id,
     opportunityId: before.opportunityId ?? null,
-    context: gigDecisionContext(row, move.at.slice(0, 10)),
+    context: gigDecisionContext(
+      row,
+      move.at.slice(0, 10),
+      await artistNamesFor(env, tenant).catch(() => undefined),
+      // The cost the screen showed was a guess from where they travel from, so
+      // the snapshot makes the same guess.
+      homeFrom((await readHome(env, tenant).catch(() => null))?.place),
+    ),
   })
 }
 
 /** Log a move on a sync target, from the row as it was before the move. */
-export function recordSyncDecision(env: Env, tenant: TenantId, before: SyncRowForLog, move: Move): Promise<boolean> {
+export async function recordSyncDecision(env: Env, tenant: TenantId, before: SyncRowForLog, move: Move): Promise<boolean> {
   const row = before as unknown as SyncTarget
   return recordDecision(env, tenant, {
     ...move,
     entity: 'sync',
     entityId: before.id,
     opportunityId: before.opportunityId ?? null,
-    context: syncDecisionContext(row, move.at.slice(0, 10)),
+    context: syncDecisionContext(row, move.at.slice(0, 10), await artistNamesFor(env, tenant).catch(() => undefined)),
   })
 }

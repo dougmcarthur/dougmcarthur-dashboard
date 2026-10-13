@@ -182,8 +182,9 @@ export function EditGigPanel({
         */}
         <div className="sm:col-span-2 pt-1">
           <Explainer as="div" title="The trip" titleClassName="text-xs font-semibold text-muted">
-            What it costs to get there. Every field is optional. Leave a band empty and it is
-            guessed from the location, and labelled as guessed.
+            What it costs to be there: flights or driving, accommodation, meals and local
+            transport. Every field is optional. Leave one empty and it is guessed from the
+            location, and labelled as guessed.
           </Explainer>
         </div>
         <div>
@@ -203,7 +204,7 @@ export function EditGigPanel({
           </select>
         </div>
         <div>
-          <Label>Getting there</Label>
+          <Label>Flights or driving</Label>
           <select value={draft.travelBand} onChange={(e) => set('travelBand', e.target.value)} className={FIELD}>
             <option value="">Guess from the location</option>
             {(Object.keys(TRAVEL_BANDS) as Array<keyof typeof TRAVEL_BANDS>).map((b) => (
@@ -223,7 +224,7 @@ export function EditGigPanel({
           />
         </div>
         <div>
-          <Label>Room</Label>
+          <Label>Accommodation</Label>
           <select value={draft.lodgingTier} onChange={(e) => set('lodgingTier', e.target.value)} className={FIELD}>
             <option value="">Guess from the location</option>
             {(Object.keys(LODGING_TIERS) as Array<keyof typeof LODGING_TIERS>).map((t) => (

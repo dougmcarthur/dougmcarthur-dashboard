@@ -8,7 +8,7 @@ import { scoped, withTenant } from '../db/scope'
 import { tenantOf, type AppEnv } from '../context'
 import { syncNoteColumns } from '../../shared/noteColumns'
 import { foldFinding, normaliseWebsite, readSubmissionPolicy, startingTerms, type TermsColumns } from '../../shared/syncTerms'
-import { linkSync } from '../lib/catalog'
+import { linkSync, agentMayPublish } from '../lib/catalog'
 import { agentWrite } from '../lib/agentWrites'
 import { decisionActor, recordSyncDecision } from '../lib/decisionLog'
 import { checkTarget } from '../lib/syncTerms'
@@ -119,7 +119,7 @@ sync.post('/', agentWrite('sync'), zValidator('json', SyncInsertSchema), async (
 
   // Organisations go into the shared catalog; a person does not. See
   // src/lib/catalog.ts.
-  await linkSync(c.env, tenantOf(c), { id: result[0].id, name: b.name, agencyType: b.agencyType }, ts, c.get('actor').kind === 'agent')
+  await linkSync(c.env, tenantOf(c), { id: result[0].id, name: b.name, agencyType: b.agencyType }, ts, await agentMayPublish(c.env, c.get('actor'), tenantOf(c)))
 
   // Whatever the writer said about their rules, the Worker reads the site
   // itself: an agent that did not look is how a refusal got filed as a pitch.

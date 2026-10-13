@@ -1,3 +1,4 @@
+import { beyondReachNote } from '../../../shared/artistFocus'
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type GigOpportunity, type SyncTarget, type PromoDraft } from '../api'
@@ -327,6 +328,12 @@ export function DecisionDeck({
             <p className="mt-1 text-sm text-muted truncate max-w-2xl">
               {[item.subtitle, item.parsed.location].filter(Boolean).join(' · ')}
             </p>
+          )}
+
+          {/* Beyond the reach they chose: said, not hidden. It is dealt after what is
+              within reach, which is all the choice does. */}
+          {item.focus && beyondReachNote(item.focus) && (
+            <p className="mt-0.5 text-xs text-muted">{beyondReachNote(item.focus)}</p>
           )}
 
           <Facts item={item} />

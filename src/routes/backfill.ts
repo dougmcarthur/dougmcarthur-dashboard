@@ -8,6 +8,7 @@ import { tenantOf, type AppEnv } from '../context'
 import { gigNoteColumns, syncNoteColumns, changesFor, type ColumnChange } from '../../shared/noteColumns'
 import { readSetting, writeSetting, ONCE_KEYS } from '../lib/settings'
 import { recordEvent } from '../lib/notificationEvents'
+import { artistNamesFor } from '../lib/artistName'
 import type { Env } from '../types'
 
 /**
@@ -40,9 +41,10 @@ async function plan(env: Env, tenant: TenantId): Promise<{ rows: RowPlan[]; scan
   const gigs = readGigs(await db.select().from(gigOpportunities).where(scoped(gigOpportunities, tenant)))
   const syncs = await db.select().from(syncTargets).where(scoped(syncTargets, tenant))
   const rows: RowPlan[] = []
+  const names = await artistNamesFor(env, tenant)
 
   for (const gig of gigs) {
-    const derived = gigNoteColumns(gig)
+    const derived = gigNoteColumns(gig, names)
     const changes = changesFor(gig as unknown as Record<string, unknown>, {
       submissionState: derived.storedSubmissionState,
       submissionMethod: derived.submissionMethod,

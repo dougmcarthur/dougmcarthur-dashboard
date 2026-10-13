@@ -41,7 +41,9 @@ import {
   fileDocumentReading,
   listDocumentsToRead,
   listGigs,
+  listPromoDrafts,
   listReferenceDocs,
+  listShows,
   listSyncTargets,
   logRun,
   resolveBaseUrl,
@@ -78,6 +80,8 @@ function toolsFor(agent: AgentId, cfg: ApiConfig, counter: { added: number }) {
     read_reference_docs: async () => JSON.stringify(await listReferenceDocs(cfg)),
     list_existing_gigs: async () => JSON.stringify(await listGigs(cfg)),
     list_existing_sync_targets: async () => JSON.stringify(await listSyncTargets(cfg)),
+    list_existing_promo_drafts: async () => JSON.stringify(await listPromoDrafts(cfg)),
+    list_shows: async () => JSON.stringify(await listShows(cfg)),
     create_gig_opportunity: async (input) => {
       const result = await createGig(cfg, { ...input, status: 'discovered' })
       if (result.created) counter.added++

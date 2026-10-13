@@ -3,6 +3,20 @@
 Written 2026-10-05, from reading the code rather than from the plans, which
 were written before several of these pieces landed.
 
+**Update, 2026-10-09.** Four of these have moved since this was written.
+Gap 16 is done: `decision_log` (migration 0038) records every choice with what the
+screen showed. Gap 8 is half done: goals and reach are now read, by
+`shared/artistFocus.ts`, and order what is undecided (reach is resolved from the
+home base in Settings, and nothing is hidden by it); location and genre are
+still never asked. Gap 10 is partly done: measured distance replaces the
+place-name guess where a home base is set, and Scout is stated to be for
+Canadian artists, so CAD and the P-2 rule stand; the Winnipeg fallback bands
+remain for a gig that has not been measured. Gaps 2 and 5 are partly done by the
+source poller (`docs/catalog-ingestion.md`), whose candidates still do not reach
+the catalog. Gap 18 is unchanged, and three routes that read the owner's mailbox
+or calendar for any artist were closed (`isOwnerTenant`). The next free
+migration is 0040.
+
 **The model.** Research is broad and shared: agents find what exists, once.
 Each artist's account then holds the narrower set of criteria they have stated
 or that their library implies, and Scout (1) matches the shared catalog against

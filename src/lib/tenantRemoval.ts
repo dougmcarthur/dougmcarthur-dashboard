@@ -30,7 +30,7 @@
 
 import { eq, getTableName } from 'drizzle-orm'
 import { getDb } from '../db'
-import { agentTokens, authSessions, epkShares, feedback, passkeyCredentials, tenants, usageDaily, users } from '../db/schema'
+import { agentTokens, authSessions, epkShares, feedback, invites, passkeyCredentials, tenants, usageDaily, users } from '../db/schema'
 import { DOMAIN_TABLES, scoped, type TenantId } from '../db/scope'
 import { countRows } from './usage'
 import type { Env } from '../types'
@@ -99,6 +99,12 @@ export async function removeTenant(env: Env, tenant: TenantId): Promise<RemovalR
   for (const account of accounts) {
     await db.delete(passkeyCredentials).where(eq(passkeyCredentials.userId, account.id))
     await db.delete(authSessions).where(eq(authSessions.userId, account.id))
+    // The invitation that created the account holds the name and email address
+    // the owner typed for it. It has no tenant column, so it is reached through
+    // the account it was redeemed by. Left behind, "delete my data" would keep
+    // exactly the two fields a person would name first; the privacy policy says
+    // removal deletes everything the account holds.
+    await db.delete(invites).where(eq(invites.redeemedUserId, account.id))
   }
 
   await db.delete(agentTokens).where(eq(agentTokens.tenantId, tenant))

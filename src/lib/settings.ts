@@ -69,7 +69,10 @@ export interface DigestSettings {
  */
 export const DIGEST_DEFAULTS: DigestSettings = {
   enabled: false,
-  recipient: 'doug@dougmcarthur.net',
+  // Nobody. The default is the deployment's own recovery address, read from
+  // `AUTH_EMAIL` in `readDigestSettings` — configuration, not a person written
+  // into this file. Unset in both places means there is nowhere to send it.
+  recipient: '',
   sender: 'digest@sundogsmusic.ca',
   // Monday 08:00 local, which is what the hardcoded cron meant in practice.
   // Winnipeg rather than UTC because "Monday morning" is a claim about the
@@ -92,7 +95,7 @@ export async function readDigestSettings(env: Env): Promise<DigestSettings> {
 
   return {
     enabled: (map.get(DIGEST_KEYS.enabled) ?? String(DIGEST_DEFAULTS.enabled)) === 'true',
-    recipient: map.get(DIGEST_KEYS.recipient) ?? DIGEST_DEFAULTS.recipient,
+    recipient: map.get(DIGEST_KEYS.recipient) ?? (env.AUTH_EMAIL ?? '').trim(),
     sender: map.get(DIGEST_KEYS.sender) ?? DIGEST_DEFAULTS.sender,
     schedule: {
       day: (map.get(DIGEST_KEYS.day) as Weekday | undefined) ?? DIGEST_DEFAULTS.schedule.day,

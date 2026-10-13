@@ -13,6 +13,7 @@ import {
   AGENT_DAILY_LIMITS,
   AGENT_TEXT_MAX,
   duplicateGig,
+  duplicatePromoDraft,
   duplicateSyncTarget,
   overDailyLimit,
   windowStart,
@@ -175,6 +176,19 @@ describe('what counts as a repeat', () => {
     expect(duplicateSyncTarget({ name: 'Musicbed Inc.', contactEmail: 'submit@musicbed.test' }, targets)?.id).toBe(2)
     expect(duplicateSyncTarget({ name: 'Artlist', contactEmail: '' }, targets)).toBeNull()
   })
+
+  it('is a promo draft with the same title for the same month, or the same words under another title', () => {
+    const drafts = [{ id: 7, month: '2026-11', title: 'Show roundup', content: 'Three shows this month.' }]
+    expect(duplicatePromoDraft({ month: '2026-11', title: 'SHOW ROUNDUP!', content: 'Different.' }, drafts)?.id).toBe(7)
+    expect(duplicatePromoDraft({ month: '2026-12', title: 'Another title', content: 'three  shows this month' }, drafts)?.id).toBe(7)
+  })
+
+  it('does not call a recurring heading a repeat across months', () => {
+    // "Show roundup" is honest every month; whether a subject was already
+    // written about is for the agent reading its own list, not for this rule.
+    const drafts = [{ id: 7, month: '2026-11', title: 'Show roundup', content: 'Three shows this month.' }]
+    expect(duplicatePromoDraft({ month: '2026-12', title: 'Show roundup', content: 'Two shows in December.' }, drafts)).toBeNull()
+  })
 })
 
 // The Worker reads the clock for its trailing day and its run stamps, so the
@@ -205,6 +219,7 @@ async function setup() {
       env,
     )
   const agent = (path: string, body: unknown) => send(path, body, { Authorization: 'Bearer issued-token' })
+  const read = (path: string) => app.request(path, { headers: { Authorization: 'Bearer issued-token' } }, env)
   const legacy = (path: string, body: unknown) => send(path, body, { Authorization: 'Bearer legacy-secret' })
   const person = async (path: string, body: unknown) => {
     const { token } = await createSession(env, { credentialId: null, label: 'test', userId: 'usr_0001' })
@@ -219,7 +234,7 @@ async function setup() {
     )
     for (let i = 0; i < n; i++) insert.run(tenant, `Seeded ${tenant} ${at} ${i}`, at, at)
   }
-  return { db, env, agent, legacy, person, count, seedGigs }
+  return { db, env, agent, read, legacy, person, count, seedGigs }
 }
 
 const FOLK = { name: 'Folk Fest', type: 'festival', url: 'https://folkfest.example/artists', fitRationale: 'Fits.', status: 'discovered' }
@@ -310,11 +325,91 @@ describe('POST /api/sync, /api/promo and /api/task-runs with an issued token', (
 
   it('files a promo draft, refuses a status, and stops at its ceiling', async () => {
     const t = await setup()
-    const draft = (n: number) => ({ month: '2026-11', title: `Draft ${n}`, content: 'Something real.' })
+    // Each draft says something different: identical copy is a repeat now.
+    const draft = (n: number) => ({ month: '2026-11', title: `Draft ${n}`, content: `Something real, number ${n}.` })
     expect((await t.agent('/api/promo', { ...draft(0), status: 'posted' })).status).toBe(400)
     for (let i = 0; i < AGENT_DAILY_LIMITS.promo; i++) expect((await t.agent('/api/promo', draft(i))).status).toBe(201)
     expect((await t.agent('/api/promo', draft(99))).status).toBe(429)
     expect(t.count('promo_drafts')).toBe(AGENT_DAILY_LIMITS.promo)
+  })
+
+  it('says which promo draft it repeats, and files nothing', async () => {
+    const t = await setup()
+    const draft = { month: '2026-11', title: 'Show roundup', content: 'Three shows this month.' }
+    expect((await t.agent('/api/promo', draft)).status).toBe(201)
+
+    const again = await t.agent('/api/promo', { ...draft, title: 'show roundup', content: 'Reworded.' })
+    expect(again.status).toBe(409)
+    expect(((await again.json()) as { error: string }).error).toMatch(/promo draft #1, "Show roundup" \(2026-11\)/)
+
+    const sameWords = await t.agent('/api/promo', { ...draft, month: '2026-12', title: 'Renamed' })
+    expect(sameWords.status).toBe(409)
+
+    expect((await t.agent('/api/promo', { ...draft, month: '2026-12', content: 'Two shows in December.' })).status).toBe(201)
+    expect(t.count('promo_drafts')).toBe(2)
+  })
+
+  it('does not take another artist\'s promo draft for a repeat', async () => {
+    const t = await setup()
+    t.db.prepare(
+      `INSERT INTO promo_drafts (tenant_id, month, title, content, status, created_at) VALUES ('tnt_0001', '2026-11', 'Show roundup', 'Three shows this month.', 'draft', ?)`,
+    ).run(OLD)
+    expect((await t.agent('/api/promo', { month: '2026-11', title: 'Show roundup', content: 'Three shows this month.' })).status).toBe(201)
+  })
+
+  it('lists the token\'s own promo drafts and no other artist\'s, and cannot edit or remove one', async () => {
+    const t = await setup()
+    const insert = t.db.prepare(
+      `INSERT INTO promo_drafts (tenant_id, month, title, content, status, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    insert.run('tnt_0002', '2026-10', 'Mine', 'My copy.', 'published', OLD)
+    insert.run('tnt_0001', '2026-10', 'Theirs', 'Their copy.', 'draft', OLD)
+
+    const res = await t.read('/api/promo')
+    expect(res.status).toBe(200)
+    const rows = (await res.json()) as Array<{ title: string; status: string }>
+    expect(rows.map((r) => r.title)).toEqual(['Mine'])
+    expect(rows[0].status).toBe('published')
+
+    // Reading drafts is the whole of what the route list admits.
+    const patch = await app.request(
+      '/api/promo/1',
+      { method: 'PATCH', headers: { 'content-type': 'application/json', Authorization: 'Bearer issued-token' }, body: JSON.stringify({ status: 'published' }) },
+      t.env,
+    )
+    expect(patch.status).toBeGreaterThanOrEqual(400)
+    const del = await app.request('/api/promo/1', { method: 'DELETE', headers: { Authorization: 'Bearer issued-token' } }, t.env)
+    expect(del.status).toBeGreaterThanOrEqual(400)
+    expect(t.count('promo_drafts')).toBe(1)
+  })
+
+  it('lists the token\'s own booked shows on the show list, and no other artist\'s, and nothing unconfirmed', async () => {
+    const t = await setup()
+    const insert = t.db.prepare(
+      `INSERT INTO gig_opportunities (tenant_id, name, type, status, performance_start, performance_end, location, discovered_at, updated_at)
+       VALUES (?, ?, 'festival', ?, ?, ?, ?, ?, ?)`,
+    )
+    insert.run('tnt_0002', 'Mine Fest', 'booked', '2026-11-14', '2026-11-15', 'Lac du Bonnet, MB', OLD, OLD)
+    insert.run('tnt_0002', 'Maybe Fest', 'submitted', '2026-11-20', '2026-11-21', 'Brandon, MB', OLD, OLD)
+    insert.run('tnt_0001', 'Theirs Fest', 'booked', '2026-11-16', '2026-11-16', 'Winnipeg, MB', OLD, OLD)
+
+    const res = await t.read('/api/shows?today=2026-10-07')
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { upcoming: Array<{ title: string; sources: string[] }>; sources: unknown[] }
+    expect(body.upcoming.map((s) => s.title)).toEqual(['Mine Fest'])
+    expect(body.upcoming[0].sources).toEqual(['scout'])
+    // No Bandsintown or Manitoba Music connector on this artist: nothing was asked of either.
+    expect(body.sources).toEqual([])
+
+    // A read, and only a read.
+    const post = await app.request(
+      '/api/shows',
+      { method: 'POST', headers: { 'content-type': 'application/json', Authorization: 'Bearer issued-token' }, body: '{}' },
+      t.env,
+    )
+    expect(post.status).toBeGreaterThanOrEqual(400)
+    const connectors = await t.read('/api/connectors')
+    expect(connectors.status).toBeGreaterThanOrEqual(400)
   })
 
   it('refuses a run stamped by the caller', async () => {

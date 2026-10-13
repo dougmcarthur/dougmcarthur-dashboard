@@ -13,12 +13,20 @@ import type { GigOpportunity, SyncTarget, PromoDraft } from '../../shared/types'
 import { renderDigestEmail } from '../lib/digestMail'
 import { addressBook, sendMail, mailerConfigured, senderIdentity } from '../lib/mailer'
 import { recipientAllowed } from '../../shared/recipients'
-import { readDigestSettings, writeSetting, DIGEST_KEYS } from '../lib/settings'
+import { writeSetting, DIGEST_KEYS } from '../lib/settings'
+import { readAccountDigest, recordDigestSent, writeAccountDigest } from '../lib/digestSettings'
+import { artistNamesFor } from '../lib/artistName'
+import { focusFor } from '../lib/focus'
 import { describeSchedule, nextRun } from '../../shared/digestSchedule'
 import type { Env } from '../types'
 
 /**
- * The weekly digest: preview it, send it, configure it.
+ * The weekly digest: preview it, send it, configure it, for the account asking.
+ *
+ * Every account has one. The switch and the schedule are the account's own and
+ * it is off until they turn it on; an artist's goes to the address they sign
+ * in with and cannot be pointed anywhere else, and the owner's keeps its
+ * configurable recipient. See `src/lib/digestSettings.ts`.
  *
  * `GET /preview` renders exactly what a send would produce without sending, so
  * the content can be checked — and iterated on — without a mailbox, a binding,
@@ -45,6 +53,8 @@ export async function composeDigest(
     gigs: gigs as GigOpportunity[],
     sync: sync as SyncTarget[],
     promo: promo as PromoDraft[],
+    artist: await artistNamesFor(env, tenant),
+    focus: await focusFor(env, tenant),
   })
 
   const built = buildDigest({
@@ -59,7 +69,7 @@ export async function composeDigest(
   })
 
   const base = env.DASHBOARD_URL ?? 'https://scout.sundogsmusic.ca'
-  const settings = await readDigestSettings(env)
+  const settings = await readAccountDigest(env, tenant)
   // `subject` is the whole subject line, product name included, so the preview
   // shows exactly what an inbox will.
   const mail = renderDigestEmail(built, { base, schedule: settings.schedule, identity: senderIdentity(env) })
@@ -93,7 +103,7 @@ export async function recordDigest(env: Env, tenant: TenantId, built: Digest): P
 
 digest.get('/preview', async (c) => {
   const { digest: built, subject, html, text } = await composeDigest(c.env, tenantOf(c))
-  const settings = await readDigestSettings(c.env)
+  const settings = await readAccountDigest(c.env, tenantOf(c))
   const now = new Date()
   return c.json({
     empty: built.empty,
@@ -101,43 +111,53 @@ digest.get('/preview', async (c) => {
     groups: built.groups,
     html,
     text,
-    settings,
+    settings: {
+      enabled: settings.enabled,
+      recipient: settings.recipient,
+      sender: settings.sender,
+      recipientEditable: settings.recipientEditable,
+    },
     mailerConfigured: mailerConfigured(c.env),
     // Says plainly why a send would be skipped, rather than leaving the
     // Settings screen to infer it from three separate flags.
-    wouldSend: !built.empty && settings.enabled && mailerConfigured(c.env),
+    wouldSend: !built.empty && settings.enabled && Boolean(settings.recipient) && mailerConfigured(c.env),
     schedule: {
       ...settings.schedule,
       describes: describeSchedule(settings.schedule),
       nextRun: nextRun(now, settings.schedule, settings.lastSentAt)?.toISOString() ?? null,
       lastSentAt: settings.lastSentAt,
+      zoneChosen: settings.zoneChosen,
     },
   })
 })
 
 /**
- * The digest is the owner's: its schedule, recipient and sender are platform
- * settings rather than a tenant's, and the cron sends it for the owner's
- * tenant only. So sending one and changing where it goes are the owner's too.
- * While the mail binding had a one-address allowlist this was moot; now an
- * artist able to PATCH the recipient could point the owner's digest at an
- * inbox of their choosing, or send their own digest to the owner.
+ * Who a request may change the recipient and sender for.
+ *
+ * The owner's digest has a configurable recipient and sender, which are platform
+ * settings. An artist's goes to the address they sign in with, so there is
+ * nothing for them to set, and a route that let them would be a way to point
+ * mail at an inbox of their choosing now that the sending allowlist is gone.
  */
 function ownerOnly(c: Context<AppEnv>) {
   const actor = c.get('actor')
   if (actor.kind === 'user' && actor.role === 'owner') return null
-  return c.json({ error: 'Only the owner can change or send the weekly digest.' }, 403)
+  return c.json({ error: 'Your digest goes to the address you sign in with. Only the owner can change where it goes.' }, 403)
 }
 
 digest.post('/send', async (c) => {
-  const refused = ownerOnly(c)
-  if (refused) return refused
-  const settings = await readDigestSettings(c.env)
+  const tenant = tenantOf(c)
+  const settings = await readAccountDigest(c.env, tenant)
   if (!mailerConfigured(c.env)) {
     return c.json({ error: 'This site cannot send email yet.' }, 503)
   }
+  if (!settings.recipient) {
+    return c.json(
+      { error: settings.recipientEditable ? 'The digest has nowhere to go yet. Set a recipient first.' : 'There is no email address on your account to send it to.' },
+      400,
+    )
+  }
 
-  const tenant = tenantOf(c)
   const { digest: built, subject, html, text } = await composeDigest(c.env, tenant)
 
   // An empty digest teaches you to ignore the full ones, so there is no way to
@@ -146,7 +166,8 @@ digest.post('/send', async (c) => {
 
   const result = await sendMail(c.env, {
     to: settings.recipient,
-    audience: 'owner',
+    audience: settings.audience,
+    tenant,
     from: settings.sender,
     subject,
     text,
@@ -180,24 +201,35 @@ const SettingsSchema = z.object({
 })
 
 digest.patch('/settings', zValidator('json', SettingsSchema), async (c) => {
-  const refused = ownerOnly(c)
-  if (refused) return refused
+  const tenant = tenantOf(c)
   const body = c.req.valid('json')
-  // Checked here as well as at send time, so a recipient the mailer would
-  // refuse is a 400 now rather than a critical in the bell next Monday.
-  if (
-    body.recipient !== undefined &&
-    !recipientAllowed({ to: body.recipient, audience: 'owner', book: await addressBook(c.env) })
-  ) {
-    return c.json({ error: 'The digest can only go to the owner’s own address.' }, 400)
+
+  // Where it goes and what it is sent from are the owner's. Refused outright
+  // for anybody else rather than ignored: a request that names a recipient is
+  // a request to redirect mail, and "accepted, nothing happened" is a worse
+  // answer than no.
+  if (body.recipient !== undefined || body.sender !== undefined) {
+    const refused = ownerOnly(c)
+    if (refused) return refused
+    // Checked here as well as at send time, so a recipient the mailer would
+    // refuse is a 400 now rather than a critical in the bell next Monday.
+    if (
+      body.recipient !== undefined &&
+      !recipientAllowed({ to: body.recipient, audience: 'owner', book: await addressBook(c.env) })
+    ) {
+      return c.json({ error: 'The digest can only go to the owner’s own address.' }, 400)
+    }
+    if (body.recipient !== undefined) await writeSetting(c.env, DIGEST_KEYS.recipient, body.recipient)
+    if (body.sender !== undefined) await writeSetting(c.env, DIGEST_KEYS.sender, body.sender)
   }
-  if (body.enabled !== undefined) await writeSetting(c.env, DIGEST_KEYS.enabled, String(body.enabled))
-  if (body.recipient !== undefined) await writeSetting(c.env, DIGEST_KEYS.recipient, body.recipient)
-  if (body.sender !== undefined) await writeSetting(c.env, DIGEST_KEYS.sender, body.sender)
-  if (body.day !== undefined) await writeSetting(c.env, DIGEST_KEYS.day, body.day)
-  if (body.hour !== undefined) await writeSetting(c.env, DIGEST_KEYS.hour, String(body.hour))
-  if (body.timezone !== undefined) await writeSetting(c.env, DIGEST_KEYS.timezone, body.timezone)
-  return c.json(await readDigestSettings(c.env))
+
+  await writeAccountDigest(c.env, tenant, {
+    enabled: body.enabled,
+    day: body.day,
+    hour: body.hour,
+    timezone: body.timezone,
+  })
+  return c.json(await readAccountDigest(c.env, tenant))
 })
 
 export default digest

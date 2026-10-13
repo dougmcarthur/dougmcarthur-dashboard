@@ -198,6 +198,13 @@ export function LoginScreen({ session, onSignedIn }: { session: SessionState; on
         <a href="#welcome" className="block text-xs text-faint hover:text-ink transition-colors">
           New here? What is Sun Dogs Music Scout?
         </a>
+
+        <a
+          href="/privacy/"
+          className="block text-xs text-muted hover:text-ink transition-colors underline underline-offset-2"
+        >
+          Privacy policy
+        </a>
       </div>
     </div>
   )

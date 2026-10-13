@@ -5,6 +5,7 @@ import { AssociationsCard } from '../components/AssociationsCard'
 import { NudgeRoutingCard } from '../components/NudgeRoutingCard'
 import { AppearanceSettings } from '../components/AppearanceSettings'
 import { DigestSettingsCard } from '../components/DigestSettingsCard'
+import { SuggestionsCard } from '../components/SuggestionsCard'
 import { NotesBackfillCard } from '../components/NotesBackfillCard'
 import { PasskeysCard } from '../components/PasskeysCard'
 import { AgentTokensCard } from '../components/AgentTokensCard'
@@ -88,7 +89,16 @@ export function SettingsPage({ initialTab = null }: { initialTab?: string | null
           }
         />
       ) : section === 'reminders' ? (
-        <Columns left={<NudgeRoutingCard />} right={<DigestSettingsCard />} />
+        // Every account has its own digest, off until they switch it on.
+        <Columns
+          left={
+            <>
+              <NudgeRoutingCard />
+              <SuggestionsCard />
+            </>
+          }
+          right={<DigestSettingsCard />}
+        />
       ) : section === 'account' ? (
         <Columns
           left={
@@ -101,8 +111,10 @@ export function SettingsPage({ initialTab = null }: { initialTab?: string | null
           }
           right={
             <>
-              {/* Beside Passkeys: both answer who and what can get in. */}
-              <AgentTokensCard />
+              {/* Beside Passkeys: both answer who and what can get in. The owner's
+                  only: research is collected once for everybody, so an artist has
+                  no agent of their own to give a credential to. */}
+              {session?.role === 'owner' && <AgentTokensCard />}
               {/* Owners only — and the route says the same thing again, because
                   a card that is merely not rendered is still a URL. */}
               {session?.role === 'owner' && <AdminModeCard />}

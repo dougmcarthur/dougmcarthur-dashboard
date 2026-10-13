@@ -9,7 +9,8 @@ import { gigStatusColumns, readGig, readGigs } from '../db/gigRows'
 import { tenantOf, type AppEnv } from '../context'
 import { syncGigNudges, removeGigNudges, type GigRow } from '../lib/gigNudges'
 import { readNudgePreferences } from '../lib/nudgeSettings'
-import { linkGig } from '../lib/catalog'
+import { linkGig, agentMayPublish } from '../lib/catalog'
+import { artistNamesFor } from '../lib/artistName'
 import { agentWrite } from '../lib/agentWrites'
 import { decisionActor, recordGigDecision } from '../lib/decisionLog'
 import {
@@ -113,7 +114,10 @@ gigs.post('/', agentWrite('gig'), zValidator('json', GigInsertSchema), async (c)
 
   // See shared/noteColumns.ts, and docs/notes-field-audit.md for why this is
   // on the way in rather than on the way out.
-  const derived = gigNoteColumns({ fitRationale: b.fitRationale, fee: null, paid: b.paid ? 1 : 0 })
+  const derived = gigNoteColumns(
+    { fitRationale: b.fitRationale, fee: null, paid: b.paid ? 1 : 0 },
+    await artistNamesFor(c.env, tenantOf(c)),
+  )
 
   const result = await db
     .insert(gigOpportunities)
@@ -167,7 +171,7 @@ gigs.post('/', agentWrite('gig'), zValidator('json', GigInsertSchema), async (c)
   // costs the artist the row they just filed. See src/lib/catalog.ts.
   // Published by default only when a research agent filed it: a row typed in
   // by the artist may be a private arrangement.
-  await linkGig(c.env, tenantOf(c), { ...b, id: result[0].id, url: b.url || null }, ts, c.get('actor').kind === 'agent')
+  await linkGig(c.env, tenantOf(c), { ...b, id: result[0].id, url: b.url || null }, ts, await agentMayPublish(c.env, c.get('actor'), tenantOf(c)))
 
   return c.json({ id: result[0].id }, 201)
 })
@@ -211,7 +215,10 @@ gigs.patch('/:id', zValidator('json', GigPatchSchema), async (c) => {
   // extractor is not allowed to undo one. What this PATCH states explicitly
   // wins over both.
   if (b.fitRationale !== undefined) {
-    const derived = gigNoteColumns({ fitRationale: b.fitRationale, fee: before.fee, paid: before.paid })
+    const derived = gigNoteColumns(
+      { fitRationale: b.fitRationale, fee: before.fee, paid: before.paid },
+      await artistNamesFor(c.env, tenantOf(c)),
+    )
     const fill = {
       submissionState: derived.storedSubmissionState,
       submissionMethod: derived.submissionMethod,

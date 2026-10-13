@@ -12,6 +12,7 @@ import { DecisionBar } from './DecisionBar'
 import { Caption, Card } from '../../components/ui/Surface'
 import { TermsPanel, mayPitch } from '../../components/SyncTerms'
 import { mapsLink } from '../../../../shared/travelDistance'
+import { whereLabel } from '../../../../shared/artistFocus'
 
 /**
  * Everything known about the selected item, on one surface.
@@ -66,7 +67,7 @@ export function Detail({
     ...parsed.alerts.map((a) => ({ text: a.text, severity: a.severity })),
     ...parsed.blockers.map((b) => ({ text: b })),
     ...parsed.draftedFields
-      .filter((f) => f.needsDoug)
+      .filter((f) => f.needsArtist)
       .map((f) => ({ text: f.label ? `${f.label} — ${f.value}` : f.value })),
   ]
 
@@ -167,6 +168,18 @@ export function Detail({
     })
   }
   if (fee.payout) facts.push({ label: 'Pays', value: fee.payout })
+
+  // How far it is, in the words of the reach question. Said for every place the
+  // artist could be asked to travel to, and with the choice named when it sits
+  // beyond the reach they set. Never a reason to hide it: it is here, after
+  // what is within reach. See shared/artistFocus.ts.
+  if (item.focus?.where && item.focus.where !== 'no_travel') {
+    facts.push({
+      label: 'Where',
+      value: whereLabel(item.focus.where),
+      note: item.focus.reach === 'beyond' ? 'Beyond the reach you chose, so it comes after what is within it.' : null,
+    })
+  }
 
   return (
     // One card, one background. Every section below is a heading and a rule.

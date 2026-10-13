@@ -114,9 +114,9 @@ export const WIDTHS: Record<ShellWidth, string> = {
 
 const STACKS: Record<Exclude<FontChoice, 'custom'>, string> = {
   system:
-    "'Public Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    "'Public Sans Variable', 'Public Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
   humanist:
-    "'Bricolage Grotesque', 'Optima', 'Gill Sans', 'Segoe UI', system-ui, sans-serif",
+    "'Bricolage Grotesque Variable', 'Bricolage Grotesque', 'Optima', 'Gill Sans', 'Segoe UI', system-ui, sans-serif",
   serif: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif",
   mono: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace",
 }

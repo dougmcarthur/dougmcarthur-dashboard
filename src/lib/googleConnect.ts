@@ -194,7 +194,7 @@ async function provision(
 }
 
 /**
- * "Doug McArthur – EPK", in the artist's own Drive. The artist's name from
+ * "Jane Smith – EPK", in the artist's own Drive. The artist's name from
  * their profile, because a juror's downloads folder is full of folders called
  * "EPK"; a generic name when nobody has set one.
  */

@@ -1,5 +1,8 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+
+const page = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 
 export default defineConfig({
   root: 'frontend',
@@ -13,6 +16,17 @@ export default defineConfig({
   build: {
     outDir: '../dist',
     emptyOutDir: true,
+    rollupOptions: {
+      // Two documents. The app is one page that routes on the hash; the
+      // privacy policy is its own, so it is a real page at /privacy/ that
+      // reads without JavaScript and has an address a regulator, a search
+      // engine or Google's app review can fetch. The Worker's static assets
+      // serve dist/privacy/index.html for /privacy/ with no route of its own.
+      input: {
+        main: page('./frontend/index.html'),
+        privacy: page('./frontend/privacy/index.html'),
+      },
+    },
   },
   server: {
     port: 5173,

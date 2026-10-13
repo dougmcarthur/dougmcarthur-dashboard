@@ -1,13 +1,80 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, type GigOpportunity } from '../../api'
 import { mappablePlace, measuredDistance } from '../../../../shared/travelDistance'
+import { profileHome } from '../../../../shared/onboarding'
 import {
   estimateGigCost,
+  homeFrom,
   visaLead,
   formatCostRange,
+  outlookScale,
   type CostLine,
+  type CostRange,
+  type Outlook,
+  type PayLine,
 } from '../../../../shared/gigCost'
 import { Caption } from '../../components/ui/Surface'
+
+/**
+ * The badge. Words chosen to be encouraging without being untrue: spending on
+ * a showcase is an investment in being heard, and a trip that pays is income.
+ * Colours are meaning tokens, and neither of the two hard ones is a warning:
+ * a trip that costs more than it pays is not a problem to be flagged.
+ */
+const OUTLOOK_STYLE: Record<Outlook['id'], string> = {
+  income: 'bg-success-bg text-success-fg border-success-line',
+  even: 'bg-surface text-body border-line',
+  investment: 'bg-info-bg text-info-fg border-info-line',
+}
+
+const BAR_STYLE: Record<Outlook['id'], string> = {
+  income: 'bg-success-solid',
+  even: 'bg-accent',
+  investment: 'bg-accent',
+}
+
+/**
+ * Where the trip falls between a bigger investment and a bigger payout.
+ *
+ * A bar rather than a point, because the estimate is a range: one that crosses
+ * the middle says "could go either way" without a word. The scale is not
+ * linear, so a $200 trip and a $4,000 one read as different sizes (see
+ * `scalePosition`). It carries no dollar figures of its own; the sentence above
+ * it and the totals below it have them, and a graphic that printed a third
+ * set would be a third place for them to disagree.
+ */
+function OutlookScaleGraphic({ outlook, net }: { outlook: Outlook; net: CostRange }) {
+  const scale = outlookScale(net)
+  const pct = (n: number) => `${(n * 100).toFixed(2)}%`
+  // A hairline is still a bar: a trip that costs almost exactly what it pays
+  // has a range a few dollars wide, and nothing drawn would read as no answer.
+  const width = Math.max(scale.to - scale.from, 0.025)
+  const left = Math.min(scale.from, 1 - width)
+
+  return (
+    <div
+      className="mt-3"
+      role="img"
+      aria-label={`On a scale from a bigger investment to a bigger payout: ${outlook.label}. ${outlook.summary}`}
+    >
+      <div className="relative h-2.5 rounded-full border border-line bg-sunken">
+        {scale.ticks.map((t) => (
+          <span key={t.ahead} className="absolute inset-y-0 w-px bg-line-strong/60" style={{ left: pct(t.position) }} />
+        ))}
+        <span className="absolute -inset-y-1 w-0.5 bg-line-strong" style={{ left: '50%' }} />
+        <span
+          className={`absolute inset-y-0 rounded-full ${BAR_STYLE[outlook.id]}`}
+          style={{ left: pct(left), width: pct(width) }}
+        />
+      </div>
+      <div className="mt-1 grid grid-cols-3 text-xs text-muted" aria-hidden>
+        <span>Bigger investment</span>
+        <span className="text-center">Even</span>
+        <span className="text-right">Bigger payout</span>
+      </div>
+    </div>
+  )
+}
 
 /**
  * What the trip costs, assembled on read.
@@ -19,9 +86,13 @@ import { Caption } from '../../components/ui/Surface'
  * asked for. See docs/gig-pipeline-plan.md §7.
  */
 export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }) {
-  const estimate = estimateGigCost(gig)
-  const lead = visaLead(gig, today)
   const home = useQuery({ queryKey: ['travel-home'], queryFn: api.travel.home })
+  const said = useQuery({ queryKey: ['onboarding'], queryFn: api.onboarding.read })
+  // Where they travel from, so a guess is made from their province and not
+  // from nobody's: the home base when there is one, and the province they said
+  // in the welcome questions until then. See `inferTravelBand`.
+  const estimate = estimateGigCost(gig, homeFrom(home.data?.home?.place) ?? profileHome(said.data?.profile ?? null))
+  const lead = visaLead(gig, today)
 
   // Measured on the map, or why not. Only asked where the gig names a real
   // place and nobody set its band by hand — elsewhere a map has nothing to add.
@@ -35,7 +106,7 @@ export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }
       : gig.geoStatus === 'not_found' && gig.geoPlace === mappablePlace(gig)
         ? `The map does not know "${gig.geoPlace}", so this is guessed from the name.`
         : home.data?.home
-          ? 'Being measured on the map — it takes up to an hour.'
+          ? 'Being measured on the map. It takes up to an hour.'
           : null
 
   // Nothing banded and nothing paid: the row has none of the inputs, and a
@@ -43,31 +114,42 @@ export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }
   if (estimate.lines.length === 0 && estimate.income.high === 0) {
     return (
       <div>
-        <Caption spaced>What it costs</Caption>
-        <p className="text-sm text-faint">
-          Nothing to cost this on yet — add a location, a country and the nights away in Edit details.
+        <Caption spaced>Costs and pay</Caption>
+        <p className="text-sm text-muted">
+          Nothing to cost this on yet. Add a location, a country and the nights away in Edit details.
         </p>
       </div>
     )
   }
 
-  const pays = estimate.net.high < 0
+  const { outlook } = estimate
 
   return (
     <div>
-      <Caption spaced>What it costs</Caption>
+      <Caption spaced>Costs and pay</Caption>
 
-      <p className="text-lg font-semibold text-ink">
-        {formatCostRange(estimate.net)}
-        {estimate.anyInferred && <span className="text-xs font-normal text-faint ml-2">partly estimated</span>}
-      </p>
-      <p className="text-xs text-faint mt-0.5">
-        {pays
-          ? 'Net, after what they pay you — this one covers itself.'
-          : 'Net of anything they pay you. An estimate, in CAD, at both ends.'}
+      {/*
+        The answer first, as a word and a sentence. Everything below is how it
+        was reached, and the sentence carries the same ranges the rows do.
+      */}
+      {outlook && (
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span
+            className={`inline-block rounded-md border px-2.5 py-0.5 text-sm font-semibold ${OUTLOOK_STYLE[outlook.id]}`}
+          >
+            {outlook.label}
+          </span>
+          <p className="text-sm text-ink">{outlook.summary}</p>
+        </div>
+      )}
+      {outlook && <OutlookScaleGraphic outlook={outlook} net={estimate.net} />}
+      <p className="text-xs text-muted mt-2">
+        Estimates in Canadian dollars, shown as a range because the real figure depends on the trip.
+        {estimate.anyInferred && ' Partly estimated from the location.'}
       </p>
 
-      <ul className="mt-2.5 space-y-1">
+      {/* What it costs, line by line, and the total of the lines. */}
+      <ul className="mt-3 space-y-2">
         {estimate.lines.map((line: CostLine) => (
           <li key={line.id} className="flex justify-between gap-4 text-sm">
             <span className="text-body">
@@ -77,20 +159,48 @@ export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }
                 prose. A band nobody set must not read as one somebody did.
               */}
               {line.basis ? (
-                <span className="text-faint"> · from the map</span>
+                <span className="text-muted"> · from the map</span>
               ) : (
-                line.inferred && <span className="text-faint"> · guessed</span>
+                line.inferred && <span className="text-muted"> · guessed</span>
               )}
+              <span className="block text-xs text-muted">{line.detail}</span>
             </span>
-            <span className="text-ink tabular-nums">{formatCostRange(line.amount)}</span>
+            <span className="text-ink tabular-nums whitespace-nowrap">{formatCostRange(line.amount)}</span>
           </li>
         ))}
-        {estimate.income.high > 0 && (
-          <li className="flex justify-between gap-4 text-sm">
-            <span className="text-body">They pay</span>
-            <span className="text-success-fg tabular-nums">−{formatCostRange(estimate.income)}</span>
+        {estimate.lines.length > 0 && (
+          <li className="flex justify-between gap-4 border-t border-line pt-2 text-sm font-semibold text-ink">
+            <span>Estimated total cost</span>
+            <span className="tabular-nums whitespace-nowrap">{formatCostRange(estimate.gross)}</span>
           </li>
         )}
+      </ul>
+
+      {/* What they pay, so the two sides can be read against each other. */}
+      <ul className="mt-3 space-y-2">
+        {estimate.payLines.map((pay: PayLine) => (
+          <li key={pay.id} className="flex justify-between gap-4 text-sm">
+            <span className="text-body">
+              {pay.label}
+              <span className="block text-xs text-muted">{pay.detail}</span>
+            </span>
+            <span className="text-success-fg tabular-nums whitespace-nowrap">{formatCostRange(pay.amount)}</span>
+          </li>
+        ))}
+        <li
+          className={`flex justify-between gap-4 text-sm ${
+            estimate.payLines.length > 0 ? 'border-t border-line pt-2 font-semibold text-ink' : 'text-body'
+          }`}
+        >
+          <span>{estimate.payLines.length > 0 ? 'Estimated pay' : 'Pay'}</span>
+          <span className="tabular-nums whitespace-nowrap">
+            {estimate.payLines.length > 0
+              ? formatCostRange(estimate.income)
+              : outlook?.payKnown
+                ? 'None'
+                : 'Not recorded'}
+          </span>
+        </li>
       </ul>
 
       {/*
@@ -127,7 +237,7 @@ export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }
         from it is shown — and the one caveat about how it was derived.
       */}
       {mapBasis && (
-        <p className="mt-2 text-xs text-faint">
+        <p className="mt-2 text-xs text-muted">
           {mapBasis === 'straight_line' ? 'No road route was found, so the distance is a straight line, adjusted. ' : ''}
           Distance from{' '}
           <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline">
@@ -136,14 +246,14 @@ export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }
           .
         </p>
       )}
-      {whyGuessed && <p className="mt-2 text-xs text-faint">{whyGuessed}</p>}
+      {whyGuessed && <p className="mt-2 text-xs text-muted">{whyGuessed}</p>}
 
       {estimate.unknowns.length > 0 && (
         <div className="mt-3">
           <Caption className="mb-1">Not counted</Caption>
           <ul className="space-y-0.5">
             {estimate.unknowns.map((u) => (
-              <li key={u} className="text-xs text-faint">
+              <li key={u} className="text-xs text-muted">
                 {u}
               </li>
             ))}

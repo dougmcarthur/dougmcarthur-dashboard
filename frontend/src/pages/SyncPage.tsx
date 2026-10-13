@@ -11,6 +11,7 @@ import { DraftActions } from '../components/DraftActions'
 import { GmailDraftsPanel } from '../components/GmailDraftsPanel'
 import { CheckAllTerms, TermsChip, TermsPanel, mayPitch } from '../components/SyncTerms'
 import { termsState } from '../../../shared/syncTerms'
+import { useSession } from '../hooks/useSession'
 import { Banner, Card, EmptyState } from '../components/ui/Surface'
 import { Caption, Label } from '../components/ui/Surface'
 
@@ -257,6 +258,9 @@ function SyncDetail({ target, onEdit }: { target: SyncTarget; onEdit: () => void
 
 export function SyncPage() {
   const qc = useQueryClient()
+  // Reconciling reads the owner's sent mail, which is nobody else's to compare
+  // against. The route refuses too; this is so there is no button to press.
+  const ownsMailbox = useSession()?.role === 'owner'
   const [statusFilter, setStatusFilter] = useState('')
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -311,7 +315,7 @@ export function SyncPage() {
             <option value="">All statuses</option>
             {SYNC_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
-          <button
+          {ownsMailbox && <button
             onClick={() => { setShowReconcile((v) => !v); setShowCreate(false) }}
             className={`text-sm px-3.5 py-1.5 rounded-md font-medium border transition-colors ${
               showReconcile
@@ -320,7 +324,7 @@ export function SyncPage() {
             }`}
           >
             Reconcile with Gmail
-          </button>
+          </button>}
           <button
             onClick={() => { setShowCreate((v) => !v); setShowReconcile(false) }}
             className={`text-sm px-3.5 py-1.5 rounded-md font-medium transition-colors ${
@@ -332,7 +336,7 @@ export function SyncPage() {
         </div>
       </div>
 
-      {showReconcile && <ReconcilePanel onClose={() => setShowReconcile(false)} />}
+      {ownsMailbox && showReconcile && <ReconcilePanel onClose={() => setShowReconcile(false)} />}
       {showCreate && <CreateSyncForm onDone={() => setShowCreate(false)} />}
 
       {/* Before the drafts panel, which leaves an unread target out until this

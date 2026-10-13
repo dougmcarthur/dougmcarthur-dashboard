@@ -21,18 +21,19 @@ import { grantConfigured } from '../lib/googleGrant'
 import { clearTenantSetting, readTenantSetting, writeTenantSetting } from '../lib/nudgeSettings'
 import {
   GOALS,
+  CITY_MAX,
+  GENRES,
   GOAL_NOTE_MAX,
+  MAX_GENRES,
+  ONBOARDING_KEYS,
   REACH,
+  REGIONS,
   nextSteps,
   onboardingSteps,
   parseGoals,
+  parseProfile,
   type OnboardingFacts,
 } from '../../shared/onboarding'
-
-export const ONBOARDING_KEYS = {
-  goals: 'onboarding.goals',
-  hiddenAt: 'onboarding.hiddenAt',
-} as const
 
 const onboarding = new Hono<AppEnv>()
 
@@ -41,7 +42,7 @@ onboarding.get('/', async (c) => {
   const actor = c.get('actor')
   const db = getDb(c.env.DB)
 
-  const [tenantRow, libraryEntries, documents, connectorRows, grants, passkeys, goalsRaw, hiddenAt] =
+  const [tenantRow, libraryEntries, documents, connectorRows, grants, passkeys, goalsRaw, profileRaw, hiddenAt] =
     await Promise.all([
       db.select().from(tenants).where(eq(tenants.id, tenant)).get(),
       countRows(c.env, artistAssets, tenant),
@@ -63,6 +64,7 @@ onboarding.get('/', async (c) => {
             .then((r) => r?.count ?? 0)
         : Promise.resolve(0),
       readTenantSetting(c.env, tenant, ONBOARDING_KEYS.goals),
+      readTenantSetting(c.env, tenant, ONBOARDING_KEYS.profile),
       readTenantSetting(c.env, tenant, ONBOARDING_KEYS.hiddenAt),
     ])
 
@@ -78,13 +80,15 @@ onboarding.get('/', async (c) => {
     passkeys,
   }
   const goals = parseGoals(goalsRaw)
+  const profile = parseProfile(profileRaw)
 
   return c.json({
-    ...onboardingSteps(facts, goals),
+    ...onboardingSteps(facts, goals, profile),
     goals,
+    profile,
     next: nextSteps(goals),
     hidden: hiddenAt !== null,
-    options: { goals: GOALS, reach: REACH },
+    options: { goals: GOALS, reach: REACH, regions: REGIONS, genres: GENRES, maxGenres: MAX_GENRES },
   })
 })
 
@@ -99,6 +103,30 @@ onboarding.put('/goals', zValidator('json', GoalsSchema), async (c) => {
   const value = { goals: [...new Set(body.goals)], reach: [...new Set(body.reach)], note: body.note || null }
   await writeTenantSetting(c.env, tenantOf(c), ONBOARDING_KEYS.goals, JSON.stringify(value))
   return c.json({ goals: parseGoals(JSON.stringify(value)) })
+})
+
+const ProfileSchema = z.object({
+  region: z.enum(REGIONS.map((r) => r.id) as [string, ...string[]]).nullable().optional(),
+  city: z.string().trim().max(CITY_MAX).nullable().optional(),
+  genres: z.array(z.enum(GENRES.map((g) => g.id) as [string, ...string[]])).max(MAX_GENRES).optional(),
+})
+
+/**
+ * Where they are based and what they play. Saved as the screen is left, like the
+ * goals, so every part is optional and an empty body clears nothing it was not
+ * given.
+ */
+onboarding.put('/profile', zValidator('json', ProfileSchema), async (c) => {
+  const tenant = tenantOf(c)
+  const body = c.req.valid('json')
+  const before = parseProfile(await readTenantSetting(c.env, tenant, ONBOARDING_KEYS.profile))
+  const value = {
+    region: body.region !== undefined ? body.region : (before?.region ?? null),
+    city: body.city !== undefined ? body.city || null : (before?.city ?? null),
+    genres: body.genres !== undefined ? [...new Set(body.genres)] : (before?.genres ?? []),
+  }
+  await writeTenantSetting(c.env, tenant, ONBOARDING_KEYS.profile, JSON.stringify(value))
+  return c.json({ profile: parseProfile(JSON.stringify(value)) })
 })
 
 onboarding.post('/hide', async (c) => {
