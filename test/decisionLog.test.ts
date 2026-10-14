@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect, vi } from 'vitest'
 import { app } from '../src/index'
-import { createSession } from '../src/lib/auth'
+import { createSession, sha256Hex } from '../src/lib/auth'
 import { recordGigDecision } from '../src/lib/decisionLog'
 import { prepareApplication } from '../src/lib/applicationStaging'
 import { asTenantId } from '../src/db/scope'
@@ -246,11 +246,15 @@ const OTHER = 'tnt_0002'
 
 async function world() {
   const { d1, db } = sqliteD1()
-  const env = { DB: d1, DASHBOARD_URL: 'http://localhost:8787', API_TOKEN: 'agent-secret' } as never
+  const env = { DB: d1, DASHBOARD_URL: 'http://localhost:8787' } as never
 
   // The migrations seed the owner (usr_0001 on tnt_0001); one artist beside them.
   db.exec(`INSERT INTO tenants (id, display_name, created_at) VALUES ('${OTHER}', 'Artist', '2026-01-01')`)
   db.exec(`INSERT INTO users (id, role, tenant_id, display_name, created_at) VALUES ('usr_artist', 'artist', '${OTHER}', 'Artist', '2026-01-01')`)
+  // The agent case holds an issued token: the shared secret is retired.
+  db.prepare(`INSERT INTO agent_tokens (id, tenant_id, token_hash, label) VALUES ('tok_agent', '${OWNER}', ?, 'Research routines')`).run(
+    await sha256Hex('agent-secret'),
+  )
 
   const cookie = async (userId: string) => {
     const { token } = await createSession(env, { credentialId: null, label: 'test', userId })
@@ -397,12 +401,15 @@ describe('moving a gig', () => {
     expect(w.log()).toHaveLength(0)
   })
 
-  it('says it was a research agent when it was one', async () => {
+  it('is never reached by a research agent, so a machine writes no choice', async () => {
     const w = await world()
     const id = w.addGig()
+    // An issued token reaches research's routes and nothing else, and the shared
+    // secret that once let an agent move a gig is retired. `isChoice` still
+    // reads an agent's move as no choice, for the day a route is added.
     const res = await w.send(null, 'PATCH', `/api/gigs/${id}`, { status: 'shortlisted' }, { Authorization: 'Bearer agent-secret' })
-    expect(res.status).toBe(200)
-    expect(w.log()[0]).toMatchObject({ actor: 'agent', via: 'gig_patch' })
+    expect(res.status).toBe(403)
+    expect(w.log()).toHaveLength(0)
   })
 
   it('writes nothing, for anyone, when the row belongs to somebody else', async () => {

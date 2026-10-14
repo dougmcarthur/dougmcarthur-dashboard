@@ -51,9 +51,13 @@ afterEach(() => {
 
 async function setup() {
   const { d1, db } = sqliteD1()
-  const env = { DB: d1, DASHBOARD_URL: 'http://localhost:8787', API_TOKEN: 'agent-secret' } as never
+  const env = { DB: d1, DASHBOARD_URL: 'http://localhost:8787' } as never
   db.exec(`INSERT INTO tenants (id, display_name, created_at) VALUES ('tnt_0002', 'Artist', '2026-01-01')`)
   db.exec(`INSERT INTO users (id, role, tenant_id, display_name, created_at) VALUES ('usr_artist', 'artist', 'tnt_0002', 'Artist', '2026-01-01')`)
+  // The agent case holds an issued token: the shared secret is retired.
+  db.prepare(`INSERT INTO agent_tokens (id, tenant_id, token_hash, label) VALUES ('tok_agent', 'tnt_0001', ?, 'Research routines')`).run(
+    await sha256Hex('agent-secret'),
+  )
 
   const cookie = async (userId: string, admin: boolean) => {
     const { token } = await createSession(env, { credentialId: null, label: 'test', userId })

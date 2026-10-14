@@ -10,8 +10,8 @@
  * else. A token already issued to an artist's tenant keeps working until it is
  * revoked; the owner can do that from admin mode.
  *
- * `API_TOKEN` is a Worker secret with no tenant attached, which was right while
- * one artist owned every row and is wrong the moment two do: the agents POST
+ * They replaced `API_TOKEN`, a Worker secret with no tenant attached, which was
+ * right while one artist owned every row and is wrong the moment two do: the agents POST
  * gigs, and a gig belongs to somebody. Nothing breaks visibly when one lands in
  * the wrong tenant — it simply appears on a stranger's Overview — which is why
  * this is worth building before it is needed rather than after.

@@ -5,7 +5,7 @@
  * limits what it may send through them, how much, and whether it is sending
  * something already on file. One middleware per create route, in front of the
  * route's own validator, and a no-op for everybody who is not an issued token —
- * a person's form and the legacy CI secret reach the same handlers unchanged.
+ * a person's form reaches the same handlers unchanged.
  *
  * Four rules, in the order they are checked:
  *

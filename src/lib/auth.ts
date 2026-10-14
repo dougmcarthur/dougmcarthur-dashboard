@@ -16,13 +16,9 @@
  *    That is why the check is one middleware over `/api/*` with a named
  *    exemption list, rather than a decorator each route has to remember.
  *  - **The research agents lost their front door.** They POST from outside a
- *    browser and cannot do a passkey ceremony, so they authenticate with
- *    `API_TOKEN` as a bearer instead. They break **the moment this deploys**,
- *    not when Access is later switched off: Access let a request through the
- *    edge and the Worker then trusted everything that arrived, so it never
- *    supplied a credential the middleware below would accept. Setting the
- *    secret and teaching the agents to send it is a prerequisite of the
- *    deploy, not of the Access removal — see docs/passkey-login.md.
+ *    browser and cannot do a passkey ceremony, so they authenticate with a
+ *    bearer instead — an issued agent token (src/lib/actor.ts), since the
+ *    shared `API_TOKEN` they started on was retired.
  */
 
 import { desc, eq, isNull, lt, sql } from 'drizzle-orm'
@@ -545,27 +541,6 @@ export async function spendEnrolmentCode(env: Env, id: string, now = new Date())
 /* --------------------------------------------------------------------- */
 /* Bearer token                                                           */
 /* --------------------------------------------------------------------- */
-
-/**
- * The research agents' credential.
- *
- * Deliberately a shared secret rather than a second passkey: they run headless
- * and outside this repo, and WebAuthn has no non-interactive mode.
- *
- * Answering *whether* a bearer is valid is no longer enough, because the
- * answer a request needs is *whose rows it may write* — the agents POST gigs,
- * and a gig belongs to somebody. `actorForBearer` in src/lib/actor.ts resolves
- * a token to a tenant, and this remains only as the platform-secret half of
- * that, kept while the agents still hold `API_TOKEN` rather than a per-tenant
- * row.
- */
-export function bearerAuthorised(env: Env, header: string | null | undefined): boolean {
-  const expected = env.API_TOKEN
-  if (!expected) return false
-  const offered = /^Bearer\s+(.+)$/i.exec(header ?? '')?.[1]
-  if (!offered) return false
-  return timingSafeEqual(offered, expected)
-}
 
 /* --------------------------------------------------------------------- */
 /* Housekeeping                                                           */

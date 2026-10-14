@@ -16,11 +16,15 @@ const RESPONDENTS = 140
 
 async function setup(vars: Record<string, string> = {}) {
   const { d1, db } = sqliteD1()
-  const env = { DB: d1, DASHBOARD_URL: 'http://localhost:8787', API_TOKEN: 'agent-secret', ...vars } as never
+  const env = { DB: d1, DASHBOARD_URL: 'http://localhost:8787', ...vars } as never
 
   // The migrations seed the owner (usr_0001, on tnt_0001); one artist is added beside them.
   db.exec(`INSERT INTO tenants (id, display_name, created_at) VALUES ('tnt_0002', 'Artist', '2026-01-01')`)
   db.exec(`INSERT INTO users (id, role, tenant_id, display_name, created_at) VALUES ('usr_artist', 'artist', 'tnt_0002', 'Artist', '2026-01-01')`)
+  // The agent cases hold an issued token: the shared secret is retired.
+  db.prepare(`INSERT INTO agent_tokens (id, tenant_id, token_hash, label) VALUES ('tok_agent', 'tnt_0001', ?, 'Research routines')`).run(
+    await sha256Hex('agent-secret'),
+  )
 
   const insert = db.prepare(
     `INSERT INTO survey_responses (id, instrument, source, device, plan, answers, seconds, status, created_at, updated_at, completed_at)

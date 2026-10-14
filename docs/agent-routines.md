@@ -51,9 +51,8 @@ reads festival pages written by strangers.
    routes and nothing else — see `shared/agentRoutes.ts` — and what it may send
    through the create routes is limited too (`src/lib/agentWrites.ts`): only the
    tool's own fields, a row only ever `discovered`, bounded text, a daily
-   ceiling, and a 409 for a row already on file. The legacy
-   `API_TOKEN` is not limited, and is never given to anything that reads
-   untrusted pages.
+   ceiling, and a 409 for a row already on file. There is no unlimited
+   credential any more: the shared `API_TOKEN` was retired.
 3. **`cli.ts` is named operations, not a general client.** It is the easy path,
    so the session takes it; the Worker is what holds if it does not.
 
@@ -114,8 +113,8 @@ This needs `scripts/agents/cli.ts` on `main`, because a routine clones the
 default branch, and migration 0022 applied, because that is where
 `agent_tokens` lives.
 
-1. **Issue a token** for the routines, separate from `API_TOKEN` so either can
-   be revoked without touching the other: **Settings → Agent tokens**, name it
+1. **Issue a token** for the routines, separate from the GitHub fallback's
+   (`SCOUT_API_TOKEN`) so either can be revoked without touching the other: **Settings → Agent tokens**, name it
    *Research routines*, and confirm with your passkey. Or, from a terminal:
 
    ```bash
