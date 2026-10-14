@@ -23,11 +23,16 @@
  * credential actually lands.
  */
 
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, isNull, lt, or } from 'drizzle-orm'
 import { getDb } from '../db'
 import { invites, tenants, users } from '../db/schema'
 import { randomToken, sha256Hex } from './auth'
-import { inviteExpiry, inviteState, type InviteState } from '../../shared/invites'
+import {
+  inviteExpiry,
+  inviteRetentionCutoff,
+  inviteState,
+  type InviteState,
+} from '../../shared/invites'
 import type { Env } from '../types'
 
 export interface IssuedInvite {
@@ -112,6 +117,39 @@ export async function revokeInvite(env: Env, id: string, now = new Date()): Prom
   if (!row || row.redeemedAt) return false
   await db.update(invites).set({ revokedAt: now.toISOString() }).where(eq(invites.id, id))
   return true
+}
+
+/**
+ * Forget an invitation nobody used, once it has been dead long enough.
+ *
+ * Revoking keeps the row so "did I send that, and what happened" has an
+ * answer, and an expired one is kept for the same reason. Neither is a reason
+ * to keep the name and address typed for it forever, so this is the other end
+ * of that: the same invitation, ninety days after it expired or was withdrawn,
+ * whichever came first (`UNUSED_INVITE_RETENTION_DAYS`).
+ *
+ * `redeemed_at IS NULL` is the whole boundary, and it is the same test
+ * `inviteState` uses. A redeemed row is never matched here: it is the record of
+ * where an account came from, and it is deleted with the account, by
+ * `removeTenant`, rather than on a timer that would make that origin unreadable
+ * while the account is still live.
+ *
+ * Invitations are platform state with no tenant column, so there is no scope
+ * to apply and none to forget. The window is a handful of rows. Returns how
+ * many went, for the cron to say so when it is not nothing.
+ */
+export async function pruneInvites(env: Env, now: Date): Promise<number> {
+  const cutoff = inviteRetentionCutoff(now)
+  const gone = await getDb(env.DB)
+    .delete(invites)
+    .where(
+      and(
+        isNull(invites.redeemedAt),
+        or(lt(invites.expiresAt, cutoff), lt(invites.revokedAt, cutoff)),
+      ),
+    )
+    .returning({ id: invites.id })
+  return gone.length
 }
 
 export interface RedeemedAccount {
