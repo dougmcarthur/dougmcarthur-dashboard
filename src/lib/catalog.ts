@@ -14,6 +14,12 @@
  *    adds a missing deadline but cannot rewrite a name every artist reads.
  *    One research session reading a poisoned page must not be able to change
  *    what everybody else sees.
+ *  - **One thing may move: a closed deadline, forward.** A programme that comes
+ *    round again is the same entry, and a deadline that has passed is the one
+ *    fact nobody can be misled by losing. So the platform's own research (never
+ *    an artist re-typing a row) may replace a deadline that has gone with a
+ *    later one, and it is then held for the same days a new arrival is, so the
+ *    owner can block it. See `shared/intakes.ts`.
  *  - **Only research is published by default.** A row an agent filed is a
  *    call it found on a public page. A row the artist typed in may be a
  *    private arrangement — a house concert, an offer made to them — so it is
@@ -39,6 +45,7 @@ import {
   type CatalogFacts,
 } from '../../shared/opportunityCatalog'
 import { gigStage, gigStatusFromStored } from '../../shared/gigStage'
+import { advanceIntake } from '../../shared/intakes'
 import { ONCE_KEYS, readSetting, writeSetting } from './settings'
 import { isOwnerTenant, type Actor } from './actor'
 import type { Env } from '../types'
@@ -94,10 +101,17 @@ export async function catalogueEntry(
   const key = catalogKey({ ...facts, applicationUrl: keyInput.applicationUrl })
   const existing = await findByKey(env, key)
   if (existing) {
+    const advance =
+      foundBy === 'artist'
+        ? null
+        : advanceIntake(existing, { deadline: facts.deadline, deadlineNote: facts.deadlineNote, opensAt: facts.opensAt ?? null }, now.slice(0, 10))
     await db
       .update(opportunities)
       .set({
         ...fillMissing({ ...existing, category: existing.category as CatalogFacts['category'] }, facts),
+        ...(advance
+          ? { deadline: advance.deadline, deadlineNote: advance.deadlineNote, opensAt: advance.opensAt, reopenedAt: now }
+          : {}),
         lastSeenAt: now,
         // Seen again on a public page is confirmation that it still stands. An
         // artist re-typing a row is not.

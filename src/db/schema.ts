@@ -763,6 +763,12 @@ export const opportunities = sqliteTable('opportunities', {
   exclusivityEvidence: text('exclusivity_evidence'),
   exclusivityUrl: text('exclusivity_url'),
   termsReadAt: text('terms_read_at'),
+  /**
+   * When the deadline last moved forward to the programme's next intake, and
+   * when somebody last looked for one on its own page. Migration 0043.
+   */
+  reopenedAt: text('reopened_at'),
+  intakeCheckedAt: text('intake_checked_at'),
   firstSeenAt: text('first_seen_at').notNull(),
   lastSeenAt: text('last_seen_at').notNull(),
 })

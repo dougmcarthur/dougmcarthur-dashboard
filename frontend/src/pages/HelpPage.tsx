@@ -109,6 +109,11 @@ export function HelpPage() {
           An offer is not a booking. Nothing reaches your calendar until it is accepted — a signed
           contract, or a written confirmation for a grant.
         </p>
+        <p>
+          Passing is about that one intake, not the programme. When a grant or call you passed on
+          or missed opens again, Scout adds it as a new opportunity and tells you in the bell.
+          Delete the row if you never want to see it again.
+        </p>
       </Section>
 
       <Section title="What Scout will not do">

@@ -39,6 +39,8 @@ import publicSite from './routes/publicSite'
 import surveyRoute from './routes/survey'
 import { relinkMissing, runCatalogBackfillOnce } from './lib/catalog'
 import { pollSources, pruneCandidates } from './lib/sourcePoll'
+import { reopenIntakes } from './lib/intakes'
+import { refreshProgrammes } from './lib/programmeRefresh'
 import { pruneInviteRequests } from './lib/inviteRequests'
 import { pruneInvites } from './lib/invites'
 import connectors from './routes/connectors'
@@ -522,6 +524,22 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
     }
   }
 
+  // A programme that has opened again. A New row whose date has gone follows
+  // its programme to the newer one, and a passed or missed intake is offered
+  // again as a new row, with a bell event saying so. Per tenant, because what
+  // an artist passed on is theirs, and *before* the reconcile below so the new
+  // date has its reminders the same night. See shared/intakes.ts.
+  for (const tenant of tenants) {
+    try {
+      const run = await reopenIntakes(env, tenant, today, new Date().toISOString())
+      if (run.advanced || run.reoffered) {
+        console.log(`intakes for ${tenant}: ${run.advanced} moved to a newer date, ${run.reoffered} offered again`)
+      }
+    } catch (err) {
+      console.error('reopening intakes failed:', err)
+    }
+  }
+
   // Bring each artist's calendar and task list back into line with their rows.
   //
   // Per tenant, because the plan is derived from that artist's own rows and
@@ -720,6 +738,16 @@ async function runScheduled(env: Env): Promise<void> {
     pollSources(env).catch((err) => {
       console.error('source poll failed:', err)
     }),
+    // Platform-level too: the next intake of a programme whose last date has
+    // passed, read from its own page. Three entries a tick and a week between
+    // looks at one; see src/lib/programmeRefresh.ts for what it will not do.
+    refreshProgrammes(env)
+      .then((run) => {
+        if (run.advanced) console.log(`programmes: ${run.advanced} of ${run.looked} looked at have a next intake`)
+      })
+      .catch((err) => {
+        console.error('programme refresh failed:', err)
+      }),
     owner
       ? runReplyScanIfDue(env, owner).catch((err) => {
           console.error('reply scan failed:', err)

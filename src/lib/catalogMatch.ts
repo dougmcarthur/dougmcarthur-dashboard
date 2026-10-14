@@ -123,6 +123,7 @@ export function toEntry(row: Row): CatalogEntry {
     feeCurrency: row.feeCurrency,
     firstSeenAt: row.firstSeenAt,
     delivery: row.delivery,
+    reopenedAt: row.reopenedAt,
     org: orgOf(row),
   }
 }
@@ -323,8 +324,36 @@ export async function addMatches(env: Env, tenant: TenantId, matches: Match[], n
   const added: Match[] = []
   for (const match of matches) {
     if (present.has(match.entry.id)) continue
-    const e = match.entry
-    await db.insert(gigOpportunities).values(
+    await insertCatalogGig(env, tenant, match, now)
+    added.push(match)
+  }
+
+  if (added.length > 0) {
+    const before = await readAdded(env, tenant)
+    await writeAdded(env, tenant, [...before, ...added.map((m) => m.entry.id)])
+  }
+  return added
+}
+
+/**
+ * One New-stage row on an artist's side, copied from a catalog entry.
+ *
+ * Its own function so that filing a match and re-offering a programme's next
+ * intake cannot drift into two spellings of the same insert. `fitRationale`
+ * defaults to the matcher's account of why; a re-offer puts its own sentence
+ * ahead of it.
+ */
+export async function insertCatalogGig(
+  env: Env,
+  tenant: TenantId,
+  match: Match,
+  now: string,
+  fitRationale: string = explainMatch(match),
+): Promise<void> {
+  const e = match.entry
+  await getDb(env.DB)
+    .insert(gigOpportunities)
+    .values(
       withTenant(tenant, {
         name: e.name,
         type: e.kind ?? KIND_LABEL[e.category] ?? 'Opportunity',
@@ -338,7 +367,7 @@ export async function addMatches(env: Env, tenant: TenantId, matches: Match[], n
         feeAmount: e.feeAmount,
         feeCurrency: e.feeAmount !== null ? (e.feeCurrency ?? 'USD') : 'USD',
         paid: e.feeAmount !== null && e.feeAmount > 0 ? 1 : 0,
-        fitRationale: explainMatch(match),
+        fitRationale,
         ...gigStatusColumns('discovered'),
         opportunityId: e.id,
         origin: 'catalog',
@@ -346,14 +375,6 @@ export async function addMatches(env: Env, tenant: TenantId, matches: Match[], n
         updatedAt: now,
       }),
     )
-    added.push(match)
-  }
-
-  if (added.length > 0) {
-    const before = await readAdded(env, tenant)
-    await writeAdded(env, tenant, [...before, ...added.map((m) => m.entry.id)])
-  }
-  return added
 }
 
 /** What the starter set would add: the best matches, none of them a penalty of two or more. */

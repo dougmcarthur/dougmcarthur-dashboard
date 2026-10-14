@@ -206,12 +206,12 @@ function pageKey(raw: string): string {
   }
 }
 
-interface Page {
+export interface Page {
   url: string
   html: string
 }
 
-async function getPage(url: string, fetchImpl: typeof fetch): Promise<Page | null> {
+export async function getPage(url: string, fetchImpl: typeof fetch = fetch): Promise<Page | null> {
   try {
     const res = await fetchImpl(url, {
       headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },

@@ -65,6 +65,11 @@ export interface CatalogEntry {
   /** null = after the holding period, 'approved' = now, 'blocked' = never. */
   delivery: string | null
   /**
+   * When the deadline last moved forward to the programme's next intake. A new
+   * intake is a new arrival and waits out the holding period from here.
+   */
+  reopenedAt?: string | null
+  /**
    * What a sync organisation's own site says about being pitched. Read by the
    * first-run lanes (`shared/startLanes.ts`) and by nothing in `matchCatalog`,
    * which skips organisations. Absent on every other category.
@@ -106,10 +111,16 @@ function daysBetween(from: string, to: string): number {
   return Number.isNaN(a) || Number.isNaN(b) ? NaN : Math.round((b - a) / DAY)
 }
 
-export function isDeliverable(entry: Pick<CatalogEntry, 'delivery' | 'firstSeenAt'>, today: string): boolean {
+export function isDeliverable(
+  entry: Pick<CatalogEntry, 'delivery' | 'firstSeenAt' | 'reopenedAt'>,
+  today: string,
+): boolean {
   if (entry.delivery === 'blocked') return false
   if (entry.delivery === 'approved') return true
-  const waited = daysBetween(entry.firstSeenAt, today)
+  // The later of the two: an entry is as new as its newest intake.
+  const since =
+    entry.reopenedAt && entry.reopenedAt.slice(0, 10) > entry.firstSeenAt.slice(0, 10) ? entry.reopenedAt : entry.firstSeenAt
+  const waited = daysBetween(since, today)
   return !Number.isNaN(waited) && waited >= DELIVERY_HOLD_DAYS
 }
 

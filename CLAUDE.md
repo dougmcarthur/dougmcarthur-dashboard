@@ -2113,6 +2113,68 @@ written. The body is capped at 3 MB (Music BC's feed is 1.6 MB for ten items)
 and a stranger's markup only ever becomes strings: it is never followed, run or
 passed to a model.
 
+**A programme that comes round again is the same programme, and Pass means this
+intake.** One catalog entry is one programme, keyed by its address, and it held
+the first deadline it was filed with for good. A passed row was never offered
+again, a snooze woke with the old date, and a New call whose date had gone sat in
+the deck as "Deadline passed" for ever. `shared/intakes.ts` is the rule and
+`src/lib/intakes.ts` runs it per artist on the 3am tick, ahead of the reminder
+reconcile so the new date has its reminders that night. The owner decided the
+first two points below on 2026-10-14; the rest follows from them.
+
+- **Pass is about one intake.** A passed or missed intake is offered again as a
+  new New row when the programme's entry holds a later date, opening with the
+  sentence that says what it is and which intake they passed on, and the old row
+  is left exactly as it was. The decision log's account of what they were looking
+  at when they passed is not rewritten. Deleting the row is how somebody says
+  never: no linked row means nothing to re-offer. The Pass button's own
+  tooltip says so, and Help does.
+- **A row nobody decided on follows the programme.** A New row whose own date has
+  gone is advanced in place. That is a change to what the row says, so
+  `updated_at` moves and a snooze made against the old intake is woken, which is
+  the case `snoozeState` was written for. It is the one place a row of the
+  artist's is rewritten from the catalog, and it is the only sound reading of a
+  row they never decided on.
+- **It re-offers only what they did not apply for.** Passed and missed. A call
+  they applied to and lost, one they won, one they withdrew from and one they
+  archived are different sentences; archived has no outcome and is how somebody
+  says never without deleting. Nothing In progress or Applied is touched:
+  "Missed the deadline" is the move that closes an intake and lets this run. It
+  also waits for the old intake to have closed, since a row whose own date is
+  ahead may be a different stream.
+- **A new intake is a new arrival.** `reopened_at` (migration 0043) restarts the
+  same three-day holding period `first_seen_at` starts, so the owner can block
+  it in the same window, and `delivery = 'approved'` skips the wait.
+  `isDeliverable` reads the later of the two.
+- **Only the platform's own research moves a deadline, only forward, and only
+  one that has gone.** `catalogueEntry` applies `advanceIntake` for an agent
+  sighting and never for an artist re-typing a row; an entry whose date is still
+  ahead is not moved by a later one, since a page naming a later date may be
+  naming another stream and a poisoned page must not be able to push a live
+  deadline out of sight. An entry with no date is never given one by this: that
+  is how a rolling programme would be closed.
+- **Something has to deliver the next date, and it is the Worker, for free.**
+  `refreshProgrammes` (`src/lib/programmeRefresh.ts`) reads the page of a
+  public entry whose deadline has passed, three a tick and a week between looks at
+  one, and stops after eighteen months. `readNextDeadline`
+  (`shared/programmeDates.ts`) takes a date only from a line that says
+  deadline, closes or due, requires a year, takes the earliest still ahead, and
+  returns the count so the entry says the page lists several. It was written
+  against a real capture of Canada Council's Arts Across Canada and Abroad page:
+  ten funding opportunities, two of them rolling ("Any time before your departure
+  date"), seven listing several dates each, one a season. Of the eight pages that
+  opened, from six funders, only that one stated a date in its server-rendered
+  text, and three more did not open at all (a 404, a 410, a refused connection),
+  so recall is low and the page reader is a partial feeder. The agents are not asked
+  to re-file a programme on file; if one does, the same advance applies.
+- **Told on the bell, one event a night.** "N programmes are open again", with a
+  sentence each. It is not a choice, so it is not in the decision log: the new
+  row is filed and the old row moved by Scout, and the artist's choice about the
+  new one is logged as any choice is.
+- **Suggestions off means no new rows.** Moving a row they already have is not a
+  suggestion and happens regardless; filing a fresh one is. Ten re-offers a night
+  at most, the rest the next.
+
 **A new account is shown what is open to nearly anyone, before it has said
 anything.** The Overview of an account with no rows used to be a checklist and
 an empty deck, and the starter set waited for the welcome questions and then
@@ -2175,10 +2237,10 @@ residents are removed there, once, for the reasons they are removed everywhere.
   before reading the catalog, since the Overview loads it every visit and rows
   read is the cost that binds. The old `/starter` routes and the daily trickle
   are unchanged.
-- **What it does not do: recurrence.** A programme that comes round again is not
-  re-offered, which is gap 5 in `docs/matching-gaps.md` and now has its
-  behaviours written down there. The lanes inherit it: a national grant leaves its
-  lane the day its first-seen deadline passes.
+- **A programme that comes round again returns to the lanes.** The entry's
+  deadline can move forward (see "A programme that comes round again" below), so
+  a national grant no longer leaves its lane for good the day its first-seen date
+  passes.
 
 **The logged-out page shows the catalog, and publishing is conservative.**
 Strangers see `LandingPage` (a browser that has signed in before still gets

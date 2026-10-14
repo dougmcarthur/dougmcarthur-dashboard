@@ -194,7 +194,15 @@ export function gigMoves(status: string | null | undefined, type?: string | null
           ? { label: 'Offer fell through', meaning: 'They withdrew the offer or the terms could not be agreed.', tone: 'no' }
           : { label: 'Not selected', meaning: 'They said no.', tone: 'no' }
       case 'passed':
-        return { label: 'Pass', meaning: GIG_OUTCOME_META.passed.meaning, tone: 'no' }
+        // Passing is about this intake and nothing else. A programme that
+        // opens again is shown as a new row (shared/intakes.ts), and deleting
+        // the row is how somebody says they never want it.
+        return {
+          label: 'Pass',
+          meaning:
+            'You decided not to apply this time. If the programme opens again it comes back as a new one, and deleting this row stops that.',
+          tone: 'no',
+        }
       case 'expired':
         return STAGE_OF[from] === 'applied'
           ? { label: 'Never heard back', meaning: 'The answer is not coming.', tone: 'no' }

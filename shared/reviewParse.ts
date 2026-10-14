@@ -325,7 +325,7 @@ export function findDate(text: string): string | null {
 const MONTH_NAME = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
 
 /** Words that, just before a date, mean it is when things START, not when they end. */
-const OPENS_CUE = /\b(?:opens?|opening|re-?opens?|check back(?: in)?|not open(?: until)?|available from|starts?|submissions? (?:open|begin)|applications? open|window opens?)\b[^.]{0,30}$/i
+export const OPENS_CUE = /\b(?:opens?|opening|re-?opens?|check back(?: in)?|not open(?: until)?|available from|starts?|submissions? (?:open|begin)|applications? open|window opens?)\b[^.]{0,30}$/i
 
 /**
  * Past-tense framing, which turns a date into a historical note rather than a
@@ -336,7 +336,7 @@ const OPENS_CUE = /\b(?:opens?|opening|re-?opens?|check back(?: in)?|not open(?:
  * A wrong date is worse here than no date: no date leaves the row in the
  * open-ended pile, where it honestly belongs.
  */
-const PAST_CUE = /\b(?:was|were|had been|expired|already passed|closed on|last year'?s?)\s*[:—-]?\s*$/i
+export const PAST_CUE = /\b(?:was|were|had been|expired|already passed|closed on|last year'?s?)\s*[:—-]?\s*$/i
 
 const RANGE = new RegExp(
   `\\b${MONTH_NAME}\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s*\\d{4})?` +
@@ -350,14 +350,14 @@ const ANY_DATE = new RegExp(
   'gi',
 )
 
-interface FoundDate {
+export interface FoundDate {
   iso: string
   start: number
   end: number
 }
 
 /** Every date in `text`, in the order they appear, with where they sit. */
-function findDates(text: string): FoundDate[] {
+export function findDates(text: string): FoundDate[] {
   const out: FoundDate[] = []
   for (const m of text.matchAll(ANY_DATE)) {
     const iso = findDate(m[0])

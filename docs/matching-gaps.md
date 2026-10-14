@@ -109,12 +109,23 @@ does not work without it.
      rolling note stays open for ever, which is right for one with no date to
      miss, and is said as such in the first-run lanes (`isRolling`).
 
-   *What it would take, in the order that is safe: let a later sighting advance a
-   closed deadline (a change to the fill-gaps rule, which is a trust decision);
-   re-offer an entry whose only linked rows are closed with a deadline earlier
-   than the entry's (a change to "added at most once, ever", which is a product
-   decision about what Pass means); and a feeder, since none exists. Both forks
-   are the owner's.*
+   **Built 2026-10-14**, with the owner deciding that Pass means this intake and
+   nothing about the programme. A closed deadline can now move forward
+   (`advanceIntake`, applied only to the platform's own research), a passed or
+   missed intake is offered again as a new row and a New row follows its programme
+   (`shared/intakes.ts`, nightly), a new intake waits out the same holding period
+   as a new arrival (migration 0043), and the Worker reads the page of a closed
+   programme for its next date (`src/lib/programmeRefresh.ts`). The bullets above
+   describe what was true before; CLAUDE.md, "A programme that comes round again",
+   describes what is true now.
+
+   *What is still thin: the page reader's recall.* Of eight pages that opened,
+   from six funders, one stated dates in server-rendered text (Canada Council, which
+   lists several per stream and mixes in rolling ones) and the rest said nothing in
+   it; three more did not open. A programme whose page does not state its next date is not found by this
+   and still needs the agent re-filing it, an artist, or a better feeder. Measuring
+   on more pages is the next step, and what to read from a funder that publishes
+   its deadlines only in a PDF is open.*
    `lastSeenAt` moves only when an agent re-files a sighting, and agents skip
    anything already on file, so it is first-seen in practice. `fillMissing`
    never overwrites a deadline, so an annual call at the same URL keeps last
