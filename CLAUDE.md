@@ -1886,12 +1886,40 @@ ReverbNation, Groover, Submittable), including what was left out on purpose.
   website terms. The page asks a Quebec resident to write before creating an
   account, and an invitation is how the owner holds that until there is a French
   version. `docs/terms-of-service-research.md` has the sources.
-- **Nothing records which version of the terms an account accepted.** The
-  commentary puts this first, and it is not built: a nullable column on the user
-  and a write where the invitation is redeemed, with the same record used to ask
-  for re-acceptance when a term changes. Until then the terms say a change is
-  announced 30 days ahead and continued use is acceptance, which is the weaker
-  form.
+**An account records which terms it agreed to, and nothing reads it yet.**
+`users.terms_version` and `users.terms_accepted_at` (migration 0041) are written
+by `redeemInvite`, in the write that creates the account, which is after the
+passkey verifies and so after the point the invitation is spent. The version is
+`TERMS_VERSION` in `shared/terms.ts`, the date the page says it was last updated,
+and the instant is the same `now` the route hands the rest of the redemption, so
+it equals `created_at`. `test/termsAcceptance.test.ts` fails when the page's
+"Last updated" line and the constant disagree, so moving one without the other is
+a red test rather than an account recorded against words it never saw.
+
+- **Null means no record, and it is never backfilled.** The owner and every artist
+  invited before 0041 read null in both columns. A date written in afterwards
+  would be a claim nobody made, so the record says what is true: nobody recorded
+  an acceptance. Both columns are nullable with no default.
+- **The version is the Worker's, never the browser's.** A value from whoever is
+  asking is a claim rather than a record. The cost is a window: a person who
+  loaded the invitation screen the moment before a deploy changed the terms is
+  recorded against the new ones. The terms promise 30 days' notice of a change,
+  which keeps that window to a deploy that has already been announced.
+- **It is for a re-acceptance prompt, which is not built.** The same two columns
+  are what a later prompt would read: null and an older version alike mean "ask
+  again", and answering writes them. Until that exists the terms rely on 30 days'
+  notice and continued use, which is the weaker form of agreement. Moving
+  `TERMS_VERSION` is for a change to the terms themselves; a typo corrected on
+  the page is not a new version, and moving the date would mark every account
+  stale.
+- **It is shown nowhere.** `test/termsAcceptance.test.ts` allows exactly two files
+  to name either column, the schema and `redeemInvite`, so a list route, the
+  oversight surface or a screen that starts carrying it fails there and has to
+  say why. The row goes with the account in `removeTenant`, which deletes the user
+  row, and the privacy policy's retention line for an account already says that.
+  The policy's list of what is held about an account names the record in its
+  "Who you are" line, including that an older account has none, and the same test
+  pins that sentence, so dropping the columns means changing the page too.
 
 **Goals and reach order what is undecided, and remove nothing.** The welcome
 questions are read in `shared/artistFocus.ts`, and the queue carries the result
