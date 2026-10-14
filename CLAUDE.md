@@ -1873,9 +1873,10 @@ ReverbNation, Groover, Submittable), including what was left out on purpose.
   link stops resolving, an invitation lapses after `INVITE_TTL_DAYS`.
   `test/termsOfService.test.ts`.
 - **It does not point artists at a screen they never see.** The Agent tokens
-  card is rendered for the owner only, so the terms speak of whoever holds a
-  token. The privacy policy still says an artist can issue one in Settings,
-  which is wrong for the same reason and has not been corrected.
+  card is rendered for the owner only, and `/api/agent-tokens` refuses
+  everybody else, so the terms say that tokens are issued only by us and an
+  artist cannot issue one. The privacy policy says the same in its own words,
+  and both tests read the owner refusal out of the route source.
 - **The figures are the owner's, and are written down as such.** The $100 cap,
   the 30-day notice, Manitoba law with exclusive courts, and a narrow indemnity.
   Change the number and the sentence together, and the page's date with them.
@@ -1955,9 +1956,11 @@ behalf is reading the owner's, so it asks `isOwnerTenant` first
 bell's Gmail and email rows, and the Settings rows that describe them. An
 artist's own mailbox is a grant they would make, like Gmail drafting, and is
 not built. Publishing to the shared catalog is the owner's agents only
-(`agentMayPublish`): any artist can issue themselves an agent token, and what
-their agent files is a stranger's claim about a page, catalogued and linked to
-their own row and not shown to anybody else until the owner shows it.
+(`agentMayPublish`). Artists are not issued agent tokens (`/api/agent-tokens`
+refuses everybody but the owner), so that check is a second lock on the same
+door: a token that still exists for another tenant, issued before the route
+closed, files a stranger's claim about a page, catalogued and linked to their
+own row and not shown to anybody else until the owner shows it.
 `test/ownerOnly.test.ts` fails on a route that reads the mailbox without asking.
 
 **A bulk write previews first, and the shell that does it is shared.**
