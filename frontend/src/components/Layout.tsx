@@ -8,6 +8,7 @@ import { SideDock } from './SidePanel'
 import { AnswersDialog } from './AnswersPanel'
 import { Icon } from './notificationParts'
 import { useSidePanel } from '../hooks/useSidePanel'
+import { useSignOut } from '../hooks/useSignOut'
 import { HelpMenu } from './HelpMenu'
 import { FeedbackModal } from './FeedbackModal'
 import { Button } from './ui/Button'
@@ -135,6 +136,8 @@ export function Layout({
     }
   }, [menuOpen])
 
+  const signOut = useSignOut()
+
   const toggleTheme = () => set({ theme: resolved === 'dark' ? 'light' : 'dark' })
 
   const linkClass = (id: string) =>
@@ -235,7 +238,10 @@ export function Layout({
                 <ThemeIcon dark={resolved === 'dark'} />
               </button>
 
-              <div className={`relative ${admin ? 'hidden' : ''}`} ref={menuRef}>
+              {/* In admin mode too, where Sign out is all it holds: every page
+                  in the list is refused there, and the only other way out was
+                  to leave admin mode first. */}
+              <div className="relative" ref={menuRef}>
                 <button
                   type="button"
                   onClick={() => setMenuOpen((o) => !o)}
@@ -254,64 +260,86 @@ export function Layout({
                     aria-label="More"
                     className="absolute right-0 top-full mt-2 w-48 z-40 rounded-xl border border-line bg-surface shadow-pop p-1"
                   >
-                    {/* Below md the main destinations have nowhere else to go. */}
-                    <span className="md:hidden">
-                      {NAV_LINKS.map((l) => (
-                        <a
-                          key={l.id}
-                          href={`#${l.id}`}
-                          aria-current={page === l.id ? 'page' : undefined}
-                          className={`block ${linkClass(l.id)}`}
-                        >
-                          {l.label}
-                        </a>
-                      ))}
-                      <hr className="border-line my-1" />
-                    </span>
-                    {MORE_LINKS.map((l) => (
-                      <a
-                        key={l.id}
-                        href={`#${l.id}`}
-                        aria-current={page === l.id ? 'page' : undefined}
-                        className={`block ${linkClass(l.id)}`}
-                      >
-                        {l.label}
-                      </a>
-                    ))}
-                    {!side.wide && (
-                      <button
-                        type="button"
-                        className={`block w-full text-left ${linkClass('answers')}`}
-                        onClick={() => {
-                          setMenuOpen(false)
-                          setAnswersOpen(true)
-                        }}
-                      >
-                        Answers at hand
-                      </button>
+                    {!admin && (
+                      <>
+                        {/* Below md the main destinations have nowhere else to go. */}
+                        <span className="md:hidden">
+                          {NAV_LINKS.map((l) => (
+                            <a
+                              key={l.id}
+                              href={`#${l.id}`}
+                              aria-current={page === l.id ? 'page' : undefined}
+                              className={`block ${linkClass(l.id)}`}
+                            >
+                              {l.label}
+                            </a>
+                          ))}
+                          <hr className="border-line my-1" />
+                        </span>
+                        {MORE_LINKS.map((l) => (
+                          <a
+                            key={l.id}
+                            href={`#${l.id}`}
+                            aria-current={page === l.id ? 'page' : undefined}
+                            className={`block ${linkClass(l.id)}`}
+                          >
+                            {l.label}
+                          </a>
+                        ))}
+                        {!side.wide && (
+                          <button
+                            type="button"
+                            className={`block w-full text-left ${linkClass('answers')}`}
+                            onClick={() => {
+                              setMenuOpen(false)
+                              setAnswersOpen(true)
+                            }}
+                          >
+                            Answers at hand
+                          </button>
+                        )}
+                        {/* The header's question mark, for a phone, where the
+                            header has no room for it. */}
+                        <span className="sm:hidden">
+                          <hr className="border-line my-1" />
+                          <a
+                            href="#help"
+                            aria-current={page === 'help' ? 'page' : undefined}
+                            className={`block ${linkClass('help')}`}
+                          >
+                            Help
+                          </a>
+                          <button
+                            type="button"
+                            className={`block w-full text-left ${linkClass('feedback')}`}
+                            onClick={() => {
+                              setMenuOpen(false)
+                              setFeedbackOpen(true)
+                            }}
+                          >
+                            Send feedback
+                          </button>
+                        </span>
+                        <hr className="border-line my-1" />
+                      </>
                     )}
-                    {/* The header's question mark, for a phone, where the
-                        header has no room for it. */}
-                    <span className="sm:hidden">
-                      <hr className="border-line my-1" />
-                      <a
-                        href="#help"
-                        aria-current={page === 'help' ? 'page' : undefined}
-                        className={`block ${linkClass('help')}`}
-                      >
-                        Help
-                      </a>
-                      <button
-                        type="button"
-                        className={`block w-full text-left ${linkClass('feedback')}`}
-                        onClick={() => {
-                          setMenuOpen(false)
-                          setFeedbackOpen(true)
-                        }}
-                      >
-                        Send feedback
-                      </button>
-                    </span>
+                    {/* Last, and apart from the destinations: it is the one item
+                        here that is not a place to go. No confirmation — it ends
+                        this browser's session and leaves every passkey enrolled,
+                        so coming back costs one touch. */}
+                    <button
+                      type="button"
+                      disabled={signOut.isPending}
+                      className={`block w-full text-left disabled:opacity-60 ${linkClass('sign-out')}`}
+                      onClick={() => signOut.mutate()}
+                    >
+                      {signOut.isPending ? 'Signing out…' : 'Sign out'}
+                    </button>
+                    {signOut.isError && (
+                      <p role="alert" className="px-3.5 py-1.5 text-xs text-danger-fg">
+                        Could not sign out. Try again.
+                      </p>
+                    )}
                   </nav>
                 )}
               </div>

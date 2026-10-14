@@ -4,6 +4,7 @@ import { startRegistration } from '@simplewebauthn/browser'
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser'
 import { api } from '../api'
 import { withConfirmation } from '../confirmIdentity'
+import { useSignOut } from '../hooks/useSignOut'
 import { Button } from './ui/Button'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from './ui/Explainer'
@@ -71,13 +72,8 @@ export function PasskeysCard() {
     },
   })
 
-  // Both reload rather than clearing the query cache, because the page you
-  // are on was rendered for somebody who is now signed out — and a reload is
-  // the one refresh that cannot leave a stale panel behind.
-  const signOut = useMutation({
-    mutationFn: () => api.auth.logout(),
-    onSuccess: () => window.location.reload(),
-  })
+  // Both reload rather than clearing the query cache; see `useSignOut`.
+  const signOut = useSignOut()
 
   const signOutEverywhere = useMutation({
     mutationFn: () => api.auth.logoutEverywhere(),
