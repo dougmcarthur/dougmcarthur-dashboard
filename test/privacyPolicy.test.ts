@@ -195,6 +195,31 @@ describe('what happens when an account is removed', () => {
   })
 })
 
+describe('who can hand a program a token', () => {
+  it('says an artist cannot issue one, which the card and the route both enforce', () => {
+    expect(TEXT).toContain(
+      'A token that lets a program read an account without signing in is issued only by the operator, and an artist cannot issue one.',
+    )
+    // The sentence the page used to carry promised a control an artist never had.
+    expect(TEXT).not.toContain('run an agent of your own')
+    expect(TEXT).not.toContain('a token you issue in Settings')
+
+    // What makes it true: the card is rendered for the owner alone, and the
+    // route refuses everybody else, since a card that is not rendered is still
+    // a URL (see test/ownerOnly.test.ts for the request-level check).
+    expect(read('frontend/src/pages/SettingsPage.tsx')).toMatch(/role === 'owner' && <AgentTokensCard \/>/)
+    expect(withoutComments(read('src/routes/agentTokens.ts'))).toMatch(
+      /actor\.kind === 'user' && actor\.role !== 'owner'/,
+    )
+  })
+
+  it('keeps the sentence about where a token holder’s data goes', () => {
+    expect(TEXT).toContain(
+      'What a program holding a token receives goes to the AI service its holder chooses, under the holder’s own arrangement with that service and not ours.',
+    )
+  })
+})
+
 describe('how it reads', () => {
   it('has no em dash', () => {
     expect(HTML).not.toContain(String.fromCodePoint(0x2014))

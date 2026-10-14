@@ -1840,11 +1840,14 @@ purpose: a redirect onto a client-rendered page is not a document.
   fails until the page says the new one. Change the page and its date together.
 - **Gaps it says out loud rather than hides.** There is no self-service export
   or deletion: both are a request by email, answered within 30 days, and the
-  removal is `removeTenant`. An invitation nobody used is never pruned, so its
-  name and address stay, and the retention list says that. If the document
-  reader is ever pointed at a file in an artist's Drive, "what we receive from
-  Google is never passed to an AI service" stops being true, and Google's
-  Limited Use rules need explicit consent for that transfer.
+  removal is `removeTenant`. An invitation nobody used was never pruned until
+  `pruneInvites`; it now goes 90 days after it expires or is withdrawn
+  (`UNUSED_INVITE_RETENTION_DAYS` in `shared/invites.ts`), the retention list
+  says that, and the test reads the number from the constant. Until then its
+  name and address stay. If the document reader is ever pointed at a file in
+  an artist's Drive, "what we receive from Google is never passed to an AI
+  service" stops being true, and Google's Limited Use rules need explicit
+  consent for that transfer.
 
 **Goals and reach order what is undecided, and remove nothing.** The welcome
 questions are read in `shared/artistFocus.ts`, and the queue carries the result
