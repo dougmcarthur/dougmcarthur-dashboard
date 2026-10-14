@@ -1,0 +1,30 @@
+-- Which version of the terms of service an account agreed to, and when.
+--
+-- The invitation screen says that setting up a passkey creates the account and
+-- that doing so is agreeing to the terms. Nothing recorded which terms those
+-- were, so a later change to the page could not be told apart from what a
+-- person had actually been shown. These two columns are that record, written
+-- once, where an invitation is redeemed (src/lib/invites.ts).
+--
+--   terms_version      the date the terms page said it was last updated, as
+--                      an ISO date ("2026-10-13"). `TERMS_VERSION` in
+--                      shared/terms.ts is the one place it is written down, and
+--                      test/termsAcceptance.test.ts fails when the page and the
+--                      constant disagree.
+--   terms_accepted_at  the moment the account was created, as an ISO timestamp.
+--                      The same instant as `created_at` on a redeemed account,
+--                      because creating it *is* the acceptance.
+--
+-- Both are NULL on every account that exists today, and that is the point. The
+-- owner's account and any artist invited before this change never had an
+-- acceptance recorded, and a backfill would invent one: "2026-10-13" on a row
+-- that was created in September is a claim nobody made. Null reads as "no
+-- record", which is true. A later prompt asking for re-acceptance reads the same
+-- columns and treats null and an older version alike.
+--
+-- Additive only, so it is safe in the gap between migrate and deploy: two
+-- nullable columns the deployed Worker neither names nor selects. Not NOT NULL,
+-- not defaulted, not backfilled. SQLite has no ALTER COLUMN, so a future rebuild
+-- of `users` (as 0024 did) has to carry both columns in its column list.
+ALTER TABLE users ADD COLUMN terms_version TEXT;
+ALTER TABLE users ADD COLUMN terms_accepted_at TEXT;

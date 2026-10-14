@@ -33,6 +33,7 @@ import {
   inviteState,
   type InviteState,
 } from '../../shared/invites'
+import { TERMS_VERSION } from '../../shared/terms'
 import type { Env } from '../types'
 
 export interface IssuedInvite {
@@ -170,6 +171,18 @@ export interface RedeemedAccount {
  * `email` comes from the invite and nowhere else. It becomes the account's
  * recovery address, and the rule it lives under is that a recovery address is
  * never typed by the person asking for it.
+ *
+ * **The account records which terms it agreed to, in the same write.** The
+ * invitation screen says that setting up a passkey is agreeing to the terms of
+ * service, so creating the account is the acceptance: `terms_version` is the
+ * version in force (`TERMS_VERSION`, never anything the browser sent, since a
+ * value from whoever is asking is a claim rather than a record) and
+ * `terms_accepted_at` is the same instant as `created_at`, taken from the
+ * `now` this was handed. Both land here and nowhere else, after the credential
+ * has verified, for the reason the invite is spent last: a cancelled prompt
+ * accepted nothing. The version is the one the Worker was built with, which is
+ * the page's own date in the same build; a person who loaded the screen the
+ * moment before a deploy changed the terms is recorded against the new ones.
  */
 export async function redeemInvite(
   env: Env,
@@ -193,6 +206,8 @@ export async function redeemInvite(
     displayName: invite.displayName,
     email: invite.email,
     createdAt: stamp,
+    termsVersion: TERMS_VERSION,
+    termsAcceptedAt: stamp,
   })
   await db
     .update(invites)

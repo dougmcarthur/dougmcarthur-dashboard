@@ -193,14 +193,12 @@ has the same gap.
 
 ### What was not done, and is the owner's call
 
-- **No record of acceptance.** Nothing stores which version of the terms an account
-  agreed to, or when. Every firm that writes on this puts it near the top, because
-  it is the evidence in a dispute about whether a term was agreed. It needs a
-  nullable column and a write in the invitation redemption, and is queued as its
-  own change.
 - **No re-acceptance on a material change.** The page promises notice and treats
   continued use as acceptance, which is the weaker form. A prompt at next sign-in
-  that must be accepted is the stronger one, and needs the same record.
+  that must be accepted is the stronger one. It reads the record of acceptance,
+  which is built (`users.terms_version` and `users.terms_accepted_at`, migration
+  0041, written where an invitation is redeemed, null on every account that
+  predates it). The prompt itself is not.
 - **No checkbox.** The invitation screen is one action on purpose. A ticked box
   would be firmer evidence and one more click. The record above matters more.
 - **No French version**, and no Quebec lawyer has read either document.

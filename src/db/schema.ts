@@ -595,6 +595,16 @@ export const users = sqliteTable('users', {
   /** The recovery address, and the only place one may come from. Never typed. */
   email: text('email'),
   createdAt: text('created_at').notNull(),
+  /**
+   * The terms an account agreed to (migration 0041): `TERMS_VERSION` when the
+   * invitation was redeemed, and the instant that happened. Null on every
+   * account that predates the record, and deliberately never backfilled: null
+   * says "nobody recorded an acceptance", which is true, where a date written
+   * in afterwards would be a claim nobody made. Written in one place,
+   * `redeemInvite`, and read by nothing yet.
+   */
+  termsVersion: text('terms_version'),
+  termsAcceptedAt: text('terms_accepted_at'),
 })
 
 /** An invitation to create an account. Stored hashed — it is a credential. */
