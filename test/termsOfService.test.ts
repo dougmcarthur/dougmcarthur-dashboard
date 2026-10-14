@@ -227,6 +227,19 @@ describe('what the terms promise about the service', () => {
     expect(TEXT).not.toMatch(/revoke it in Settings/i)
   })
 
+  it('says only we issue an agent token, because the route refuses an artist', () => {
+    expect(TEXT).toContain('Tokens are issued only by us, and an artist cannot issue one.')
+    // The sentences it replaced assumed an artist holds one for their own account
+    // or runs software of their own, which no artist can.
+    expect(TEXT).not.toContain('issued for your own account')
+    expect(TEXT).not.toContain('software of yours')
+    expect(TEXT).toContain('other than through an agent token we have issued')
+    // What makes it true, and the sentence the privacy page says in its own words.
+    expect(withoutComments(read('src/routes/agentTokens.ts'))).toMatch(
+      /actor\.kind === 'user' && actor\.role !== 'owner'/,
+    )
+  })
+
   it('promises about your content only what the policy already promises', () => {
     // The terms say we do not sell it, will not send it to an AI service without
     // asking, and read it only with permission. Each of those is a sentence the
