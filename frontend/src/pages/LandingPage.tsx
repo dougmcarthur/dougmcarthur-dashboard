@@ -120,6 +120,9 @@ export function LandingPage({ onSignIn }: { onSignIn: () => void }) {
             <a href="/privacy/" className="underline underline-offset-2 hover:text-ink">
               Privacy policy
             </a>
+            <a href="/terms-of-service/" className="underline underline-offset-2 hover:text-ink">
+              Terms of service
+            </a>
             <span>Questions: hello@sundogsmusic.ca</span>
           </p>
         </div>

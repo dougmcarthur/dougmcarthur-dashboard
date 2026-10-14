@@ -1,6 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./frontend/index.html', './frontend/privacy/index.html', './frontend/src/**/*.{ts,tsx}'],
+  content: [
+    './frontend/index.html',
+    './frontend/privacy/index.html',
+    './frontend/terms-of-service/index.html',
+    './frontend/src/**/*.{ts,tsx}',
+  ],
   // Every colour below resolves to a CSS variable, so a theme switch is a
   // variable swap rather than a `dark:` class on every element. The selector is
   // still declared for the few places that need to diverge structurally rather

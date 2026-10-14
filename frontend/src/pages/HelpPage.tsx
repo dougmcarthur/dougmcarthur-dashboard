@@ -169,12 +169,21 @@ export function HelpPage() {
         <p className="text-xs text-muted">{themeCredit()}</p>
       </Section>
 
-      <Section title="Your information and privacy">
+      <Section title="Your information, privacy and terms">
         <p>
           The privacy policy says what Sun Dogs Music Scout collects, which other companies handle
           it, how long it is kept, and how to see, correct or delete yours.{' '}
           <a href="/privacy/" className="font-medium text-ink underline hover:text-accent">
             Read the privacy policy
+          </a>
+          .
+        </p>
+        <p>
+          The terms of service say what you can expect from the service and what it expects of
+          you, including that it never sends anything for you and can be wrong, so check before you
+          rely on it.{' '}
+          <a href="/terms-of-service/" className="font-medium text-ink underline hover:text-accent">
+            Read the terms of service
           </a>
           .
         </p>

@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en-CA">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f6f1dc" />
+    <script>
+      /* The same early theme the app sets, so this page opens in the theme the
+         reader chose rather than flashing the default first. */
+      try {
+        var a = JSON.parse(localStorage.getItem('musichq.appearance') || '{}')
+        var t = a.theme || 'light'
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        var root = document.documentElement
+        root.dataset.theme = t
+        var more = matchMedia('(prefers-contrast: more)').matches
+        var hc = a.highContrast
+        if (hc === undefined || hc === null) hc = more
+        root.dataset.contrast = hc ? 'high' : 'normal'
+        var p = a.palette
+        if (!p) p = more ? 'high-contrast' : 'sun-dogs'
+        root.dataset.palette = p
+      } catch (e) {}
+    </script>
+    <title>Terms of service | Sun Dogs Music Scout</title>
+    <link rel="canonical" href="https://scout.sundogsmusic.ca/terms-of-service/" />
+    <meta
+      name="description"
+      content="The terms for using Sun Dogs Music Scout: what the service does and does not do, what you can expect from it, what it expects of you, and how either of us can end the arrangement."
+    />
+    <script type="module" src="/src/terms.ts"></script>
+  </head>
+  <body>
+    <a
+      href="#terms"
+      class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:text-ink"
+    >
+      Skip to the terms
+    </a>
+
+    <header class="border-b border-line">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+        <a href="/" class="font-semibold text-ink">Sun Dogs Music Scout</a>
+        <a href="/" class="text-sm text-muted underline underline-offset-2 hover:text-ink">Back to the app</a>
+      </div>
+    </header>
+
+    <main id="terms" class="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-10 text-body leading-relaxed">
+      <div class="space-y-3">
+        <h1 class="text-3xl font-semibold text-ink tracking-tight">Terms of service for Sun Dogs Music Scout</h1>
+        <p class="text-sm text-muted">Last updated October 13, 2026.</p>
+        <p>
+          These terms are the agreement between you and Sun Dogs Music Manitoba about your use of
+          Sun Dogs Music Scout. They are written for Canadian musicians in plain language. Please
+          read them before you create an account. The
+          <a class="text-info-fg underline underline-offset-2" href="/privacy/">privacy policy</a>
+          is a separate page, and it is part of this agreement.
+        </p>
+      </div>
+
+      <nav aria-label="On this page" class="rounded-lg border border-line bg-surface p-5">
+        <h2 class="text-base font-semibold text-ink">Jump to a section</h2>
+        <ol class="mt-3 space-y-1 text-sm sm:columns-2 sm:gap-8">
+          <li><a class="text-info-fg underline underline-offset-2" href="#short">The short version</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#who">Who this agreement is between</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#account">Your account</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#what">What the service is</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#accuracy">Checking what it tells you</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#yours">Your content</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#rules">What you may not do</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#connections">Other companies&rsquo; services</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#ours">What belongs to us</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#fees">Cost</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#availability">Availability</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#ending">Ending the arrangement</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#warranty">No promise about results</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#liability">Limits on our responsibility</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#indemnity">Claims from what you send</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#disputes">Disputes and the law that applies</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#changes">Changes to these terms</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#general">General terms</a></li>
+          <li><a class="text-info-fg underline underline-offset-2" href="#contact">How to reach us</a></li>
+        </ol>
+      </nav>
+
+      <section id="short" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">The short version is that this is a tool for your own decisions, and you stay in charge of what you send</h2>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li>Sun Dogs Music Scout finds, tracks and drafts for opportunities. It never applies, pitches or sends anything for you.</li>
+          <li>What it shows comes from public pages and software agents, and it can be wrong or out of date. Check the organiser&rsquo;s own page before you act on it.</li>
+          <li>What you put in stays yours. We use it only to run the service for you.</li>
+          <li>It is free today. If that changes, we will tell you first.</li>
+          <li>You need an invitation, and you must be 18 or older.</li>
+          <li>You can leave and have your account deleted whenever you like. We can close an account for the reasons listed below.</li>
+          <li>Our responsibility to you is limited, and you are responsible for claims that come from what you send or publish. Both are set out below.</li>
+          <li>Manitoba law applies, and the courts of Manitoba decide disputes, unless the law where you live lets you go to court at home.</li>
+        </ul>
+      </section>
+
+      <section id="who" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">Sun Dogs Music Manitoba runs this service, and these terms are between you and it</h2>
+        <p>
+          Sun Dogs Music Scout is run by Sun Dogs Music Manitoba, a sole proprietorship that Doug
+          McArthur registered in Manitoba under The Business Names Registration Act (registry
+          number 10219396). In these terms, &ldquo;we&rdquo; and &ldquo;us&rdquo; mean Sun Dogs
+          Music Manitoba, and &ldquo;you&rdquo; means the person who holds the account.
+        </p>
+        <p>
+          You agree to these terms when you set up a passkey to create an account, and again each
+          time you use the service after being told about a change. If you do not agree, do not
+          create an account. If you already have one, ask us to delete it.
+        </p>
+        <p>
+          If you use the service for a band, a duo or any other group, you confirm that the others
+          have agreed to you doing so and to you putting their information in it.
+        </p>
+        <p>
+          If you manage or represent an artist, you confirm that you are authorized to act for
+          them. The artist is bound by these terms through you, and you answer for what is done in
+          the account.
+        </p>
+        <p>
+          These terms and the privacy policy are the whole agreement between us. If they differ
+          about personal information, the privacy policy applies. The artist survey has its own
+          notice, which applies to the survey.
+        </p>
+      </section>
+
+      <section id="account" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">You need an invitation and an account, and you keep the account secure</h2>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li>Accounts are created by invitation. An invitation link works once and expires after 30 days.</li>
+          <li>You must be 18 or older and able to make a binding agreement where you live, and the name and email address on your account must be your own.</li>
+          <li>You sign in with a passkey. Keep the devices that hold your passkeys secure, and do not share your account with anyone.</li>
+          <li>If you lose every device that holds a passkey, a code emailed to the address on your account lets you add a new one. Keep that mailbox secure as well.</li>
+          <li>You are responsible for what happens under your account. If you think someone else has got into it, write to us straight away, and remove any passkey you no longer trust in Settings.</li>
+        </ul>
+      </section>
+
+      <section id="what" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">Sun Dogs Music Scout is a research and drafting tool, and it never acts for you</h2>
+        <p>
+          It is built for working Canadian musicians. It lists and ranks opportunities such as
+          festivals, showcases, grants and sync pitches, reminds you of deadlines, estimates what a
+          trip would cost, keeps your answers and documents in one place, and drafts text for you
+          to use. Costs are in Canadian dollars and the notes on paperwork assume a Canadian act.
+          You may still look at an opportunity anywhere in the world.
+        </p>
+        <p>
+          It never submits an application, sends a pitch or any other message to an organiser,
+          accepts an offer or pays a fee for you. A draft is text for you to read, change and send
+          yourself. The Gmail permission creates drafts in your Drafts folder. The service has no
+          way to send a message, even though Google&rsquo;s permission would allow it.
+        </p>
+        <p>
+          Ranking and flags help you decide what to look at first. Every decision is yours, and
+          nothing about you is decided by a machine.
+        </p>
+        <p>
+          You are the sender of everything you send and the publisher of everything you publish.
+          You are responsible for what it says and for following the law and the organiser&rsquo;s
+          rules, including Canada&rsquo;s anti-spam legislation where it applies to a message to
+          someone who has not asked to hear from you.
+        </p>
+      </section>
+
+      <section id="accuracy" class="space-y-4">
+        <h2 class="text-xl font-semibold text-ink">What the service tells you may be wrong, so check it before you rely on it</h2>
+        <p>
+          Treat what the service shows as a starting point for your own checking, not as the last
+          word.
+        </p>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li><strong class="font-medium text-ink">Listings and deadlines:</strong> opportunities are found by software agents and read from public web pages. A deadline, fee, eligibility rule or address can be wrong, out of date or missing, and a closing date recovered from prose is shown as approximate. Confirm it on the organiser&rsquo;s own page before you apply or pay anyone.</li>
+          <li><strong class="font-medium text-ink">Whether a target takes pitches:</strong> the service reads an organisation&rsquo;s site and tells you when it asks for no unsolicited submissions. It can miss a refusal, and finding none is never permission. You can pitch anyway, and that is your decision.</li>
+          <li><strong class="font-medium text-ink">Costs and distances:</strong> a trip cost is a range built partly from guesses, not a quote. Distances are measured with OpenStreetMap data and can be off.</li>
+          <li><strong class="font-medium text-ink">Paperwork and timing:</strong> notes about visas, work permits, tax forms and contracts are general information. They are not legal, immigration, tax or financial advice, so ask a qualified person before you rely on them.</li>
+          <li><strong class="font-medium text-ink">AI:</strong> software agents running on AI models write parts of what you see, such as research notes and draft text. They make mistakes. Read a draft before you use it.</li>
+          <li><strong class="font-medium text-ink">Organisers:</strong> a listing is not an endorsement. We do not vet organisers, and we cannot promise that any of them is honest, fair or will pay you. Be careful with anyone who asks you for money before they will consider you.</li>
+        </ul>
+        <p>
+          If you run a festival, label or program and a listing about you is wrong, write to us and
+          we will correct or remove it.
+        </p>
+      </section>
+
+      <section id="yours" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">What you put in stays yours, and you let us use it to run the service</h2>
+        <p>
+          You keep ownership of everything you put into the service, including your notes, drafts,
+          answers, documents and photos. We claim no rights in it.
+        </p>
+        <p>
+          You give us permission to store it, process it, show it to you and pass it to the
+          services you switch on. We use that permission to run the service for you, keep it
+          secure, talk to you, and fix and improve the service, which are the uses the privacy
+          policy lists, and only for as long as your account exists. That permission ends when
+          your account is deleted, apart from backups, which age out within 30 days as the
+          privacy policy explains.
+        </p>
+        <p>
+          We do not sell your content. We will not send it to an AI service, or use it in any way
+          the privacy policy does not describe, without asking you first. We read what is in your
+          account only with your permission, to investigate a security problem or a fault you asked
+          us to look into, or when the law requires it.
+        </p>
+        <p>
+          You promise that you have the right to put it in, and that it does not break the law or
+          anyone else&rsquo;s rights. Do not put in other people&rsquo;s personal information beyond
+          what you need to pursue an opportunity, such as an organiser&rsquo;s contact details.
+        </p>
+        <p>
+          The facts about an opportunity itself, such as its name, web address, closing date, place
+          and entry fee, may be kept once in a shared catalogue so that every artist is not
+          researching the same thing. Nothing you decided, wrote or noted goes with it, and other
+          artists see an entry only when we choose to show it.
+        </p>
+        <p>
+          When you publish a press kit link, anyone who holds the link can see what you chose to
+          publish, and can save it or pass it on. You can switch a link off on the Artist page.
+          That stops it working from then on. It cannot take back what somebody already saved.
+        </p>
+        <p>
+          If you send us feedback or an idea, we may use it to improve the service without paying
+          you or asking again. It gives us no other right to your content.
+        </p>
+      </section>
+
+      <section id="rules" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">There are some things you may not do with the service</h2>
+        <p>Please do not:</p>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li>use it to break the law, to harass or mislead organisers or other people, or to send messages in bulk that nobody asked for;</li>
+          <li>give false information about who you are, or pretend to be someone else;</li>
+          <li>try to get into another person&rsquo;s account or data, or to probe, test or overload the service, or to send it anything harmful, such as malware. If you find a security problem, please write to us first so that we can fix it;</li>
+          <li>read the service or the catalogue by automated means, or copy it in bulk, other than through an agent token issued for your own account, or use it to build a competing listing service;</li>
+          <li>get around a limit or a safeguard, including the daily limits on what an agent token can file;</li>
+          <li>resell the service, or let someone else use your account.</li>
+        </ul>
+        <p>
+          An agent token lets software read an account&rsquo;s lists and reference documents and
+          add new entries and run records. It cannot delete anything, and it cannot send anything.
+          A token is shown once when it is issued, and it can be revoked at any time. Whoever holds
+          one is responsible for what their software does with it and for where it sends what it
+          reads. If that is an AI service, it is under their arrangement with that service and not
+          ours.
+        </p>
+      </section>
+
+      <section id="connections" class="space-y-4">
+        <h2 class="text-xl font-semibold text-ink">Other companies&rsquo; services have their own terms, and you accept those too</h2>
+        <dl class="divide-y divide-line border-y border-line">
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Google</dt>
+            <dd>If you connect a Google account, Google&rsquo;s own terms govern your use of Calendar, Tasks, Gmail and Drive, and you give permission on Google&rsquo;s screen, not ours. Google&rsquo;s Tasks permission technically reaches every list in your account, and we use only one. You can leave out any service, and you can disconnect at any time. What we do with Google data is in the privacy policy.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">Bandsintown</dt>
+            <dd>Use only the key Bandsintown issued to you for your own artist profile. You confirm that you are entitled to use it, and Bandsintown&rsquo;s terms apply to it.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">OpenStreetMap</dt>
+            <dd>Distances use data made by OpenStreetMap contributors and available under the Open Database Licence. The screens credit OpenStreetMap beside a measured figure, and you should too if you pass one on.</dd>
+          </div>
+          <div class="py-3 sm:grid sm:grid-cols-[13rem_1fr] sm:gap-4">
+            <dt class="font-medium text-ink">AI services</dt>
+            <dd>If software of yours reads your information through an agent token and passes it to an AI service, your arrangement with that service is between you and them.</dd>
+          </div>
+        </dl>
+        <p>
+          We do not control these services. If one changes, fails or ends, a feature that depends
+          on it may stop working, and we are not responsible for that.
+        </p>
+      </section>
+
+      <section id="ours" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">We own the software and the name, and we respect other people&rsquo;s rights</h2>
+        <p>
+          The software, the design, the name Sun Dogs Music Scout and the way the catalogue is put
+          together belong to Sun Dogs Music Manitoba or to the people who license them to us. While
+          you have an account you may use the service for your own music career. That is a personal
+          right, and you cannot transfer it. Please do not copy the software, take it apart, or use
+          the name to suggest that we endorse you.
+        </p>
+        <p>
+          Names, logos and listings that belong to organisers and other companies stay theirs. If
+          you believe something in the service infringes your copyright, write to us with what it
+          is, where it appears, who owns the copyright and how to reach you, and we will look at it promptly.
+        </p>
+      </section>
+
+      <section id="fees" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">The service is free today, and we will tell you before that changes</h2>
+        <p>
+          Using Sun Dogs Music Scout costs nothing, and it does not collect payment details. If we
+          ever add a paid plan, we will tell you at least 30 days before it applies to you, and you
+          will not be charged unless you choose to pay.
+        </p>
+        <p>
+          You carry your own costs, such as your internet connection, your Google and Bandsintown
+          accounts, application fees, travel and taxes. The service does not pay, reimburse or
+          advance any of them. You are also responsible for your own tax and legal obligations,
+          including on anything you earn from an opportunity.
+        </p>
+      </section>
+
+      <section id="availability" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">The service can change, pause or stop, and we cannot promise it is always there</h2>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li>We run it as well as we can. We do not promise that it will always be available, free of errors or free of interruption.</li>
+          <li>We may add, change or remove features, and research may pause or change what it covers.</li>
+          <li>A reminder, a task, a calendar entry or an email can fail to arrive, and a Google service can refuse a request. For anything with a hard deadline, keep a note of your own as well.</li>
+          <li>The library keeps your answers and links to your documents, not the files themselves. Keep your own copies of contracts, photos, press materials and anything else you cannot do without.</li>
+          <li>If we decide to close the whole service, we will tell you at least 30 days before, and you can ask for a copy of your information in that time.</li>
+          <li>Neither of us is responsible for a delay or failure caused by something beyond reasonable control, such as an outage at a hosting, network or Google service.</li>
+        </ul>
+      </section>
+
+      <section id="ending" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">You can leave at any time, and we can close an account for the reasons below</h2>
+        <p>
+          To leave, write to us and ask for your account to be deleted. Use Disconnect for Google
+          first, so that Google stops honouring our access. We remove the account and its records
+          and confirm when it is done, as the privacy policy describes. If you would like a copy of
+          your information first, ask for it in the same message.
+        </p>
+        <p>
+          We may suspend or close an account if you break these terms, if what you are doing puts
+          the service or other people at risk, or if the law requires it. Unless the matter is
+          urgent, we will tell you why and give you a chance to put it right first. We may also
+          remove something you published, or switch off a press kit link, if it breaks these
+          terms. We will give you a copy of your information if you ask, unless the law or a
+          security problem stops us.
+        </p>
+        <p>
+          The parts of these terms that are meant to last, including ownership, the limits on our
+          responsibility and the rules about disputes, continue after the account is gone.
+        </p>
+      </section>
+
+      <section id="warranty" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">The service is provided as it is, with no promise about the results</h2>
+        <p>
+          We provide Sun Dogs Music Scout as it is and as it is available. We make no promise that
+          using it will get you a booking, a grant, a placement, a reply or any other result, or
+          that what it shows is complete, accurate or right for what you want to do with it. To the
+          extent the law allows, we give no warranty beyond what these terms say.
+        </p>
+        <p>
+          We are not your agent, manager, publicist, lawyer, accountant or adviser, and we do not
+          represent you to anyone. Nothing in the service creates a relationship between you and an
+          organiser.
+        </p>
+        <p>
+          Anything you agree with an organiser, including a contract, a fee, a rider or travel, is
+          between you and them. We are not a party to it, and we are not responsible if it falls
+          through or is not honoured.
+        </p>
+      </section>
+
+      <section id="liability" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">Our responsibility to you is limited as far as the law allows</h2>
+        <p>
+          We are not responsible for indirect or consequential loss, or for lost income, a missed
+          deadline, a lost opportunity, a loss of information or damage to your reputation that comes
+          from using the service or from being unable to use it, even if we were told it could
+          happen. This is one more reason to keep your own copies of what matters.
+        </p>
+        <p>
+          Our total responsibility to you for all claims together that arise from the service is
+          limited to the greater of what you paid us in the twelve months before the claim and
+          $100 Canadian. Because the service is free, that figure is $100.
+        </p>
+        <p>
+          These limits do not apply where the law does not allow them, including for our own fraud,
+          intentional wrongdoing or gross negligence, or for injury to a person. They take away no
+          right you have under consumer or privacy law that cannot be waived. If you live in
+          Quebec, some of them may not apply to you, and nothing here takes away a right Quebec
+          law gives you. They reflect that the service is free and run by one person.
+        </p>
+      </section>
+
+      <section id="indemnity" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">You are responsible for claims that come from what you send or publish</h2>
+        <p>
+          If somebody makes a claim against us because of something you put in, published or sent
+          in breach of these terms or the law, you will cover our reasonable costs of dealing with
+          it, including reasonable legal fees, to the extent you caused it. We will tell you about
+          the claim promptly. This does not apply to a claim that comes from something we did
+          wrong.
+        </p>
+      </section>
+
+      <section id="disputes" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">Manitoba law applies, and we would like to hear from you first</h2>
+        <p>
+          If something goes wrong, write to us first. Most problems can be settled in a
+          conversation, and we will answer within 30 days.
+        </p>
+        <p>
+          These terms are governed by the laws of Manitoba and the federal laws of Canada that
+          apply there. The courts of Manitoba have exclusive jurisdiction over a dispute about
+          them, except that nothing in these terms takes away a right the law of where you live
+          gives you to go to court at home. If you live in Quebec, that includes any right Quebec
+          law gives you to bring a claim in the courts of Quebec.
+        </p>
+      </section>
+
+      <section id="changes" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">We will tell you before a change to these terms that matters</h2>
+        <p>
+          The date at the top of this page says when these terms last changed. We change them for
+          four reasons: the law changes, the service or one of the companies it relies on
+          changes, a security problem needs a rule, or something here turns out to be unclear or
+          unfair. A change can be to any part of these terms, including what the service does and
+          what we ask of you.
+        </p>
+        <p>
+          For a change that matters, we will tell signed-in people in the service and by email at
+          least 30 days before it takes effect, unless a security problem or the law needs it
+          sooner. If you do not accept the change, you can have your account deleted before it
+          takes effect, and you will not be charged for doing so. Using the service after that
+          date means you accept it. A change does not apply to a dispute that has already begun.
+          Earlier versions are available on request.
+        </p>
+      </section>
+
+      <section id="general" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">A few more terms apply, as in any agreement like this</h2>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li>If part of these terms cannot be enforced, the rest still applies.</li>
+          <li>If we do not insist on something straight away, we have not given it up.</li>
+          <li>You cannot transfer your account to someone else. If the business is sold, we may transfer these terms to the new owner, who must follow them and the privacy policy.</li>
+          <li>We send notices to the email address on your account and in the service. You can send yours to the address below.</li>
+          <li>These terms are available only in English for now, as the privacy policy is. If you live in Quebec, please write to us before you create an account, so that we can talk about a French version.</li>
+        </ul>
+      </section>
+
+      <section id="contact" class="space-y-3">
+        <h2 class="text-xl font-semibold text-ink">Write to us with any question about these terms</h2>
+        <address class="not-italic rounded-lg border border-line bg-surface p-5 space-y-0.5">
+          <p class="font-medium text-ink">Doug McArthur</p>
+          <p>Sun Dogs Music Manitoba</p>
+          <p>55 Tunis Bay, Winnipeg, Manitoba R3T 2X2</p>
+          <p>
+            <a class="text-info-fg underline underline-offset-2" href="mailto:hello@sundogsmusic.ca">hello@sundogsmusic.ca</a>
+          </p>
+        </address>
+      </section>
+    </main>
+
+    <footer class="border-t border-line">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
+        <p>Sun Dogs Music Scout is a product of Sun Dogs Music Manitoba.</p>
+        <p class="flex flex-wrap gap-x-4 gap-y-1">
+          <a href="/privacy/" class="underline underline-offset-2 hover:text-ink">Privacy policy</a>
+          <a href="/" class="underline underline-offset-2 hover:text-ink">Back to the app</a>
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

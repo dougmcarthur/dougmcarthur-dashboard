@@ -1846,6 +1846,50 @@ purpose: a redirect onto a client-rendered page is not a document.
   Google is never passed to an AI service" stops being true, and Google's
   Limited Use rules need explicit consent for that transfer.
 
+**The terms of service are a page of their own, written beside the policy.**
+`/terms-of-service/` is `frontend/terms-of-service/index.html`, a third Vite
+entry in the same shape as `/privacy/`: plain HTML, no route in the Worker,
+`src/terms.ts` borrowing the policy's entry for the stylesheet and appearance.
+`docs/terms-of-service-research.md` is the clause-by-clause comparison it was
+revised against (Bandsintown, SOCAN, SubmitHub, Bandzoogle, FACTOR,
+ReverbNation, Groover, Submittable), including what was left out on purpose.
+
+- **It is agreed to at one action, in words, beside the button.** The invitation
+  screen says that setting up a passkey creates the account and that doing so is
+  agreeing to the terms; the terms say the same sentence back. A checkbox would
+  be firmer evidence and costs a click on the one screen that is deliberately
+  one action, so it is a decision for the owner rather than a default.
+- **It promises only what the policy promises.** No sale, no AI service without
+  asking, content read only with permission, the same four uses of information,
+  the same 30-day answer and backup window. Those are checked against the
+  policy's own sentences, so changing one page and not the other fails.
+- **Every claim about the service is pinned to the code that makes it true.**
+  Free (no payment processor anywhere in the source), never sends (no send call
+  in the Worker), an agent token can only read and add (`AGENT_ROUTES` holds no
+  DELETE, PATCH or PUT), a press kit link can be switched off and a switched-off
+  link stops resolving, an invitation lapses after `INVITE_TTL_DAYS`.
+  `test/termsOfService.test.ts`.
+- **It does not point artists at a screen they never see.** The Agent tokens
+  card is rendered for the owner only, so the terms speak of whoever holds a
+  token. The privacy policy still says an artist can issue one in Settings,
+  which is wrong for the same reason and has not been corrected.
+- **The figures are the owner's, and are written down as such.** The $100 cap,
+  the 30-day notice, Manitoba law with exclusive courts, and a narrow indemnity.
+  Change the number and the sentence together, and the page's date with them.
+- **English only, as the policy is, and that is a real gap in Quebec.** Section 55
+  of the Charter of the French language has wanted a French version handed over
+  first, then an express choice of English, for any contract of adhesion since
+  1 June 2023, and the commentary does not limit it to consumers or exclude
+  website terms. The page asks a Quebec resident to write before creating an
+  account, and an invitation is how the owner holds that until there is a French
+  version. `docs/terms-of-service-research.md` has the sources.
+- **Nothing records which version of the terms an account accepted.** The
+  commentary puts this first, and it is not built: a nullable column on the user
+  and a write where the invitation is redeemed, with the same record used to ask
+  for re-acceptance when a term changes. Until then the terms say a change is
+  announced 30 days ahead and continued use is acceptance, which is the weaker
+  form.
+
 **Goals and reach order what is undecided, and remove nothing.** The welcome
 questions are read in `shared/artistFocus.ts`, and the queue carries the result
 on each item (`ReviewItem.focus`). Two rules: *what was asked for outranks how

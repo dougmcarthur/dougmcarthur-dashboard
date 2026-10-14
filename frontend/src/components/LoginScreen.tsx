@@ -199,12 +199,20 @@ export function LoginScreen({ session, onSignedIn }: { session: SessionState; on
           New here? What is Sun Dogs Music Scout?
         </a>
 
-        <a
-          href="/privacy/"
-          className="block text-xs text-muted hover:text-ink transition-colors underline underline-offset-2"
-        >
-          Privacy policy
-        </a>
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <a
+            href="/privacy/"
+            className="text-xs text-muted hover:text-ink transition-colors underline underline-offset-2"
+          >
+            Privacy policy
+          </a>
+          <a
+            href="/terms-of-service/"
+            className="text-xs text-muted hover:text-ink transition-colors underline underline-offset-2"
+          >
+            Terms of service
+          </a>
+        </div>
       </div>
     </div>
   )

@@ -125,7 +125,17 @@ export function JoinScreen({ token, onJoined }: { token: string; onJoined: () =>
               </p>
 
               <p className="text-xs text-muted">
-                Setting up a passkey creates your account. What we collect and why is in the{' '}
+                Setting up a passkey creates your account, and by setting one up you agree to the{' '}
+                <a
+                  href="/terms-of-service/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-ink"
+                >
+                  terms of service
+                </a>
+                , which limit our responsibility and say that Manitoba law applies. What we collect
+                and why is in the{' '}
                 <a
                   href="/privacy/"
                   target="_blank"
