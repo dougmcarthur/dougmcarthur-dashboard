@@ -44,6 +44,34 @@ export function inviteExpiry(now: Date): string {
 }
 
 /**
+ * How long an invitation nobody used is kept once it has stopped working.
+ *
+ * It holds the name and address the owner typed for somebody who never signed
+ * up, so it is not kept for its own sake. Ninety days outlasts the thirty it
+ * could be used for, which is long enough to answer "did I invite them, and
+ * what happened to it" after the link has lapsed. The privacy page states the
+ * same number, and `test/privacyPolicy.test.ts` reads it from here.
+ *
+ * A used invitation is not covered: it goes with the account it created.
+ */
+export const UNUSED_INVITE_RETENTION_DAYS = 90
+
+/**
+ * An unused invitation whose expiry or withdrawal is older than this is past
+ * retention.
+ *
+ * "Stopped working" is whichever came first, so a row is old enough when
+ * *either* date is. That is deliberate: withdrawing an invitation that had
+ * already lapsed does not restart its clock, and one withdrawn in week one is
+ * gone ninety days after the withdrawal rather than ninety days after the
+ * thirty it would otherwise have run. Strictly older, so a row exactly on the
+ * line is kept for one more tick.
+ */
+export function inviteRetentionCutoff(now: Date): string {
+  return new Date(now.getTime() - UNUSED_INVITE_RETENTION_DAYS * 86_400_000).toISOString()
+}
+
+/**
  * What the person holding a dead link is told.
  *
  * Each one says what happened and what to do about it, because "invalid
