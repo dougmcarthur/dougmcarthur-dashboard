@@ -8,6 +8,7 @@ import {
   SESSION_TTL_DAYS,
 } from '../shared/auth'
 import { HANDLED_RETENTION_DAYS, UNHANDLED_RETENTION_DAYS } from '../shared/inviteRequests'
+import { UNUSED_INVITE_RETENTION_DAYS } from '../shared/invites'
 
 /**
  * The privacy policy, read off the source.
@@ -108,6 +109,16 @@ describe('the numbers are the code’s', () => {
 
     const usage = constant('src/lib/usage.ts', 'USAGE_RETENTION_DAYS')
     expect(TEXT).toMatch(new RegExp(`Daily record counts ${usage} days\\.`))
+  })
+
+  it('an invitation nobody used goes when the sweep says it does', () => {
+    // The number is the constant `pruneInvites` measures from, so the page and
+    // the daily tick cannot disagree about it.
+    expect(TEXT).toContain(
+      `One that was never used goes ${UNUSED_INVITE_RETENTION_DAYS} days after it expires or is withdrawn, whichever comes first.`,
+    )
+    // And the old promise, which was the absence of a rule, is gone.
+    expect(TEXT).not.toContain('is kept until you ask us to remove it')
   })
 
   it('the Google connection cookie lasts as long as the page says', () => {
