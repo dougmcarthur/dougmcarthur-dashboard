@@ -40,6 +40,7 @@ import surveyRoute from './routes/survey'
 import { relinkMissing, runCatalogBackfillOnce } from './lib/catalog'
 import { pollSources, pruneCandidates } from './lib/sourcePoll'
 import { pruneInviteRequests } from './lib/inviteRequests'
+import { pruneInvites } from './lib/invites'
 import connectors from './routes/connectors'
 import manitobaMusic from './routes/manitobaMusic'
 import associationsRoute, { scanProfiles } from './routes/associations'
@@ -422,6 +423,18 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
   // Invitation requests are a stranger's name and address. Kept long enough to
   // answer, and no longer — the landing page says as much.
   await pruneInviteRequests(env, new Date())
+
+  // The other half of that: an invitation the owner issued and nobody used
+  // holds the name and address typed for it. Platform state, so once rather
+  // than per tenant, and only where `redeemed_at` is empty: a used one leaves
+  // with its account. Guarded like the steps below, so a failure here cannot
+  // skip the credential check after it.
+  try {
+    const gone = await pruneInvites(env, new Date())
+    if (gone) console.log(`pruned ${gone} unused invitations`)
+  } catch (err) {
+    console.error('invitation pruning failed:', err)
+  }
 
   // Platform-level, like event retention: what the source poller read is not
   // any artist's. Ignored items are kept two months so the verdicts can be
