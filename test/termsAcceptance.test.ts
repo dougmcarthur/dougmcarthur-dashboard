@@ -187,6 +187,22 @@ describe('what redeeming an invitation writes, run for real', () => {
   })
 })
 
+describe('the privacy policy says it is kept', () => {
+  const PRIVACY = read('frontend/privacy/index.html')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+
+  it('names the record, and that older accounts have none', () => {
+    // The collection list is where a reader looks for what is held about them.
+    // A column that stores a fact about a person and a page that does not say so
+    // is the gap this closes, so the sentence goes if the record does.
+    expect(PRIVACY).toContain('which version of the terms of service you agreed to and when')
+    expect(PRIVACY).toContain('written once when your account is created')
+    expect(PRIVACY).toContain('An account made before we began recording this has no such record.')
+  })
+
+})
+
 describe('where it is written and where it is not', () => {
   const NAMES = /\b(termsVersion|termsAcceptedAt|terms_version|terms_accepted_at)\b/
 

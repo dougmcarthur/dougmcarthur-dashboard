@@ -1914,6 +1914,9 @@ a red test rather than an account recorded against words it never saw.
   oversight surface or a screen that starts carrying it fails there and has to
   say why. The row goes with the account in `removeTenant`, which deletes the user
   row, and the privacy policy's retention line for an account already says that.
+  The policy's list of what is held about an account names the record in its
+  "Who you are" line, including that an older account has none, and the same test
+  pins that sentence, so dropping the columns means changing the page too.
 
 **Goals and reach order what is undecided, and remove nothing.** The welcome
 questions are read in `shared/artistFocus.ts`, and the queue carries the result
