@@ -601,6 +601,85 @@ const replies = [
 ]
 
 // ---------------------------------------------------------------------------
+// The shared catalog, in the shapes the first-run lanes tell apart
+// (shared/startLanes.ts). An account that has said nothing is shown what is
+// open to nearly anyone, so the fixture holds each way an entry is in or out:
+// a national grant with a date and one that rolls, a provincial grant that
+// must not be called national, festivals and showcases in the owner's province
+// and in another one, and four sync companies that differ only in what their
+// own sites said. The catalog belongs to nobody, so there is no tenant here.
+// First sighting is three weeks back, past the holding period.
+
+const catalogRow = (o) => ({
+  catalog_key: o.key,
+  category: o.category,
+  name: o.name,
+  organizer: o.organizer ?? null,
+  kind: o.kind ?? null,
+  url: o.url ?? null,
+  deadline: o.deadline ?? null,
+  deadline_note: o.deadline_note ?? null,
+  location: o.location ?? null,
+  country: o.country ?? null,
+  region: o.region ?? null,
+  public: 1,
+  first_seen_at: iso(-24 * 21),
+  last_seen_at: iso(-24 * 2),
+  found_by: 'agent',
+  site: o.site ?? null,
+  submission_policy: o.policy ?? null,
+  policy_evidence: o.policy_evidence ?? null,
+  policy_url: o.policy ? `${o.site}/submit` : null,
+  policy_checked_at: o.policy ? iso(-24 * 3) : null,
+  exclusivity: o.exclusivity ?? null,
+  exclusivity_evidence: o.exclusivity_evidence ?? null,
+  exclusivity_url: o.exclusivity ? `${o.site}/artists` : null,
+  terms_read_at: o.read ? iso(-24 * 3) : null,
+})
+
+const sync = (name, o) =>
+  catalogRow({
+    key: `seed:sync:${name.toLowerCase().replace(/[^a-z]+/g, '-')}`,
+    category: 'sync',
+    name,
+    kind: 'Library',
+    site: `https://${name.toLowerCase().replace(/[^a-z]+/g, '')}.example.test`,
+    ...o,
+  })
+
+const catalogRows = [
+  catalogRow({ key: 'seed:grant:touring', category: 'funding', name: 'National Touring Fund', kind: 'Grant', organizer: 'Arts Federation of Canada', url: 'https://touring.example.test/fund', deadline: day(24), location: 'National', country: 'CA' }),
+  catalogRow({ key: 'seed:grant:showcase-travel', category: 'funding', name: 'Showcase Travel Fund', kind: 'Grant', url: 'https://travel.example.test/fund', deadline_note: 'Rolling intake, apply any time before you travel', location: 'National', country: 'CA' }),
+  // Not national: a province in the place, so it belongs to that province's artists.
+  catalogRow({ key: 'seed:grant:prairie', category: 'funding', name: 'Prairie Arts Grant', kind: 'Grant', url: 'https://prairie.example.test/grant', deadline: day(31), location: 'Winnipeg, MB', country: 'CA', region: 'MB' }),
+  // Not national: nothing says where it is.
+  catalogRow({ key: 'seed:grant:placeless', category: 'funding', name: 'Emerging Voices Award', kind: 'Award', url: 'https://voices.example.test/award', deadline: day(45) }),
+  catalogRow({ key: 'seed:festival:red-river', category: 'festival', name: 'Red River Roots Weekend', kind: 'Festival', url: 'https://redriverroots.example.test/apply', deadline: day(40), location: 'Selkirk, MB', country: 'CA', region: 'MB' }),
+  catalogRow({ key: 'seed:showcase:prairie-night', category: 'showcase', name: 'Prairie Showcase Night', kind: 'Showcase', url: 'https://prairienight.example.test/apply', deadline: day(18), location: 'Winnipeg, MB', country: 'CA', region: 'MB' }),
+  catalogRow({ key: 'seed:showcase:lakeshore', category: 'showcase', name: 'Lakeshore Showcase', kind: 'Showcase', url: 'https://lakeshore.example.test/apply', deadline: day(27), location: 'Kenora, ON', country: 'CA', region: 'ON' }),
+  // Closed already: removed with a reason, never listed.
+  catalogRow({ key: 'seed:festival:closed', category: 'festival', name: 'Birch Bay Folk Fest', kind: 'Festival', url: 'https://birchbay.example.test/apply', deadline: day(-9), location: 'Brandon, MB', country: 'CA', region: 'MB' }),
+
+  sync('Open Door Music Library', {
+    policy: 'open',
+    policy_evidence: 'We welcome submissions from independent artists and listen to everything that is sent.',
+    exclusivity: 'non_exclusive',
+    exclusivity_evidence: 'All of our agreements with artists are non-exclusive, so you keep placing your music elsewhere.',
+    read: true,
+  }),
+  sync('Quiet Pines Sync', { policy: 'open', policy_evidence: 'Send us your music through the submission form.', read: true }),
+  sync('Fresh Ink Library', { policy: 'open', policy_evidence: 'We are always looking for new writers and composers.', read: false }),
+  sync('Northern Lights Publishing', {
+    policy: 'open',
+    policy_evidence: 'We accept submissions year round.',
+    exclusivity: 'exclusive',
+    exclusivity_evidence: 'We sign artists to an exclusive representation agreement for a term of three years.',
+    read: true,
+  }),
+  sync('Closed Door Records', { policy: 'closed', policy_evidence: 'No unsolicited material please.', read: true }),
+]
+
+// ---------------------------------------------------------------------------
 // The enrolment code. Without this the fixture is a database nobody can log in
 // to look at: a fresh local database has no passkey, and the emailed-code path
 // needs a mailer that local development does not have. `code_hash` is a plain
@@ -622,7 +701,7 @@ const codeRow = {
 const OWNED_TABLES = [
   'application_fields', 'notification_events', 'gig_replies',
   'task_runs', 'artist_assets', 'reference_docs', 'promo_drafts',
-  'sync_targets', 'gig_opportunities', 'auth_enrolment_codes', 'users', 'tenants',
+  'sync_targets', 'gig_opportunities', 'opportunities', 'auth_enrolment_codes', 'users', 'tenants',
 ]
 
 const statements = [
@@ -630,6 +709,7 @@ const statements = [
   ...insert('tenants', tenants),
   ...insert('users', users),
   ...insert('gig_opportunities', gigRows),
+  ...insert('opportunities', catalogRows),
   ...insert('sync_targets', syncRows),
   ...insert('promo_drafts', promoRows),
   ...insert('artist_assets', assetRows),
@@ -651,6 +731,7 @@ const counts = {
   tenants: tenants.length,
   users: users.length,
   gig_opportunities: gigRows.length,
+  opportunities: catalogRows.length,
   sync_targets: syncRows.length,
   promo_drafts: promoRows.length,
   artist_assets: assetRows.length,

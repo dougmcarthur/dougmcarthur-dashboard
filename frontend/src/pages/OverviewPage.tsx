@@ -6,7 +6,7 @@ import { OpenEndedRow } from '../components/OpenEndedRow'
 import { DataHealthRow } from '../components/DataHealthRow'
 import { OnboardingCard, useOnboardingAutostart } from '../components/OnboardingCard'
 import { OnboardingFlow, type FlowScreen } from '../components/OnboardingFlow'
-import { StarterMatches } from '../components/StarterMatches'
+import { StartHere } from '../components/StartHere'
 import { useState } from 'react'
 
 export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
@@ -77,10 +77,11 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
         <OnboardingFlow state={onboarding.data} startAt={flow} onClose={() => setFlow(null)} />
       )}
 
-      {/* What Scout found in the shared catalog for this artist, previewed before it is
-          added. Renders nothing until they have said what they want, and once they
-          have answered. */}
-      <StarterMatches />
+      {/* What is open to nearly any Canadian artist, shown before they have said
+          anything: grants anywhere in Canada, festivals and showcases in their
+          province, and sync companies that take submissions with no exclusivity.
+          Each row is its own Add. Renders nothing once they have answered. */}
+      <StartHere />
 
       {/*
         One column until xl, then a main column and a rail.

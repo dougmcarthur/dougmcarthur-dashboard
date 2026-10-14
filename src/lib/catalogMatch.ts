@@ -26,12 +26,13 @@
  *    new matches for you" is not recoverable from tomorrow's state.
  */
 
-import { desc, inArray, isNotNull } from 'drizzle-orm'
+import { desc, eq, inArray, isNotNull } from 'drizzle-orm'
 import { getDb } from '../db'
-import { gigOpportunities, opportunities } from '../db/schema'
+import { gigOpportunities, opportunities, syncTargets } from '../db/schema'
 import { scoped, withTenant, type TenantId } from '../db/scope'
 import { gigStatusColumns } from '../db/gigRows'
 import { focusFor } from './focus'
+import { readHome } from './travelEnrich'
 import { readTenantSetting, writeTenantSetting, clearTenantSetting } from './nudgeSettings'
 import { recordEvent } from './notificationEvents'
 import {
@@ -41,8 +42,12 @@ import {
   type Eligibility,
   type Match,
   type MatchResult,
+  type OrgTerms,
 } from '../../shared/catalogMatch'
-import { ONBOARDING_KEYS, parseProfile, type Profile } from '../../shared/onboarding'
+import { ONBOARDING_KEYS, parseGoals, parseProfile, type Profile } from '../../shared/onboarding'
+import { homeRegionOf } from '../../shared/artistFocus'
+import { PROVINCES } from '../../shared/regions'
+import { buildStartLanes, syncCandidates, type StartLanes, type SyncRow } from '../../shared/startLanes'
 import type { Focus } from '../../shared/artistFocus'
 import type { Env } from '../types'
 
@@ -78,6 +83,25 @@ function parseJson<T>(raw: string | null): T | null {
 
 type Row = typeof opportunities.$inferSelect
 
+/** What an organisation's own site said, for an entry that is one. Null for every other kind. */
+function orgOf(row: Row): OrgTerms | null {
+  if (row.category !== 'sync') return null
+  const policy = row.submissionPolicy === 'open' || row.submissionPolicy === 'closed' ? row.submissionPolicy : null
+  const exclusivity =
+    row.exclusivity === 'non_exclusive' || row.exclusivity === 'exclusive' ? row.exclusivity : null
+  return {
+    site: row.site,
+    submissionPolicy: policy,
+    policyEvidence: row.policyEvidence,
+    policyUrl: row.policyUrl,
+    policyCheckedAt: row.policyCheckedAt,
+    exclusivity,
+    exclusivityEvidence: row.exclusivityEvidence,
+    exclusivityUrl: row.exclusivityUrl,
+    termsReadAt: row.termsReadAt,
+  }
+}
+
 export function toEntry(row: Row): CatalogEntry {
   const genres = parseJson<string[]>(row.genres)
   return {
@@ -99,6 +123,7 @@ export function toEntry(row: Row): CatalogEntry {
     feeCurrency: row.feeCurrency,
     firstSeenAt: row.firstSeenAt,
     delivery: row.delivery,
+    org: orgOf(row),
   }
 }
 
@@ -118,6 +143,8 @@ export interface Plan extends MatchResult {
   said: boolean
   /** Ids already offered, so a row they removed is not offered again. */
   added: Set<number>
+  /** The whole catalog as the matcher saw it, for the lanes that read organisations. */
+  entries: CatalogEntry[]
 }
 
 /**
@@ -142,14 +169,135 @@ export async function planMatches(env: Env, tenant: TenantId, today: string): Pr
   const profile = parseProfile(profileRaw)
   const added = new Set(offered)
   const have = new Set([...linked.map((r) => r.id).filter((id): id is number => id !== null), ...added])
+  const entries = rows.map(toEntry)
 
   return {
-    ...matchCatalog({ entries: rows.map(toEntry), focus, profile, have, today }),
+    ...matchCatalog({ entries, focus, profile, have, today }),
     focus,
     profile,
     said: focus !== null || (profile?.region ?? null) !== null || (profile?.genres.length ?? 0) > 0,
     added,
+    entries,
   }
+}
+
+/**
+ * Where the artist is, for "in your province", from the most exact thing said.
+ *
+ * The home base from Settings, then the province they chose in the welcome
+ * questions. Read here and not from `focusFor`, which is null until goals are
+ * chosen: the first screen has to be able to say a province before there are
+ * any, and an account with neither has no province, which the lane then asks
+ * for instead of guessing.
+ */
+export async function provinceFor(env: Env, tenant: TenantId, profile: Profile | null): Promise<string | null> {
+  const home = await readHome(env, tenant)
+  const fromHome = homeRegionOf(home?.place ?? null)
+  if (fromHome) return fromHome
+  const said = profile?.region ?? null
+  return said && said in PROVINCES ? said : null
+}
+
+/** Catalog ids of the sync organisations already on this artist's Sync list. */
+async function syncOnList(env: Env, tenant: TenantId): Promise<Set<number>> {
+  const rows = await getDb(env.DB)
+    .select({ id: syncTargets.opportunityId })
+    .from(syncTargets)
+    .where(scoped(syncTargets, tenant, isNotNull(syncTargets.opportunityId)))
+  return new Set(rows.map((r) => r.id).filter((id): id is number => id !== null))
+}
+
+export interface StartPlan {
+  lanes: StartLanes
+  /** The whole plan, so the route that adds can check an id against what is offered. */
+  plan: Plan
+  /** Sync organisations that may be added, shown or not: the server's own list, never the browser's. */
+  syncAddable: Map<number, SyncRow>
+}
+
+/**
+ * What an account with nothing on it is shown, and what it may add.
+ *
+ * Reads no more than the starter preview does plus the artist's own Sync rows,
+ * and writes nothing. `syncAddable` is every organisation the lane would offer
+ * or list, so the add route checks the id it was given against this and never
+ * against the screen that sent it.
+ */
+export async function planStart(env: Env, tenant: TenantId, today: string): Promise<StartPlan> {
+  const [plan, haveSync, goalsRaw] = await Promise.all([
+    planMatches(env, tenant, today),
+    syncOnList(env, tenant),
+    readTenantSetting(env, tenant, ONBOARDING_KEYS.goals),
+  ])
+  const home = await provinceFor(env, tenant, plan.profile)
+  const goals = parseGoals(goalsRaw)?.goals ?? []
+
+  const lanes = buildStartLanes({ matches: plan.matches, entries: plan.entries, haveSync, home, goals, today })
+  const candidates = syncCandidates(plan.entries, haveSync, today)
+  return {
+    lanes,
+    plan,
+    syncAddable: new Map([...candidates.stated, ...candidates.unclear].map((row) => [row.id, row])),
+  }
+}
+
+export interface AddedSync {
+  id: number
+  name: string
+}
+
+/** The artist's own Sync row for a catalog organisation, if they have one. */
+export async function findSyncTarget(env: Env, tenant: TenantId, entryId: number): Promise<AddedSync | null> {
+  const row = await getDb(env.DB)
+    .select({ id: syncTargets.id, name: syncTargets.name })
+    .from(syncTargets)
+    .where(scoped(syncTargets, tenant, eq(syncTargets.opportunityId, entryId)))
+    .get()
+  return row ?? null
+}
+
+/**
+ * Put one sync organisation on the artist's Sync list, as a target to research.
+ *
+ * Linked to the catalog entry, and carrying the policy its own site stated
+ * with the sentence, so the Sync page's gate reads "takes submissions" with the
+ * evidence beside it and not an unchecked row. It starts `draft_ready`, which
+ * is where the Sync page's own form starts a target typed in by hand, and the
+ * pitch gate and the deck both already read the terms on it.
+ *
+ * Idempotent: an organisation already linked is returned as it is, so two taps
+ * on Add file one row.
+ */
+export async function addSyncTarget(
+  env: Env,
+  tenant: TenantId,
+  entry: CatalogEntry,
+  now: string,
+): Promise<AddedSync | null> {
+  const existing = await findSyncTarget(env, tenant, entry.id)
+  if (existing) return existing
+
+  const org = entry.org
+  const [row] = await getDb(env.DB)
+    .insert(syncTargets)
+    .values(
+      withTenant(tenant, {
+        name: entry.name,
+        agencyType: entry.kind,
+        website: org?.site ?? null,
+        status: 'draft_ready',
+        notes: 'Added from Scout’s shared list. Read their terms yourself before you sign anything.',
+        opportunityId: entry.id,
+        submissionPolicy: org?.submissionPolicy ?? null,
+        policyEvidence: org?.policyEvidence ?? null,
+        policyUrl: org?.policyUrl ?? null,
+        policyCheckedAt: org?.policyCheckedAt ?? null,
+        discoveredAt: now,
+        updatedAt: now,
+      }),
+    )
+    .returning({ id: syncTargets.id, name: syncTargets.name })
+  return row
 }
 
 /**

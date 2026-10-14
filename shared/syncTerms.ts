@@ -43,7 +43,7 @@ export interface PolicyReading {
  * pitches"), and a reader that took the keyword and ignored the doubt would
  * close every target the agent was unsure about.
  */
-const UNCERTAIN =
+export const UNCERTAIN =
   /\b(?:whether|could\s?n[o']?t|could not|unable to|not able to|unconfirmed|unverified|unclear|unsure|not sure|unknown|not confirm\w*|no (?:public |clear |stated |explicit )?(?:statement|information|mention|policy|word)|(?:does|did|do)(?:\s?n[o']?t| not) (?:say|state|mention|specify)|check (?:if|whether)|find out|if (?:they|it|the company|the label|she|he)\b|ask (?:if|whether|them))/i
 
 /**

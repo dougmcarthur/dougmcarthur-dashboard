@@ -5,6 +5,7 @@ import type { StagePlot } from '../../shared/stagePlot'
 import type { PaletteId } from '../../shared/themes'
 import type { DocumentReading } from '../../shared/documentReadings'
 import type { PublicOpportunity } from '../../shared/opportunityCatalog'
+import type { StartLanes } from '../../shared/startLanes'
 import type { InviteRequestStatus } from '../../shared/inviteRequests'
 import type { Plan as SurveyPlan } from '../../shared/surveyDesign'
 import type { AnswerMap as SurveyAnswers } from '../../shared/surveyAnswers'
@@ -1112,9 +1113,20 @@ export const api = {
     show: () => apiFetch<{ hidden: boolean }>('/onboarding/show', { method: 'POST' }),
   },
   matching: {
-    starter: () => apiFetch<StarterPreview>(`/matching/starter?today=${localToday()}`),
-    addStarter: () =>
-      apiFetch<{ added: number; names: string[] }>(`/matching/starter?today=${localToday()}`, { method: 'POST' }),
+    /** What a new account is shown before it has said anything. Writes nothing. */
+    start: () => apiFetch<StartPreview>(`/matching/start?today=${localToday()}`),
+    /** Festivals, showcases and grants from the lanes. Each id is checked again on the server. */
+    addToList: (ids: number[]) =>
+      apiFetch<{ added: number; names: string[] }>(`/matching/start/add?today=${localToday()}`, {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      }),
+    /** One sync company onto the Sync list, carrying what its own site said. */
+    addSync: (id: number) =>
+      apiFetch<{ added: boolean; id: number | null; name: string }>(`/matching/start/sync?today=${localToday()}`, {
+        method: 'POST',
+        body: JSON.stringify({ id }),
+      }),
     decline: () => apiFetch<{ ok: boolean }>('/matching/starter/decline', { method: 'POST' }),
     settings: () => apiFetch<{ enabled: boolean }>('/matching/settings'),
     setEnabled: (enabled: boolean) =>
@@ -1402,38 +1414,16 @@ export interface BackfillResult {
   byColumn: Record<string, number>
 }
 
-/** One opportunity from the shared catalog, as the preview shows it. */
-export interface StarterMatch {
-  id: number
-  name: string
-  category: string
-  kind: string | null
-  location: string | null
-  deadline: string | null
-  deadlineNote: string | null
-  url: string | null
-  /** Why it is here, in sentences. */
-  reasons: string[]
-  /** What the listing does not say. */
-  unknowns: string[]
-}
-
-/** What Scout found for this artist, before any of it is added. */
-export interface StarterPreview {
-  /** They have told Scout something to match on. */
-  said: boolean
-  /** They have already added the set or said not now. */
+/** What a new account is shown, and whether they have already answered it. See shared/startLanes.ts. */
+export interface StartPreview {
+  /** They have already added from it or said not now. */
   answered: boolean
   /** They switched suggestions off. */
   off: boolean
-  limit: number
-  willAdd: StarterMatch[]
-  /** Matched, and not in the set. */
-  rest: number
-  /** Still in the holding period. */
-  held: number
-  skipped: Array<{ reason: string; count: number; example: string }>
-  unknowns: Record<string, number>
+  /** They have a list of their own, so this is not a first visit. */
+  established: boolean
+  /** Null whenever there is nothing to show: answered, off, or established. */
+  lanes: StartLanes | null
 }
 
 /** The first-run checklist. See shared/onboarding.ts. */

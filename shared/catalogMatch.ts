@@ -64,6 +64,26 @@ export interface CatalogEntry {
   firstSeenAt: string
   /** null = after the holding period, 'approved' = now, 'blocked' = never. */
   delivery: string | null
+  /**
+   * What a sync organisation's own site says about being pitched. Read by the
+   * first-run lanes (`shared/startLanes.ts`) and by nothing in `matchCatalog`,
+   * which skips organisations. Absent on every other category.
+   */
+  org?: OrgTerms | null
+}
+
+/** A sync organisation's own words about submissions and exclusivity. Null is "no claim". */
+export interface OrgTerms {
+  site: string | null
+  submissionPolicy: 'open' | 'closed' | null
+  policyEvidence: string | null
+  policyUrl: string | null
+  policyCheckedAt: string | null
+  exclusivity: 'non_exclusive' | 'exclusive' | null
+  exclusivityEvidence: string | null
+  exclusivityUrl: string | null
+  /** When exclusivity was last looked for. Null is "never", which is not "found nothing". */
+  termsReadAt: string | null
 }
 
 /**

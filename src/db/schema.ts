@@ -749,6 +749,20 @@ export const opportunities = sqliteTable('opportunities', {
   /** null = after the holding period, 'approved' = now, 'blocked' = never. */
   delivery: text('delivery'),
   checkedAt: text('checked_at'),
+  /**
+   * What a sync organisation's own site says about being pitched. Facts about
+   * the organisation, nothing about anybody's relationship to it. Null is "no
+   * claim" and never a green light. Migration 0042.
+   */
+  site: text('site'),
+  submissionPolicy: text('submission_policy'), // open | closed | null
+  policyEvidence: text('policy_evidence'),
+  policyUrl: text('policy_url'),
+  policyCheckedAt: text('policy_checked_at'),
+  exclusivity: text('exclusivity'), // non_exclusive | exclusive | null
+  exclusivityEvidence: text('exclusivity_evidence'),
+  exclusivityUrl: text('exclusivity_url'),
+  termsReadAt: text('terms_read_at'),
   firstSeenAt: text('first_seen_at').notNull(),
   lastSeenAt: text('last_seen_at').notNull(),
 })

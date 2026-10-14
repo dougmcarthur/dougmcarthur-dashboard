@@ -8,13 +8,17 @@ import {
   foldFinding,
   readSubmissionPolicy,
   refusalRetracted,
+  RETRY_DAYS,
   termsDue,
   termsState,
   type PolicyReading,
   type TermsColumns,
+  type TermsFinding,
 } from '../../shared/syncTerms'
+import { readExclusivity, type ExclusivityReading } from '../../shared/syncExclusivity'
 import { decodeEntities } from './formParser'
 import { recordEvent } from './notificationEvents'
+import { mirrorTargetTerms, recordOrgTerms, targetsUnreadForExclusivity } from './orgTerms'
 import type { Env } from '../types'
 
 /**
@@ -244,6 +248,12 @@ async function mapLimit<T, R>(items: T[], limit: number, work: (item: T) => Prom
 export interface SiteScan {
   closed: (PolicyReading & { url: string }) | null
   open: (PolicyReading & { url: string }) | null
+  /**
+   * What their own pages say about exclusivity, read from the pages already
+   * fetched for the policy and at no extra request. An exclusive reading
+   * outranks a non-exclusive one: see `readExclusivity`.
+   */
+  exclusivity: (ExclusivityReading & { url: string }) | null
   pagesRead: number
   /** Whether there was any address to read at all. */
   hadSite: boolean
@@ -263,6 +273,7 @@ export async function scanSite(
     return {
       closed: null,
       open: null,
+      exclusivity: null,
       pagesRead: 0,
       hadSite: false,
       url: null,
@@ -334,6 +345,7 @@ export async function scanSite(
     return {
       closed: null,
       open: null,
+      exclusivity: null,
       pagesRead: 0,
       hadSite: true,
       url: null,
@@ -343,15 +355,25 @@ export async function scanSite(
 
   let closed: SiteScan['closed'] = null
   let open: SiteScan['open'] = null
+  let exclusivity: SiteScan['exclusivity'] = null
   for (const page of pages) {
-    const reading = readSubmissionPolicy(htmlToText(page.html))
+    const text = htmlToText(page.html)
+    const reading = readSubmissionPolicy(text)
     if (reading?.policy === 'closed' && !closed) closed = { ...reading, url: page.url }
     if (reading?.policy === 'open' && !open) open = { ...reading, url: page.url }
+
+    // Every page is read before a reassurance may stand: one page's
+    // "non-exclusive" does not outrank another's "exclusive representation".
+    const found = readExclusivity(text)
+    if (found && (!exclusivity || (found.kind === 'exclusive' && exclusivity.kind !== 'exclusive'))) {
+      exclusivity = { ...found, url: page.url }
+    }
   }
 
   return {
     closed,
     open,
+    exclusivity,
     pagesRead: pages.length,
     hadSite: true,
     url: closed?.url ?? open?.url ?? pages[0].url,
@@ -450,15 +472,12 @@ export async function checkTarget(
   const fromNotes = readSubmissionPolicy(row.notes, { only: 'closed' })
 
   const closed = scan.closed ?? (fromNotes ? { ...fromNotes, url: null } : null)
-  const folded = foldFinding(
-    columnsOf(row),
-    closed
-      ? { policy: 'closed', quote: closed.quote, url: closed.url, note: scan.note }
-      : scan.open
-        ? { policy: 'open', quote: scan.open.quote, url: scan.open.url, note: scan.note }
-        : { policy: null, quote: null, url: scan.url, note: scan.note },
-    now,
-  )
+  const finding: TermsFinding = closed
+    ? { policy: 'closed', quote: closed.quote, url: closed.url, note: scan.note }
+    : scan.open
+      ? { policy: 'open', quote: scan.open.quote, url: scan.open.url, note: scan.note }
+      : { policy: null, quote: null, url: scan.url, note: scan.note }
+  const folded = foldFinding(columnsOf(row), finding, now)
 
   await db
     .update(syncTargets)
@@ -469,6 +488,23 @@ export async function checkTarget(
       policyCheckedAt: folded.policyCheckedAt,
     })
     .where(scoped(syncTargets, tenant, eq(syncTargets.id, id)))
+
+  // The same finding, onto the catalog entry a new account is shown. The check
+  // has already been written, so a failure here costs the catalog a look and
+  // never the artist their row.
+  if (row.opportunityId !== null) {
+    try {
+      await recordOrgTerms(env, tenant, row.opportunityId, {
+        site: row.website,
+        finding,
+        checkedAt: now,
+        exclusivity: scan.exclusivity,
+        read: scan.pagesRead > 0,
+      })
+    } catch (err) {
+      console.error(`catalog terms write failed for sync target ${id}:`, err)
+    }
+  }
 
   const updated = { ...row, ...folded }
   const newlyClosed = termsState(columnsOf(row)) !== 'closed' && termsState(folded) === 'closed'
@@ -517,14 +553,43 @@ export async function checkPendingTerms(
   const retracted = await retractFalseRefusals(env, tenant)
   const rows = await db.select().from(syncTargets).where(scoped(syncTargets, tenant))
 
+  // What these targets already say, onto the catalog, before anything is
+  // fetched: it is a few writes and no network, and it is what makes a target
+  // read last month visible to somebody who arrives tonight. Owner's only.
+  try {
+    await mirrorTargetTerms(env, tenant)
+  } catch (err) {
+    console.error('mirroring sync terms to the catalog failed:', err)
+  }
+
   const order = { never: 0, retry: 1, stale: 2 } as const
   const due = rows
     .map((row) => ({ row, why: termsDue({ ...row }, today) }))
     .filter((d): d is { row: StoredTarget; why: 'never' | 'retry' | 'stale' } => d.why !== null)
     .sort((a, b) => order[a.why] - order[b.why] || a.row.id - b.row.id)
 
-  const run: TermsRun = { due: due.length, checked: 0, closed: 0, retracted }
-  for (const { row } of due.slice(0, options.limit ?? TERMS_LIMIT)) {
+  // Then the targets that were read before exclusivity was looked for. They
+  // are not otherwise due for sixty days, and a first-time artist is being
+  // shown a list that cannot include them until they are read. Last in line,
+  // and not again for `RETRY_DAYS` after a look that could not open the site.
+  const queued = new Set(due.map((d) => d.row.id))
+  let unread: StoredTarget[] = []
+  try {
+    unread = (await targetsUnreadForExclusivity(env, tenant))
+      .filter((row) => !queued.has(row.id) && row.status !== 'archived' && row.status !== 'declined')
+      .filter((row) => {
+        if (!row.policyCheckedAt) return true
+        const days = (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${row.policyCheckedAt.slice(0, 10)}T00:00:00Z`)) / 86_400_000
+        return days >= RETRY_DAYS
+      })
+      .sort((a, b) => a.id - b.id)
+  } catch (err) {
+    console.error('finding targets unread for exclusivity failed:', err)
+  }
+
+  const work = [...due.map((d) => d.row), ...unread]
+  const run: TermsRun = { due: work.length, checked: 0, closed: 0, retracted }
+  for (const row of work.slice(0, options.limit ?? TERMS_LIMIT)) {
     try {
       const result = await checkTarget(env, tenant, row.id, {
         announce: true,

@@ -2113,6 +2113,73 @@ written. The body is capped at 3 MB (Music BC's feed is 1.6 MB for ten items)
 and a stranger's markup only ever becomes strings: it is never followed, run or
 passed to a model.
 
+**A new account is shown what is open to nearly anyone, before it has said
+anything.** The Overview of an account with no rows used to be a checklist and
+an empty deck, and the starter set waited for the welcome questions and then
+sat behind a button. `StartHere` replaced it (`shared/startLanes.ts`,
+`GET /api/matching/start`): three lanes, each headed by a sentence that says the
+finding. Grants open to artists anywhere in Canada, festivals and showcases in
+their province, and sync companies whose own sites say they take submissions and
+ask for no exclusivity. The gig lanes are cut from `matchCatalog`'s output, so a
+call that has closed, one already on the list and one for another province's
+residents are removed there, once, for the reasons they are removed everywhere.
+
+- **A missing input is never a guess.** A grant is "national" only where its
+  place says so (National, Canada, nationwide) and no province is in the place or
+  the column and nobody is restricted to residents. A grant with no place at all
+  is not called national, since a Winnipeg-only grant shown to a Vancouver artist
+  is the mistake a first screen cannot afford. The province lane asks for a
+  province in place when there is none, and "Outside Canada" is not offered there
+  because it names nothing to look in. Home is the Settings home base, then the
+  province said in the welcome questions, and it is read without goals:
+  `focusFor` is null until goals are chosen, which is why `provinceFor` exists.
+- **A sync company is shown only on its own words, with the sentences.** The
+  catalog entry carries `submission_policy` and `exclusivity` with the evidence
+  and the page each came from (migration 0042). Silence about exclusivity is
+  listed apart under its own sentence ("silence is not the same as asking for
+  none"), companies that ask for exclusivity or refuse cold pitches are counted
+  and never listed, and one nobody has read for exclusivity says so rather than
+  reading as fine. `readExclusivity` (`shared/syncExclusivity.ts`) follows
+  `syncTerms.ts`'s rules: caution beats reassurance across every page read, a
+  sentence about what a *customer* gets is not about the artist (every library
+  calls its licence to customers non-exclusive), and a reassurance needs an
+  artist-side subject where a caution needs only that the sentence is not about a
+  buyer.
+- **Measured on real sites, and thin.** Run through `scanSite` against sixteen
+  real sync libraries and publishers on 2026-10-14, one stated its terms in a form
+  the reader accepts (Epidemic Sound: a non-exclusive agreement, on its artists
+  page), five returned no readable pages, and the existing policy reader made one
+  false "open" (a TuneCore blog sentence). Expect the lane to be short and to say
+  so. It reads only the pages `scanSite` already fetches, and `POLICY_PATHS` is
+  unchanged on purpose: adding terms pages would feed legalese to a refusal reader
+  that was measured without it.
+- **Only the owner's research reaches the catalog.** `checkTarget` mirrors a
+  finding onto the entry the row is linked to (`src/lib/orgTerms.ts`) only for
+  the owner's tenant, since the address a target is read from is typed by whoever
+  owns the row, and another artist could point a catalog organisation's name at a
+  page of their choosing. It folds toward caution with `foldFinding` and
+  `foldExclusivity`, never records a site that would not open as having been
+  looked at (`terms_read_at` stays empty), and never mirrors the artist's
+  override. The nightly pass mirrors what rows already say with no network, then
+  reads the owner's targets whose entry has never been looked at, last in line
+  and behind the same six-a-night cap.
+- **Every add is checked again.** `POST /start/add` and `/start/sync` take ids
+  as a request and check them against what the lanes would offer this artist now,
+  so a stale screen or a request made by hand adds nothing the preview would not
+  have shown. A company whose own site refuses pitches is a 409. Adding a company
+  files a `draft_ready` Sync target carrying the policy sentence, which is where
+  the Sync page's own form starts one typed in by hand.
+- **It is a first visit and it retires.** Hidden once they have said not now,
+  switched suggestions off, or have twelve rows between gigs and Sync targets
+  (`START_UNTIL_ROWS`, the size the starter set was). The route answers that
+  before reading the catalog, since the Overview loads it every visit and rows
+  read is the cost that binds. The old `/starter` routes and the daily trickle
+  are unchanged.
+- **What it does not do: recurrence.** A programme that comes round again is not
+  re-offered, which is gap 5 in `docs/matching-gaps.md` and now has its
+  behaviours written down there. The lanes inherit it: a national grant leaves its
+  lane the day its first-seen deadline passes.
+
 **The logged-out page shows the catalog, and publishing is conservative.**
 Strangers see `LandingPage` (a browser that has signed in before still gets
 the sign-in screen; `#welcome` and `#signin` cross over). It shows a small

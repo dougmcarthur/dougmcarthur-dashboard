@@ -81,6 +81,40 @@ does not work without it.
    regex over free text, so a residency, a venue booking or a competition
    becomes `other` — which is never public and would never match.
 5. **Entries do not go stale, and recurring calls never reopen.**
+   *Traced end to end on 2026-10-14, because "if I pass on a grant's deadline,
+   does it come back when the next one opens" was asked. It does not, and the
+   reasons are worth having in one place:*
+
+   - *There is one deadline per row and per entry.* `gig_opportunities.deadline`
+     and `opportunities.deadline` are single dates, `fillMissing` never
+     overwrites, and `catalogKey` is the programme's address, so a programme that
+     runs twice a year is one entry holding its first-seen date for good.
+   - *Passing is permanent.* `discovered` offers `shortlisted` and `passed` and
+     nothing else, `passed` offers only `archived`, and the matcher's `have`
+     set is every id ever linked or added, so a passed or deleted row is never
+     offered again. That last property is deliberate (`matching.added` exists so
+     "remove" does not mean "show me again tonight").
+   - *Snoozing wakes it before the deadline, not after it.* `snoozeOptions` caps
+     every offer at the day before a live deadline. Once the date has passed it
+     returns, with the old date, as "Deadline passed Nd ago".
+   - *Nothing sweeps a missed call.* `expired` is reachable only from
+     `shortlisted`, `preparing`, `submitted` and `acknowledged`, never from
+     `discovered`, and no job writes it. A New call whose date has gone sits in the
+     deck as a danger-toned card with an Apply button until somebody passes.
+   - *No input would deliver the next date anyway.* The weekly agent is told to
+     skip anything on file and to file a rolling programme once; the poller's
+     candidates do not reach the catalog; and `checked_at` and `last_seen_at` are
+     written and read by nothing in matching.
+   - *Rolling intakes are the part that works.* A programme with no deadline and a
+     rolling note stays open for ever, which is right for one with no date to
+     miss, and is said as such in the first-run lanes (`isRolling`).
+
+   *What it would take, in the order that is safe: let a later sighting advance a
+   closed deadline (a change to the fill-gaps rule, which is a trust decision);
+   re-offer an entry whose only linked rows are closed with a deadline earlier
+   than the entry's (a change to "added at most once, ever", which is a product
+   decision about what Pass means); and a feeder, since none exists. Both forks
+   are the owner's.*
    `lastSeenAt` moves only when an agent re-files a sighting, and agents skip
    anything already on file, so it is first-seen in practice. `fillMissing`
    never overwrites a deadline, so an annual call at the same URL keeps last
