@@ -1,0 +1,58 @@
+name: Check
+
+# The deploy gate, run on a pull request instead of after the merge.
+#
+# deploy.yml only runs on a push to main, so until this file existed a change
+# was first typechecked and tested after it had landed. That is safe, since the
+# deploy stops before it ships when either is red, but it puts the red run on
+# main instead of on the change that caused it. This runs the same four steps
+# against the pull request's merge result, which is what main would become.
+#
+# It deliberately holds no secrets and no environment. It never touches D1 or
+# Cloudflare, so a pull request from anywhere can run it, and nothing here can
+# deploy or migrate. Migrations and the deploy stay in deploy.yml.
+on:
+  pull_request:
+    branches: [main]
+
+# A newer push to the same pull request makes the older run stale, and unlike
+# the deploy there is nothing here that is worse for being cut short.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # The runners are UTC and this repository is written in Winnipeg, so a
+      # fixture that is correct locally can be a day stale by the time CI reads
+      # it. Run 28 went red on exactly that. See the same step in deploy.yml.
+      - name: Test a day ahead
+        run: TZ=Pacific/Auckland npm test
+
+      # The frontend build, so a change that typechecks and passes its tests
+      # but does not bundle is found here and not on main. `build:ui` is the
+      # Vite build alone: the `build` script goes on to deploy.
+      - name: Build frontend
+        run: npm run build:ui
