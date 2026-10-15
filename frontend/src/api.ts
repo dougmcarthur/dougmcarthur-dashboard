@@ -514,6 +514,17 @@ export interface SurveyConfigView {
   changedAt: string | null
 }
 
+/** The owner's view of the Google picker's two public values. */
+export interface DrivePickerView {
+  /** Both are set, so artists can add files to their folder. */
+  available: boolean
+  apiKey: string | null
+  /** The Cloud project number. Digits, not the project's name. */
+  appId: string | null
+  /** The number the Worker's own Google client ID names, when it has one. */
+  clientProjectNumber: string | null
+}
+
 export interface SurveyResults {
   config: SurveyConfigView
   summary: SurveySummary
@@ -959,6 +970,10 @@ export const api = {
     /** Open or close the survey, set who to contact, set the spam check's site key. */
     setSurvey: (patch: { open?: boolean; contact?: string | null; siteKey?: string | null }) =>
       apiFetch<{ config: SurveyConfigView }>('/admin/survey/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
+    drivePicker: () => apiFetch<DrivePickerView>('/admin/drive-picker'),
+    /** Null or empty clears a value. Both are public: the picker runs in the artist's browser. */
+    setDrivePicker: (patch: { apiKey?: string | null; appId?: string | null }) =>
+      apiFetch<DrivePickerView>('/admin/drive-picker', { method: 'PATCH', body: JSON.stringify(patch) }),
     setInviteRequest: (id: number, status: InviteRequestStatus) =>
       apiFetch<{ ok: boolean }>(`/admin/invite-requests/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
     listings: () => apiFetch<{ items: ListingItem[] }>('/admin/listings'),

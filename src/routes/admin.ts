@@ -51,6 +51,7 @@ import { sourceState } from '../../shared/catalogSources'
 import { MEASURED_FIELDS } from '../lib/usage'
 import { isFeedbackKind } from '../../shared/feedback'
 import { readSurveyConfig, writeSurveySettings } from '../lib/surveySettings'
+import { readPickerView, writePickerSettings } from '../lib/pickerSettings'
 import { clearPublication, fingerprint, readPublication, summarisePublication, writePublication } from '../lib/surveyPublication'
 import type { Env } from '../types'
 import { summarise, toCsv, toRespondent, type Respondent } from '../../shared/surveyAnalysis'
@@ -655,6 +656,55 @@ admin.patch(
     const result = await writeSurveySettings(c.env, current, c.req.valid('json'))
     if (!result.ok) return c.json({ error: result.error }, 409)
     return c.json({ config: await surveyConfigView(c) })
+  },
+)
+
+/**
+ * The Google picker's two public values: the browser API key and the Cloud
+ * project number. Admin mode and nothing more, like the survey's switches: it
+ * changes whether artists can add files to their Drive folder, not who can get
+ * in, and both values are handed to every artist's browser by `/api/drive`.
+ *
+ * Shapes are checked rather than trusted because a wrong value here fails
+ * somewhere else, in Google's own dialog, with a message that does not say
+ * which half was wrong. The project number is digits only on purpose: the
+ * project *ID* (`my-project-123`) is the value people reach for first, and it
+ * would be accepted by anything looser.
+ */
+const PICKER_API_KEY = /^[A-Za-z0-9_-]{20,100}$/
+const PROJECT_NUMBER = /^\d{6,15}$/
+
+admin.get('/drive-picker', async (c) => {
+  if (!adminOf(c)) return c.json({ error: 'not available' }, 403)
+  return c.json(await readPickerView(c.env))
+})
+
+admin.patch(
+  '/drive-picker',
+  zValidator(
+    'json',
+    z
+      .object({
+        apiKey: z
+          .union([
+            z.string().trim().regex(PICKER_API_KEY, 'That does not look like an API key. It is one long string of letters and numbers.'),
+            z.literal(''),
+          ])
+          .nullable(),
+        appId: z
+          .union([
+            z.string().trim().regex(PROJECT_NUMBER, 'The project number is digits only. A name with letters and dashes is the project ID, which is a different thing.'),
+            z.literal(''),
+          ])
+          .nullable(),
+      })
+      .partial()
+      .strict(),
+  ),
+  async (c) => {
+    if (!adminOf(c)) return c.json({ error: 'not available' }, 403)
+    await writePickerSettings(c.env, c.req.valid('json'))
+    return c.json(await readPickerView(c.env))
   },
 )
 
