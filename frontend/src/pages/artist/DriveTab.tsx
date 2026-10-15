@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type DriveFileRow } from '../../api'
+import { useSession } from '../../hooks/useSession'
 import { Button } from '../../components/ui/Button'
 import { Disclosure } from '../../components/ui/Disclosure'
 import { Card } from '../../components/ui/Surface'
@@ -152,7 +153,10 @@ function OrganisePanel({ onDone }: { onDone: () => void }) {
 export function DriveTab({ outcome }: { outcome: string | null }) {
   const qc = useQueryClient()
   const status = useQuery({ queryKey: ['drive-status'], queryFn: api.drive.status })
-  const files = useQuery({ queryKey: ['drive-files'], queryFn: api.drive.files, enabled: Boolean(status.data?.connected) })
+  // Only the owner has an admin mode to be sent to; everybody else is told it
+  // is the operator's to finish, which is true and is all they can act on.
+  const isOwner = useSession()?.role === 'owner'
+  const files =useQuery({ queryKey: ['drive-files'], queryFn: api.drive.files, enabled: Boolean(status.data?.connected) })
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
 
@@ -248,7 +252,9 @@ export function DriveTab({ outcome }: { outcome: string | null }) {
               </Button>
             ) : (
               <span className="text-xs text-muted">
-                Adding files needs GOOGLE_PICKER_API_KEY and GOOGLE_CLOUD_PROJECT_NUMBER on this deployment.
+                {isOwner
+                  ? 'Adding files is not set up yet. Open admin mode and fill in Google Drive file picker.'
+                  : 'Adding files is not switched on yet. Whoever runs this deployment has to finish setting it up.'}
               </span>
             )}
           </div>

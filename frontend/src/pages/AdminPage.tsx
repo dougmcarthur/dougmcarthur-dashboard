@@ -10,6 +10,7 @@ import { InviteRequestsPanel } from '../components/InviteRequestsPanel'
 import { CatalogSourcesPanel } from '../components/CatalogSourcesPanel'
 import { PublicListingsPanel } from '../components/PublicListingsPanel'
 import { SurveyPanel } from '../components/SurveyPanel'
+import { DrivePickerPanel } from '../components/DrivePickerPanel'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from '../components/ui/Explainer'
 import { Card } from '../components/ui/Surface'
@@ -116,6 +117,12 @@ export function AdminPage() {
       <hr className="border-line" />
 
       <PublicListingsPanel />
+
+      <hr className="border-line" />
+
+      <DrivePickerPanel />
+
+      <hr className="border-line" />
 
       <SurveyPanel />
     </div>

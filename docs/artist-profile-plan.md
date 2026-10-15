@@ -71,9 +71,18 @@ folder, which every file inherits, after saying what that means; then the
 folder link and each file's direct-download link have Copy buttons. Nothing is
 ever deleted, and disconnecting leaves the folder where it is.
 
-Needs, in the Google Cloud project: the Drive and Picker APIs enabled, the
-`drive.file` scope on the consent screen, and `GOOGLE_PICKER_API_KEY` /
-`GOOGLE_CLOUD_PROJECT_NUMBER` in `wrangler.toml` (instructions there). Not yet
+Needs, in the Google Cloud project that owns the OAuth client:
+
+1. APIs & Services → enable "Google Drive API" and "Google Picker API".
+2. OAuth consent screen → add the scope `.../auth/drive.file` (non-sensitive, no
+   verification needed).
+3. Credentials → Create API key; restrict it to the Picker API and to the
+   website `https://scout.sundogsmusic.ca/*`.
+4. The project **number** (not the ID) is on the project's dashboard; it is also
+   the digits before the first dash of the OAuth client ID.
+
+The key and the number are then entered in admin mode, under *Google Drive file
+picker* (`src/lib/pickerSettings.ts`). They are not `wrangler.toml` vars. Not yet
 built: dropping the EPK PDF into the folder automatically — for now it is Save
 as PDF from the profile page, then Add files.
 

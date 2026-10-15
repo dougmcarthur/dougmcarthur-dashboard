@@ -1265,8 +1265,19 @@ picker — nothing else in their Drive, whatever this code does;
 Picking a *folder* grants the folder, not its contents, so the picker tells the
 artist to select the files inside. Picked files are copied, never moved;
 organising previews first; sharing is one permission on the folder that every
-file inherits; nothing is deleted. The picker needs `GOOGLE_PICKER_API_KEY` and
-`GOOGLE_CLOUD_PROJECT_NUMBER`, which are vars in `wrangler.toml`.
+file inherits; nothing is deleted. The picker needs an API key and the Cloud
+project's number, and both are **settings in admin mode** (Google Drive file
+picker), stored as `drive.pickerApiKey` and `drive.pickerAppId` in
+`app_settings` and read per request by `src/lib/pickerSettings.ts`. They were
+`GOOGLE_PICKER_API_KEY` and `GOOGLE_CLOUD_PROJECT_NUMBER` in `wrangler.toml`,
+commented out and never set in production, and they are gone from the file and
+from `Env` with no fallback: the owner's rule is that a public value typed once
+is not a commit and a deploy, and two places for one value is how the one you
+changed is not the one that is read. The panel offers the number its own Google
+client ID names (the digits before the first dash) and warns when a saved number
+differs, because a picker opened under another project hands Scout files it
+cannot read; it never saves that number for the owner.
+`test/pickerSettings.test.ts` fails if either old name comes back.
 
 **Google is one connection, stored as several grants.** "Connect Google
 account" on Settings is one consent for Calendar, Tasks, Gmail drafts and

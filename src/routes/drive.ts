@@ -30,6 +30,7 @@ import type { TenantId } from '../db/scope'
 import type { Env } from '../types'
 import { accessTokenForGrant, forgetGrant, readGrant } from '../lib/googleGrant'
 import { beginConsent, consentAvailable } from '../lib/googleOAuth'
+import { readPickerConfig } from '../lib/pickerSettings'
 import {
   DriveError,
   asDriveFiles,
@@ -47,12 +48,6 @@ import { eq } from 'drizzle-orm'
 import { downloadUrl, folderUrl, planOrganise, subfolderFor } from '../../shared/driveOrganise'
 
 const drive = new Hono<AppEnv>()
-
-function pickerConfig(env: Env) {
-  const apiKey = env.GOOGLE_PICKER_API_KEY?.trim() || null
-  const appId = env.GOOGLE_CLOUD_PROJECT_NUMBER?.trim() || null
-  return { available: Boolean(apiKey && appId), apiKey, appId }
-}
 
 async function artistName(env: Env, tenant: TenantId): Promise<string> {
   const row = await getDb(env.DB).select().from(tenants).where(eq(tenants.id, tenant)).get()
@@ -76,7 +71,7 @@ drive.get('/status', async (c) => {
   return c.json({
     ...grant,
     folderUrl: grant.driveFolderId ? folderUrl(grant.driveFolderId) : null,
-    picker: pickerConfig(c.env),
+    picker: await readPickerConfig(c.env),
   })
 })
 
@@ -106,10 +101,11 @@ drive.post('/disconnect', async (c) => {
 drive.get('/picker-token', async (c) => {
   const on = await connected(c.env, tenantOf(c))
   if (!on) return c.json({ error: 'Google Drive is not connected' }, 409)
-  if (!pickerConfig(c.env).available) {
-    return c.json({ error: 'This deployment has no GOOGLE_PICKER_API_KEY or GOOGLE_CLOUD_PROJECT_NUMBER' }, 503)
+  const picker = await readPickerConfig(c.env)
+  if (!picker.available) {
+    return c.json({ error: 'Adding files is not set up on this deployment yet' }, 503)
   }
-  return c.json({ accessToken: on.token, folderId: on.folderId, ...pickerConfig(c.env) })
+  return c.json({ accessToken: on.token, folderId: on.folderId, ...picker })
 })
 
 /** Everything in the folder, where it sits, and the links to hand out. */
