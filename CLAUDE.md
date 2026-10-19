@@ -1550,6 +1550,21 @@ distinctive token rather than `lie` + `low`; and with splitting it, so
 "BreakOut West" yields BOW. Getting that backwards loses LieLow entirely, which
 is how it was found.
 
+**The scan never reads this app's own mail.** The weekly digest names the gigs
+that need a decision and lands in the owner's inbox, so a search for a gig's name
+found it, matched it to the first gig it listed and offered to bind `digest@` to
+that application — four of them sat in Review as "Not sure". `-in:sent` does not
+catch it, because the Worker sends through Cloudflare's binding and Gmail never
+files that as sent. `shared/ownMail.ts` names the senders (the two the binding's
+`allowed_sender_addresses` accepts, which `test/ownMail.test.ts` ties to
+`wrangler.toml`, plus the configured digest and sign-in senders), as exact
+addresses and never the domain, since the artist's own mail lives there too. They
+are left out of the Gmail query, because the fetch is capped at 60 messages and a
+digest a week would crowd real replies out, and skipped again after it. Rows an
+earlier scan filed are deleted at the start of the next scan, unresolved ones
+only: the query no longer returns that mail, so the clear-on-no-match branch
+could never reach it.
+
 **Matching reads the whole body; classification reads only the top post.** The
 quoted form receipt underneath a reply is often the only place the event is
 named — LieLow's rejection has the festival nowhere in its subject — and it is

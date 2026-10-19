@@ -18,6 +18,7 @@
  */
 
 import { automationVerdict, type AutomationVerdict } from '../../shared/bulkMail'
+import { ownSenders } from '../../shared/ownMail'
 import type { Binding, MatchableGig, ReplyMessage } from '../../shared/replyMatch'
 import { significantWords, initialisms, isMatchableGig } from '../../shared/replyMatch'
 import { decodeBase64, extractPlainText, type GmailEnv } from './gmail'
@@ -105,6 +106,11 @@ export function planReplyScan(input: {
   today: string
   /** Overrides the derived window, in days. */
   windowDays?: number
+  /**
+   * Addresses this app sends as, left out of every query. Defaults to the fixed
+   * pair, so a caller that knows no more still excludes the digest.
+   */
+  ownSenders?: string[]
 }): ReplyScanPlan {
   const gigs = input.gigs.filter(isMatchableGig)
   const submissions = gigs
@@ -150,13 +156,23 @@ export function planReplyScan(input: {
       else precise.add(t)
     }
   }
+  const own = ownSenders(input.ownSenders)
   for (const b of input.bindings ?? []) {
-    if (b.kind === 'address') precise.add(`from:${b.value}`)
+    // A binding to one of our own addresses would ask for the mail the next
+    // clause removes. It can only exist from before the scan skipped them.
+    if (b.kind === 'address' && !own.includes(b.value.trim().toLowerCase())) {
+      precise.add(`from:${b.value}`)
+    }
   }
 
+  // The app's own mail names gigs and lands in this mailbox without ever being
+  // "sent" as far as Gmail is concerned, so `-in:sent` does not remove it. It
+  // is excluded here as well as after the fetch because the fetch is capped at
+  // MAX_MESSAGES: a digest a week for a year would crowd real replies out.
+  const notOurs = own.map((a) => `-from:${a}`).join(' ')
   const window = `newer_than:${windowDays}d`
-  const PRECISE_PREFIX = `in:anywhere -in:sent -in:draft ${window} `
-  const LOOSE_PREFIX = `category:primary -in:spam -in:trash -in:sent -in:draft ${window} `
+  const PRECISE_PREFIX = `in:anywhere -in:sent -in:draft ${notOurs} ${window} `
+  const LOOSE_PREFIX = `category:primary -in:spam -in:trash -in:sent -in:draft ${notOurs} ${window} `
 
   const queries: string[] = []
 
