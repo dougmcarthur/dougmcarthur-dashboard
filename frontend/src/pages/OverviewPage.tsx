@@ -31,6 +31,10 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
   // The first-run checklist. Its own query, and its failure is silent: a
   // checklist that cannot load is not a reason to show the Overview broken.
   const onboarding = useQuery({ queryKey: ['onboarding'], queryFn: api.onboarding.read })
+  const start = useQuery({ queryKey: ['matching', 'start'], queryFn: api.matching.start })
+  const startActive = Boolean(
+    start.data && !start.data.answered && !start.data.off && !start.data.established && start.data.lanes !== null,
+  )
   const checklist =
     onboarding.data && !onboarding.data.hidden && !onboarding.data.complete ? onboarding.data : null
   // Held here, not in the card: answering can complete the checklist, and the
@@ -106,6 +110,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
               total={queue.data?.counts.deck ?? 0}
               inProgress={queue.data?.counts.in_progress ?? 0}
               onNav={onNav}
+              hideWhenEmpty={startActive || Boolean(checklist)}
             />
           )}
 

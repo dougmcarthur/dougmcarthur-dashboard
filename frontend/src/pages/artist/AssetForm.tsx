@@ -9,18 +9,22 @@ import { Label } from '../../components/ui/Surface'
 /** Add or edit one entry. Same form either way — the fields do not differ. */
 export function AssetForm({
   asset,
+  initialKind,
+  initialLabel,
   onSave,
   onCancel,
   isSaving,
 }: {
   asset?: ArtistAssetWithHealth
+  initialKind?: string
+  initialLabel?: string
   onSave: (body: ArtistAssetInput) => void
   onCancel: () => void
   isSaving: boolean
 }) {
   const [draft, setDraft] = useState({
-    kind: asset?.kind ?? 'bio',
-    label: asset?.label ?? '',
+    kind: asset?.kind ?? initialKind ?? 'bio',
+    label: asset?.label ?? initialLabel ?? '',
     value: asset?.value ?? '',
     questionKind: asset?.questionKind ?? '',
     variant: asset?.variant ?? '',

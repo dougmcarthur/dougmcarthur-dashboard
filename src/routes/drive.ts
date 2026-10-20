@@ -26,7 +26,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { tenantOf, type AppEnv } from '../context'
-import type { TenantId } from '../db/scope'
+import { scoped, withTenant, type TenantId } from '../db/scope'
 import type { Env } from '../types'
 import { accessTokenForGrant, forgetGrant, readGrant } from '../lib/googleGrant'
 import { beginConsent, consentAvailable } from '../lib/googleOAuth'
@@ -36,16 +36,26 @@ import {
   asDriveFiles,
   copyInto,
   ensureSubfolders,
+  isReadableTextFile,
   isSharedWithLink,
   listFolderTree,
+  readFileText,
   renameAndMove,
   shareWithLink,
   unshareLink,
 } from '../lib/googleDrive'
 import { getDb } from '../db'
-import { tenants } from '../db/schema'
+import { artistAssets, tenants } from '../db/schema'
 import { eq } from 'drizzle-orm'
-import { downloadUrl, folderUrl, planOrganise, subfolderFor } from '../../shared/driveOrganise'
+import { normaliseAssetKind, type ArtistAsset } from '../../shared/artistAssets'
+import {
+  downloadUrl,
+  folderUrl,
+  planOrganise,
+  proposalsFromDrive,
+  subfolderFor,
+  type DriveLibraryFile,
+} from '../../shared/driveOrganise'
 
 const drive = new Hono<AppEnv>()
 
@@ -224,4 +234,116 @@ drive.post('/share', zValidator('json', ShareSchema), async (c) => {
   }
 })
 
+function sameValue(v: string): string {
+  return v.trim().toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/\/+$/, '')
+}
+
+async function proposeDriveImport(env: Env, tenant: TenantId) {
+  const on = await connected(env, tenant)
+  if (!on) return null
+  const [{ files }, shared, artist] = await Promise.all([
+    listFolderTree(on.token, on.folderId),
+    isSharedWithLink(on.token, on.folderId),
+    artistName(env, tenant),
+  ])
+  const textIds = new Set(files.filter(isReadableTextFile).slice(0, 10).map((f) => f.id))
+  const filesWithText: DriveLibraryFile[] = await Promise.all(
+    files.map(async (f) => ({
+      id: f.id,
+      name: f.name,
+      mimeType: f.mimeType,
+      folder: f.folder,
+      createdTime: f.createdTime,
+      webViewLink: f.webViewLink,
+      width: f.width,
+      height: f.height,
+      text: textIds.has(f.id) ? await readFileText(on.token, f) : null,
+    })),
+  )
+  const { proposals, skipped } = proposalsFromDrive(filesWithText, artist)
+  const rows = (await getDb(env.DB)
+    .select()
+    .from(artistAssets)
+    .where(scoped(artistAssets, tenant))) as ArtistAsset[]
+  const sources = new Set(rows.map((r) => r.source).filter((s): s is string => !!s))
+  const values = new Set(rows.map((r) => (r.value ? sameValue(r.value) : '')).filter(Boolean))
+  const fresh = proposals.filter((p) => !sources.has(p.source) && !values.has(sameValue(p.value)))
+  const needsOrganise = planOrganise(asDriveFiles(files), artist).length
+  return {
+    proposals: fresh,
+    skipped,
+    existing: proposals.length - fresh.length,
+    wouldAdd: fresh.length,
+    totalFiles: files.length,
+    needsOrganise,
+    shared,
+    folderUrl: folderUrl(on.folderId),
+  }
+}
+
+/**
+ * Preview building the artist library from the files in the Drive folder.
+ *
+ * Reads photos, audio samples, videos, stage plots, press kits, and up to ten
+ * Google Docs or text files (bios, links), proposes library entries without
+ * writing anything, and reports whether the folder itself still has files to
+ * tidy into subfolders or turn on link-sharing.
+ */
+drive.get('/import', async (c) => {
+  try {
+    const plan = await proposeDriveImport(c.env, tenantOf(c))
+    if (!plan) return c.json({ error: 'Google Drive is not connected' }, 409)
+    return c.json(plan)
+  } catch (err) {
+    return c.json({ error: failure(err).error }, 502)
+  }
+})
+
+/**
+ * Write the proposed Drive entries to `artist_assets`. Everything lands with
+ * `review_by = null` (`unreviewed`) so nothing is claimed as verified before
+ * the artist reads it over.
+ */
+drive.post('/import', async (c) => {
+  try {
+    const tenant = tenantOf(c)
+    const plan = await proposeDriveImport(c.env, tenant)
+    if (!plan) return c.json({ error: 'Google Drive is not connected' }, 409)
+    const db = getDb(c.env.DB)
+    const ts = new Date().toISOString()
+    for (const p of plan.proposals) {
+      await db.insert(artistAssets).values(
+        withTenant(tenant, {
+          kind: normaliseAssetKind(p.kind),
+          label: p.label,
+          value: p.value,
+          questionKind: p.questionKind,
+          variant: p.variant,
+          charCount: p.value.length,
+          credit: null,
+          usageRights: null,
+          reviewBy: null,
+          source: p.source,
+          notes: p.notes,
+          sortOrder: 0,
+          archived: 0,
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      )
+    }
+    return c.json({
+      added: plan.proposals.length,
+      existing: plan.existing,
+      skipped: plan.skipped,
+      needsOrganise: plan.needsOrganise,
+      shared: plan.shared,
+      folderUrl: plan.folderUrl,
+    })
+  } catch (err) {
+    return c.json({ error: failure(err).error }, 502)
+  }
+})
+
 export default drive
+

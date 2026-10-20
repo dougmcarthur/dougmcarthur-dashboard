@@ -377,6 +377,7 @@ describe('a panel that writes in bulk previews first', () => {
     'frontend/src/components/GmailDraftsPanel.tsx',
     'frontend/src/pages/artist/AssociationPanel.tsx',
     'frontend/src/pages/artist/DriveTab.tsx',
+    'frontend/src/pages/artist/DriveImportPanel.tsx',
   ]
 
   it('uses the shared shell rather than a third hand-rolled one', () => {

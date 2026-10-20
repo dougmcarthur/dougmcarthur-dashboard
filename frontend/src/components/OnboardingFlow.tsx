@@ -79,13 +79,19 @@ export function OnboardingFlow({
   const saveGoals = useMutation({
     mutationFn: () =>
       api.onboarding.saveGoals({ goals: [...goals], reach: [...reach], note: note.trim() || null }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['onboarding'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['onboarding'] })
+      qc.invalidateQueries({ queryKey: ['matching'] })
+    },
   })
 
   const saveProfile = useMutation({
     mutationFn: () =>
       api.onboarding.saveProfile({ region, city: city.trim() || null, genres: [...genres] }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['onboarding'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['onboarding'] })
+      qc.invalidateQueries({ queryKey: ['matching'] })
+    },
   })
 
   const index = ORDER.indexOf(screen)
@@ -129,13 +135,13 @@ export function OnboardingFlow({
       return
     }
     if (screen === 'done') {
-      // Enter on the last screen takes the button it highlights.
-      if (remaining[0]?.href) window.location.hash = remaining[0].href.slice(1)
+      // Closing lands on the Overview where StartHere shows open calls
+      // tailored to the province, genres, and goals just chosen.
       onClose()
       return
     }
     go(ORDER[index + 1])
-  }, [screen, goals.size, go, index, onClose, remaining])
+  }, [screen, goals.size, go, index, onClose])
 
   const back = useCallback(() => {
     if (index > 0) go(ORDER[index - 1])
@@ -381,8 +387,8 @@ export function OnboardingFlow({
             </>
           )}
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant={remaining.length ? 'neutral' : 'primary'} onClick={onClose}>
-              {remaining.length ? 'Not now' : 'Done'}
+            <Button variant="primary" size="lg" onClick={onClose}>
+              {remaining.length ? 'See open calls on your Overview' : 'Done'}
             </Button>
           </div>
         </>

@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { Disclosure } from '../../components/ui/Disclosure'
 import { Card } from '../../components/ui/Surface'
 import { SUBFOLDERS } from '../../../../shared/driveOrganise'
+import { DriveImportPanel } from './DriveImportPanel'
 
 /**
  * The folder of assets organisers and juries ask for, built in the artist's
@@ -47,7 +48,7 @@ function loadPicker(): Promise<void> {
   return pickerLoaded
 }
 
-async function openPicker(onPicked: (docs: Array<{ id: string; parentId?: string }>) => void) {
+export async function openDrivePicker(onPicked: (docs: Array<{ id: string; parentId?: string }>) => void) {
   const [{ accessToken, folderId, apiKey, appId }] = await Promise.all([api.drive.pickerToken(), loadPicker()])
   const g = window.google.picker
   const upload = new g.DocsUploadView().setParent(folderId).setIncludeFolders(true)
@@ -100,7 +101,7 @@ function size(bytes: number | null): string {
   return `${Math.max(1, Math.round(bytes / 1e3))} KB`
 }
 
-function OrganisePanel({ onDone }: { onDone: () => void }) {
+export function OrganisePanel({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const preview = useQuery({ queryKey: ['drive-organise'], queryFn: () => api.driveOrganise.preview(), enabled: open })
@@ -109,6 +110,7 @@ function OrganisePanel({ onDone }: { onDone: () => void }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['drive-files'] })
       qc.invalidateQueries({ queryKey: ['drive-organise'] })
+      qc.invalidateQueries({ queryKey: ['drive-import'] })
       onDone()
     },
   })
@@ -163,6 +165,7 @@ export function DriveTab({ outcome }: { outcome: string | null }) {
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['drive-files'] })
     qc.invalidateQueries({ queryKey: ['drive-organise'] })
+    qc.invalidateQueries({ queryKey: ['drive-import'] })
   }
 
   const adopt = useMutation({
@@ -245,7 +248,9 @@ export function DriveTab({ outcome }: { outcome: string | null }) {
                 variant="primary"
                 onClick={() => {
                   setError(null)
-                  openPicker((docs) => docs.length ? adopt.mutate(docs.map((d) => d.id)) : refresh()).catch((e) => setError((e as Error).message))
+                  openDrivePicker((docs) => (docs.length ? adopt.mutate(docs.map((d) => d.id)) : refresh())).catch((e) =>
+                    setError((e as Error).message),
+                  )
                 }}
               >
                 Add files
@@ -292,6 +297,7 @@ export function DriveTab({ outcome }: { outcome: string | null }) {
         {files.isError && <p className="text-xs text-danger-fg">{(files.error as Error).message}</p>}
       </Card>
 
+      {data && data.files.length > 0 && <DriveImportPanel onDone={refresh} />}
       {data && data.files.length > 0 && <OrganisePanel onDone={() => setNote('Tidied.')} />}
 
       {files.isLoading && <p className="text-sm text-muted">Reading the folder…</p>}

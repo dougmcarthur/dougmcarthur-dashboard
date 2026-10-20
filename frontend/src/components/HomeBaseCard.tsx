@@ -35,8 +35,9 @@ export function HomeBaseCard() {
   }, [home.data])
 
   const save = useMutation({
-    mutationFn: async (): Promise<void> => {
-      if (place.trim()) await api.travel.setHome(place.trim())
+    mutationFn: async (override?: string): Promise<void> => {
+      const target = (override ?? place).trim()
+      if (target) await api.travel.setHome(target)
       else await api.travel.clearHome()
     },
     onSuccess: () => {
@@ -72,9 +73,21 @@ export function HomeBaseCard() {
       </label>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="neutral" onClick={() => save.mutate()} disabled={!dirty || save.isPending}>
+        <Button variant="neutral" onClick={() => save.mutate(undefined)} disabled={!dirty || save.isPending}>
           {save.isPending ? 'Finding it…' : 'Save'}
         </Button>
+        {!current && suggestion && !place.trim() && (
+          <Button
+            variant="primary"
+            disabled={save.isPending}
+            onClick={() => {
+              setPlace(suggestion)
+              save.mutate(suggestion)
+            }}
+          >
+            Use {suggestion}
+          </Button>
+        )}
         {saved && !dirty && (
           <span className="text-xs text-muted">
             {current ? 'Saved. Gigs are being measured from here — it takes a few minutes.' : 'Cleared.'}

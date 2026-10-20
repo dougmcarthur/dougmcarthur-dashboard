@@ -754,6 +754,26 @@ export type DriveFiles =
   | { connected: false }
   | { connected: true; folderUrl: string; shared: boolean; files: DriveFileRow[] }
 
+export interface DriveImportPlan {
+  proposals: AssetProposal[]
+  skipped: SkippedSection[]
+  existing: number
+  wouldAdd: number
+  totalFiles: number
+  needsOrganise: number
+  shared: boolean
+  folderUrl: string
+}
+
+export interface DriveImportResult {
+  added: number
+  existing: number
+  skipped: SkippedSection[]
+  needsOrganise: number
+  shared: boolean
+  folderUrl: string
+}
+
 export type { PlannedChange, Subfolder }
 
 /** A research agent's credential, as Settings sees it. Never the token. */
@@ -1108,6 +1128,11 @@ export const api = {
       apiFetch<{ applied: number; failed: Array<{ name: string; error: string }> }>('/drive/organise', {
         method: 'POST',
       }),
+  },
+  /** Building the artist library from files in the Drive folder: preview, then apply. */
+  driveImport: {
+    preview: () => apiFetch<DriveImportPlan>('/drive/import'),
+    apply: () => apiFetch<DriveImportResult>('/drive/import', { method: 'POST' }),
   },
   /** Every show from every source, merged. `today` is the viewer's own date. */
   shows: () => apiFetch<ShowsResponse>(`/shows?today=${localToday()}`),

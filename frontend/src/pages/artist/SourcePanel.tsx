@@ -16,6 +16,10 @@ import { Disclosure } from '../../components/ui/Disclosure'
 export function SourcePanel({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
+  const docs = useQuery({
+    queryKey: ['referenceDocs'],
+    queryFn: api.referenceDocs.list,
+  })
 
   const preview = useQuery({
     queryKey: ['artist-source'],
@@ -32,6 +36,8 @@ export function SourcePanel({ onDone }: { onDone: () => void }) {
       onDone()
     },
   })
+
+  if (!docs.data || docs.data.length === 0) return null
 
   const data = preview.data
 

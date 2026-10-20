@@ -185,3 +185,33 @@ export async function isSharedWithLink(token: string, folderId: string): Promise
 export function asDriveFiles(files: Array<DriveItem & { folder: Subfolder | null }>): DriveFile[] {
   return files.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, folder: f.folder, createdTime: f.createdTime }))
 }
+
+const GOOGLE_DOC = 'application/vnd.google-apps.document'
+
+export function isReadableTextFile(f: { mimeType: string }): boolean {
+  return f.mimeType === GOOGLE_DOC || f.mimeType === 'text/plain' || f.mimeType === 'text/markdown'
+}
+
+/**
+ * Plain text of a Google Doc or text file inside the EPK folder, capped at
+ * 20,000 characters. Returns `null` when Drive cannot export or download it so
+ * one unreadable file never blocks importing the rest of the folder.
+ */
+export async function readFileText(token: string, f: { id: string; mimeType: string }): Promise<string | null> {
+  if (!isReadableTextFile(f)) return null
+  const path =
+    f.mimeType === GOOGLE_DOC
+      ? `/files/${encodeURIComponent(f.id)}/export?mimeType=text%2Fplain`
+      : `/files/${encodeURIComponent(f.id)}?alt=media`
+  try {
+    const res = await fetch(`${API}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return null
+    const text = await res.text()
+    return text.slice(0, 20000)
+  } catch {
+    return null
+  }
+}
+

@@ -17,6 +17,11 @@
  * Pure: no network, no clock. The tests feed it the shapes Drive returns.
  */
 
+import { extractAssets, type AssetProposal, type SkippedSection } from './artistSource'
+import { linkLabel } from './manitobaMusic'
+import { youtubeId } from './publicEpk'
+import { classifyQuestion } from './questionKinds'
+
 export const SUBFOLDERS = ['Photos', 'Audio', 'Video', 'Tech', 'Press', 'Other'] as const
 export type Subfolder = (typeof SUBFOLDERS)[number]
 
@@ -27,6 +32,14 @@ export interface DriveFile {
   /** The subfolder it sits in now, or null for the root. */
   folder: Subfolder | null
   createdTime?: string
+}
+
+export interface DriveLibraryFile extends DriveFile {
+  webViewLink?: string | null
+  width?: number | null
+  height?: number | null
+  /** Plain text read from a Google Doc or text file in the folder, when readable. */
+  text?: string | null
 }
 
 const GOOGLE_FOLDER = 'application/vnd.google-apps.folder'
@@ -167,3 +180,249 @@ export function downloadUrl(id: string): string {
 export function folderUrl(id: string): string {
   return `https://drive.google.com/drive/folders/${encodeURIComponent(id)}`
 }
+
+const CONTACT = /[\w.+-]+@[\w-]+\.[\w.]+|\(?\b\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/
+
+/**
+ * What the files in the artist's Drive folder would add to the artist library.
+ *
+ * The same `AssetProposal` shape the reference documents and association
+ * profiles produce: preview first, then write, and everything added lands
+ * never reviewed (`review_by = null`). Contact details are never copied out of
+ * a Drive document, and anything Scout cannot classify is named in `skipped`.
+ */
+export function proposalsFromDrive(
+  files: DriveLibraryFile[],
+  artist: string,
+): { proposals: AssetProposal[]; skipped: SkippedSection[] } {
+  const ordered = files
+    .filter((f) => !isFolder(f))
+    .sort((a, b) => (a.createdTime ?? '').localeCompare(b.createdTime ?? '') || a.name.localeCompare(b.name))
+
+  const proposals: AssetProposal[] = []
+  const skipped: SkippedSection[] = []
+  const seenUrls = new Set<string>()
+  let photoCount = 0
+
+  for (const f of ordered) {
+    const folder = subfolderFor(f)
+    const { stem } = splitExt(f.name)
+    const title = cleanTitle(stem, artist).replace(/-/g, ' ').trim()
+    const fileLink = (f.webViewLink ?? '').trim() || downloadUrl(f.id)
+    const note = `From "${f.name}" in your Google Drive folder.`
+
+    if (folder === 'Photos') {
+      photoCount++
+      const label = title || (photoCount === 1 ? 'Press photo' : `Press photo ${photoCount}`)
+      const dims = f.width && f.height ? ` (${f.width}×${f.height} px)` : ''
+      proposals.push({
+        kind: 'photo',
+        label,
+        value: downloadUrl(f.id),
+        questionKind: null,
+        variant: null,
+        source: `drive:${f.id}`,
+        notes: `${note}${dims} Add the photographer's credit before using it.`,
+      })
+      continue
+    }
+
+    if (folder === 'Audio') {
+      proposals.push({
+        kind: 'audio',
+        label: title || stem.trim() || 'Audio sample',
+        value: fileLink,
+        questionKind: null,
+        variant: null,
+        source: `drive:${f.id}`,
+        notes: note,
+      })
+      continue
+    }
+
+    if (folder === 'Video') {
+      proposals.push({
+        kind: 'video',
+        label: title || 'Live video',
+        value: fileLink,
+        questionKind: 'youtube',
+        variant: null,
+        source: `drive:${f.id}`,
+        notes: note,
+      })
+      continue
+    }
+
+    if (folder === 'Tech') {
+      const label = /stage ?plot/i.test(f.name)
+        ? 'Stage plot'
+        : /input ?list|patch ?list/i.test(f.name)
+          ? 'Input list'
+          : /rider/i.test(f.name)
+            ? 'Tech rider'
+            : title || 'Technical requirements'
+      proposals.push({
+        kind: 'document',
+        label,
+        value: fileLink,
+        questionKind: 'tech_requirements',
+        variant: null,
+        source: `drive:${f.id}`,
+        notes: note,
+      })
+      continue
+    }
+
+    const rawText = (f.text ?? '').trim()
+    if (rawText) {
+      const before = proposals.length
+      if (/^##\s+/m.test(rawText)) {
+        const extracted = extractAssets({ id: `drive:${f.id}`, title: f.name, content: rawText })
+        let contactDropped = false
+        for (const p of extracted.proposals) {
+          if (CONTACT.test(p.value)) {
+            contactDropped = true
+            continue
+          }
+          proposals.push(p)
+        }
+        if (contactDropped) {
+          skipped.push({
+            heading: `${f.name} (contact details)`,
+            reason: 'Phone and email are left in your Google Drive document, not copied into Scout.',
+          })
+        }
+        for (const s of extracted.skipped) {
+          skipped.push({ heading: `${f.name}: ${s.heading}`, reason: s.reason })
+        }
+      } else {
+        for (const m of rawText.matchAll(/https?:\/\/[^\s<>)"']+/gi)) {
+          const url = m[0].replace(/[.,;:!?)]+$/, '')
+          let host = ''
+          try {
+            host = new URL(url).hostname.replace(/^www\./, '').toLowerCase()
+          } catch {
+            continue
+          }
+          if (host === 'drive.google.com' || host === 'docs.google.com') continue
+          const key = url.toLowerCase()
+          if (seenUrls.has(key)) continue
+          seenUrls.add(key)
+
+          const yt = youtubeId(url)
+          if (yt) {
+            proposals.push({
+              kind: 'video',
+              label: 'Live video',
+              value: `https://www.youtube.com/watch?v=${yt}`,
+              questionKind: 'youtube',
+              variant: null,
+              source: `drive:${f.id}#video:${yt}`,
+              notes: note,
+            })
+          } else {
+            const lbl = linkLabel(url)
+            proposals.push({
+              kind: 'link',
+              label: lbl,
+              value: url,
+              questionKind: classifyQuestion({ label: lbl })?.key ?? null,
+              variant: null,
+              source: `drive:${f.id}#link:${url}`,
+              notes: note,
+            })
+          }
+        }
+
+        let contactDropped = false
+        const paras = rawText
+          .split(/\n\s*\n/)
+          .map((p) => p.replace(/^#{1,6}\s+/gm, '').trim())
+          .filter((p) => {
+            if (!p) return false
+            if (/^https?:\/\/\S+$/i.test(p)) return false
+            if (/^[^:\n]{1,60}:\s*https?:\/\/\S+$/i.test(p)) return false
+            if (CONTACT.test(p)) {
+              contactDropped = true
+              return false
+            }
+            return true
+          })
+
+        const bio = paras.join('\n\n').trim()
+        if (bio.length >= 40) {
+          const isOneLiner = /\bone[ -]?line/i.test(f.name)
+          const label = isOneLiner
+            ? 'One-line description'
+            : /\bshort\b/i.test(f.name)
+              ? 'Short bio'
+              : title && !/\bbio(graphy)?\b/i.test(title)
+                ? `${title} bio`
+                : 'Bio'
+          proposals.push({
+            kind: 'bio',
+            label,
+            value: bio.slice(0, 4000),
+            questionKind: isOneLiner ? 'one_liner' : 'bio',
+            variant: f.name,
+            source: `drive:${f.id}#bio`,
+            notes: `${note} Nobody has confirmed it since.`,
+          })
+        }
+        if (contactDropped) {
+          skipped.push({
+            heading: `${f.name} (contact details)`,
+            reason: 'Phone and email are left in your Google Drive document, not copied into Scout.',
+          })
+        }
+      }
+
+      if (/\bepk\b|press ?kit|one[ -]?sheet/i.test(f.name)) {
+        proposals.push({
+          kind: 'document',
+          label: /\bepk\b|press ?kit/i.test(f.name) ? 'EPK' : 'One-sheet',
+          value: fileLink,
+          questionKind: 'epk',
+          variant: null,
+          source: `drive:${f.id}`,
+          notes: note,
+        })
+      } else if (proposals.length === before) {
+        skipped.push({
+          heading: f.name,
+          reason: 'No bio text or links found in this document.',
+        })
+      }
+      continue
+    }
+
+    if (folder === 'Press') {
+      const isEpk = /\bepk\b|press ?kit|one[ -]?sheet/i.test(f.name)
+      const label = /\bepk\b|press ?kit/i.test(f.name)
+        ? 'EPK'
+        : /one[ -]?sheet/i.test(f.name)
+          ? 'One-sheet'
+          : /\bbio(graphy)?\b/i.test(f.name)
+            ? 'Bio document'
+            : title || 'Press kit'
+      proposals.push({
+        kind: 'document',
+        label,
+        value: fileLink,
+        questionKind: isEpk ? 'epk' : null,
+        variant: null,
+        source: `drive:${f.id}`,
+        notes: note,
+      })
+      continue
+    }
+
+    skipped.push({
+      heading: f.name,
+      reason: 'Could not tell whether this is a bio, photo, audio sample, video or stage plot from its name or file type.',
+    })
+  }
+
+  return { proposals, skipped }
+}
+

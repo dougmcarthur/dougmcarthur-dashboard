@@ -201,12 +201,14 @@ export function DecisionDeck({
   total,
   inProgress,
   onNav,
+  hideWhenEmpty = false,
 }: {
   items: ReviewItem[]
   total: number
   /** Gigs in the In progress stage, which the deck counts rather than deals. */
   inProgress: number
   onNav: (page: string) => void
+  hideWhenEmpty?: boolean
 }) {
   const qc = useQueryClient()
   const [index, setIndex] = useState(0)
@@ -260,6 +262,7 @@ export function DecisionDeck({
   })
 
   if (!item) {
+    if (hideWhenEmpty && inProgress === 0) return null
     return (
       <DeckShell head={null}>
         <div className="rounded-xl border border-line bg-surface shadow-card px-5 py-8 text-center">

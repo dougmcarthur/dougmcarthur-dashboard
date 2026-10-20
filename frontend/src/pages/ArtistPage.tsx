@@ -16,6 +16,8 @@ import { AssetForm } from './artist/AssetForm'
 import { ShowsPanel } from './artist/ShowsPanel'
 import { ProfileTab } from './artist/ProfileTab'
 import { DriveTab } from './artist/DriveTab'
+import { DriveImportPanel } from './artist/DriveImportPanel'
+import { LibraryStarter } from './artist/LibraryStarter'
 import { SourcePanel } from './artist/SourcePanel'
 import { AssociationPanels } from './artist/AssociationPanel'
 import { Explainer } from '../components/ui/Explainer'
@@ -67,6 +69,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
   )
   const [audience, setAudience] = useState<EpkAudience>('festival')
   const [adding, setAdding] = useState(false)
+  const [addingPreset, setAddingPreset] = useState<{ kind?: string; label?: string } | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [view, setView] = useState<LibraryView>(loadLibraryView)
   // The entry open in the Profile and Table views. Held as an id so the modal
@@ -92,7 +95,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
 
   const create = useMutation({
     mutationFn: (body: ArtistAssetInput) => api.artist.create(body),
-    onSuccess: () => { setAdding(false); invalidate() },
+    onSuccess: () => { setAdding(false); setAddingPreset(null); invalidate() },
   })
   const patch = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Partial<ArtistAssetInput> }) =>
@@ -150,7 +153,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
               <option key={k} value={k}>{ASSET_KIND_META[k].plural}</option>
             ))}
           </select>
-          <Button variant="primary" onClick={() => { setAdding(true); setTab('library') }}>+ Add</Button>
+          <Button variant="primary" onClick={() => { setAddingPreset(null); setAdding(true); setTab('library') }}>+ Add</Button>
         </div>
       </div>
 
@@ -229,20 +232,34 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
         <DriveTab outcome={new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('drive')} />
       ) : tab === 'library' ? (
         <div className="space-y-4">
+          <DriveImportPanel onDone={invalidate} onOpenDriveTab={() => setTab('drive')} />
           <SourcePanel onDone={invalidate} />
           <AssociationPanels onDone={invalidate} />
           {adding && (
             <AssetForm
+              initialKind={addingPreset?.kind}
+              initialLabel={addingPreset?.label}
               onSave={(body) => create.mutate(body)}
-              onCancel={() => setAdding(false)}
+              onCancel={() => { setAdding(false); setAddingPreset(null) }}
               isSaving={create.isPending}
             />
           )}
           {isLoading && <p className="text-sm text-muted">Loading…</p>}
           {!isLoading && items.length === 0 && !adding && (
-            <p className="text-sm text-muted py-8 text-center">
-              Nothing here yet. Add a bio, a live video and a press photo and the EPK builds itself.
-            </p>
+            kindFilter || freshness ? (
+              <p className="text-sm text-muted py-8 text-center">
+                Nothing matching this filter.
+              </p>
+            ) : (
+              <LibraryStarter
+                onStartAdd={(kind, label) => {
+                  setAddingPreset({ kind, label })
+                  setAdding(true)
+                }}
+                onOpenDriveTab={() => setTab('drive')}
+                onDriveFilesAdded={invalidate}
+              />
+            )
           )}
           {!isLoading && items.length > 0 && (
             <div className="flex justify-end">

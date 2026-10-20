@@ -4,8 +4,10 @@ import {
   cleanTitle,
   downloadUrl,
   planOrganise,
+  proposalsFromDrive,
   subfolderFor,
   type DriveFile,
+  type DriveLibraryFile,
 } from '../shared/driveOrganise'
 
 const ARTIST = 'Doug McArthur'
@@ -89,3 +91,80 @@ describe('the plan', () => {
 it('builds a direct-download link', () => {
   expect(downloadUrl('1AbC_d-9')).toBe('https://drive.google.com/uc?export=download&id=1AbC_d-9')
 })
+
+describe('building the artist library from Drive files', () => {
+  function libFile(
+    name: string,
+    mimeType: string,
+    extra: Partial<DriveLibraryFile> = {},
+  ): DriveLibraryFile {
+    t++
+    return {
+      id: `df${t}`,
+      name,
+      mimeType,
+      folder: null,
+      createdTime: `2026-09-25T00:00:${String(t % 60).padStart(2, '0')}Z`,
+      webViewLink: `https://drive.google.com/file/d/df${t}/view`,
+      ...extra,
+    }
+  }
+
+  it('proposes photos, audio samples, videos, stage plots, and press kits from binary files', () => {
+    const { proposals, skipped } = proposalsFromDrive(
+      [
+        libFile('IMG_4471.JPG', 'image/jpeg', { width: 3000, height: 2000 }),
+        libFile('01 - Magic (final).wav', 'audio/wav'),
+        libFile('Live at the Hall.mp4', 'video/mp4'),
+        libFile('Stage Plot solo.pdf', 'application/pdf'),
+        libFile('Electronic Press Kit 2026.pdf', 'application/pdf'),
+        libFile('receipt.pdf', 'application/pdf'),
+      ],
+      ARTIST,
+    )
+
+    expect(proposals.map((p) => ({ kind: p.kind, label: p.label, questionKind: p.questionKind }))).toEqual([
+      { kind: 'photo', label: 'Press photo', questionKind: null },
+      { kind: 'audio', label: 'Magic', questionKind: null },
+      { kind: 'video', label: 'Live At The Hall', questionKind: 'youtube' },
+      { kind: 'document', label: 'Stage plot', questionKind: 'tech_requirements' },
+      { kind: 'document', label: 'EPK', questionKind: 'epk' },
+    ])
+    expect(proposals[0].notes).toContain('3000×2000 px')
+    expect(skipped).toEqual([
+      {
+        heading: 'receipt.pdf',
+        reason: 'Could not tell whether this is a bio, photo, audio sample, video or stage plot from its name or file type.',
+      },
+    ])
+  })
+
+  it('extracts bios and social/music links from a Google Doc while stripping contact details', () => {
+    const docText = [
+      'A folk-rock songwriter from Winnipeg whose third record was cut live off the floor in two days.',
+      'Reached #4 on the earshot! national folk chart and toured western Canada in the autumn.',
+      'Booking: artist@example.com or 204-555-0199',
+      'https://open.spotify.com/artist/12345',
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://instagram.com/exampleartist',
+    ].join('\n\n')
+
+    const { proposals, skipped } = proposalsFromDrive(
+      [libFile('Artist Bio & Links', 'application/vnd.google-apps.document', { text: docText })],
+      ARTIST,
+    )
+
+    const bio = proposals.find((p) => p.kind === 'bio')
+    expect(bio).toBeDefined()
+    expect(bio?.value).toContain('folk-rock songwriter from Winnipeg')
+    expect(bio?.value).not.toContain('artist@example.com')
+    expect(bio?.value).not.toContain('204-555-0199')
+
+    expect(proposals.find((p) => p.label === 'Spotify')?.value).toBe('https://open.spotify.com/artist/12345')
+    expect(proposals.find((p) => p.kind === 'video')?.value).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+    expect(proposals.find((p) => p.label === 'Instagram')?.value).toBe('https://instagram.com/exampleartist')
+    expect(skipped.some((s) => s.reason.includes('Phone and email are left in your Google Drive document'))).toBe(true)
+  })
+})
+
+
