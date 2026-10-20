@@ -105,12 +105,13 @@ export function SettingsPage({ initialTab = null }: { initialTab?: string | null
             <>
               <ProfileCard />
               {/* Beside your name: the other fact about you rather than the app. */}
-              <HomeBaseCard />
+              {session?.role === 'owner' ? <HomeBaseCard /> : null}
               <PasskeysCard />
             </>
           }
           right={
             <>
+              {session?.role !== 'owner' && <HomeBaseCard />}
               {/* Beside Passkeys: both answer who and what can get in. The owner's
                   only: research is collected once for everybody, so an artist has
                   no agent of their own to give a credential to. */}

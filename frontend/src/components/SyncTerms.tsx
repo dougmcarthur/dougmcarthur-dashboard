@@ -108,7 +108,7 @@ export function TermsPanel({
       {/* What was done, when nothing was found: a count of pages, or why none opened. */}
       {!quote && view.quote && <p className="text-xs text-muted">{view.quote}</p>}
 
-      {view.checkedAt && <p className="text-xs text-faint">Checked {shortDate(view.checkedAt)}.</p>}
+      {view.checkedAt && <p className="text-xs text-muted">Checked {shortDate(view.checkedAt)}.</p>}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="neutral" size="sm" disabled={busy} onClick={() => check.mutate()}>

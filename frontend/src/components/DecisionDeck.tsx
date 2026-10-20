@@ -13,6 +13,7 @@ import {
 import { KindTag } from './ReviewPanels'
 import { SnoozeMenu } from './SnoozeMenu'
 import { shortDate } from '../format'
+import { Button } from './ui/Button'
 
 /**
  * The action icons.
@@ -346,12 +347,12 @@ export function DecisionDeck({
                 a status and a note is an edit, and an unanswered question is
                 an email. Saying so beats a button that would 400. */}
             {decision.actions.length === 0 && (
-              <button
+              <Button
+                variant="primary"
                 onClick={() => onNav(`review/${item.key}`)}
-                className="text-sm px-3.5 py-1.5 rounded-md font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-colors"
               >
                 Open it
-              </button>
+              </Button>
             )}
             {decision.actions.map((a) => (
               <button

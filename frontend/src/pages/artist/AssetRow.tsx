@@ -12,7 +12,7 @@ const FRESHNESS: Record<Freshness, { text: string; className: string }> = {
   fresh: { text: '', className: '' },
   due_soon: { text: 'Review soon', className: 'border-line text-muted' },
   overdue: { text: 'Overdue', className: 'border-danger-line text-danger-fg' },
-  unreviewed: { text: 'Never reviewed', className: 'border-line text-faint' },
+  unreviewed: { text: 'Never reviewed', className: 'border-line text-muted' },
 }
 
 export function AssetRow({
@@ -80,7 +80,7 @@ export function AssetRow({
             nothing, which is the honest rendering of nothing to report.
           */}
           {asset.reviewBy && asset.health.freshness !== 'fresh' && (
-            <span className="text-xs text-faint tabular-nums">Review by {asset.reviewBy}</span>
+            <span className="text-xs text-muted tabular-nums">Review by {asset.reviewBy}</span>
           )}
         </div>
       </div>

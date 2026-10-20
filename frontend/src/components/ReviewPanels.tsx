@@ -3,6 +3,7 @@ import type { DraftedField } from '../../../shared/reviewParse'
 import type { ReviewFlag, ReviewKind } from '../../../shared/reviewQueue'
 import type { AlertSeverity } from '../../../shared/reviewParse'
 import { flagTone } from '../../../shared/flagTone'
+import { CopyButton } from './CopyButton'
 
 /**
  * A section of the detail pane.
@@ -115,26 +116,7 @@ export function NeedsYou({ items }: { items: Array<{ text: string; severity?: Al
   )
 }
 
-export function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false)
-
-  return (
-    <button
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text)
-          setCopied(true)
-          setTimeout(() => setCopied(false), 1500)
-        } catch {
-          setCopied(false)
-        }
-      }}
-      className="text-xs px-2 py-0.5 rounded border border-line-strong text-muted hover:bg-surface hover:text-ink transition-colors"
-    >
-      {copied ? 'Copied' : label}
-    </button>
-  )
-}
+export { CopyButton }
 
 /**
  * Only a genuine problem gets the clay.

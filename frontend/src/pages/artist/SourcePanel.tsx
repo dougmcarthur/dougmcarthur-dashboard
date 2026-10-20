@@ -69,9 +69,9 @@ export function SourcePanel({ onDone }: { onDone: () => void }) {
           <ul className="divide-y divide-line border-y border-line">
             {data.proposals.map((p: AssetProposal) => (
               <li key={p.source} className="py-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
-                <span className="text-xs text-faint w-12 shrink-0">{p.kind}</span>
+                <span className="text-xs text-muted w-12 shrink-0">{p.kind}</span>
                 <span className="text-ink font-medium shrink-0">{p.label}</span>
-                {p.variant && <span className="text-xs text-faint shrink-0">{p.variant}</span>}
+                {p.variant && <span className="text-xs text-muted shrink-0">{p.variant}</span>}
                 {/* Its own line below sm: squeezed in beside the rest at
                     320px it kept 45px, about five characters of the thing
                     you are being asked to check before it is filed. */}

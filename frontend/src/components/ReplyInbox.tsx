@@ -72,18 +72,18 @@ function Card({
           </span>
         ) : null}
         {reply.classConfidence === 'low' && (
-          <span className="text-xs text-faint">low confidence</span>
+          <span className="text-xs text-muted">low confidence</span>
         )}
         {reply.inSpam && (
           <span className="text-xs px-2 py-0.5 rounded-md border border-warn-line text-warn-fg bg-surface">
             Found in spam
           </span>
         )}
-        <span className="text-xs text-faint ml-auto">{shortDate(reply.receivedAt)}</span>
+        <span className="text-xs text-muted ml-auto">{shortDate(reply.receivedAt)}</span>
       </div>
 
       <p className="text-sm font-medium text-ink mt-2">{reply.subject || '(no subject)'}</p>
-      <p className="text-xs text-faint">
+      <p className="text-xs text-muted">
         {reply.fromName ? `${reply.fromName} · ` : ''}
         {reply.fromAddress}
       </p>
@@ -274,7 +274,7 @@ export function ReplyInbox() {
             {scan.isPending ? 'Reading your mail…' : 'Check mail'}
           </Button>
         )}
-        {note && <span className="text-xs text-faint">{note}</span>}
+        {note && <span className="text-xs text-muted">{note}</span>}
       </div>
 
       {items.length === 0 && !note && (

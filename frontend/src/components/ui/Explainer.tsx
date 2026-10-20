@@ -146,6 +146,7 @@ export function Explainer({
             // `-bg-hover` twin to change.
             className={`shrink-0 rounded-full transition-colors hover:text-body
                         focus:outline-none focus:ring-2 focus:ring-accent
+                        p-1.5 -m-1.5
                         ${open ? 'text-body' : 'text-faint'}`}
           >
             <InfoGlyph />

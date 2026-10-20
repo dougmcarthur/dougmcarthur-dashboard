@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, type MergedShow } from '../../api'
 import { Card, Caption } from '../../components/ui/Surface'
+import { Button } from '../../components/ui/Button'
 import { SOURCE_LABELS } from '../../../../shared/showMerge'
 
 /**
@@ -32,7 +33,7 @@ function ShowRow({ show }: { show: MergedShow }) {
       <div className="min-w-0 flex-1 space-y-0.5">
         <p className="text-sm text-ink truncate">{show.title || show.venue || 'Show'}</p>
         {where && <p className="text-xs text-muted truncate">{where}</p>}
-        <p className="text-xs text-faint">
+        <p className="text-xs text-muted">
           {show.links.length > 0
             ? show.links.map((l, i) => (
                 <span key={l.source}>
@@ -76,10 +77,15 @@ export function ShowsPanel() {
 
   if (data.connected.length === 0 && empty) {
     return (
-      <p className="text-sm text-muted">
-        Shows come from Bandsintown and your Manitoba Music profile. Connect either under Settings
-        and your dates appear here, together with any gig you have marked booked.
-      </p>
+      <div className="space-y-3">
+        <p className="text-sm text-muted">
+          Shows come from Bandsintown and your Manitoba Music profile. Connect either under Settings
+          and your dates appear here, together with any gig you have marked booked.
+        </p>
+        <Button variant="neutral" size="sm" onClick={() => { window.location.hash = 'settings' }}>
+          Open Settings
+        </Button>
+      </div>
     )
   }
 

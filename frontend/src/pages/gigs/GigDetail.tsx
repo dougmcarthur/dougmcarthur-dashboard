@@ -78,7 +78,7 @@ export function GigDetail({
           <Caption className="mb-1">On stage</Caption>
           <p className="text-sm font-semibold text-ink">{span}</p>
           {status !== 'booked' && (
-            <p className="text-xs text-faint mt-0.5">
+            <p className="text-xs text-muted mt-0.5">
               Pencilled in. Nothing reaches your calendar until it is accepted.
             </p>
           )}
@@ -162,7 +162,7 @@ export function GigDetail({
         {onDelete ? (
           <Button
             variant="quiet"
-            className="ml-auto text-faint hover:text-danger-fg"
+            className="ml-auto text-muted hover:text-danger-fg"
             disabled={isPatching}
             onClick={onDelete}
           >

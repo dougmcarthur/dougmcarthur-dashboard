@@ -30,12 +30,12 @@ export function QueueRow({
             }`}
           />
         )}
-        <span className="text-[11px] text-muted truncate">{item.subtitle}</span>
+        <span className="text-xs text-muted truncate">{item.subtitle}</span>
       </div>
       <p className={`text-sm leading-snug ${active ? 'font-semibold text-ink' : 'font-medium text-body'}`}>
         {item.title}
       </p>
-      {top && <p className="text-[11px] text-muted mt-0.5 truncate">{top.label}</p>}
+      {top && <p className="text-xs text-muted mt-0.5 truncate">{top.label}</p>}
     </button>
   )
 }

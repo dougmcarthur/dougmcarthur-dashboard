@@ -6,6 +6,7 @@ import { Chevron } from '../components/Chevron'
 import { SkeletonList } from '../components/Skeleton'
 import { FILTER } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
+import { CopyButton } from '../components/CopyButton'
 import { Banner, Card, EmptyState } from '../components/ui/Surface'
 
 /** "2026-09" is a key, not a label. */
@@ -149,25 +150,33 @@ export function PromoDraftsPage() {
                         Publish
                       </Button>
                     )}
-                    <button
+                    <Button
+                      variant="quiet"
+                      size="sm"
                       disabled={deleteMutation.isPending}
                       onClick={(e) => {
                         e.stopPropagation()
                         if (confirm(`Delete "${draft.title}"?`)) deleteMutation.mutate(draft.id)
                       }}
-                      className="w-6 h-6 flex items-center justify-center rounded text-faint hover:text-danger-fg hover:bg-danger-bg disabled:opacity-40 transition-colors"
+                      className="w-6 h-6 p-0 flex items-center justify-center text-muted hover:text-danger-fg hover:bg-danger-bg"
                       title="Delete"
+                      aria-label={`Delete ${draft.title}`}
                     >
                       ×
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
                 {isOpen && (
-                  <div className="px-6 pb-5 pt-3 bg-sunken border-t border-line">
+                  <div className="px-6 pb-5 pt-3 bg-sunken border-t border-line space-y-3">
                     <p className="text-sm text-body leading-relaxed whitespace-pre-wrap">
                       {draft.content}
                     </p>
+                    <div className="flex items-center justify-end pt-1">
+                      <CopyButton text={draft.content} label={`Copy ${draft.title}`}>
+                        Copy draft
+                      </CopyButton>
+                    </div>
                   </div>
                 )}
               </div>

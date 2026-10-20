@@ -8,26 +8,13 @@ import { Input, Textarea, Select } from '../../components/ui/Field'
 import { Caption } from '../../components/ui/Surface'
 import { PrefillLink } from './PrefillLink'
 
-/**
- * Phase 3 on screen: the questions this application asks, and what the artist
- * database can answer them with.
- *
- * The panel is deliberately a *staging* surface and says so in several places.
- * Nothing on it sends anything — every answer is copied out by hand into
- * somebody else's form, because an application filed by automation is a good
- * way to be blacklisted. The buttons are Copy and Approve, never Submit.
- *
- * The distinction the layout is built around is between an answer the app
- * suggested and one you have read. They look different, they count
- * differently in the summary line, and a panel full of unread suggestions
- * reports itself as unfinished rather than as done.
- */
-
 function Copy({ text, label = 'Copy' }: { text: string; label?: string }) {
   const [done, setDone] = useState(false)
   return (
     <Button
       variant="quiet"
+      size="sm"
+      aria-label={label}
       onClick={() => {
         navigator.clipboard.writeText(text).then(
           () => {
@@ -74,10 +61,10 @@ function FieldCard({
             {field.label}
             {field.required && <span className="text-danger-fg ml-1">*</span>}
           </p>
-          {field.helpText && <p className="text-xs text-faint mt-0.5">{field.helpText}</p>}
+          {field.helpText && <p className="text-xs text-muted mt-0.5">{field.helpText}</p>}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {question && <span className="text-xs text-faint">{question.label}</span>}
+          {question && <span className="text-xs text-muted">{question.label}</span>}
           <span className={`text-xs px-2 py-0.5 rounded-md border bg-surface ${chip.className}`}>
             {chip.text}
           </span>
@@ -104,7 +91,7 @@ function FieldCard({
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <span
               className={`text-xs ${
-                field.maxLength && value.length > field.maxLength ? 'text-danger-fg' : 'text-faint'
+                field.maxLength && value.length > field.maxLength ? 'text-danger-fg' : 'text-muted'
               }`}
             >
               {value.length}
@@ -159,7 +146,7 @@ function FieldCard({
         ))}
 
       {field.source && (
-        <p className="text-xs text-faint mt-1.5">
+        <p className="text-xs text-muted mt-1.5">
           From “{field.source.label}” in the artist database.
         </p>
       )}
@@ -186,7 +173,7 @@ function Checklist({ items }: { items: ChecklistItem[] }) {
               {item.problem ? (
                 <span className="text-xs text-danger-fg block">{item.problem}</span>
               ) : (
-                <span className="text-xs text-faint block">
+                <span className="text-xs text-muted block">
                   {item.candidates.length} on file — {item.candidates[0].label}
                 </span>
               )}
@@ -225,7 +212,7 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
     onSuccess: setPacket,
   })
 
-  if (isLoading) return <p className="text-sm text-faint">Loading the application…</p>
+  if (isLoading) return <p className="text-sm text-muted">Loading the application…</p>
   if (error) return <p className="text-sm text-danger-fg">{(error as Error).message}</p>
   if (!data) return null
 
@@ -340,7 +327,7 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
             ))}
           </ul>
           {email.missing.length > 0 && (
-            <p className="text-xs text-faint mt-1.5">
+            <p className="text-xs text-muted mt-1.5">
               Nothing on file for: {email.missing.join(', ')}.
             </p>
           )}

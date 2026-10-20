@@ -115,7 +115,7 @@ export function FeedbackModal({ open, onClose }: { open: boolean; onClose: () =>
                   </div>
                 ))}
               </dl>
-              <p className="mt-2 text-xs text-faint">
+              <p className="mt-2 text-xs text-muted">
                 Nothing else — not what is on the page, and nothing about your gigs or drafts.
               </p>
             </details>

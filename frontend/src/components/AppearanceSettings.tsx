@@ -12,6 +12,8 @@ import {
 import { Button } from './ui/Button'
 import { Explainer } from './ui/Explainer'
 import { Card } from './ui/Surface'
+import { Toggle } from './ui/Toggle'
+import { Input } from './ui/Field'
 
 /**
  * The appearance panel.
@@ -82,35 +84,6 @@ function Segmented<T extends string>({
   )
 }
 
-function Toggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean
-  onChange: (v: boolean) => void
-  label: string
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        checked ? 'bg-accent' : 'bg-line-strong'
-      }`}
-    >
-      <span
-        className={`inline-block h-4.5 w-4.5 transform rounded-full bg-surface shadow-card transition-transform ${
-          checked ? 'translate-x-6' : 'translate-x-1'
-        }`}
-        style={{ height: '1.125rem', width: '1.125rem' }}
-      />
-    </button>
-  )
-}
 
 export function AppearanceSettings() {
   const { appearance: a, set, reset, resolved } = useAppearance()
@@ -198,13 +171,13 @@ export function AppearanceSettings() {
               <label htmlFor="custom-font" className="sr-only">
                 Custom font family
               </label>
-              <input
+              <Input
                 id="custom-font"
                 type="text"
                 value={a.customFont}
                 onChange={(e) => set({ customFont: e.target.value })}
                 placeholder="e.g. Iosevka, Charter, Atkinson Hyperlegible"
-                className="w-full max-w-sm rounded-md border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-faint"
+                className="max-w-sm"
               />
               <p className="text-xs text-muted mt-1">
                 Falls back to the system stack if the name is not installed. Atkinson

@@ -47,7 +47,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * looks like a button cannot drift from one.
  */
 export function buttonClass(variant: ButtonVariant = 'neutral', size: ButtonSize = 'md', className = ''): string {
-  return `inline-block rounded-md font-medium transition-colors ${SIZES[size]} ${VARIANTS[variant]} ${className}`.trim()
+  return `inline-block rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${SIZES[size]} ${VARIANTS[variant]} ${className}`.trim()
 }
 
 export function Button({
@@ -61,7 +61,7 @@ export function Button({
     <button
       type={type}
       className={`rounded-md font-medium transition-colors disabled:opacity-40
-                  disabled:pointer-events-none ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
+                  disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
       {...rest}
     />
   )

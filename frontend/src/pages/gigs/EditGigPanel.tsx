@@ -216,7 +216,7 @@ export function EditGigPanel({
         </div>
         <div>
           <Label>
-            Nights away <span className="text-faint font-normal">— 0 if you sleep at home</span>
+            Nights away <span className="text-muted font-normal">— 0 if you sleep at home</span>
           </Label>
           <input
             type="number" min={0} value={draft.nights}
@@ -252,7 +252,7 @@ export function EditGigPanel({
         </div>
         <div>
           <Label>
-            Stipend <span className="text-faint font-normal">— CAD</span>
+            Stipend <span className="text-muted font-normal">— CAD</span>
           </Label>
           <input
             type="number" min={0} value={draft.stipendAmount}
@@ -261,7 +261,7 @@ export function EditGigPanel({
         </div>
         <div>
           <Label>
-            Guarantee <span className="text-faint font-normal">— CAD</span>
+            Guarantee <span className="text-muted font-normal">— CAD</span>
           </Label>
           <input
             type="number" min={0} value={draft.guaranteeAmount}

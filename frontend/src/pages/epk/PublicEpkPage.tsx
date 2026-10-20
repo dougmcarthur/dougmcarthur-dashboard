@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api'
 import { EpkView } from '../../components/epk/EpkView'
 import { epkProfile } from '../../../../shared/epkProfile'
+import { Button } from '../../components/ui/Button'
 
 /**
  * A shared EPK, opened from its link — by somebody who is not signed in and
@@ -40,9 +41,9 @@ export function PublicEpkPage({ token }: { token: string }) {
     <main className="min-h-screen bg-canvas">
       <EpkView page={data} />
       <div className="max-w-5xl mx-auto px-5 sm:px-10 py-6 print:hidden">
-        <button onClick={() => window.print()} className="text-sm text-muted underline hover:text-ink">
+        <Button variant="quiet" size="sm" onClick={() => window.print()}>
           Save as PDF
-        </button>
+        </Button>
       </div>
     </main>
   )

@@ -49,7 +49,7 @@ export function AssetForm({
               <option key={k} value={k}>{ASSET_KIND_META[k].label}</option>
             ))}
           </select>
-          <p className="text-xs text-faint mt-1">{meta.meaning}</p>
+          <p className="text-xs text-muted mt-1">{meta.meaning}</p>
         </div>
         <div>
           <Label>Label</Label>
@@ -68,13 +68,13 @@ export function AssetForm({
               className={`${FIELD} resize-y`} />
           )}
           {!meta.isLink && draft.value && (
-            <p className="text-xs text-faint mt-1 tabular-nums">{draft.value.length} characters</p>
+            <p className="text-xs text-muted mt-1 tabular-nums">{draft.value.length} characters</p>
           )}
         </div>
 
         <div className="sm:col-span-2">
           <Label>
-            Answers the question <span className="text-faint font-normal">— what a form is asking when it asks for this</span>
+            Answers the question <span className="text-muted font-normal">— what a form is asking when it asks for this</span>
           </Label>
           <select value={draft.questionKind} onChange={(e) => set('questionKind', e.target.value)} className={FIELD}>
             <option value="">—</option>
@@ -100,7 +100,7 @@ export function AssetForm({
 
         <div>
           <Label>
-            Review by <span className="text-faint font-normal">— blank for {meta.reviewMonths} months</span>
+            Review by <span className="text-muted font-normal">— blank for {meta.reviewMonths} months</span>
           </Label>
           <input type="date" value={draft.reviewBy} onChange={(e) => set('reviewBy', e.target.value)} className={FIELD} />
         </div>

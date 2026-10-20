@@ -5,7 +5,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { Chevron } from '../components/Chevron'
 import { SkeletonList } from '../components/Skeleton'
 import { ReconcilePanel } from '../components/ReconcilePanel'
-import { FIELD, FILTER } from '../components/ui/Field'
+import { FIELD, FILTER, Select } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { DraftActions } from '../components/DraftActions'
 import { GmailDraftsPanel } from '../components/GmailDraftsPanel'
@@ -311,10 +311,14 @@ export function SyncPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-ink">Sync Targets</h1>
         <div className="flex flex-wrap gap-2 items-center">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={FILTER}>
+          <Select
+            filter
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
             <option value="">All statuses</option>
             {SYNC_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
-          </select>
+          </Select>
           {ownsMailbox && <button
             onClick={() => { setShowReconcile((v) => !v); setShowCreate(false) }}
             className={`text-sm px-3.5 py-1.5 rounded-md font-medium border transition-colors ${
@@ -325,14 +329,12 @@ export function SyncPage() {
           >
             Reconcile with Gmail
           </button>}
-          <button
+          <Button
+            variant={showCreate ? 'neutral' : 'primary'}
             onClick={() => { setShowCreate((v) => !v); setShowReconcile(false) }}
-            className={`text-sm px-3.5 py-1.5 rounded-md font-medium transition-colors ${
-              showCreate ? 'bg-line text-body' : 'bg-accent text-accent-fg hover:bg-accent-hover'
-            }`}
           >
             {showCreate ? 'Cancel' : '+ New target'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -401,12 +403,17 @@ export function SyncPage() {
                         </Button>
                       </>
                     )}
-                    <button disabled={deleteMutation.isPending}
+                    <Button
+                      variant="quiet"
+                      size="sm"
+                      disabled={deleteMutation.isPending}
                       onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${target.name}"?`)) deleteMutation.mutate(target.id) }}
-                      className="w-6 h-6 flex items-center justify-center rounded text-faint hover:text-danger-fg hover:bg-danger-bg disabled:opacity-40 transition-colors"
-                      title="Delete">
+                      className="w-6 h-6 p-0 flex items-center justify-center text-muted hover:text-danger-fg hover:bg-danger-bg"
+                      title="Delete"
+                      aria-label={`Delete ${target.name}`}
+                    >
                       ×
-                    </button>
+                    </Button>
                   </div>
                 </div>
 

@@ -48,7 +48,7 @@ function QuestionCard({ q, lead }: { q: PublicQuestion; lead: number }) {
       </div>
       <BarList bars={q.bars} lead={lead} label={q.title} />
       {q.hidden > 0 && (
-        <p className="text-xs text-faint">
+        <p className="text-xs text-muted">
           {q.hidden === 1 ? 'One more answer was' : `${q.hidden} more answers were`} chosen by fewer than 10 artists, so {q.hidden === 1 ? 'it is' : 'they are'} not shown.
         </p>
       )}
@@ -265,7 +265,7 @@ export function ResultsView({ results: r, contact, open = false }: { results: Pu
             </p>
           )}
         </div>
-        <p className="text-xs text-faint">
+        <p className="text-xs text-muted">
           Sun Dogs Music published this on {publishedOn(r.publishedAt)}, from {r.n} completed responses to version {r.instrument} of the survey.
         </p>
       </footer>

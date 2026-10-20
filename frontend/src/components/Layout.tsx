@@ -140,8 +140,8 @@ export function Layout({
 
   const toggleTheme = () => set({ theme: resolved === 'dark' ? 'light' : 'dark' })
 
-  const linkClass = (id: string) =>
-    `px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
+  const linkClass = (id: string, mobile = false) =>
+    `px-3.5 ${mobile ? 'py-2' : 'py-1.5'} rounded-md text-sm font-medium transition-colors ${
       page === id ? 'bg-raised text-ink shadow-inset' : 'text-muted hover:text-ink hover:bg-sunken'
     }`
 
@@ -174,7 +174,7 @@ export function Layout({
               href={admin ? '#admin' : '#overview'}
               className="font-semibold text-ink text-sm tracking-tight hover:text-body transition-colors shrink-0"
             >
-              Scout <span className="text-faint font-normal">— Sun Dogs Music</span>
+              Scout <span className="text-muted font-normal">— Sun Dogs Music</span>
             </a>
 
             {admin ? (
@@ -258,7 +258,7 @@ export function Layout({
                   <nav
                     id="mobile-nav"
                     aria-label="More"
-                    className="absolute right-0 top-full mt-2 w-48 z-40 rounded-xl border border-line bg-surface shadow-pop p-1"
+                    className="absolute right-0 top-full mt-2 w-52 z-40 rounded-xl border border-line bg-surface shadow-pop p-1"
                   >
                     {!admin && (
                       <>
@@ -269,7 +269,7 @@ export function Layout({
                               key={l.id}
                               href={`#${l.id}`}
                               aria-current={page === l.id ? 'page' : undefined}
-                              className={`block ${linkClass(l.id)}`}
+                              className={`block ${linkClass(l.id, true)}`}
                             >
                               {l.label}
                             </a>
@@ -281,7 +281,7 @@ export function Layout({
                             key={l.id}
                             href={`#${l.id}`}
                             aria-current={page === l.id ? 'page' : undefined}
-                            className={`block ${linkClass(l.id)}`}
+                            className={`block ${linkClass(l.id, true)}`}
                           >
                             {l.label}
                           </a>
@@ -289,7 +289,7 @@ export function Layout({
                         {!side.wide && (
                           <button
                             type="button"
-                            className={`block w-full text-left ${linkClass('answers')}`}
+                            className={`block w-full text-left ${linkClass('answers', true)}`}
                             onClick={() => {
                               setMenuOpen(false)
                               setAnswersOpen(true)
@@ -305,13 +305,13 @@ export function Layout({
                           <a
                             href="#help"
                             aria-current={page === 'help' ? 'page' : undefined}
-                            className={`block ${linkClass('help')}`}
+                            className={`block ${linkClass('help', true)}`}
                           >
                             Help
                           </a>
                           <button
                             type="button"
-                            className={`block w-full text-left ${linkClass('feedback')}`}
+                            className={`block w-full text-left ${linkClass('feedback', true)}`}
                             onClick={() => {
                               setMenuOpen(false)
                               setFeedbackOpen(true)
@@ -330,7 +330,7 @@ export function Layout({
                     <button
                       type="button"
                       disabled={signOut.isPending}
-                      className={`block w-full text-left disabled:opacity-60 ${linkClass('sign-out')}`}
+                      className={`block w-full text-left disabled:opacity-60 ${linkClass('sign-out', true)}`}
                       onClick={() => signOut.mutate()}
                     >
                       {signOut.isPending ? 'Signing out…' : 'Sign out'}

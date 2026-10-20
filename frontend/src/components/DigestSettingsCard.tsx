@@ -4,6 +4,9 @@ import { api, type Weekday } from '../api'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from './ui/Explainer'
 import { Banner, Card } from './ui/Surface'
+import { Toggle } from './ui/Toggle'
+import { Button } from './ui/Button'
+import { Select } from './ui/Field'
 
 const DAYS: Array<{ id: Weekday; label: string }> = [
   { id: 'mon', label: 'Mon' },
@@ -62,23 +65,18 @@ export function DigestSettingsCard() {
         <Explainer as="h2" title="Weekly digest">
           Only when something moved. Nothing is sent when there is nothing to say.
         </Explainer>
-        <button
-          onClick={() => {
+        <Toggle
+          label="Weekly digest"
+          checked={Boolean(settings?.enabled)}
+          disabled={!settings || patch.isPending}
+          onChange={() => {
             if (!settings) return
             // The first time it goes on, the zone is this device's rather than the
             // platform's, which is whoever set the deployment up.
             const takeZone = !settings.enabled && d && !d.schedule.zoneChosen && device
             patch.mutate({ enabled: !settings.enabled, ...(takeZone ? { timezone: device } : {}) })
           }}
-          disabled={!settings || patch.isPending}
-          className={`shrink-0 text-xs px-3 py-1.5 rounded-md font-medium transition-colors disabled:opacity-40 ${
-            settings?.enabled
-              ? 'bg-success-solid text-accent-fg hover:brightness-110'
-              : 'bg-surface border border-line-strong text-body hover:bg-sunken'
-          }`}
-        >
-          {settings?.enabled ? 'On' : 'Off'}
-        </button>
+        />
       </div>
 
       {d && !d.mailerConfigured && (
@@ -126,19 +124,20 @@ export function DigestSettingsCard() {
             <label htmlFor="digest-hour" className="text-xs text-muted w-10 shrink-0">
               Time
             </label>
-            <select
+            <Select
               id="digest-hour"
+              filter
               value={d.schedule.hour}
               disabled={patch.isPending}
               onChange={(e) => patch.mutate({ hour: Number(e.target.value) })}
-              className="text-xs rounded-md border border-line bg-surface text-ink px-2 py-1 disabled:opacity-40"
+              className="text-xs py-1"
             >
               {HOURS.map((h) => (
                 <option key={h} value={h}>
                   {String(h).padStart(2, '0')}:00
                 </option>
               ))}
-            </select>
+            </Select>
             {/* The zone is what makes the hour mean anything, so it is stated
                 rather than assumed. It is not editable here: there is one
                 reader, in one place, and a zone picker would be a list of 400
@@ -198,20 +197,22 @@ export function DigestSettingsCard() {
             </p>
             <div className="flex gap-1.5 shrink-0">
               {!d.empty && (
-                <button
+                <Button
+                  variant="neutral"
+                  size="sm"
                   onClick={() => setOpen((o) => !o)}
-                  className="text-xs px-2.5 py-1 rounded-md border border-line text-body hover:bg-sunken transition-colors"
                 >
                   {open ? 'Hide' : 'Preview'}
-                </button>
+                </Button>
               )}
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => send.mutate()}
                 disabled={d.empty || !d.mailerConfigured || send.isPending}
-                className="text-xs px-2.5 py-1 rounded-md bg-accent text-accent-fg disabled:opacity-30 transition-colors"
               >
                 {send.isPending ? 'Sending…' : 'Send now'}
-              </button>
+              </Button>
             </div>
           </div>
 

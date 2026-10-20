@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type AssociationIdentity, type AssociationSummary } from '../api'
-import { Button } from './ui/Button'
+import { Button, buttonClass } from './ui/Button'
 import { FIELD } from './ui/Field'
 import { relativeTime } from '../format'
 import { Explainer } from './ui/Explainer'
@@ -105,7 +105,7 @@ export function AssociationsCard() {
                   href={a.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs px-3 py-1.5 rounded-md font-medium transition-colors border border-line-strong text-body hover:bg-sunken hover:text-ink"
+                  className={buttonClass('neutral', 'sm')}
                 >
                   Open the profile
                 </a>

@@ -502,7 +502,7 @@ export function StageCards({
         <p className="text-center text-[11px] font-medium uppercase tracking-[0.2em] text-muted">Upstage</p>
         {renderLine('upstage')}
         {renderLine('downstage')}
-        <div className="flex items-baseline justify-between text-[11px] text-faint">
+        <div className="flex items-baseline justify-between text-xs text-muted">
           <span>Stage right</span>
           <span className="font-medium uppercase tracking-[0.2em] text-muted">Audience</span>
           <span>Stage left</span>

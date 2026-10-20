@@ -55,6 +55,8 @@ export default function App() {
         {page === 'review' && <ReviewPage initialFilter={arg} />}
         {page === 'gigs' && <GigsPage initialOpen={arg} />}
         {page === 'artist' && <ArtistPage initialTab={arg} />}
+        {page === 'shows' && <ArtistPage initialTab="checklists" />}
+        {page === 'epk' && <ArtistPage initialTab="profile" />}
         {page === 'sync' && <SyncPage />}
         {page === 'promo' && <PromoDraftsPage />}
         {page === 'runs' && <HistoryPage key={arg ?? ''} initialKind={arg} onNav={navigate} />}

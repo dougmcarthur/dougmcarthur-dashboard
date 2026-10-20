@@ -70,7 +70,7 @@ function Bio({ profile }: { profile: EpkProfile }) {
               className={`h-8 px-3.5 rounded-full text-sm transition-colors ${k === i ? 'bg-raised text-ink font-semibold' : 'text-body hover:text-ink'}`}
             >
               {b.label}
-              <span className={`ml-1.5 text-xs ${k === i ? 'text-muted' : 'text-faint'}`}>{b.words}w</span>
+              <span className="ml-1.5 text-xs text-muted">{b.words}w</span>
             </button>
           ))}
         </div>
@@ -375,7 +375,7 @@ export function EpkView({ page }: { page: EpkPage }) {
               <LinkColumn title="More" links={p.links.more} />
             </nav>
           )}
-          <p className="text-xs text-faint">Kept current with Sun Dogs Music Scout</p>
+          <p className="text-xs text-muted">Kept current with Sun Dogs Music Scout</p>
         </div>
       </footer>
     </article>

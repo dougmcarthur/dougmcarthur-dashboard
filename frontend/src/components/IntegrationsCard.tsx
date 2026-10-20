@@ -281,20 +281,20 @@ function DetailModal({
         {grant?.connected ? (
           <dl className="space-y-1.5 text-xs">
             <div className="flex gap-2">
-              <dt className="w-28 shrink-0 text-faint">Account</dt>
+              <dt className="w-28 shrink-0 text-muted">Account</dt>
               <dd className="min-w-0 break-words text-body">{grant.accountEmail ?? 'Not reported by Google'}</dd>
             </div>
             <div className="flex gap-2">
-              <dt className="w-28 shrink-0 text-faint">Connected</dt>
+              <dt className="w-28 shrink-0 text-muted">Connected</dt>
               <dd className="text-body">{onDate(grant.grantedAt) ?? 'Unknown'}</dd>
             </div>
             <div className="flex gap-2">
-              <dt className="w-28 shrink-0 text-faint">Last used</dt>
+              <dt className="w-28 shrink-0 text-muted">Last used</dt>
               <dd className="text-body">{onDate(grant.lastUsedAt) ?? 'Not used yet'}</dd>
             </div>
           </dl>
         ) : row.checkedAt ? (
-          <p className="text-xs text-faint">Last checked {onDate(row.checkedAt)}</p>
+          <p className="text-xs text-muted">Last checked {onDate(row.checkedAt)}</p>
         ) : null}
 
         {/*
@@ -342,7 +342,7 @@ function DetailModal({
           </div>
         ) : null}
 
-        <p className="text-xs text-faint">{spec.breaks}</p>
+        <p className="text-xs text-muted">{spec.breaks}</p>
 
         {isConnectable(spec) && grant?.connected ? (
           <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
@@ -353,7 +353,7 @@ function DetailModal({
             >
               {disconnect.isPending ? 'Disconnecting…' : 'Disconnect'}
             </Button>
-            <p className="min-w-0 flex-1 text-xs text-faint">{LEAVES_BEHIND[spec.id]}</p>
+            <p className="min-w-0 flex-1 text-xs text-muted">{LEAVES_BEHIND[spec.id]}</p>
           </div>
         ) : null}
       </div>
@@ -555,7 +555,7 @@ function GoogleAccounts({ serverReady }: { serverReady: boolean }) {
         )
       })}
       {confirming !== null ? (
-        <p className="text-xs text-faint">
+        <p className="text-xs text-muted">
           The calendar, task list, Drive folder and drafts Scout made stay in the account.
           Google also stops listing Scout under the account’s third-party access.
         </p>
@@ -590,7 +590,7 @@ function OtherAccounts({ rows }: { rows: RowState[] }) {
         Use a different Google account for one service
       </summary>
       <div className="mt-2 space-y-2">
-        <p className="text-xs text-faint">
+        <p className="text-xs text-muted">
           For keeping, say, your calendar on one account and your mail on another. Google asks which
           account to use; the service switches to it and everything else stays as it is.
         </p>

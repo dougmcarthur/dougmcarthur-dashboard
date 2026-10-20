@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type DriveFileRow } from '../../api'
 import { useSession } from '../../hooks/useSession'
-import { Button } from '../../components/ui/Button'
+import { Button, buttonClass } from '../../components/ui/Button'
 import { Disclosure } from '../../components/ui/Disclosure'
 import { Card } from '../../components/ui/Surface'
 import { SUBFOLDERS } from '../../../../shared/driveOrganise'
@@ -209,7 +209,7 @@ export function DriveTab({ outcome }: { outcome: string | null }) {
         {s.configured ? (
           <a
             href={api.drive.connectHref}
-            className="inline-flex items-center h-10 px-4 rounded-md bg-accent text-accent-fg font-medium hover:bg-accent-hover transition-colors"
+            className={buttonClass('primary')}
           >
             Connect Google Drive
           </a>
@@ -319,7 +319,7 @@ export function DriveTab({ outcome }: { outcome: string | null }) {
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {f.viewUrl && (
-                    <a href={f.viewUrl} target="_blank" rel="noreferrer" className="text-xs px-3 py-1.5 rounded-md text-body hover:text-ink hover:bg-sunken transition-colors">
+                    <a href={f.viewUrl} target="_blank" rel="noreferrer" className={buttonClass('quiet', 'sm')}>
                       Open
                     </a>
                   )}

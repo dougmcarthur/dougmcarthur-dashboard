@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
-import { Card } from '../components/ui/Surface'
+import { Caption, Card } from '../components/ui/Surface'
 import { Button } from '../components/ui/Button'
 import { OnboardingCard } from '../components/OnboardingCard'
 import { OnboardingFlow, type FlowScreen } from '../components/OnboardingFlow'
@@ -13,9 +13,9 @@ import { themeCredit } from '../../../shared/themes'
  *
  * In the app rather than on a separate site, so it ships with the code it
  * describes and cannot describe a version that is not running. Short on
- * purpose: one paragraph per screen, and the rules Scout keeps that somebody
- * would otherwise have to discover — it never sends, never submits, and what
- * each Google permission is for.
+ * purpose: organized into thematic sections, and the rules Scout keeps that
+ * somebody would otherwise have to discover — it never sends, never submits,
+ * and what each Google permission is for.
  */
 export function HelpPage() {
   const qc = useQueryClient()
@@ -27,11 +27,15 @@ export function HelpPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['onboarding'] }),
   })
 
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  }
+
   return (
-    <div className="space-y-8 max-w-3xl">
-      <header className="space-y-2">
+    <div className="space-y-6 max-w-3xl">
+      <header className="space-y-3">
         <h1 className="text-2xl font-semibold text-ink tracking-tight">Help</h1>
-        <p className="text-sm text-body">
+        <p className="text-sm text-body leading-relaxed">
           Scout finds opportunities for independent Canadian musicians: festivals, showcases,
           grants, sync briefs. It helps you decide which are worth it, drafts the paperwork from
           your profile, and keeps track of what you are waiting on. It never sends or submits
@@ -47,6 +51,43 @@ export function HelpPage() {
             </Button>
           )}
         </div>
+        <nav aria-label="Quick jump" className="flex flex-wrap gap-1.5 pt-2 border-t border-line">
+          <button
+            type="button"
+            onClick={() => scrollTo('canadian-artists')}
+            className="text-xs px-2.5 py-1 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
+          >
+            Canadian artists
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollTo('the-screens')}
+            className="text-xs px-2.5 py-1 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
+          >
+            The screens
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollTo('workflow')}
+            className="text-xs px-2.5 py-1 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
+          >
+            Workflow & rules
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollTo('connections-and-security')}
+            className="text-xs px-2.5 py-1 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
+          >
+            Connections & display
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollTo('privacy-and-terms')}
+            className="text-xs px-2.5 py-1 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
+          >
+            Privacy & terms
+          </button>
+        </nav>
       </header>
 
       {onboarding.data && <OnboardingCard state={onboarding.data} showDone onStart={setFlow} />}
@@ -54,7 +95,9 @@ export function HelpPage() {
         <OnboardingFlow state={onboarding.data} startAt={flow} onClose={() => setFlow(null)} />
       )}
 
-      <Section title="Made for Canadian artists">
+      {/* Section 1: Canadian Focus & Invariants */}
+      <Card id="canadian-artists" as="section" pad="md" className="space-y-4 text-sm text-body leading-relaxed">
+        <h2 className="text-base font-semibold text-ink">Made for Canadian artists</h2>
         <p>
           Scout looks first at what Canadian artists apply for: provincial and federal funding,
           the music associations in each province, and festivals and showcases across the country.
@@ -72,109 +115,128 @@ export function HelpPage() {
           and comes after the rest. Nothing is ever hidden because of it, and a deadline that is
           close still outranks both.
         </p>
-      </Section>
+        <div className="pt-2 border-t border-line space-y-2">
+          <Caption>What Scout will not do</Caption>
+          <ul className="list-disc pl-5 space-y-1 text-xs text-muted">
+            <li>Submit an application. It stages an answer for each field; you copy them into the form.</li>
+            <li>Send an email. Drafts are copied, or opened in your own mail with your Send button as the last step.</li>
+            <li>Change a status because an email arrived. It suggests; you decide.</li>
+          </ul>
+        </div>
+      </Card>
 
-      <Section title="The screens">
-        <Entry name="Overview">
-          What needs you today. New opportunities are dealt as cards — apply or pass — beside
-          upcoming deadlines and anything waiting on a reply from you.
-        </Entry>
-        <Entry name="Review">
-          The whole queue, with filters: new, in progress, waiting on them, conflicts, and
-          applications that have gone quiet.
-        </Entry>
-        <Entry name="Gigs">
-          Every opportunity in one table. Add one you already know about with <em>New gig</em>.
-        </Entry>
-        <Entry name="Artist">
-          Your profile: bio, links, photos, facts, and the documents they come from. Every draft
-          and application answer is read from here, so this is the page that makes the rest work.
-          Entries go stale on purpose — a follower count is worth re-checking every six months.
-        </Entry>
-        <Entry name="Sync">Music supervisors and briefs to pitch, with a short pitch drafted for each.</Entry>
-        <Entry name="Promo">Promotion drafts, month by month.</Entry>
-        <Entry name="History">Everything that happened, by day: what the research runs found, digests, replies from your mail. Filter it by type.</Entry>
-        <Entry name="Settings">Connections, reminders and the weekly digest, your account and passkeys, and how the app looks.</Entry>
-      </Section>
+      {/* Section 2: Screens & Workflow */}
+      <Card id="the-screens" as="section" pad="md" className="space-y-5 text-sm text-body leading-relaxed">
+        <div>
+          <h2 className="text-base font-semibold text-ink mb-3">The screens</h2>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <ScreenCard name="Overview" href="#overview">
+              What needs you today. New opportunities dealt as cards beside upcoming deadlines and replies.
+            </ScreenCard>
+            <ScreenCard name="Review" href="#review">
+              The full queue with filters: new, in progress, waiting on them, conflicts, and quiet calls.
+            </ScreenCard>
+            <ScreenCard name="Gigs" href="#gigs">
+              Every opportunity in one table. Add one you already know about with <em>New gig</em>.
+            </ScreenCard>
+            <ScreenCard name="Artist" href="#artist">
+              Your profile: bio, links, photos, facts, and documents. Powers every draft and application.
+            </ScreenCard>
+            <ScreenCard name="Sync" href="#sync">
+              Music supervisors and briefs to pitch, with a short pitch drafted for each.
+            </ScreenCard>
+            <ScreenCard name="Promo" href="#promo">
+              Promotion drafts, month by month, ready to copy into your outreach channels.
+            </ScreenCard>
+            <ScreenCard name="History" href="#runs">
+              Everything that happened, by day: research run findings, digests, and mail replies.
+            </ScreenCard>
+            <ScreenCard name="Settings" href="#settings">
+              Connections, reminders, weekly digest, passkeys, account security, and appearance.
+            </ScreenCard>
+          </div>
+        </div>
 
-      <Section title="How an opportunity moves">
-        <p>
-          Every opportunity is in one of four stages. <strong>New</strong> — decide whether to
-          apply. <strong>In progress</strong> — you said yes and are preparing it.{' '}
-          <strong>Applied</strong> — it went out and you are waiting; if they ask for more, or make
-          an offer, it is flagged so the ball is visibly back with you. <strong>Closed</strong> —
-          accepted, not selected, passed, missed or withdrawn.
-        </p>
-        <p>
-          An offer is not a booking. Nothing reaches your calendar until it is accepted — a signed
-          contract, or a written confirmation for a grant.
-        </p>
-        <p>
-          Passing is about that one intake, not the programme. When a grant or call you passed on
-          or missed opens again, Scout adds it as a new opportunity and tells you in the bell.
-          Delete the row if you never want to see it again.
-        </p>
-      </Section>
+        <div id="workflow" className="pt-3 border-t border-line space-y-3">
+          <h3 className="text-sm font-semibold text-ink">How an opportunity moves</h3>
+          <p>
+            Every opportunity is in one of four stages. <strong>New</strong> — decide whether to
+            apply. <strong>In progress</strong> — you said yes and are preparing it.{' '}
+            <strong>Applied</strong> — it went out and you are waiting; if they ask for more, or make
+            an offer, it is flagged so the ball is visibly back with you. <strong>Closed</strong> —
+            accepted, not selected, passed, missed or withdrawn.
+          </p>
+          <p>
+            An offer is not a booking. Nothing reaches your calendar until it is accepted — a signed
+            contract, or a written confirmation for a grant.
+          </p>
+          <p>
+            Passing is about that one intake, not the programme. When a grant or call you passed on
+            or missed opens again, Scout adds it as a new opportunity and tells you in the bell.
+            Delete the row if you never want to see it again.
+          </p>
+        </div>
+      </Card>
 
-      <Section title="What Scout will not do">
-        <ul className="list-disc pl-5 space-y-1">
-          <li>Submit an application. It stages an answer for each field; you copy them into the form.</li>
-          <li>Send an email. Drafts are copied, or opened in your own mail with your Send button as the last step.</li>
-          <li>Change a status because an email arrived. It suggests; you decide.</li>
-        </ul>
-      </Section>
+      {/* Section 3: Connections, Security & Display */}
+      <Card id="connections-and-security" as="section" pad="md" className="space-y-5 text-sm text-body leading-relaxed">
+        <div className="space-y-2">
+          <h2 className="text-base font-semibold text-ink">Connecting Google</h2>
+          <p>
+            One button in Settings connects Calendar, Tasks, Drive and — only if you choose —
+            Gmail drafts. Scout explains each permission before Google asks, and you can connect
+            without Gmail.
+          </p>
+          <ul className="list-disc pl-5 space-y-1 text-xs text-muted">
+            <li><strong>Calendar</strong> — Scout makes its own calendar and can only touch that one.</li>
+            <li><strong>Tasks</strong> — deadlines and replies you owe become tasks on one list.</li>
+            <li><strong>Drive</strong> — Scout sees only the folder it creates and files you pick.</li>
+            <li>
+              <strong>Gmail</strong> — puts drafts in your drafts folder. Google&rsquo;s permission
+              would also allow sending; Scout has no code that sends.
+            </li>
+          </ul>
+        </div>
 
-      <Section title="Connecting Google">
-        <p>
-          One button in Settings connects Calendar, Tasks, Drive and — only if you choose —
-          Gmail drafts. Scout explains each permission before Google asks, and you can connect
-          without Gmail.
-        </p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li><strong>Calendar</strong> — Scout makes its own calendar and can only touch that one.</li>
-          <li><strong>Tasks</strong> — deadlines and replies you owe become tasks on one list.</li>
-          <li><strong>Drive</strong> — Scout sees only the folder it creates and files you pick.</li>
-          <li>
-            <strong>Gmail</strong> — puts drafts in your drafts folder. Google&rsquo;s permission
-            would also allow sending; Scout has no code that sends.
-          </li>
-        </ul>
-      </Section>
+        <div className="pt-3 border-t border-line space-y-2">
+          <h3 className="text-sm font-semibold text-ink">Signing in</h3>
+          <p>
+            Scout uses passkeys — Touch ID, Face ID, your screen lock or a password manager — rather
+            than passwords. Add a second one on another device from Settings → Account, so losing a
+            phone is not a problem.
+          </p>
+          <p>
+            If you lose every passkey, the sign-in screen can email a setup code to the address on
+            your account. The code only adds a new passkey; it is never a login on its own. A few
+            actions — adding or removing a passkey, issuing an agent token — ask for your passkey
+            again, because they change who can get into your account.
+          </p>
+        </div>
 
-      <Section title="Signing in">
-        <p>
-          Scout uses passkeys — Touch ID, Face ID, your screen lock or a password manager — rather
-          than passwords. Add a second one on another device from Settings → Account, so losing a
-          phone is not a problem.
-        </p>
-        <p>
-          If you lose every passkey, the sign-in screen can email a setup code to the address on
-          your account. The code only adds a new passkey; it is never a login on its own. A few
-          actions — adding or removing a passkey, issuing an agent token — ask for your passkey
-          again, because they change who can get into your account.
-        </p>
-      </Section>
+        <div id="display-and-themes" className="pt-3 border-t border-line space-y-2">
+          <h3 className="text-sm font-semibold text-ink">Looking after your eyes</h3>
+          <p>
+            Settings, then Appearance, holds a colour theme, light or dark, text size, a typeface,
+            higher contrast and reduced motion. The themes under the first heading are a matter of
+            taste. The four under Accessible themes are made for a need: High contrast, with the
+            strongest text and firm lines; Colour-blind safe, which uses blue, gold and rose in
+            place of green, ochre and clay so that the three stay apart for every kind of colour
+            blindness; Greyscale, with no colour at all, where go, waiting and broken differ in
+            lightness; and Low glare, a dim, warm page with no white and no stark text, for light
+            sensitivity and migraine.
+          </p>
+          <p>
+            A device that asks for more contrast gets High contrast until you choose a theme of your
+            own. The colour theme follows your account onto every device you sign in from; light or
+            dark, text size and the other settings are kept on each device.
+          </p>
+          <p className="text-xs text-muted">{themeCredit()}</p>
+        </div>
+      </Card>
 
-      <Section title="Looking after your eyes">
-        <p>
-          Settings, then Appearance, holds a colour theme, light or dark, text size, a typeface,
-          higher contrast and reduced motion. The themes under the first heading are a matter of
-          taste. The four under Accessible themes are made for a need: High contrast, with the
-          strongest text and firm lines; Colour-blind safe, which uses blue, gold and rose in
-          place of green, ochre and clay so that the three stay apart for every kind of colour
-          blindness; Greyscale, with no colour at all, where go, waiting and broken differ in
-          lightness; and Low glare, a dim, warm page with no white and no stark text, for light
-          sensitivity and migraine.
-        </p>
-        <p>
-          A device that asks for more contrast gets High contrast until you choose a theme of your
-          own. The colour theme follows your account onto every device you sign in from; light or
-          dark, text size and the other settings are kept on each device.
-        </p>
-        <p className="text-xs text-muted">{themeCredit()}</p>
-      </Section>
-
-      <Section title="Your information, privacy and terms">
+      {/* Section 4: Privacy & Terms */}
+      <Card id="privacy-and-terms" as="section" pad="md" className="space-y-3 text-sm text-body leading-relaxed">
+        <h2 className="text-base font-semibold text-ink">Your information, privacy and terms</h2>
         <p>
           The privacy policy says what Sun Dogs Music Scout collects, which other companies handle
           it, how long it is kept, and how to see, correct or delete yours.{' '}
@@ -192,41 +254,25 @@ export function HelpPage() {
           </a>
           .
         </p>
-      </Section>
-
-      <Section title="Feedback">
-        <p>
-          Something broken, confusing, or missing? <em>Send feedback</em> in the question-mark
-          menu goes straight to the people who make Scout. It includes which page you were on and
-          any error from the last half hour, and shows you exactly that before it sends, so you do
-          not have to describe where you were.
-        </p>
-        <Button variant="neutral" onClick={() => setFeedbackOpen(true)}>
-          Send feedback
-        </Button>
-      </Section>
+      </Card>
 
       <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function ScreenCard({ name, href, children }: { name: string; href: string; children: ReactNode }) {
   return (
-    <Card as="section" pad="md" className="space-y-3 text-sm text-body leading-relaxed">
-      <h2 className="text-base font-semibold text-ink">{title}</h2>
-      {children}
-    </Card>
-  )
-}
-
-function Entry({ name, children }: { name: string; children: ReactNode }) {
-  return (
-    <p>
-      <a href={`#${name.toLowerCase() === 'history' ? 'runs' : name.toLowerCase()}`} className="font-medium text-ink hover:text-accent">
-        {name}
-      </a>{' '}
-      — {children}
-    </p>
+    <div className="rounded-lg border border-line bg-surface/50 p-3 space-y-1">
+      <div className="flex items-center gap-2">
+        <a
+          href={href}
+          className="text-xs font-semibold px-2 py-0.5 rounded bg-raised border border-line-strong text-ink hover:text-accent hover:border-accent transition-colors"
+        >
+          {name}
+        </a>
+      </div>
+      <p className="text-xs text-muted leading-relaxed">{children}</p>
+    </div>
   )
 }

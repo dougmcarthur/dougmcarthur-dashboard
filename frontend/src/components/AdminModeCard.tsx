@@ -57,7 +57,7 @@ export function AdminModeCard() {
       </Button>
 
       {error && <p className="text-sm text-danger-fg">{error}</p>}
-      <p className="text-xs text-faint">
+      <p className="text-xs text-muted">
         Asks for your passkey, and lasts until you switch back.
       </p>
     </Card>

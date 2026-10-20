@@ -19,7 +19,7 @@ import { localToday, shortDate } from '../format'
 import { StatusBadge } from '../components/StatusBadge'
 import { Chevron } from '../components/Chevron'
 import { SkeletonTable } from '../components/Skeleton'
-import {  FILTER } from '../components/ui/Field'
+import { Select, Input } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { CreateGigForm } from './gigs/CreateGigForm'
 import { EditGigPanel } from './gigs/EditGigPanel'
@@ -308,28 +308,30 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-ink">Gig Opportunities</h1>
         <div className="flex flex-wrap gap-2 items-center">
-          <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as GigStage | '')} className={FILTER}>
+          <Select
+            filter
+            value={stageFilter}
+            onChange={(e) => setStageFilter(e.target.value as GigStage | '')}
+          >
             <option value="">All stages</option>
             {GIG_STAGES.map((s) => (
               <option key={s} value={s} title={GIG_STAGE_META[s].meaning}>
                 {GIG_STAGE_META[s].label}
               </option>
             ))}
-          </select>
-          <input
+          </Select>
+          <Input
             placeholder="Search by name…"
             value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
             onChange={(e) => table.getColumn('name')?.setFilterValue(e.target.value)}
-            className={`${FILTER} w-44`}
+            className="w-44"
           />
-          <button
+          <Button
+            variant={showCreate ? 'neutral' : 'primary'}
             onClick={() => { setShowCreate((v) => !v) }}
-            className={`text-sm px-3.5 py-1.5 rounded-md font-medium transition-colors ${
-              showCreate ? 'bg-line text-body' : 'bg-accent text-accent-fg hover:bg-accent-hover'
-            }`}
           >
             {showCreate ? 'Cancel' : '+ New gig'}
-          </button>
+          </Button>
         </div>
       </div>
 

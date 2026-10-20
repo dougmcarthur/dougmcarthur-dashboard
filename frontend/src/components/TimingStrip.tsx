@@ -1,5 +1,5 @@
 import type { DueReminder, TimingRow } from '../api'
-import { shortDate } from '../format'
+import { localToday, shortDate } from '../format'
 import { isGigTransitionAllowed } from '../../../shared/gigStatus'
 import { Button } from './ui/Button'
 import { Caption, Card } from './ui/Surface'
@@ -36,9 +36,9 @@ function countdown(band: TimingRow['band'], days: number): string {
 
 /** Whole days from today to an ISO date, negative once it has passed. */
 function daysTo(iso: string): number {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return Math.round((new Date(`${iso.slice(0, 10)}T00:00:00`).getTime() - today.getTime()) / 86_400_000)
+  const today = localToday()
+  const todayMs = new Date(`${today}T00:00:00`).getTime()
+  return Math.round((new Date(`${iso.slice(0, 10)}T00:00:00`).getTime() - todayMs) / 86_400_000)
 }
 
 function Row({
@@ -116,7 +116,7 @@ export function TimingStrip({
           return (
             <Row
               key={`reminder-${r.id}`}
-              title={r.gigName ?? `${r.entityType} #${r.entityId}`}
+              title={r.gigName || 'Application reminder'}
               meta={`${shortDate(r.scheduledFor)} · did the application go in?`}
               tone={days < 0 ? BAND_STYLE.overdue : BAND_STYLE.due_soon}
               right={countdown(days < 0 ? 'overdue' : 'due_soon', days)}

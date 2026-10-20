@@ -22,7 +22,7 @@ export function CopyButton({
 }: {
   text: string
   /** The accessible name, which should say what is copied: "Copy short bio". */
-  label: string
+  label?: string
   /** What the button says before it is pressed. */
   children?: string
   variant?: ButtonVariant
@@ -48,7 +48,7 @@ export function CopyButton({
 
   return (
     <>
-      <Button variant={variant} size="sm" aria-label={label} onClick={copy} className={`shrink-0 ${className}`}>
+      <Button variant={variant} size="sm" aria-label={label || children || 'Copy'} onClick={copy} className={`shrink-0 ${className}`}>
         {said || children}
       </Button>
       {/* Outside the button, because a button with its own accessible name is

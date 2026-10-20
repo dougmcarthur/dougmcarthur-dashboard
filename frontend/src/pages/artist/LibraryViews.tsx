@@ -226,7 +226,7 @@ export function ProfileView({
               <span className="text-base text-body">{firstLine(tagline.value)}</span>
             </Entry>
           ) : (
-            <p className="text-sm text-faint">No one-line description yet.</p>
+            <p className="text-sm text-muted">No one-line description yet.</p>
           )}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
             {[hometown, genre, lineup].map((a) =>
@@ -248,7 +248,7 @@ export function ProfileView({
                 >
                   <Mark asset={l} />
                   {l.label}
-                  {host(l.value) && <span className="text-faint">{host(l.value)}</span>}
+                  {host(l.value) && <span className="text-muted">{host(l.value)}</span>}
                 </button>
               ))}
             </div>
@@ -260,7 +260,7 @@ export function ProfileView({
         <div className="space-y-6 min-w-0">
           <ProfileSection title="About">
             {bios.length === 0 ? (
-              <p className="text-sm text-faint">No bio yet.</p>
+              <p className="text-sm text-muted">No bio yet.</p>
             ) : (
               <div className="space-y-3">
                 <Entry asset={bios[0]} onOpen={() => onOpen(bios[0])}>
@@ -282,7 +282,7 @@ export function ProfileView({
                       >
                         <Mark asset={b} />
                         {b.label}
-                        <span className="text-faint tabular-nums">{(b.value ?? '').split(/\s+/).filter(Boolean).length}w</span>
+                        <span className="text-muted tabular-nums">{(b.value ?? '').split(/\s+/).filter(Boolean).length}w</span>
                       </button>
                     ))}
                   </div>
@@ -310,7 +310,7 @@ export function ProfileView({
 
           <ProfileSection title="Watch and listen">
             {media.length === 0 ? (
-              <p className="text-sm text-faint">No live video or recordings yet. A live video is the first thing a programmer watches.</p>
+              <p className="text-sm text-muted">No live video or recordings yet. A live video is the first thing a programmer watches.</p>
             ) : (
               <ul className="space-y-1">
                 {media.map((m) => (
@@ -338,7 +338,7 @@ export function ProfileView({
 
           <ProfileSection title="Photos">
             {photos.length === 0 ? (
-              <p className="text-sm text-faint">No press photos yet.</p>
+              <p className="text-sm text-muted">No press photos yet.</p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {photos.map((p) => (
@@ -372,7 +372,7 @@ export function ProfileView({
         <aside className="space-y-6 min-w-0" aria-label="Facts and documents">
           <ProfileSection title="Facts">
             {facts.length === 0 ? (
-              <p className="text-sm text-faint">No facts yet — hometown, line-up, set length.</p>
+              <p className="text-sm text-muted">No facts yet — hometown, line-up, set length.</p>
             ) : (
               <dl className="space-y-1">
                 {facts.map((f) => (
@@ -389,7 +389,7 @@ export function ProfileView({
 
           <ProfileSection title="Documents">
             {documents.length === 0 ? (
-              <p className="text-sm text-faint">No stage plot, rider or tax forms yet.</p>
+              <p className="text-sm text-muted">No stage plot, rider or tax forms yet.</p>
             ) : (
               <ul className="space-y-1">
                 {documents.map((d) => (

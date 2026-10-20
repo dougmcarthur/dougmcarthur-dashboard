@@ -384,7 +384,7 @@ function PlotView({
 
       <WaitingNote waiting={waiting} />
 
-      <p className="text-xs text-faint print:hidden">
+      <p className="text-xs text-muted print:hidden">
         Inputs are the usual choice for each instrument. If your rig is different, say so in the notes or the gear
         list — both are printed on the plot.
       </p>

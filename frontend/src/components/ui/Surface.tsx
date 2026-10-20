@@ -35,6 +35,7 @@ export interface CardProps {
   clip?: boolean
   className?: string
   as?: 'div' | 'section' | 'li'
+  id?: string
   'aria-labelledby'?: string
 }
 

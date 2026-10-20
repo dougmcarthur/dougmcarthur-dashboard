@@ -117,7 +117,7 @@ export function QuestionScreen({
           aria-label={tx(q.prompt)}
           className="text-base"
         />
-        <p className="text-xs text-faint" aria-live="polite">
+        <p className="text-xs text-muted" aria-live="polite">
           {text.length} of {q.maxLength} characters
         </p>
       </div>

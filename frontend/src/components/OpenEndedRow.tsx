@@ -1,5 +1,6 @@
 import type { Backlog } from '../api'
 import { CARD_CLASS } from './ui/Surface'
+import { localToday } from '../format'
 
 /**
  * Block D — the rot detector.
@@ -16,7 +17,8 @@ import { CARD_CLASS } from './ui/Surface'
 
 function since(iso: string | null): string | null {
   if (!iso) return null
-  const days = Math.round((Date.now() - new Date(`${iso}T00:00:00Z`).getTime()) / 86_400_000)
+  const today = localToday()
+  const days = Math.round((new Date(`${today}T00:00:00Z`).getTime() - new Date(`${iso}T00:00:00Z`).getTime()) / 86_400_000)
   if (days < 45) return null // Too recent to call it sitting.
   const months = Math.round(days / 30)
   return months >= 12 ? 'over a year' : `${months} months`

@@ -75,9 +75,9 @@ function AssociationPanel({ association, onDone }: { association: AssociationSum
           <ul className="divide-y divide-line border-y border-line">
             {data.proposals.map((p: AssetProposal) => (
               <li key={p.source} className="py-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
-                <span className="text-xs text-faint w-12 shrink-0">{p.kind}</span>
+                <span className="text-xs text-muted w-12 shrink-0">{p.kind}</span>
                 <span className="text-ink font-medium shrink-0">{p.label}</span>
-                {p.variant && <span className="text-xs text-faint shrink-0">{p.variant}</span>}
+                {p.variant && <span className="text-xs text-muted shrink-0">{p.variant}</span>}
                 <span className="text-muted truncate min-w-0 basis-full sm:basis-auto sm:flex-1">{p.value}</span>
               </li>
             ))}
