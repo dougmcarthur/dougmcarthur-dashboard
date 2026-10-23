@@ -1,6 +1,7 @@
 import { AnswersBody, useAnswers } from './AnswersPanel'
 import { IconButton } from './notificationParts'
 import { NotificationBody, useNotificationFeed } from './NotificationPanel'
+import { usePopOut } from './PopOut'
 import { SIDE_PANELS, SIDE_PANEL_LABELS, type SidePanelId } from '../sidePanel'
 import type { SidePanelControls } from '../hooks/useSidePanel'
 
@@ -42,6 +43,7 @@ export function SideDock({
   const notifications = useNotificationFeed({ poll: false })
   // Only the panel in view costs a request.
   const answers = useAnswers({ enabled: side.panel === 'answers' })
+  const popOut = usePopOut()
   const { unread, markRead } = notifications
   const out = WAY_OUT[side.panel]
 
@@ -89,6 +91,16 @@ export function SideDock({
         <div className="flex items-center gap-0.5">
           {/* First, and always here: the way to everything the panel cannot hold. */}
           <IconButton label={out.label} icon={out.icon} onClick={() => onNav(out.page)} />
+          {/* The answers, lifted out of the column into a window that stays above
+              whatever form is open in another tab. Only for the panel that is
+              answers, and only where there is somewhere to put a window. */}
+          {side.panel === 'answers' && popOut.available && (
+            <IconButton
+              label={popOut.showing({ kind: 'answers' }) ? 'Close the pop-out window' : 'Pop the answers out into a window'}
+              icon="popout"
+              onClick={() => (popOut.showing({ kind: 'answers' }) ? popOut.close() : popOut.open({ kind: 'answers' }))}
+            />
+          )}
           <IconButton label="Unpin, and go back to a dropdown" icon="pin-off" onClick={side.unpin} />
           <IconButton label="Hide the panel" icon="x" onClick={side.hide} />
         </div>

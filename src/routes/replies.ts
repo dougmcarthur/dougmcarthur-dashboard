@@ -14,6 +14,8 @@ import { refuseUnlessMailboxOwner } from '../lib/ownerMailbox'
 import { fetchReplies, planReplyScan, sentThreadIds } from '../lib/gmailReplies'
 import { recordEvent } from '../lib/notificationEvents'
 import { FORGOTTEN_ON_DISMISS } from '../lib/replyRetention'
+import { DIGEST_KEYS, readSetting } from '../lib/settings'
+import { isOwnMail, ownSenders } from '../../shared/ownMail'
 import {
   matchReply,
   matchConfidence,
@@ -149,9 +151,25 @@ export async function runReplyScan(
   const gigs = allGigs.map(toMatchable)
   const bindings = await loadBindings(env, tenant)
 
-  const plan = planReplyScan({ gigs, bindings, today })
+  // The addresses this app sends as. The digest's is a setting and the sign-in
+  // one is configuration, so both are read rather than assumed; the fixed pair
+  // is always in the list. See shared/ownMail.ts.
+  const senders = ownSenders([env.AUTH_EMAIL_SENDER, await readSetting(env, DIGEST_KEYS.sender)])
+
+  // Our own mail that an earlier scan had already filed. The query leaves it
+  // out now, so nothing would ever fetch it again to clear it the way an
+  // unmatched row is cleared; it is removed here instead. A row somebody
+  // resolved is left alone, whoever it was from.
+  const purged = (
+    await db
+      .delete(gigReplies)
+      .where(scoped(gigReplies, tenant, inArray(gigReplies.fromAddress, senders), isNull(gigReplies.resolution)))
+      .returning({ id: gigReplies.id })
+  ).length
+
+  const plan = planReplyScan({ gigs, bindings, today, ownSenders: senders })
   if (plan.queries.length === 0) {
-    return { ...plan, found: 0, stored: 0, skipped: 0, unmatched: 0, cleared: 0 }
+    return { ...plan, found: 0, stored: 0, skipped: 0, unmatched: 0, cleared: purged }
   }
 
   const messages = await fetchReplies(env, plan)
@@ -175,7 +193,7 @@ export async function runReplyScan(
   // Fetched, read, and found to be about none of your applications.
   let unmatched = 0
   // Of those, the ones an earlier scan had filed and this one removed.
-  let cleared = 0
+  let cleared = purged
   const fresh: Array<{ subject: string | null; gigName: string | null; classification: string }> = []
 
   // Measured once for the whole scan rather than per message: the question is
@@ -197,6 +215,14 @@ export async function runReplyScan(
     // A decision already made is not re-proposed. This is what makes the scan
     // safe to run on a schedule.
     if (prior?.resolution) {
+      skipped++
+      continue
+    }
+
+    // Mail this app sent. The query already leaves these out; this is for the
+    // sender that changed after the query was built, and for Gmail matching a
+    // `from:` loosely. Nothing is stored, so there is nothing to clear.
+    if (isOwnMail(message.from, senders)) {
       skipped++
       continue
     }

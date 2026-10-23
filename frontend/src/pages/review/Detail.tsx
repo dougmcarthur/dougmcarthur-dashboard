@@ -13,6 +13,7 @@ import { Caption, Card } from '../../components/ui/Surface'
 import { TermsPanel, mayPitch } from '../../components/SyncTerms'
 import { mapsLink } from '../../../../shared/travelDistance'
 import { whereLabel } from '../../../../shared/artistFocus'
+import { windowState } from '../../../../shared/windowProse'
 
 /**
  * Everything known about the selected item, on one surface.
@@ -139,13 +140,23 @@ export function Detail({
   }
 
   if (deadline.opensAt) {
+    // Tense follows the date. "Window opens Oct 1" with nothing beside it read
+    // the same on the 22nd as on the 1st, which left the open window looking
+    // like one still to come.
+    const opened = windowState(deadline) === 'open'
     facts.push({
-      label: 'Window opens',
+      label: opened ? 'Window opened' : 'Window opens',
       value: (
         <>
           {shortDate(deadline.opensAt)}
-          {deadline.opensInDays !== null && deadline.opensInDays > 0 && (
-            <span className="ml-1.5 font-normal text-muted">in {deadline.opensInDays}d</span>
+          {deadline.opensInDays !== null && (
+            <span className="ml-1.5 font-normal text-muted">
+              {opened
+                ? deadline.opensInDays === 0
+                  ? 'today'
+                  : `${Math.abs(deadline.opensInDays)}d ago`
+                : `in ${deadline.opensInDays}d`}
+            </span>
           )}
         </>
       ),

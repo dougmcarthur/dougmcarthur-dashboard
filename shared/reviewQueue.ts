@@ -26,6 +26,7 @@ import type { GigOpportunity, SyncTarget, PromoDraft } from './types'
 import { decisionFor, type Decision } from './decisionCopy'
 import { visaLead } from './gigCost'
 import { withStoredColumns } from './noteColumns'
+import { settleWindowProse, windowState } from './windowProse'
 import { focusOfItem, type Focus, type ItemFocus } from './artistFocus'
 import { pitchGate, termsOf } from './syncTerms'
 import {
@@ -387,7 +388,9 @@ function flagsFor(
       kind: 'warning',
     })
   }
-  if (parsed.timing.length > 0) {
+  // The note says the window is coming; the column can say it has come. Once
+  // it has, "opens later" is the one claim here that is certainly wrong.
+  if (parsed.timing.length > 0 && windowState(deadline) !== 'open') {
     flags.push({ id: 'window', label: 'Window opens later', severity: 'info', kind: 'state' })
   }
 
@@ -402,16 +405,23 @@ function score(flags: ReviewFlag[], deadline: ParsedDeadline): number {
 }
 
 function gigItem(row: GigOpportunity, today: string, names: ArtistNames): Omit<ReviewItem, 'decision' | 'focus'> {
-  // The columns first, the prose only where they are empty. Until this the
-  // screen re-derived on every render, so a `submission_state` you corrected
-  // by hand changed the database and nothing you could see.
-  const parsed = withStoredColumns(parseNote(row.fitRationale ?? row.fitNotes, names), row)
-  const fee = parseFee(row.fee, row.paid)
   const deadline = parseDeadline(row.deadline, {
     note: row.deadlineNote,
     opensAt: row.opensAt,
     today,
   })
+  // The columns first, the prose only where they are empty. Until this the
+  // screen re-derived on every render, so a `submission_state` you corrected
+  // by hand changed the database and nothing you could see.
+  //
+  // Then the opening date against the note, which was written while the window
+  // was shut: a window the column says has opened is no longer something the
+  // note is waiting on. See `shared/windowProse.ts`.
+  const parsed = settleWindowProse(
+    withStoredColumns(parseNote(row.fitRationale ?? row.fitNotes, names), row),
+    deadline,
+  )
+  const fee = parseFee(row.fee, row.paid)
   const silence = submissionSilence(row, today)
   const flags = flagsFor('gig', row.status, parsed, fee, deadline, silence, row, today)
 

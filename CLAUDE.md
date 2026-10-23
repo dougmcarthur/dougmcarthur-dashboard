@@ -1445,6 +1445,28 @@ encoded characters, under the common 8 KB request-line limit since Google does
 not publish its own. Other platforms need builder-side field names and
 Airtable renders in JavaScript, so this is Google Forms only.
 
+**The answers can sit in a window above the form, and every copy takes the
+window it was clicked in.** A Document Picture-in-Picture window, or a pop-up
+where that is missing, lists an application's questions in the form's order
+with Copy, Enter for copy-and-next and "This one is right", beside the form's
+own tab (`PopOutProvider` in `Layout`, `AnswerSheet`; what was measured and what
+was built is in `docs/submission-helper-plan.md`). It writes one thing, approving
+an answer the artist has read, and cannot reach the form. Three things are not
+obvious. **The clipboard:** a click in the window focuses the window and not the
+page that holds the code, so `navigator.clipboard` called from that code fails
+with "Document is not focused" while the window's own clipboard works. Every
+write therefore goes through `writeClipboard(text, win)` in
+`frontend/src/clipboard.ts`, with the window taken from the button that was
+pressed, and `test/popOut.test.ts` fails if anything the window draws reaches
+for the global one. **Its life:** it lasts exactly as long as the page that
+opened it, so a reload or a sign-out redirect closes it and a change of `#`
+route does not, which is why the provider sits in `Layout`. **Its document:** the
+window has its own, so absolutely positioned text with no positioned ancestor,
+such as the copy buttons' screen-reader labels, is placed against that document
+and stretches it. The shell is positioned and clipped, the highlighted row is
+scrolled into view by the list alone and never by `scrollIntoView`, and the
+window's title is set on its own document: `document.title` is the tab's.
+
 **A suggestion is not an answer.** `answer_state` is a column apart from
 `answer` for the same reason `unreviewed` is a state apart from `overdue`: "the
 app proposed this" and "you read it and said yes" are different claims, and an
@@ -1549,6 +1571,21 @@ ways on purpose: without splitting camel case, so "LieLow" stays one
 distinctive token rather than `lie` + `low`; and with splitting it, so
 "BreakOut West" yields BOW. Getting that backwards loses LieLow entirely, which
 is how it was found.
+
+**The scan never reads this app's own mail.** The weekly digest names the gigs
+that need a decision and lands in the owner's inbox, so a search for a gig's name
+found it, matched it to the first gig it listed and offered to bind `digest@` to
+that application — four of them sat in Review as "Not sure". `-in:sent` does not
+catch it, because the Worker sends through Cloudflare's binding and Gmail never
+files that as sent. `shared/ownMail.ts` names the senders (the two the binding's
+`allowed_sender_addresses` accepts, which `test/ownMail.test.ts` ties to
+`wrangler.toml`, plus the configured digest and sign-in senders), as exact
+addresses and never the domain, since the artist's own mail lives there too. They
+are left out of the Gmail query, because the fetch is capped at 60 messages and a
+digest a week would crowd real replies out, and skipped again after it. Rows an
+earlier scan filed are deleted at the start of the next scan, unresolved ones
+only: the query no longer returns that mail, so the clear-on-no-match branch
+could never reach it.
 
 **Matching reads the whole body; classification reads only the top post.** The
 quoted form receipt underneath a reply is often the only place the event is

@@ -97,6 +97,13 @@ export function Icon({ name, className }: { name: string; className?: string }) 
         <path d="M2 2l12 12" />
       </>
     ),
+    // A window with a smaller one floating in its corner: the answers lifted out.
+    popout: (
+      <>
+        <rect x="1.8" y="3" width="12.4" height="10" rx="1.6" />
+        <rect x="7.6" y="7.4" width="5" height="3.8" rx="0.8" />
+      </>
+    ),
   }
   return (
     <svg
