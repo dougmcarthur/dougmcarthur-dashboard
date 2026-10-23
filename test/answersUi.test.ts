@@ -24,6 +24,10 @@ describe('copying', () => {
     // clipboard, a stale bio, ends up in a form.
     expect(copy).toContain('catch')
     expect(copy).toContain("'Could not copy'")
+    // The write goes through `writeClipboard`, which takes the window the button
+    // is in: the answers can sit in a pop-out, and see `test/popOut.test.ts`.
+    expect(copy).toContain('writeClipboard(text, win)')
+    expect(prose('frontend/src/components/CopyButton.tsx')).not.toMatch(/(?<![\w.])navigator\.clipboard/)
     expect(prose('frontend/src/components/AnswersPanel.tsx')).not.toContain('navigator.clipboard')
     expect(panel).toContain('<CopyButton')
   })

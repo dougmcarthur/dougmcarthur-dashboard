@@ -1445,6 +1445,28 @@ encoded characters, under the common 8 KB request-line limit since Google does
 not publish its own. Other platforms need builder-side field names and
 Airtable renders in JavaScript, so this is Google Forms only.
 
+**The answers can sit in a window above the form, and every copy takes the
+window it was clicked in.** A Document Picture-in-Picture window, or a pop-up
+where that is missing, lists an application's questions in the form's order
+with Copy, Enter for copy-and-next and "This one is right", beside the form's
+own tab (`PopOutProvider` in `Layout`, `AnswerSheet`; what was measured and what
+was built is in `docs/submission-helper-plan.md`). It writes one thing, approving
+an answer the artist has read, and cannot reach the form. Three things are not
+obvious. **The clipboard:** a click in the window focuses the window and not the
+page that holds the code, so `navigator.clipboard` called from that code fails
+with "Document is not focused" while the window's own clipboard works. Every
+write therefore goes through `writeClipboard(text, win)` in
+`frontend/src/clipboard.ts`, with the window taken from the button that was
+pressed, and `test/popOut.test.ts` fails if anything the window draws reaches
+for the global one. **Its life:** it lasts exactly as long as the page that
+opened it, so a reload or a sign-out redirect closes it and a change of `#`
+route does not, which is why the provider sits in `Layout`. **Its document:** the
+window has its own, so absolutely positioned text with no positioned ancestor,
+such as the copy buttons' screen-reader labels, is placed against that document
+and stretches it. The shell is positioned and clipped, the highlighted row is
+scrolled into view by the list alone and never by `scrollIntoView`, and the
+window's title is set on its own document: `document.title` is the tab's.
+
 **A suggestion is not an answer.** `answer_state` is a column apart from
 `answer` for the same reason `unreviewed` is a state apart from `overdue`: "the
 app proposed this" and "you read it and said yes" are different claims, and an

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { windowOf, writeClipboard } from '../clipboard'
 import { Button, type ButtonVariant } from './ui/Button'
 
 /**
@@ -10,6 +11,10 @@ import { Button, type ButtonVariant } from './ui/Button'
  * was already on the clipboard gets pasted instead. So the label reports what
  * happened, and a refusal says so.
  *
+ * The write goes through the window the button is drawn in, which is not always
+ * the app's: the answers can sit in a pop-out above the form, and a click there
+ * does not focus the page that holds this code. See `clipboard.ts`.
+ *
  * The confirmation fades after a moment. A button that says "Copied" for the
  * rest of the session stops meaning that it just worked.
  */
@@ -19,6 +24,7 @@ export function CopyButton({
   children = 'Copy',
   variant = 'quiet',
   className = '',
+  onCopied,
 }: {
   text: string
   /** The accessible name, which should say what is copied: "Copy short bio". */
@@ -27,20 +33,26 @@ export function CopyButton({
   children?: string
   variant?: ButtonVariant
   className?: string
+  /** Runs after a write the clipboard accepted, and not after a refusal. */
+  onCopied?: () => void
 }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => () => clearTimeout(timer.current), [])
 
-  const copy = async () => {
+  const copy = async (e: MouseEvent<HTMLButtonElement>) => {
+    // Read before the first await: the event's target is gone after it.
+    const win = windowOf(e.currentTarget)
     clearTimeout(timer.current)
+    let ok = false
     try {
-      await navigator.clipboard.writeText(text)
-      setState('copied')
+      ok = await writeClipboard(text, win)
     } catch {
-      setState('failed')
+      ok = false
     }
+    setState(ok ? 'copied' : 'failed')
+    if (ok) onCopied?.()
     timer.current = setTimeout(() => setState('idle'), 2000)
   }
 

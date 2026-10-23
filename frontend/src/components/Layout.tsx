@@ -6,6 +6,7 @@ import { usePageAnnouncement } from '../hooks/usePageAnnouncement'
 import { NotificationBell } from './NotificationBell'
 import { SideDock } from './SidePanel'
 import { AnswersDialog } from './AnswersPanel'
+import { PopOutProvider } from './PopOut'
 import { Icon } from './notificationParts'
 import { useSidePanel } from '../hooks/useSidePanel'
 import { useSignOut } from '../hooks/useSignOut'
@@ -83,12 +84,7 @@ function LeaveAdminMode() {
   )
 }
 
-export function Layout({
-  children,
-  page,
-  onNav,
-  admin = false,
-}: {
+interface LayoutProps {
   children: ReactNode
   page: string
   onNav: (p: string) => void
@@ -98,7 +94,24 @@ export function Layout({
    * rendering them would be offering what the server would turn down.
    */
   admin?: boolean
-}) {
+}
+
+/**
+ * The frame, and above it the one thing that has to outlive a page: the
+ * pop-out window for the answers. It sits here and not in the application
+ * panel that has the button, so moving from one page to another does not end
+ * a window somebody is filling a form beside. Not in admin mode, where the
+ * library it shows is refused.
+ */
+export function Layout(props: LayoutProps) {
+  return (
+    <PopOutProvider onNav={props.onNav} enabled={!props.admin}>
+      <LayoutFrame {...props} />
+    </PopOutProvider>
+  )
+}
+
+function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
   const { appearance, set, resolved } = useAppearance()
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)

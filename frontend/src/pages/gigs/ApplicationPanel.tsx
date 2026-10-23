@@ -6,6 +6,7 @@ import { gigStage } from '../../../../shared/gigStage'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea, Select } from '../../components/ui/Field'
 import { Caption } from '../../components/ui/Surface'
+import { PopOutButton } from '../../components/PopOut'
 import { PrefillLink } from './PrefillLink'
 
 function Copy({ text, label = 'Copy' }: { text: string; label?: string }) {
@@ -237,6 +238,9 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
             Ready to copy out
           </span>
         )}
+        {/* The answers in a window above the form, for when the form is open in
+            another tab. Drawn only where the browser has somewhere to put one. */}
+        <PopOutButton content={{ kind: 'application', gigId }} className="ml-auto" />
       </div>
 
       {/*
