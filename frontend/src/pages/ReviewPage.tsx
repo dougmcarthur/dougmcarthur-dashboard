@@ -8,6 +8,7 @@ import { Detail } from './review/Detail'
 import { ReplyInbox } from '../components/ReplyInbox'
 import { Banner } from '../components/ui/Surface'
 import { Select } from '../components/ui/Field'
+import { Button } from '../components/ui/Button'
 
 /**
  * The filters, and why they are worded the way they are.
@@ -126,6 +127,16 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
    */
   const detailRef = useRef<HTMLDivElement>(null)
   const queueRef = useRef<HTMLDivElement>(null)
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(Boolean(deepLinked))
+  const queueScrollY = useRef(0)
+
+  const handleBackToQueue = () => {
+    setMobileDetailOpen(false)
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: queueScrollY.current, behavior: 'instant' })
+    })
+  }
+
   const stacked = () => !window.matchMedia('(min-width: 1024px)').matches
   const reveal = (el: HTMLElement | null) => {
     const still =
@@ -142,6 +153,10 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
   // its row arrives.
   const pendingReveal = useRef<string | null>(deepLinked)
   const choose = (key: string) => {
+    if (stacked()) {
+      queueScrollY.current = window.scrollY
+      setMobileDetailOpen(true)
+    }
     if (key === selected?.key) {
       if (stacked()) reveal(detailRef.current)
       return
@@ -341,7 +356,9 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
         <div className="grid gap-5 lg:grid-cols-[19rem_minmax(0,1fr)]">
           <div
             ref={queueRef}
-            className="scroll-mt-20 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl border border-line bg-surface shadow-card divide-y divide-line"
+            className={`${
+              mobileDetailOpen ? 'hidden lg:block' : 'block'
+            } scroll-mt-20 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl border border-line bg-surface shadow-card divide-y divide-line`}
           >
             {visible.map((item) => (
               <QueueRow
@@ -355,16 +372,26 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
 
           {selected && (
             // `scroll-mt-20` clears the sticky header when this is scrolled to.
-            <div ref={detailRef} className="min-w-0 scroll-mt-20">
-              {/* The way back up, only where the queue is above rather than
-                  beside. Its gap is its own margin, so it leaves with it. */}
-              <button
-                type="button"
-                onClick={() => reveal(queueRef.current)}
-                className="lg:hidden mb-2 py-1 text-xs font-semibold text-info-fg"
-              >
-                ↑ Back to the queue
-              </button>
+            <div
+              ref={detailRef}
+              className={`${
+                mobileDetailOpen ? 'block' : 'hidden lg:block'
+              } min-w-0 scroll-mt-20`}
+            >
+              {/* The way back up on mobile master-detail */}
+              <div className="lg:hidden flex items-center justify-between pb-2 mb-3 border-b border-line">
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  onClick={handleBackToQueue}
+                  className="text-xs font-semibold text-info-fg px-2 py-1 -ml-2"
+                >
+                  ← Back to queue
+                </Button>
+                <span className="text-xs text-muted">
+                  {visible.findIndex((i) => i.key === selected.key) + 1} of {visible.length}
+                </span>
+              </div>
               <Detail
                 key={selected.key}
                 item={selected}

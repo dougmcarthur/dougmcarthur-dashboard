@@ -7,6 +7,7 @@ import { FIELD } from '../../components/ui/Field'
 import { Card } from '../../components/ui/Surface'
 import { relativeTime, shortDate } from '../../format'
 import { WITHHELD_REASONS, type WithheldReason } from '../../../../shared/publicEpk'
+import { useConfirm } from '../../components/ui/ConfirmModal'
 
 /**
  * The EPK as the page a share link opens, and the links themselves.
@@ -61,6 +62,7 @@ function IssuedLink({ url, onDone }: { url: string; onDone: () => void }) {
 
 function ShareLinks({ audience }: { audience: EpkAudience }) {
   const qc = useQueryClient()
+  const { confirm, ConfirmDialog } = useConfirm()
   const shares = useQuery({ queryKey: ['epk-shares'], queryFn: api.epk.shares })
   const [label, setLabel] = useState('')
   const [issued, setIssued] = useState<string | null>(null)
@@ -122,8 +124,14 @@ function ShareLinks({ audience }: { audience: EpkAudience }) {
                 variant="danger"
                 size="sm"
                 disabled={revoke.isPending}
-                onClick={() => {
-                  if (confirm(`Withdraw the link for "${s.label}"? Whoever has it will see a "not active" page.`)) revoke.mutate(s.id)
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `Withdraw the link for "${s.label}"?`,
+                    description: 'Whoever has it will see a "not active" page.',
+                    confirmLabel: 'Withdraw link',
+                    destructive: true,
+                  })
+                  if (ok) revoke.mutate(s.id)
                 }}
               >
                 Withdraw
@@ -144,6 +152,7 @@ function ShareLinks({ audience }: { audience: EpkAudience }) {
           </ul>
         </details>
       )}
+      {ConfirmDialog}
     </Card>
   )
 }
@@ -177,7 +186,7 @@ export function ProfileTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
         <span className="text-xs text-muted">Version</span>
         <div role="group" aria-label="Version" className="flex flex-wrap gap-1 p-1 rounded-lg border border-line bg-surface">
           {AUDIENCES.map((a) => (
@@ -193,10 +202,12 @@ export function ProfileTab() {
         </div>
       </div>
 
-      <ShareLinks audience={audience} />
+      <div className="print:hidden">
+        <ShareLinks audience={audience} />
+      </div>
 
       {preview.data && (gaps.length > 0 || withheld.length > 0) && (
-        <Card className="space-y-3">
+        <Card className="space-y-3 print:hidden">
           {gaps.length > 0 && (
             <div className="space-y-1">
               <p className="text-sm font-semibold text-ink">What would make this page stronger</p>
@@ -235,8 +246,8 @@ export function ProfileTab() {
 
       {preview.isLoading && <p className="text-sm text-muted">Building the page…</p>}
       {preview.data && (
-        <div className="rounded-xl border border-line overflow-hidden">
-          <p className="relative z-10 px-4 py-2 text-xs text-muted bg-sunken border-b border-line">
+        <div className="rounded-xl border border-line overflow-hidden print:border-none print:rounded-none">
+          <p className="relative z-10 px-4 py-2 text-xs text-muted bg-sunken border-b border-line print:hidden">
             This is what a share link shows.
           </p>
           <EpkView page={preview.data} />

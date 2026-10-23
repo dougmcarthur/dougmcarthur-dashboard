@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { FIELD, Input, Textarea } from '../../components/ui/Field'
 import { Label } from '../../components/ui/Surface'
 import { slugFor } from '../../../../shared/slug'
+import { useConfirm } from '../../components/ui/ConfirmModal'
 
 /**
  * The documents that describe the artist: bio, one-sheet, style guide.
@@ -84,6 +85,7 @@ function DocEditor({
   isSaving: boolean
   isDeleting: boolean
 }) {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(doc.title)
   const [content, setContent] = useState(doc.content)
@@ -132,8 +134,13 @@ function DocEditor({
               <Button
                 variant="quiet"
                 size="sm"
-                onClick={() => {
-                  if (confirm(`Delete "${doc.title}"?`)) onDelete(doc.id)
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `Delete "${doc.title}"?`,
+                    description: 'This reference document will be permanently deleted.',
+                    destructive: true,
+                  })
+                  if (ok) onDelete(doc.id)
                 }}
                 disabled={isDeleting}
                 className="text-muted hover:text-danger-fg"
@@ -165,6 +172,7 @@ function DocEditor({
           )}
         </div>
       )}
+      {ConfirmDialog}
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { FIELD } from './ui/Field'
 import { relativeTime } from '../format'
 import { Explainer } from './ui/Explainer'
 import { Card } from './ui/Surface'
+import { useConfirm } from './ui/ConfirmModal'
 
 /**
  * Bandsintown, connected with the artist's own key.
@@ -40,6 +41,7 @@ function StatusPill({ status }: { status: string }) {
 
 export function BandsintownCard() {
   const qc = useQueryClient()
+  const { confirm, ConfirmDialog } = useConfirm()
   const list = useQuery({ queryKey: ['connectors'], queryFn: api.connectors.list })
   const [editing, setEditing] = useState(false)
   const [account, setAccount] = useState('')
@@ -120,8 +122,14 @@ export function BandsintownCard() {
               variant="quiet"
               size="sm"
               disabled={remove.isPending}
-              onClick={() => {
-                if (confirm('Disconnect Bandsintown? Your shows stop appearing in Scout; nothing changes on Bandsintown.')) {
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Disconnect Bandsintown?',
+                  description: 'Your shows stop appearing in Scout; nothing changes on Bandsintown.',
+                  confirmLabel: 'Disconnect',
+                  destructive: true,
+                })
+                if (ok) {
                   remove.mutate()
                 }
               }}
@@ -201,6 +209,7 @@ export function BandsintownCard() {
 
       {error && <p className="text-xs text-danger-fg bg-danger-bg rounded-md px-3 py-2">{error}</p>}
       {saved && !error && <p className="text-xs text-success-fg">{saved}</p>}
+      {ConfirmDialog}
     </Card>
   )
 }

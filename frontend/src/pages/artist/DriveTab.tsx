@@ -7,6 +7,7 @@ import { Disclosure } from '../../components/ui/Disclosure'
 import { Card } from '../../components/ui/Surface'
 import { SUBFOLDERS } from '../../../../shared/driveOrganise'
 import { DriveImportPanel } from './DriveImportPanel'
+import { useConfirm } from '../../components/ui/ConfirmModal'
 
 /**
  * The folder of assets organisers and juries ask for, built in the artist's
@@ -154,6 +155,7 @@ export function OrganisePanel({ onDone }: { onDone: () => void }) {
 
 export function DriveTab({ outcome }: { outcome: string | null }) {
   const qc = useQueryClient()
+  const { confirm, ConfirmDialog } = useConfirm()
   const status = useQuery({ queryKey: ['drive-status'], queryFn: api.drive.status })
   // Only the owner has an admin mode to be sent to; everybody else is told it
   // is the operator's to finish, which is true and is all they can act on.
@@ -277,9 +279,18 @@ export function DriveTab({ outcome }: { outcome: string | null }) {
                   variant={data.shared ? 'neutral' : 'primary'}
                   size="sm"
                   disabled={share.isPending}
-                  onClick={() => {
-                    if (data.shared) share.mutate(false)
-                    else if (confirm('Anyone with the link will be able to view and download everything in this folder, and pass the link on. Turn link sharing on?')) share.mutate(true)
+                  onClick={async () => {
+                    if (data.shared) {
+                      share.mutate(false)
+                    } else {
+                      const ok = await confirm({
+                        title: 'Turn link sharing on?',
+                        description: 'Anyone with the link will be able to view and download everything in this folder, and pass the link on.',
+                        confirmLabel: 'Share folder',
+                        destructive: false,
+                      })
+                      if (ok) share.mutate(true)
+                    }
                   }}
                 >
                   {data.shared ? 'Stop sharing' : 'Share with a link'}
@@ -335,13 +346,20 @@ export function DriveTab({ outcome }: { outcome: string | null }) {
         Disconnecting leaves the folder in your Drive.{' '}
         <button
           className="underline hover:text-ink"
-          onClick={() => {
-            if (confirm('Disconnect Google Drive? The folder stays in your Drive; Scout just stops managing it.')) disconnect.mutate()
+          onClick={async () => {
+            const ok = await confirm({
+              title: 'Disconnect Google Drive?',
+              description: 'The folder stays in your Drive; Scout just stops managing it.',
+              confirmLabel: 'Disconnect',
+              destructive: true,
+            })
+            if (ok) disconnect.mutate()
           }}
         >
           Disconnect
         </button>
       </p>
+      {ConfirmDialog}
     </div>
   )
 }

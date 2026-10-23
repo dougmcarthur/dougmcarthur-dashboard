@@ -6,6 +6,7 @@ import { FIELD } from './ui/Field'
 import { relativeTime } from '../format'
 import { Explainer } from './ui/Explainer'
 import { Card } from './ui/Surface'
+import { useConfirm } from './ui/ConfirmModal'
 
 /**
  * Connecting a member profile on a provincial music association's site —
@@ -21,6 +22,7 @@ import { Card } from './ui/Surface'
  */
 export function AssociationsCard() {
   const qc = useQueryClient()
+  const { confirm, ConfirmDialog } = useConfirm()
   const list = useQuery({ queryKey: ['associations'], queryFn: api.associations.list })
   const [url, setUrl] = useState('')
   const [found, setFound] = useState<AssociationIdentity | null>(null)
@@ -113,8 +115,14 @@ export function AssociationsCard() {
                   variant="quiet"
                   size="sm"
                   disabled={remove.isPending}
-                  onClick={() => {
-                    if (confirm(`Disconnect ${a.name}? What is already in your library stays.`)) remove.mutate(a.id)
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: `Disconnect ${a.name}?`,
+                      description: 'What is already in your library stays.',
+                      confirmLabel: 'Disconnect',
+                      destructive: true,
+                    })
+                    if (ok) remove.mutate(a.id)
                   }}
                 >
                   Disconnect
@@ -256,6 +264,7 @@ export function AssociationsCard() {
       )}
 
       {error && <p className="text-xs text-danger-fg bg-danger-bg rounded-md px-3 py-2">{error}</p>}
+      {ConfirmDialog}
     </Card>
   )
 }

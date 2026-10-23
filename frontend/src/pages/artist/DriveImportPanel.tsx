@@ -4,6 +4,7 @@ import { api, type AssetProposal } from '../../api'
 import { Button } from '../../components/ui/Button'
 import { Disclosure } from '../../components/ui/Disclosure'
 import { OrganisePanel } from './DriveTab'
+import { useConfirm } from '../../components/ui/ConfirmModal'
 
 /**
  * Building the artist library from the files in the Google Drive folder, and
@@ -23,6 +24,7 @@ export function DriveImportPanel({
   onOpenDriveTab?: () => void
 }) {
   const qc = useQueryClient()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [open, setOpen] = useState(defaultOpen)
   const [copiedLink, setCopiedLink] = useState(false)
 
@@ -183,12 +185,14 @@ export function DriveImportPanel({
                   variant="primary"
                   size="sm"
                   disabled={share.isPending}
-                  onClick={() => {
-                    if (
-                      confirm(
-                        'Anyone with the link will be able to view and download everything in this folder, and pass the link on. Turn link sharing on?',
-                      )
-                    ) {
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: 'Turn link sharing on?',
+                      description: 'Anyone with the link will be able to view and download everything in this folder, and pass the link on.',
+                      confirmLabel: 'Share folder',
+                      destructive: false,
+                    })
+                    if (ok) {
                       share.mutate(true)
                     }
                   }}
@@ -205,6 +209,7 @@ export function DriveImportPanel({
           </div>
         </div>
       )}
+      {ConfirmDialog}
     </Disclosure>
   )
 }

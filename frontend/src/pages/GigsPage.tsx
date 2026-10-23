@@ -25,6 +25,7 @@ import { CreateGigForm } from './gigs/CreateGigForm'
 import { EditGigPanel } from './gigs/EditGigPanel'
 import { GigDetail } from './gigs/GigDetail'
 import { Banner, CAPTION_CLASS, Card } from '../components/ui/Surface'
+import { useConfirm } from '../components/ui/ConfirmModal'
 
 // The pipeline order, from shared/gigStatus.ts, so the picker and the Worker
 // can never disagree about what a status is or what it means.
@@ -81,6 +82,7 @@ function FitScore({ score }: { score: number | null }) {
  */
 export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }) {
   const qc = useQueryClient()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [expanded, setExpanded] = useState<Set<number>>(
@@ -402,8 +404,13 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
                             gig={row.original}
                             onEdit={() => setEditingId(row.original.id)}
                             onStatusChange={(status) => patchMutation.mutate({ id: row.original.id, body: { status } })}
-                            onDelete={() => {
-                              if (confirm(`Delete "${row.original.name}"?`)) {
+                            onDelete={async () => {
+                              const ok = await confirm({
+                                title: `Delete "${row.original.name}"?`,
+                                description: 'This removes the opportunity and any saved application answers.',
+                                destructive: true,
+                              })
+                              if (ok) {
                                 deleteMutation.mutate(row.original.id)
                               }
                             }}
@@ -437,6 +444,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
             : `${data.length} gigs`}
         </p>
       )}
+      {ConfirmDialog}
     </div>
   )
 }

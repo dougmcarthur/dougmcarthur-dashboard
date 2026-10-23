@@ -7,6 +7,7 @@ import { FIELD } from './ui/Field'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from './ui/Explainer'
 import { Banner, Card } from './ui/Surface'
+import { useConfirm } from './ui/ConfirmModal'
 
 /**
  * The research agents' credentials, one row per token.
@@ -29,6 +30,7 @@ import { Banner, Card } from './ui/Surface'
  */
 export function AgentTokensCard() {
   const qc = useQueryClient()
+  const { confirm, ConfirmDialog } = useConfirm()
   const tokens = useQuery({ queryKey: ['agentTokens'], queryFn: api.agentTokens.list })
 
   const [label, setLabel] = useState('')
@@ -141,8 +143,14 @@ export function AgentTokensCard() {
               key={token.id}
               token={token}
               busy={revoke.isPending}
-              onRevoke={() => {
-                if (confirm(`Revoke "${token.label}"? Anything using it will stop being able to file.`)) {
+              onRevoke={async () => {
+                const ok = await confirm({
+                  title: `Revoke "${token.label}"?`,
+                  description: 'Anything using this token will stop being able to file.',
+                  confirmLabel: 'Revoke token',
+                  destructive: true,
+                })
+                if (ok) {
                   revoke.mutate(token.id)
                 }
               }}
@@ -163,6 +171,7 @@ export function AgentTokensCard() {
           </ul>
         </details>
       )}
+      {ConfirmDialog}
     </Card>
   )
 }

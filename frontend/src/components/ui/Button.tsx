@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 
 /**
  * The one button.
@@ -50,19 +50,20 @@ export function buttonClass(variant: ButtonVariant = 'neutral', size: ButtonSize
   return `inline-block rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${SIZES[size]} ${VARIANTS[variant]} ${className}`.trim()
 }
 
-export function Button({
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
   variant = 'neutral',
   size = 'md',
   className = '',
   type = 'button',
   ...rest
-}: ButtonProps) {
+}: ButtonProps, ref) {
   return (
     <button
+      ref={ref}
       type={type}
       className={`rounded-md font-medium transition-colors disabled:opacity-40
                   disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
       {...rest}
     />
   )
-}
+})

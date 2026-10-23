@@ -11,6 +11,7 @@ import {
 } from '../../../../../shared/surveyPublic'
 import { Button } from '../../../components/ui/Button'
 import { Banner, Card } from '../../../components/ui/Surface'
+import { CopyButton } from '../../../components/CopyButton'
 import { BarList } from './BarList'
 import { ForestPlot, RatioTile } from './DollarCharts'
 import { pct, publishedOn } from './format'
@@ -68,6 +69,67 @@ function leftOutNote(r: PublicResults): string | null {
   return `${r.leftOut.count} completed ${r.leftOut.count === 1 ? 'response was' : 'responses were'} left out because the artist ${why.join(' or ')}.`
 }
 
+function generateSummaryText(r: PublicResults): string {
+  const lines: string[] = []
+  lines.push('How artists decide what is worth applying for - Survey Results')
+  lines.push(`Published: ${r.publishedAt.slice(0, 10)} | ${r.n} completed responses`)
+  lines.push('')
+  lines.push('Key findings:')
+  for (const h of heroLines(r)) {
+    lines.push(`- ${h.figure} ${h.rest}`)
+  }
+  if (r.findings.length > 0) {
+    lines.push('')
+    lines.push('In short:')
+    for (const f of r.findings) {
+      lines.push(`- ${f}`)
+    }
+  }
+  return lines.join('\n')
+}
+
+function downloadResultsCsv(r: PublicResults) {
+  const rows: string[][] = [
+    ['Category', 'Item / Question', 'Share / Score / Value', 'Details'],
+  ]
+  for (const h of heroLines(r)) {
+    rows.push(['Key finding', h.figure, h.rest, ''])
+  }
+  if (r.ranking) {
+    for (const item of r.ranking) {
+      rows.push(['Priorities', item.label, String(item.score), `Rank ${item.rank}`])
+    }
+  }
+  if (r.choices?.ratios) {
+    for (const ratio of r.choices.ratios) {
+      rows.push(['Trade-offs', ratio.label, String(ratio.value), ratio.verdict])
+    }
+  }
+  if (r.choices?.values) {
+    for (const val of r.choices.values) {
+      rows.push(['Values', val.label, String(val.value), val.group])
+    }
+  }
+  const questions = [r.stop, r.apply, r.find, ...r.sample].filter(Boolean) as PublicQuestion[]
+  for (const q of questions) {
+    for (const b of q.bars) {
+      rows.push([q.title, b.label, b.share === null ? '<10' : `${Math.round(b.share * 100)}%`, ''])
+    }
+  }
+  const csvContent = rows
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `sun-dogs-music-survey-${r.publishedAt.slice(0, 10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 export function ResultsView({ results: r, contact, open = false }: { results: PublicResults; contact?: string | null; open?: boolean }) {
   const leftOut = leftOutNote(r)
   const fee = r.choices?.ratios.find((x) => x.key === 'fee')
@@ -83,6 +145,15 @@ export function ResultsView({ results: r, contact, open = false }: { results: Pu
         <p className="max-w-2xl text-lg leading-relaxed text-body">
           This is what {r.n} artists said they weigh, what they would trade, and what actually stopped them from applying.
         </p>
+
+        <div className="flex flex-wrap items-center gap-2 pt-1 print:hidden">
+          <CopyButton text={generateSummaryText(r)} label="Copy survey summary">
+            Copy summary
+          </CopyButton>
+          <Button variant="quiet" size="sm" onClick={() => downloadResultsCsv(r)}>
+            Download CSV
+          </Button>
+        </div>
 
         <div className="grid gap-3 pt-2 sm:grid-cols-3">
           {hero.map((line, i) => (

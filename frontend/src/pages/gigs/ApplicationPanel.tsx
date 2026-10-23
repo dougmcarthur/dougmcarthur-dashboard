@@ -4,32 +4,11 @@ import { api, type Application, type PreparedField, type ChecklistItem } from '.
 import { kindByKey } from '../../../../shared/questionKinds'
 import { gigStage } from '../../../../shared/gigStage'
 import { Button } from '../../components/ui/Button'
+import { CopyButton } from '../../components/CopyButton'
 import { Input, Textarea, Select } from '../../components/ui/Field'
 import { Caption } from '../../components/ui/Surface'
 import { PopOutButton } from '../../components/PopOut'
 import { PrefillLink } from './PrefillLink'
-
-function Copy({ text, label = 'Copy' }: { text: string; label?: string }) {
-  const [done, setDone] = useState(false)
-  return (
-    <Button
-      variant="quiet"
-      size="sm"
-      aria-label={label}
-      onClick={() => {
-        navigator.clipboard.writeText(text).then(
-          () => {
-            setDone(true)
-            setTimeout(() => setDone(false), 1200)
-          },
-          () => setDone(false),
-        )
-      }}
-    >
-      {done ? 'Copied' : label}
-    </Button>
-  )
-}
 
 const STATE_CHIP: Record<string, { text: string; className: string }> = {
   empty: { text: 'No answer', className: 'border-line text-faint' },
@@ -112,7 +91,7 @@ function FieldCard({
                 This one is right
               </Button>
             )}
-            {value && <Copy text={value} />}
+            {value && <CopyButton text={value} label={`Copy answer for ${field.label}`} />}
             {field.alternatives.length > 0 && (
               <label className="flex items-center gap-1.5 text-xs text-muted">
                 Use instead
@@ -221,22 +200,40 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
   const busy = prepare.isPending || patchField.isPending
   const known = data.gig.applicationUrl ?? data.gig.url
 
+  const exportableFields = fields.filter(
+    (f) => f.fieldType !== 'file' && f.answer && f.answer.trim().length > 0,
+  )
+  const allAnswersText = exportableFields
+    .map((f) => `${f.label}\n${f.answer!.trim()}`)
+    .join('\n\n')
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Caption>Application</Caption>
-        {fields.length > 0 && (
-          <p className="text-xs text-muted">
-            {readiness.checked} of {readiness.answered} answers read
-            {readiness.required > 0 &&
-              ` · ${readiness.requiredAnswered}/${readiness.required} required answered`}
-            {readiness.uploads > 0 && ` · ${readiness.uploads} to attach`}
-          </p>
-        )}
-        {readiness.sendable && (
-          <span className="text-xs px-2 py-0.5 rounded-md border border-success-line text-success-fg bg-surface">
-            Ready to copy out
-          </span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Caption>Application</Caption>
+          {fields.length > 0 && (
+            <p className="text-xs text-muted">
+              {readiness.checked} of {readiness.answered} answers read
+              {readiness.required > 0 &&
+                ` · ${readiness.requiredAnswered}/${readiness.required} required answered`}
+              {readiness.uploads > 0 && ` · ${readiness.uploads} to attach`}
+            </p>
+          )}
+          {readiness.sendable && (
+            <span className="text-xs px-2 py-0.5 rounded-md border border-success-line text-success-fg bg-surface">
+              Ready to copy out
+            </span>
+          )}
+        </div>
+        {exportableFields.length > 0 && (
+          <CopyButton
+            text={allAnswersText}
+            label={`Copy all ${exportableFields.length} answers`}
+            variant="neutral"
+          >
+            Copy all answers
+          </CopyButton>
         )}
         {/* The answers in a window above the form, for when the form is open in
             another tab. Drawn only where the browser has somewhere to put one. */}
@@ -314,7 +311,7 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
             <Caption>
               Draft email — submitted by mail
             </Caption>
-            <Copy text={`${email.subject}\n\n${email.body}`} label="Copy draft" />
+            <CopyButton text={`${email.subject}\n\n${email.body}`} label="Copy draft" />
           </div>
           <p className="text-sm font-medium text-ink mt-2">{email.subject}</p>
           <pre className="text-sm text-body whitespace-pre-wrap font-sans mt-1.5">{email.body}</pre>

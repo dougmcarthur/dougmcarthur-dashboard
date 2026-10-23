@@ -147,12 +147,16 @@ export function Banner({
   tone = 'danger',
   size = 'md',
   className = '',
+  as: Tag = 'p',
+  role,
 }: {
   children: ReactNode
   tone?: 'danger' | 'warn' | 'info' | 'success'
   /** `sm` is the inline px-3 py-2 spelling; `md` the px-4 py-3 block. */
   size?: 'sm' | 'md'
   className?: string
+  as?: 'div' | 'p'
+  role?: string
 }) {
   const TONE = {
     danger: 'bg-danger-bg border-danger-line text-danger-fg',
@@ -161,7 +165,7 @@ export function Banner({
     success: 'bg-success-bg border-success-line text-success-fg',
   }
   const SIZE = { sm: 'px-3 py-2 rounded-md text-xs', md: 'px-4 py-3 rounded-lg text-sm' }
-  return <p className={`border ${TONE[tone]} ${SIZE[size]} ${className}`}>{children}</p>
+  return <Tag role={role} className={`border ${TONE[tone]} ${SIZE[size]} ${className}`}>{children}</Tag>
 }
 
 /* --------------------------------------------------------------------- */

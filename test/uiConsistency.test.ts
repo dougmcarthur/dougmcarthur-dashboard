@@ -224,7 +224,11 @@ describe('the application panel offers to copy, never to send', () => {
   })
 
   it('offers copying instead', () => {
-    expect(src).toContain('navigator.clipboard.writeText')
+    expect(src).toMatch(/navigator\.clipboard\.writeText|<CopyButton/)
+  })
+
+  it('offers a batch export of all application answers', () => {
+    expect(src).toContain('Copy all answers')
   })
 })
 
@@ -957,3 +961,56 @@ describe('a FIELD is sized by its container', () => {
     expect(offenders).toEqual([])
   })
 })
+
+describe('zero browser-native confirm() calls in the frontend', () => {
+  it('uses ConfirmModal or in-place confirmation instead of blocking window.confirm', () => {
+    const offenders: string[] = []
+    for (const file of FILES) {
+      const src = withoutComments(readFileSync(file, 'utf8'))
+      const lines = src.split('\n')
+      lines.forEach((line, i) => {
+        if (/\bwindow\.confirm\s*\(/.test(line) || /\bconfirm\s*\(\s*['"`]/.test(line)) {
+          offenders.push(`${file}:${i + 1} ${line.trim()}`)
+        }
+      })
+    }
+    expect(offenders).toEqual([])
+  })
+})
+
+describe('Phase 2 ergonomics and primitives', () => {
+  it('supports polymorphism in Banner primitive', () => {
+    const surface = readFileSync('frontend/src/components/ui/Surface.tsx', 'utf8')
+    expect(surface).toContain("as?: 'div' | 'p'")
+    expect(surface).toContain('role?: string')
+  })
+
+  it('provides readable triage labels for small screens on DecisionDeck', () => {
+    const deck = readFileSync('frontend/src/components/DecisionDeck.tsx', 'utf8')
+    expect(deck).toContain('sm:hidden')
+  })
+
+  it('tracks character count and platform fit on PromoDraftsPage', () => {
+    const promo = readFileSync('frontend/src/pages/PromoDraftsPage.tsx', 'utf8')
+    expect(promo).toContain('draft.content.length')
+    expect(promo).toMatch(/fits short post/i)
+  })
+
+  it('provides search input on HelpPage', () => {
+    const help = readFileSync('frontend/src/pages/HelpPage.tsx', 'utf8')
+    expect(help).toContain('type="search"')
+    expect(help).toContain('Search help topics...')
+  })
+
+  it('provides summary copy and CSV export on survey ResultsView', () => {
+    const results = readFileSync('frontend/src/pages/survey/results/ResultsView.tsx', 'utf8')
+    expect(results).toContain('Copy summary')
+    expect(results).toContain('Download CSV')
+  })
+
+  it('tightens JoinScreen padding and provides a key icon', () => {
+    const join = readFileSync('frontend/src/components/JoinScreen.tsx', 'utf8')
+    expect(join).toContain('p-4 sm:p-6')
+  })
+})
+

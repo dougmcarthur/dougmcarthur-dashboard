@@ -12,6 +12,7 @@ import {
 import { localToday, shortDate } from '../format'
 import { Banner, Card } from './ui/Surface'
 import { Button } from './ui/Button'
+import { useConfirm } from './ui/ConfirmModal'
 
 /**
  * What a sync target's own site says about pitches from people it does not
@@ -70,6 +71,7 @@ export function TermsPanel({
   quiet?: boolean
 }) {
   const qc = useQueryClient()
+  const { confirm, ConfirmDialog } = useConfirm()
   const view = termsOf(target)
   const refresh = () => refreshTargets(qc)
 
@@ -120,8 +122,15 @@ export function TermsPanel({
             variant="quiet"
             size="sm"
             disabled={busy}
-            onClick={() => {
-              if (confirm(`Their site says: “${view.quote ?? 'no unsolicited pitches'}”\n\nPitch ${target.name} anyway?`)) {
+            onClick={async () => {
+              const ok = await confirm({
+                title: `Pitch ${target.name} anyway?`,
+                description: `Their site says: “${view.quote ?? 'no unsolicited pitches'}”\n\nPitch ${target.name} anyway?`,
+                confirmLabel: 'Pitch anyway',
+                cancelLabel: 'Keep blocked',
+                destructive: false,
+              })
+              if (ok) {
                 override.mutate(true)
               }
             }}
@@ -140,6 +149,7 @@ export function TermsPanel({
       {(check.error || override.error) && (
         <p className="text-xs text-danger-fg">{((check.error ?? override.error) as Error).message}</p>
       )}
+      {ConfirmDialog}
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { FILTER } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { CopyButton } from '../components/CopyButton'
 import { Banner, Card, EmptyState } from '../components/ui/Surface'
+import { useConfirm } from '../components/ui/ConfirmModal'
 
 /** "2026-09" is a key, not a label. */
 function monthLabel(m: string): string {
@@ -23,6 +24,7 @@ function monthLabel(m: string): string {
 
 export function PromoDraftsPage() {
   const qc = useQueryClient()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [statusFilter, setStatusFilter] = useState('')
   const [monthFilter, setMonthFilter] = useState('')
@@ -154,9 +156,14 @@ export function PromoDraftsPage() {
                       variant="quiet"
                       size="sm"
                       disabled={deleteMutation.isPending}
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation()
-                        if (confirm(`Delete "${draft.title}"?`)) deleteMutation.mutate(draft.id)
+                        const ok = await confirm({
+                          title: `Delete "${draft.title}"?`,
+                          description: 'This promo draft will be permanently deleted.',
+                          destructive: true,
+                        })
+                        if (ok) deleteMutation.mutate(draft.id)
                       }}
                       className="w-6 h-6 p-0 flex items-center justify-center text-muted hover:text-danger-fg hover:bg-danger-bg"
                       title="Delete"
@@ -172,7 +179,16 @@ export function PromoDraftsPage() {
                     <p className="text-sm text-body leading-relaxed whitespace-pre-wrap">
                       {draft.content}
                     </p>
-                    <div className="flex items-center justify-end pt-1">
+                    <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                      <div className="flex items-center gap-2 text-xs text-muted tabular-nums">
+                        <span>{draft.content.length} characters</span>
+                        <span className="text-faint">·</span>
+                        {draft.content.length <= 300 ? (
+                          <span className="text-success-fg">Fits short post (under 300)</span>
+                        ) : (
+                          <span>Longer format (caption / email)</span>
+                        )}
+                      </div>
                       <CopyButton text={draft.content} label={`Copy ${draft.title}`}>
                         Copy draft
                       </CopyButton>
@@ -195,6 +211,7 @@ export function PromoDraftsPage() {
           {filtered ? `${visible.length} of ${data.length} drafts` : `${data.length} drafts`}
         </p>
       )}
+      {ConfirmDialog}
     </div>
   )
 }

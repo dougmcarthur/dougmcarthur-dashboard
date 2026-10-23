@@ -157,54 +157,6 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
         </div>
       </div>
 
-      {/*
-        Counted over the whole library rather than the filtered view, so the
-        number does not change because you clicked Photos. An EPK assembled
-        from overdue material looks complete and is not, which is the one
-        failure a generated document has that a folder does not.
-      */}
-      {/*
-        Buttons, not labels. These counts are the two questions the artist
-        database exists to answer, and reading one and then hunting the list
-        for the rows behind it was the whole friction — one sourcing run puts
-        twenty-two assets in the second bucket at once.
-      */}
-      {data && (data.needsReview > 0 || data.unreviewed > 0) && (
-        <div className="flex flex-wrap gap-2 text-sm print:hidden">
-          {data.needsReview > 0 && (
-            <button
-              onClick={() => { setFreshness(freshness === 'overdue' ? '' : 'overdue'); setTab('library') }}
-              aria-pressed={freshness === 'overdue'}
-              className={`px-3 py-1.5 rounded-lg border transition-colors ${
-                freshness === 'overdue'
-                  ? 'border-danger-line bg-danger-fg text-surface'
-                  : 'border-danger-line bg-danger-bg text-danger-fg hover:border-danger-fg'
-              }`}
-            >
-              <strong>{data.needsReview}</strong> overdue for review
-            </button>
-          )}
-          {data.unreviewed > 0 && (
-            <button
-              onClick={() => { setFreshness(freshness === 'unreviewed' ? '' : 'unreviewed'); setTab('library') }}
-              aria-pressed={freshness === 'unreviewed'}
-              className={`px-3 py-1.5 rounded-lg border transition-colors ${
-                freshness === 'unreviewed'
-                  ? 'border-line-strong bg-ink text-surface'
-                  : 'border-line bg-surface text-muted hover:border-line-strong'
-              }`}
-            >
-              <strong>{data.unreviewed}</strong> never reviewed
-            </button>
-          )}
-          {freshness && (
-            <button onClick={() => setFreshness('')} className="px-3 py-1.5 text-muted hover:text-ink transition-colors">
-              Show everything
-            </button>
-          )}
-        </div>
-      )}
-
       <div className="print:hidden">
       <Tabs
         label="Artist sections"
@@ -235,6 +187,47 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
           <DriveImportPanel onDone={invalidate} onOpenDriveTab={() => setTab('drive')} />
           <SourcePanel onDone={invalidate} />
           <AssociationPanels onDone={invalidate} />
+          {data && (data.needsReview > 0 || data.unreviewed > 0) && (
+            <div className="flex flex-wrap items-center gap-2 text-sm print:hidden">
+              {data.needsReview > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFreshness(freshness === 'overdue' ? '' : 'overdue')}
+                  aria-pressed={freshness === 'overdue'}
+                  className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                    freshness === 'overdue'
+                      ? 'border-danger-line bg-danger-fg text-surface'
+                      : 'border-danger-line bg-danger-bg text-danger-fg hover:border-danger-fg'
+                  }`}
+                >
+                  <strong>{data.needsReview}</strong> overdue for review
+                </button>
+              )}
+              {data.unreviewed > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFreshness(freshness === 'unreviewed' ? '' : 'unreviewed')}
+                  aria-pressed={freshness === 'unreviewed'}
+                  className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                    freshness === 'unreviewed'
+                      ? 'border-line-strong bg-ink text-surface'
+                      : 'border-line bg-surface text-muted hover:border-line-strong'
+                  }`}
+                >
+                  <strong>{data.unreviewed}</strong> never reviewed
+                </button>
+              )}
+              {freshness && (
+                <button
+                  type="button"
+                  onClick={() => setFreshness('')}
+                  className="px-3 py-1.5 text-xs text-muted hover:text-ink transition-colors"
+                >
+                  Show everything
+                </button>
+              )}
+            </div>
+          )}
           {adding && (
             <AssetForm
               initialKind={addingPreset?.kind}

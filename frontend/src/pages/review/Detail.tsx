@@ -250,28 +250,6 @@ export function Detail({
         <p className="mt-1 text-sm text-body leading-relaxed">{item.decision.rationale}</p>
       </div>
 
-      {/* What their own site says about pitches from strangers, with the way
-          past a refusal. Here and not further down: it decides whether
-          anything below it, the draft especially, should be acted on. */}
-      {sync && (
-        <div className="mt-4">
-          <TermsPanel target={sync} quiet />
-        </div>
-      )}
-
-      {/* The facts a decision turns on, before anything else. */}
-      {facts.length > 0 && (
-        <div className="mt-4">
-          <FactRow facts={facts} />
-        </div>
-      )}
-
-      {warningChips.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {warningChips.map((f) => <FlagChip key={f.id} flag={f} />)}
-        </div>
-      )}
-
       {item.snooze.active && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-info-line bg-info-bg/50 px-3 py-2">
           <p className="text-xs text-info-fg">
@@ -295,12 +273,35 @@ export function Detail({
         </p>
       )}
 
-      <div className="mt-4 pt-4 border-t border-line flex flex-wrap items-center gap-2">
+      {/* Primary Decision Action Bar — Repositioned for zero-scroll triage */}
+      <div className="mt-3.5 pt-3.5 border-t border-line flex flex-wrap items-center gap-2">
         <DecisionBar item={item} onGig={onGig} onSync={onSync} onPromo={onPromo} isSaving={isSaving} />
         {item.kind !== 'promo' && !item.snooze.active && (
           <SnoozeMenu item={item} onPick={(until) => onSnooze(until)} disabled={isSaving} />
         )}
       </div>
+
+      {/* What their own site says about pitches from strangers, with the way
+          past a refusal. Here and not further down: it decides whether
+          anything below it, the draft especially, should be acted on. */}
+      {sync && (
+        <div className="mt-4">
+          <TermsPanel target={sync} quiet />
+        </div>
+      )}
+
+      {/* The facts a decision turns on, before anything else. */}
+      {facts.length > 0 && (
+        <div className="mt-4">
+          <FactRow facts={facts} />
+        </div>
+      )}
+
+      {warningChips.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {warningChips.map((f) => <FlagChip key={f.id} flag={f} />)}
+        </div>
+      )}
 
       {needsYou.length > 0 && (
         <Section title="Needs you" count={needsYou.length}>

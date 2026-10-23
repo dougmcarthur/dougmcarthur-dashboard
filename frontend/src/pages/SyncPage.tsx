@@ -14,6 +14,7 @@ import { termsState } from '../../../shared/syncTerms'
 import { useSession } from '../hooks/useSession'
 import { Banner, Card, EmptyState } from '../components/ui/Surface'
 import { Caption, Label } from '../components/ui/Surface'
+import { useConfirm } from '../components/ui/ConfirmModal'
 
 const SYNC_STATUSES: SyncStatus[] = ['draft_ready', 'pitched', 'confirmed', 'declined', 'archived']
 
@@ -266,6 +267,8 @@ export function SyncPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [showReconcile, setShowReconcile] = useState(false)
+  const [showTools, setShowTools] = useState(false)
+  const { confirm, ConfirmDialog } = useConfirm()
 
   const { data = [], isLoading, error } = useQuery({
     queryKey: ['sync', statusFilter],
@@ -319,8 +322,22 @@ export function SyncPage() {
             <option value="">All statuses</option>
             {SYNC_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </Select>
+          <Button
+            variant={showTools ? 'neutral' : 'quiet'}
+            onClick={() => {
+              setShowTools((v) => !v)
+              setShowReconcile(false)
+              setShowCreate(false)
+            }}
+          >
+            Sync tools
+          </Button>
           {ownsMailbox && <button
-            onClick={() => { setShowReconcile((v) => !v); setShowCreate(false) }}
+            onClick={() => {
+              setShowReconcile((v) => !v)
+              setShowTools(false)
+              setShowCreate(false)
+            }}
             className={`text-sm px-3.5 py-1.5 rounded-md font-medium border transition-colors ${
               showReconcile
                 ? 'bg-line text-body border-line'
@@ -331,7 +348,11 @@ export function SyncPage() {
           </button>}
           <Button
             variant={showCreate ? 'neutral' : 'primary'}
-            onClick={() => { setShowCreate((v) => !v); setShowReconcile(false) }}
+            onClick={() => {
+              setShowCreate((v) => !v)
+              setShowTools(false)
+              setShowReconcile(false)
+            }}
           >
             {showCreate ? 'Cancel' : '+ New target'}
           </Button>
@@ -341,13 +362,25 @@ export function SyncPage() {
       {ownsMailbox && showReconcile && <ReconcilePanel onClose={() => setShowReconcile(false)} />}
       {showCreate && <CreateSyncForm onDone={() => setShowCreate(false)} />}
 
-      {/* Before the drafts panel, which leaves an unread target out until this
-          has read it. Nothing shows once every site has been read. */}
-      <CheckAllTerms />
-
-      {/* Above the list, because it acts on all of it. Closed until asked,
-          like every other bulk write in the app. */}
-      <GmailDraftsPanel />
+      {showTools && (
+        <Card pad="md" className="space-y-4 border border-line bg-raised">
+          <div className="flex items-center justify-between pb-2 border-b border-line">
+            <div>
+              <h2 className="text-sm font-semibold text-ink">Sync Tools</h2>
+              <p className="text-xs text-muted mt-0.5">
+                Draft pitches to Gmail and check target website submission policies.
+              </p>
+            </div>
+            <Button variant="quiet" size="sm" onClick={() => setShowTools(false)}>
+              Close
+            </Button>
+          </div>
+          <div className="space-y-3">
+            <CheckAllTerms />
+            <GmailDraftsPanel />
+          </div>
+        </Card>
+      )}
 
       {isLoading ? (
         <SkeletonList rows={5} />
@@ -407,7 +440,15 @@ export function SyncPage() {
                       variant="quiet"
                       size="sm"
                       disabled={deleteMutation.isPending}
-                      onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${target.name}"?`)) deleteMutation.mutate(target.id) }}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        const ok = await confirm({
+                          title: `Delete "${target.name}"?`,
+                          description: 'This removes the sync target and any drafted pitch.',
+                          destructive: true,
+                        })
+                        if (ok) deleteMutation.mutate(target.id)
+                      }}
                       className="w-6 h-6 p-0 flex items-center justify-center text-muted hover:text-danger-fg hover:bg-danger-bg"
                       title="Delete"
                       aria-label={`Delete ${target.name}`}
@@ -441,6 +482,7 @@ export function SyncPage() {
       )}
 
       {!isLoading && <p className="text-xs text-muted">{data.length} targets</p>}
+      {ConfirmDialog}
     </div>
   )
 }

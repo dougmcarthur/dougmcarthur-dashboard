@@ -85,28 +85,29 @@ export function AssetRow({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-xs text-muted">
         {question && (
           // The join to the form parser: this is the question a festival form
           // asks, in the app's own words rather than that form's.
-          <span className="px-2 py-0.5 rounded-md border border-line bg-surface text-muted">
-            Answers: {question.label}
-          </span>
+          <span>Answers: {question.label}</span>
         )}
-        {/*
-          Plain text rather than a fourth bordered pill. A pill carries the
-          weight of a status, and four of them per row is the density problem
-          — the count itself is a useful glance at whether a bio is a stub, so
-          it stays, at the weight of a footnote.
-        */}
         {!meta.isLink && length > 0 && (
-          <span className="text-muted tabular-nums">{length} chars</span>
+          <>
+            {question && <span aria-hidden="true">·</span>}
+            <span className="tabular-nums">{length} chars</span>
+          </>
         )}
         {asset.credit && (
-          <span className="px-2 py-0.5 rounded-md border border-line bg-surface text-muted">© {asset.credit}</span>
+          <>
+            {(question || (!meta.isLink && length > 0)) && <span aria-hidden="true">·</span>}
+            <span>© {asset.credit}</span>
+          </>
         )}
         {asset.usageRights && (
-          <span className="px-2 py-0.5 rounded-md border border-line bg-surface text-muted">{asset.usageRights}</span>
+          <>
+            {(question || (!meta.isLink && length > 0) || asset.credit) && <span aria-hidden="true">·</span>}
+            <span>{asset.usageRights}</span>
+          </>
         )}
         <span className="grow" />
         {asset.health.freshness !== 'fresh' && !asset.archived && (

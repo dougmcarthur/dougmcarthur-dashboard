@@ -70,7 +70,7 @@ export function JoinScreen({ token, onJoined }: { token: string; onJoined: () =>
   }
 
   return (
-    <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
+    <div className="min-h-screen bg-canvas flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-ink tracking-tight">Sun Dogs Music Scout</h1>
@@ -112,10 +112,25 @@ export function JoinScreen({ token, onJoined }: { token: string; onJoined: () =>
               <Button
                 variant="primary"
                 size="md"
-                className="w-full py-2"
+                className="w-full py-2 flex items-center justify-center gap-2"
                 disabled={busy}
                 onClick={join}
               >
+                {!busy && (
+                  <svg
+                    className="w-4 h-4 shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="7.5" cy="15.5" r="4.5" />
+                    <path d="M10.5 12.5L20 3m-2.5 4.5l2 2m-4.5.5l2 2" />
+                  </svg>
+                )}
                 {busy ? 'Waiting for your device…' : 'Set up a passkey'}
               </Button>
 

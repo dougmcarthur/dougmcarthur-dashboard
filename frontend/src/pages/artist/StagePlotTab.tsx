@@ -31,6 +31,7 @@ import { Button } from '../../components/ui/Button'
 import { Caption, Card, EmptyState } from '../../components/ui/Surface'
 import { shortDate } from '../../format'
 import { StagePlotFlow } from './StagePlotFlow'
+import { useConfirm } from '../../components/ui/ConfirmModal'
 
 /**
  * The stage plot: the drawing, the input list, and what a tech needs to know
@@ -42,6 +43,7 @@ import { StagePlotFlow } from './StagePlotFlow'
  */
 export function StagePlotTab() {
   const qc = useQueryClient()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [surveying, setSurveying] = useState(false)
   const plot = useQuery({ queryKey: ['stage-plot'], queryFn: api.stagePlot.read })
   const docs = useQuery({ queryKey: ['referenceDocs'], queryFn: api.referenceDocs.list })
@@ -109,8 +111,14 @@ export function StagePlotTab() {
           photoFor={photoFor}
           photos={photos}
           onEdit={() => setSurveying(true)}
-          onReset={() => {
-            if (confirm('Start the stage plot over? Your answers will be cleared.')) remove.mutate()
+          onReset={async () => {
+            const ok = await confirm({
+              title: 'Start the stage plot over?',
+              description: 'Your answers will be cleared and the stage plot will be reset.',
+              confirmLabel: 'Start over',
+              destructive: true,
+            })
+            if (ok) remove.mutate()
           }}
         />
       )}
@@ -123,6 +131,7 @@ export function StagePlotTab() {
           onClose={() => setSurveying(false)}
         />
       )}
+      {ConfirmDialog}
     </div>
   )
 }

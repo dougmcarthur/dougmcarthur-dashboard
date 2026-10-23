@@ -9,6 +9,7 @@ import { Button } from './ui/Button'
 import { relativeTime, shortDate } from '../format'
 import { Explainer } from './ui/Explainer'
 import { Card } from './ui/Surface'
+import { useConfirm } from './ui/ConfirmModal'
 
 /**
  * What can sign in, and what it would cost to lose each one.
@@ -35,6 +36,7 @@ import { Card } from './ui/Surface'
  */
 export function PasskeysCard() {
   const qc = useQueryClient()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [error, setError] = useState<string | null>(null)
 
   const passkeys = useQuery({ queryKey: ['auth', 'passkeys'], queryFn: api.auth.passkeys })
@@ -123,11 +125,17 @@ export function PasskeysCard() {
                 variant="danger"
                 size="sm"
                 disabled={revoke.isPending}
-                onClick={() => {
+                onClick={async () => {
                   const warning = onlyOne
-                    ? 'This is the only passkey. Removing it leaves the emailed setup code as the only way back in. Remove it?'
+                    ? 'This is the only passkey. Removing it leaves the emailed setup code as the only way back in.'
                     : `Remove "${key.label}"? It will no longer be able to sign in.`
-                  if (confirm(warning)) revoke.mutate(key.id)
+                  const ok = await confirm({
+                    title: onlyOne ? 'Remove your only passkey?' : `Remove "${key.label}"?`,
+                    description: warning,
+                    confirmLabel: 'Remove passkey',
+                    destructive: true,
+                  })
+                  if (ok) revoke.mutate(key.id)
                 }}
               >
                 Remove
@@ -151,14 +159,21 @@ export function PasskeysCard() {
             variant="quiet"
             size="sm"
             disabled={signOutEverywhere.isPending}
-            onClick={() => {
-              if (confirm('Sign out of every browser?')) signOutEverywhere.mutate()
+            onClick={async () => {
+              const ok = await confirm({
+                title: 'Sign out of every browser?',
+                description: 'You will need to sign in again with your passkey on all devices.',
+                confirmLabel: 'Sign out everywhere',
+                destructive: true,
+              })
+              if (ok) signOutEverywhere.mutate()
             }}
           >
             Everywhere
           </Button>
         </div>
       </div>
+      {ConfirmDialog}
     </Card>
   )
 }

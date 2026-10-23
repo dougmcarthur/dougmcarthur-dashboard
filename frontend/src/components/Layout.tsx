@@ -374,7 +374,11 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
         >
           {children}
         </main>
-        {!admin && side.docked && <SideDock side={side} onNav={onNav} />}
+        {!admin && side.docked && (
+          <div className="print:hidden">
+            <SideDock side={side} onNav={onNav} />
+          </div>
+        )}
       </div>
 
       {admin ? null : <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />}

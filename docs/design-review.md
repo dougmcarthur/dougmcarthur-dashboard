@@ -420,6 +420,16 @@ The following 16 high-confidence, low-risk improvements are directly queued for 
 │ 14 │ GigsPage & EditGigPanel     │ Standardize Select/Input/Button; fix 11 text-faints │
 │ 15 │ SyncPage & SyncTerms        │ Standardize Select/Button; fix text-faints          │
 │ 16 │ ArtistPage & Tabs           │ Fix text-faints across library views & forms        │
+│ 17 │ ConfirmModal.tsx            │ Shared accessible confirm dialog; 0 window.confirm()│
+│ 18 │ Detail.tsx (Review)         │ DecisionBar elevated to Y~340px for 0-scroll triage │
+│ 19 │ ReviewPage.tsx              │ Mobile master-detail drawer navigation (<1024px)    │
+│ 20 │ SyncPage.tsx                │ Consolidated "Sync Tools" toolbar and drawer        │
+│ 21 │ ApplicationPanel.tsx        │ Batch "Copy all answers" formatted Q&A export       │
+│ 22 │ Surface.tsx / DecisionDeck  │ Banner polymorphism; softened deck borders & labels │
+│ 23 │ PromoDraftsPage.tsx         │ Character counter and platform fit indicator        │
+│ 24 │ ArtistPage & AssetRow       │ Scoped overdue buttons; dot-separated metadata text │
+│ 25 │ EpkView & Layout            │ Dynamic shows grid; print:hidden SideDock & profile │
+│ 26 │ HelpPage / ResultsView/Join │ Topic search filter; CSV export; tighter JoinScreen │
 └────┴─────────────────────────────┴─────────────────────────────────────────────────────┘
 ```
 
@@ -427,23 +437,23 @@ The following 16 high-confidence, low-risk improvements are directly queued for 
 
 ## 6. Recommended Next Steps (Architectural & Product Proposals)
 
-The following proposals represent larger workflow, structural, or product-level enhancements that require future Product Owner sign-off before altering existing behavior:
+All five architectural proposals from the initial audit have been fully implemented and verified in Phase 2:
 
-1. **Review Detail Workflow Inversion (`#review`)**:
-   - *Proposal*: Reposition the `DecisionBar` action bar immediately below the primary title and rationale badge in `Detail.tsx`, rather than beneath all 6 metadata sections.
-   - *Rationale*: Allows musicians on laptop viewports (`1280x800`) to triage opportunities ("Will apply", "Pass", "Snooze") with zero scrolling.
-2. **Review Mobile Master-Detail Drawer (`#review`)**:
-   - *Proposal*: On mobile viewports (`<1024px`), replace the continuous vertical queue-and-detail scroll with an app-style master list and detail slide-in drawer.
-   - *Rationale*: Eliminates disorienting vertical jumps when reviewing 20+ item opportunity backlogs on a phone.
-3. **Consolidated Sync Integration Drawer (`#sync`)**:
-   - *Proposal*: Group `CheckAllTerms`, `GmailDraftsPanel`, and `ReconcilePanel` into a dedicated "Sync Tools" toolbar or slide-over drawer.
-   - *Rationale*: Keeps the primary sync targets table visible above the fold on initial page load.
-4. **Accessible In-Place Confirmation Modal Primitive**:
-   - *Proposal*: Replace all remaining browser-native `window.confirm()` calls with a shared, accessible `<ConfirmModal>` primitive supporting custom titles, destructive red styling, and keyboard Escape cancellation.
-   - *Rationale*: Eliminates jarring OS dialogs and maintains design system calm across all destructive actions.
-5. **Batch Application Answer Export (`#gigs`)**:
-   - *Proposal*: Introduce a "Copy all drafted answers" button in `ApplicationPanel.tsx` that copies a formatted text packet of all fields with one click.
-   - *Rationale*: Significantly speeds up pasting answers into complex external festival entry portals.
+1. **Review Detail Workflow Inversion (`#review`) — [IMPLEMENTED IN PHASE 2]**:
+   - *Implementation*: Repositioned `DecisionBar` and `SnoozeMenu` immediately beneath the opportunity header and rationale callout in `frontend/src/pages/review/Detail.tsx` (at Y ~ 340px).
+   - *Outcome*: Enables musicians on standard laptop viewports (`1280x800`) to triage opportunities ("Will apply", "Pass", "Snooze") with zero scrolling.
+2. **Review Mobile Master-Detail Navigation (`#review`) — [IMPLEMENTED IN PHASE 2]**:
+   - *Implementation*: On mobile viewports (`<1024px`), `ReviewPage.tsx` switches cleanly between the scrollable queue and a full-width detail view with a dedicated "← Back to queue" navigation header and scroll restoration.
+   - *Outcome*: Eliminates disorienting vertical jumps when reviewing 20+ item opportunity backlogs on phones.
+3. **Consolidated Sync Integration Drawer (`#sync`) — [IMPLEMENTED IN PHASE 2]**:
+   - *Implementation*: Consolidated `CheckAllTerms` and `GmailDraftsPanel` into a mutually-exclusive collapsible "Sync Tools" drawer in `SyncPage.tsx`, preserving strict mailbox ownership checks and calm UI rules.
+   - *Outcome*: Eliminates stacked banners above the table and keeps sync targets visible above the fold on initial load.
+4. **Accessible In-Place Confirmation Modal Primitive — [IMPLEMENTED IN PHASE 2]**:
+   - *Implementation*: Created `<ConfirmModal>` and `useConfirm()` hook in `frontend/src/components/ui/ConfirmModal.tsx` with alertdialog ARIA semantics, Escape listeners, focus trapping, auto-focus on Cancel, and backdrop blur. Completely refactored all 15 native `window.confirm()` calls across the entire frontend (0 native confirm calls remain).
+   - *Outcome*: Completely eliminates jarring browser alert dialogs while maintaining strict safety on destructive operations.
+5. **Batch Application Answer Export (`#gigs`) — [IMPLEMENTED IN PHASE 2]**:
+   - *Implementation*: Added a "Copy all answers" `<CopyButton>` in `ApplicationPanel.tsx` that aggregates all staged answers into a clean, double-newline-separated Q&A packet.
+   - *Outcome*: Significantly accelerates pasting answers into external festival and grant application portals.
 
 ---
 

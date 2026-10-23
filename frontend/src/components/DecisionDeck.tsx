@@ -309,11 +309,11 @@ export function DecisionDeck({
       }
     >
       <div className="relative pb-6">
-        {remaining.length > 2 && (
-          <div aria-hidden className="absolute inset-0 rounded-xl border border-line bg-surface translate-y-[10px] scale-x-[0.965] opacity-55" />
-        )}
         {remaining.length > 1 && (
-          <div aria-hidden className="absolute inset-0 rounded-xl border border-line bg-surface translate-y-[5px] scale-x-[0.984] opacity-80" />
+          <div
+            aria-hidden
+            className="absolute inset-0 rounded-xl border border-edge/30 bg-raised translate-y-1.5 scale-x-[0.985] pointer-events-none opacity-60"
+          />
         )}
 
         <div className={`relative rounded-xl border border-line bg-surface shadow-raised p-5 lg:p-6`}>
@@ -361,13 +361,16 @@ export function DecisionDeck({
                 disabled={patch.isPending}
                 title={a.label}
                 aria-label={a.label}
-                className={`grid place-items-center h-9 w-9 rounded-lg border disabled:opacity-40 transition-colors ${
+                className={`inline-flex items-center gap-1.5 h-9 px-3 sm:px-0 sm:w-9 justify-center rounded-lg border disabled:opacity-40 transition-colors ${
                   a.tone === 'go'
                     ? 'bg-accent border-transparent text-accent-fg hover:bg-accent-hover'
                     : 'bg-transparent border-line-strong text-muted hover:bg-sunken hover:text-ink'
                 }`}
               >
                 <ActionIcon name={actionGlyph(a)} />
+                <span className={`text-xs font-medium sm:hidden ${a.tone === 'go' ? 'text-accent-fg' : 'text-muted'}`}>
+                  {a.label}
+                </span>
               </button>
             ))}
             <button
@@ -377,13 +380,14 @@ export function DecisionDeck({
               onClick={() => onNav(`review/${item.key}`)}
               title="Open it"
               aria-label="Open it"
-              className="grid place-items-center h-9 w-9 rounded-lg border border-line text-body hover:bg-sunken hover:text-ink transition-colors"
+              className="inline-flex items-center gap-1.5 h-9 px-3 sm:px-0 sm:w-9 justify-center rounded-lg border border-line text-body hover:bg-sunken hover:text-ink transition-colors"
             >
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
                    strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
                 <path d="M6.5 3.5H3.2v9.3h9.3V9.5" />
                 <path d="M9.4 3.2h3.4v3.4M12.6 3.4 7.6 8.4" />
               </svg>
+              <span className="text-xs text-muted sm:hidden">Details</span>
             </button>
             {/* Promo drafts have no snooze columns — a monthly draft defers by
                 being a different month, not by a date on the row. */}
