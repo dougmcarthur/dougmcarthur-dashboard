@@ -10,8 +10,21 @@ import {
 /** Monday 08:00 in Winnipeg, which is what the old hardcoded cron meant. */
 const MON8: Schedule = { day: 'mon', hour: 8, timezone: 'America/Winnipeg' }
 
-/** Winnipeg is UTC−5 in summer (CDT), so 13:00Z is 08:00 local. */
+/** Winnipeg is UTC−5 on 31 August 2026, so 13:00Z is 08:00 local. */
 const monday8am = new Date('2026-08-31T13:00:00.000Z')
+
+/**
+ * A zone that still changes its clocks, for the tests about daylight saving.
+ *
+ * These used Winnipeg and went red on the CI runner on 2026-11-01. tzdata 2026e,
+ * released 2026-09-29, puts Manitoba on permanent UTC−5 from that day, and the
+ * runner's Node had it while this machine's did not, so "Winnipeg in winter is
+ * UTC−6" was true in one place and false in the other. The code is right to
+ * follow whatever the zone data says; a test that needs a daylight-saving
+ * change needs a zone that has one. Chicago has Winnipeg's summer offset and
+ * its change dates, and the US rules are the same in the old data and the new.
+ */
+const DST_ZONE = 'America/Chicago'
 
 describe('localParts', () => {
   it('reads the local clock, not the server clock', () => {
@@ -69,10 +82,10 @@ describe('isDigestDue', () => {
   })
 
   it('does not double-send when the clocks go back', () => {
-    // 2026-11-01 is the DST change in Winnipeg; 01:00–02:00 local happens
+    // 2026-11-01 is the DST change in Chicago; 01:00–02:00 local happens
     // twice. Comparing local *dates* rather than elapsed hours is what keeps
     // that from being two sends.
-    const dstSchedule: Schedule = { day: 'sun', hour: 1, timezone: 'America/Winnipeg' }
+    const dstSchedule: Schedule = { day: 'sun', hour: 1, timezone: DST_ZONE }
     const firstPass = new Date('2026-11-01T06:30:00.000Z')
     const secondPass = new Date('2026-11-01T07:30:00.000Z')
     expect(isDigestDue({ now: firstPass, schedule: dstSchedule, lastSentAt: null }).due).toBe(true)
@@ -83,14 +96,30 @@ describe('isDigestDue', () => {
   })
 
   it('holds the local hour across a daylight-saving change', () => {
-    // The old cron was a fixed UTC hour, so 08:00 Winnipeg in summer became
+    // The old cron was a fixed UTC hour, so 08:00 local in summer became
     // 07:00 in winter. Applying the zone at comparison time fixes that.
+    const monday8amLocal: Schedule = { ...MON8, timezone: DST_ZONE }
+    const summerMonday8am = new Date('2026-08-31T13:00:00.000Z') // CDT, UTC−5
+    expect(isDigestDue({ now: summerMonday8am, schedule: monday8amLocal, lastSentAt: null }).due).toBe(true)
     const winterMonday8am = new Date('2026-12-07T14:00:00.000Z') // CST, UTC−6
-    expect(isDigestDue({ now: winterMonday8am, schedule: MON8, lastSentAt: null }).due).toBe(true)
+    expect(isDigestDue({ now: winterMonday8am, schedule: monday8amLocal, lastSentAt: null }).due).toBe(true)
     const winterMonday7am = new Date('2026-12-07T13:00:00.000Z')
-    expect(isDigestDue({ now: winterMonday7am, schedule: MON8, lastSentAt: null }).reason).toBe(
-      'too-early',
-    )
+    expect(
+      isDigestDue({ now: winterMonday7am, schedule: monday8amLocal, lastSentAt: null }).reason,
+    ).toBe('too-early')
+  })
+
+  it('follows a zone that stops changing its clocks, which is what the zone data now says of Winnipeg', () => {
+    // A zone with no daylight-saving change keeps 08:00 at one UTC hour all
+    // year. Nothing here knows which zones those are: it asks the zone, which
+    // is why a change to the rules needs no change to this code.
+    const fixed: Schedule = { ...MON8, timezone: 'America/Panama' } // UTC−5 all year
+    for (const day of ['2026-08-31', '2026-12-07']) {
+      expect(isDigestDue({ now: new Date(`${day}T13:00:00.000Z`), schedule: fixed, lastSentAt: null }).due).toBe(true)
+      expect(isDigestDue({ now: new Date(`${day}T12:00:00.000Z`), schedule: fixed, lastSentAt: null }).reason).toBe(
+        'too-early',
+      )
+    }
   })
 })
 

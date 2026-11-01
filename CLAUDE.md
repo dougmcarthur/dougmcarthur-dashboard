@@ -121,6 +121,23 @@ date can go stale in the hours between. That cost run 28. CI now runs the suite
 twice, the second time under `TZ=Pacific/Auckland`, so the check CLAUDE.md
 prescribes is no longer one anybody has to remember.
 
+**The zone data is a clock too, and the runner's is newer than this machine's.**
+The first red `Check` runs on PR #45 failed one test, `holds the local hour
+across a daylight-saving change`, which had passed for months. Nothing in the
+repository had changed: tzdata 2026e (released 2026-09-29) puts Manitoba on
+permanent UTC−5 from 2026-11-01, the runner's Node had picked it up, and this
+machine's Node (tzdata 2025c) had not, so "Winnipeg in winter is UTC−6" was true
+here and false there. The digest code was right, since it asks the zone and not
+a table, and the tests were wrong to assume Winnipeg changes its clocks. A test
+about daylight saving now uses `America/Chicago`, which has Winnipeg's summer
+offset and change dates and whose rules are the same in either data, and another
+checks a zone that stopped changing its clocks (`America/Panama`). Two things
+follow. A fixture that names a zone is a claim about that zone's rules, which
+are data and change. And the same applies to the Worker: the digest's "Monday
+08:00 Winnipeg" is right only while the Workers runtime has the new data, so if
+it fires an hour late after 1 November the runtime's zone data is the first place
+to look, not the schedule.
+
 **There is still no HTTP smoke test.** It used to be impossible: Cloudflare
 Access sat in front of `dashboard.dougmcarthur.net`, so a request from a runner
 got the login redirect and never reached the Worker. Since passkey login
