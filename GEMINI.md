@@ -85,7 +85,6 @@
 
 - **Shared primitives (`frontend/src/components/ui/`)**:
   - Always use `<Button>`, `<Input>` / `<Select>` / `<Textarea>` (or `FIELD` / `FILTER`), `<Card>`, `<Caption>`, `<Explainer>`, and `<Disclosure>`.
-  - Raw `<button>` is permitted only for tab strip items, table sort headers, calendar cells, or inline text links (`underline`).
 - **Tailwind token discipline**:
   - Every custom colour class (`bg-*`, `text-*`, `border-*`) must exist in `tailwind.config.js` (`canvas`, `surface`, `raised`, `sunken`, `line`, `line-strong`, `ink`, `body`, `muted`, `faint`, `accent`, and the `danger-*`, `success-*`, `warn-*`, `info-*` and `cat-*` families; the complete list is in `.claude/skills/ui-rules/SKILL.md`).
   - Never use undefined classes like `text-subtle`, never pair `bg-X` with `hover:bg-X` (dead hover), and never use `text-faint` on readable prose or form labels (`text-muted` is the floor for readable text).
