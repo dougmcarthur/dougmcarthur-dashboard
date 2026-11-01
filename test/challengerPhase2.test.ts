@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const read = (path: string) => readFileSync(path, 'utf8')
+// Line endings normalised: on Windows git checks files out with CRLF (`core.autocrlf`), and a test that
+// matches a literal newline in a multi-line JSX string then fails on the owner's machine while the Linux
+// runner passes. What a test pins is the source, not how a checkout spells its line breaks.
+const read = (path: string) => readFileSync(path, 'utf8').replace(/\r\n/g, '\n')
 
 describe('Phase 2 Challenger: ConfirmModal Accessibility & Contracts', () => {
   const modalSrc = read('frontend/src/components/ui/ConfirmModal.tsx')
