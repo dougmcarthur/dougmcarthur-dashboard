@@ -33,9 +33,9 @@
  * jobs with it, so every source's failure is recorded on that source.
  */
 
-import { and, asc, eq, inArray, isNull, lt, lte, or } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm'
 import { getDb } from '../db'
-import { catalogCandidates, catalogSources, type CatalogSourceRow } from '../db/schema'
+import { adminChanges, catalogCandidates, catalogSourceReads, catalogSources, type CatalogSourceRow } from '../db/schema'
 import { sha256Hex } from './auth'
 import { readSetting, writeSetting } from './settings'
 import { feedFormat, parseFeed } from '../../shared/feedParse'
@@ -170,7 +170,7 @@ function firstSentence(s: string, max = 200): string {
   return s.replace(/\s+/g, ' ').trim().slice(0, max)
 }
 
-export async function pollOne(
+async function readOnce(
   env: Env,
   source: CatalogSourceRow,
   now: Date,
@@ -318,6 +318,29 @@ export async function pollOne(
     .where(eq(catalogSources.id, source.id))
 
   return result({ ok: !emptyReason, items: drafts.length, added, note: emptyReason ?? `Read ${drafts.length} items.` })
+}
+
+/** Read one source and keep a line about it. A history that fails to write must not fail the read. */
+export async function pollOne(
+  env: Env,
+  source: CatalogSourceRow,
+  now: Date,
+  fetchImpl: Fetcher = fetch,
+): Promise<SourceResult> {
+  const result = await readOnce(env, source, now, fetchImpl)
+  try {
+    await getDb(env.DB).insert(catalogSourceReads).values({
+      sourceId: source.id,
+      readAt: now.toISOString(),
+      ok: result.ok ? 1 : 0,
+      items: result.items,
+      added: result.added,
+      note: firstSentence(result.note),
+    })
+  } catch (err) {
+    console.error('read history not written:', err)
+  }
+  return result
 }
 
 /**
@@ -497,5 +520,10 @@ export async function pruneCandidates(env: Env, now: Date): Promise<number> {
     .delete(catalogCandidates)
     .where(and(inArray(catalogCandidates.status, ['stale', 'closed', 'new']), lt(catalogCandidates.lastSeenAt, ago(180))))
     .returning({ id: catalogCandidates.id })
+  // The read history: ninety days, and never more than sixty a source.
+  await db.delete(adminChanges).where(lt(adminChanges.at, ago(365)))
+  await db.delete(catalogSourceReads).where(lt(catalogSourceReads.readAt, ago(90)))
+  await db.run(sql`DELETE FROM catalog_source_reads WHERE id IN (
+    SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY read_at DESC, id DESC) AS n FROM catalog_source_reads) WHERE n > 60)`)
   return a.length + b.length
 }

@@ -85,20 +85,26 @@ function Segmented<T extends string>({
 }
 
 
-export function AppearanceSettings() {
+const APPEARANCE_TEXT = 'Saved in this browser only. The dashboard itself is unchanged for anyone else.'
+
+export function AppearanceSettings({ titled = true }: { /** False where the page already carries the title. */ titled?: boolean } = {}) {
   const { appearance: a, set, reset, resolved } = useAppearance()
 
   return (
     <Card
       as="section"
       pad="none"
-      aria-labelledby="appearance-heading"
+      aria-labelledby={titled ? 'appearance-heading' : undefined}
       className="p-5 sm:p-6"
     >
       <div className="flex items-start justify-between gap-4 mb-4">
-        <Explainer as="h2" id="appearance-heading" title="Appearance">
-          Saved in this browser only — the dashboard itself is unchanged for anyone else.
-        </Explainer>
+        {titled ? (
+          <Explainer as="h2" id="appearance-heading" title="Appearance">
+            {APPEARANCE_TEXT}
+          </Explainer>
+        ) : (
+          <p className="text-sm text-muted">{APPEARANCE_TEXT}</p>
+        )}
         <Button variant="neutral"
           type="button"
           onClick={reset}

@@ -50,6 +50,53 @@ export function InfoGlyph() {
   )
 }
 
+/**
+ * The info button itself, for the places that cannot be an `Explainer`: a note
+ * that opens somewhere other than under its own title (the admin-mode pill in
+ * the header, whose note is a full-width row below the header and not a ribbon
+ * beside the pill), or beside a control that has no title of its own (the admin
+ * search box). Same glyph, same colours, same name for a screen reader, so a
+ * note looks the same wherever it is and cannot drift.
+ */
+export function InfoToggle({
+  open,
+  onClick,
+  controls,
+  name,
+  className = '',
+}: {
+  open: boolean
+  onClick: () => void
+  /** The id of the note it opens. */
+  controls: string
+  /** What the note is about: "Admin mode". */
+  name: string
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      aria-controls={controls}
+      // "About X" rather than "What X does", because the titles are a
+      // mix of nouns and phrases and only the first reads as English
+      // across all of them — "What Your name does" is not a sentence.
+      aria-label={open ? `Hide the note about ${name}` : `About ${name}`}
+      // `text-faint` at rest and `text-body` open, so the icon of an
+      // open panel is visibly the one that opened it. The hover changes
+      // the colour rather than a background, because `faint` has no
+      // `-bg-hover` twin to change.
+      className={`shrink-0 rounded-full transition-colors hover:text-body
+                  focus:outline-none focus:ring-2 focus:ring-accent
+                  p-1.5 -m-1.5
+                  ${open ? 'text-body' : 'text-faint'} ${className}`}
+    >
+      <InfoGlyph />
+    </button>
+  )
+}
+
 export interface ExplainerProps {
   /** The title it sits beside. A string, because it is also the button's name. */
   title: ReactNode
@@ -131,26 +178,7 @@ export function Explainer({
           {title}
         </Tag>
         {offered ? (
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            aria-expanded={open}
-            aria-controls={panelId}
-            // "About X" rather than "What X does", because the titles are a
-            // mix of nouns and phrases and only the first reads as English
-            // across all of them — "What Your name does" is not a sentence.
-            aria-label={open ? `Hide the note about ${name}` : `About ${name}`}
-            // `text-faint` at rest and `text-body` open, so the icon of an
-            // open panel is visibly the one that opened it. The hover changes
-            // the colour rather than a background, because `faint` has no
-            // `-bg-hover` twin to change.
-            className={`shrink-0 rounded-full transition-colors hover:text-body
-                        focus:outline-none focus:ring-2 focus:ring-accent
-                        p-1.5 -m-1.5
-                        ${open ? 'text-body' : 'text-faint'}`}
-          >
-            <InfoGlyph />
-          </button>
+          <InfoToggle open={open} onClick={() => setOpen((o) => !o)} controls={panelId} name={name} />
         ) : null}
         {aside ? <div className="ml-1">{aside}</div> : null}
       </div>

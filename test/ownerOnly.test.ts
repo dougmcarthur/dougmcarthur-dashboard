@@ -167,8 +167,8 @@ describe('the screens that would offer what the routes refuse', () => {
     // It used to be hidden from artists because its request returned 403. Every
     // account has a digest now, off until they turn it on.
     const page = readFileSync('frontend/src/pages/SettingsPage.tsx', 'utf8')
-    expect(page).toMatch(/right=\{<DigestSettingsCard \/>\}/)
-    expect(page).not.toMatch(/role === 'owner' \? <DigestSettingsCard/)
+    expect(page).toContain('<DigestSettingsCard />')
+    expect(page).not.toMatch(/owner (&&|\?) <DigestSettingsCard/)
   })
 
   it('offers the reply scan and the Gmail reconcile only where they work', () => {
@@ -205,6 +205,6 @@ describe("agent tokens are the owner's", () => {
   })
 
   it('does not show the card to an artist', () => {
-    expect(readFileSync('frontend/src/pages/SettingsPage.tsx', 'utf8')).toMatch(/role === 'owner' && <AgentTokensCard \/>/)
+    expect(readFileSync('frontend/src/pages/SettingsPage.tsx', 'utf8')).toMatch(/owner && <AgentTokensCard/)
   })
 })

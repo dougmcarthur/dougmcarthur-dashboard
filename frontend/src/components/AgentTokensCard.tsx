@@ -28,7 +28,10 @@ import { useConfirm } from './ui/ConfirmModal'
  * get in"; revoking asks too because the route does, and a burst of
  * revocations costs one touch.
  */
-export function AgentTokensCard() {
+const AGENT_TOKENS_TEXT =
+  'What the research agents sign in with. A token can read your gigs, sync targets and reference docs, add new gigs, sync targets and promo drafts, and log its runs. It cannot edit or delete anything. Issuing or revoking one asks for a passkey first.'
+
+export function AgentTokensCard({ titled = true }: { /** False where the page already carries the title. */ titled?: boolean } = {}) {
   const qc = useQueryClient()
   const { confirm, ConfirmDialog } = useConfirm()
   const tokens = useQuery({ queryKey: ['agentTokens'], queryFn: api.agentTokens.list })
@@ -70,11 +73,13 @@ export function AgentTokensCard() {
 
   return (
     <Card className="space-y-3">
-      <Explainer as="h2" title="Agent tokens">
-        What the research agents sign in with. A token can read your gigs, sync targets and
-        reference docs, add new gigs, sync targets and promo drafts, and log its runs — it cannot
-        edit or delete anything. Issuing or revoking one asks for a passkey first.
-      </Explainer>
+      {titled ? (
+        <Explainer as="h2" title="Agent tokens">
+          {AGENT_TOKENS_TEXT}
+        </Explainer>
+      ) : (
+        <p className="text-sm text-body">{AGENT_TOKENS_TEXT}</p>
+      )}
 
       {/*
         Gone while a token is on screen. Issuing another replaced it, and a

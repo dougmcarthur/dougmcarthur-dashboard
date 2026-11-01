@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type DrivePickerView } from '../api'
 import { Button } from './ui/Button'
 import { Input } from './ui/Field'
-import { Explainer } from './ui/Explainer'
 import { Banner, Card } from './ui/Surface'
+import { SectionHeader } from './ui/SectionHeader'
 
 /**
  * The two public values Google's file picker needs, from the owner's side.
@@ -119,14 +119,12 @@ export function DrivePickerPanel() {
 
   return (
     <section className="space-y-3">
-      <header>
-        <Explainer as="h2" title="Google Drive file picker">
-          Adding files to an EPK folder uses Google’s own picker, which needs an API key and the number of the Google
-          Cloud project that owns this deployment’s sign-in. In that project, turn on the Google Drive API and the Google
-          Picker API, add the drive.file scope on the consent screen, then create an API key under Credentials and
-          restrict it to the Picker API and to this site’s address. The project number is on the project’s dashboard.
-        </Explainer>
-      </header>
+      <SectionHeader title="Google Drive file picker">
+        Adding files to an EPK folder uses Google’s own picker, which needs an API key and the number of the Google
+        Cloud project that owns this deployment’s sign-in. In that project, turn on the Google Drive API and the Google
+        Picker API, add the drive.file scope on the consent screen, then create an API key under Credentials and
+        restrict it to the Picker API and to this site’s address. The project number is on the project’s dashboard.
+      </SectionHeader>
       {picker.isLoading ? (
         <div className="h-24 bg-sunken rounded-xl animate-pulse" />
       ) : picker.error || !picker.data ? (

@@ -91,7 +91,11 @@ export function NudgeRoutingCard() {
         <Banner tone="warn" size="sm">
           {missing.join(' and ')} {missing.length > 1 ? 'are' : 'is'} not connected, so anything sent
           there is written nowhere. Connect{' '}
-          {missing.length > 1 ? 'them' : 'it'} above, or send those reminders somewhere else.
+          {missing.length > 1 ? 'them' : 'it'} on the{' '}
+          <a href="#settings/google" className="underline">
+            Google account
+          </a>{' '}
+          page, or send those reminders somewhere else.
         </Banner>
       ) : null}
 

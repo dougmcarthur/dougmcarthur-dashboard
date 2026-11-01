@@ -325,7 +325,7 @@ export function onboardingSteps(
       'out.',
     done: facts.passkeys >= 2,
     optional: true,
-    href: '#settings/account',
+    href: '#settings/profile',
     action: 'Add a passkey',
   })
 

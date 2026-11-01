@@ -112,7 +112,7 @@ site.post('/invite-requests', zValidator('json', RequestSchema), async (c) => {
       tier: 'info',
       title: inviteRequestTitle(body.name),
       body: body.message.length > 200 ? `${body.message.slice(0, 199)}…` : body.message,
-      href: '#settings/account',
+      href: '#settings/admin',
       action: 'Read it in admin mode',
       createdAt: now.toISOString(),
     })

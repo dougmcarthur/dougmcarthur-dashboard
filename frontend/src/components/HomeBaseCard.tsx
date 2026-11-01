@@ -52,7 +52,7 @@ export function HomeBaseCard() {
 
   return (
     <Card className="space-y-3">
-      <Explainer title="Where you travel from">
+      <Explainer as="h2" title="Where you travel from">
         Trip costs measure the drive to each gig from here, using OpenStreetMap, so a two-hour
         drive is priced as one rather than guessed from the town&rsquo;s name. Town and province is
         enough.

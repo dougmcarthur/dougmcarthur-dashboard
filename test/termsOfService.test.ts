@@ -222,7 +222,7 @@ describe('what the terms promise about the service', () => {
   it('does not point artists at a screen they never see', () => {
     // Settings shows the agent token card to the owner only, so a sentence that
     // told every artist to issue or revoke one there would be false for them.
-    expect(read('frontend/src/pages/SettingsPage.tsx')).toMatch(/role === 'owner' && <AgentTokensCard/)
+    expect(read('frontend/src/pages/SettingsPage.tsx')).toMatch(/owner && <AgentTokensCard/)
     expect(TEXT).not.toMatch(/issue an agent token in Settings/i)
     expect(TEXT).not.toMatch(/revoke it in Settings/i)
   })

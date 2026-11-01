@@ -159,12 +159,12 @@ export function settingsRedirect(
   if (isBundle(purpose)) {
     const query = new URLSearchParams({ google: outcome })
     for (const [key, values] of Object.entries(detail)) if (values.length) query.set(key, values.join(','))
-    return `${origin}/#settings?${query.toString()}`
+    return `${origin}/#settings/google?${query.toString()}`
   }
   // Drive's card lives with the EPK on the Artist page, so that is where the
   // artist comes back to.
   if (purpose === 'drive') return `${origin}/#artist/drive?drive=${encodeURIComponent(outcome)}`
-  const base = `${origin}/#settings`
+  const base = `${origin}/#settings/google`
   const key =
     purpose === 'calendar' || purpose === 'calendar.primary'
       ? 'calendar'

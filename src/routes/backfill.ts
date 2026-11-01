@@ -170,7 +170,7 @@ export async function runNotesBackfillOnce(env: Env, tenants: TenantId[]): Promi
       body: rows.length
         ? `${detail}. Scanned ${scanned}. Columns that already held something were left alone.`
         : `Scanned ${scanned} rows; every column the notes could fill already had a value.`,
-      href: '#settings/account',
+      href: '#settings/profile',
       action: 'See settings',
       dedupeKey: 'once:notesBackfill',
     })

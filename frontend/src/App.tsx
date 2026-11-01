@@ -3,6 +3,9 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { useHashRoute } from './hooks/useHashRoute'
 import { useSession } from './hooks/useSession'
 import { AdminPage } from './pages/AdminPage'
+import { resolveAdminRoute } from './pages/admin/sections'
+import { resolveSettingsRoute } from './pages/settings/sections'
+import { useNarrow } from './hooks/useNarrow'
 import { OverviewPage } from './pages/OverviewPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { GigsPage } from './pages/GigsPage'
@@ -19,6 +22,7 @@ import { notePage } from './diagnostics'
 export default function App() {
   const [page, navigate, arg] = useHashRoute('overview')
   const session = useSession()
+  const narrow = useNarrow()
 
   // The feedback form's "before that" trail. In memory only; see diagnostics.ts.
   useEffect(() => notePage(window.location.hash), [page, arg])
@@ -38,19 +42,31 @@ export default function App() {
    * what keeps it from looking like a bug. See docs/multi-tenant-plan.md.
    */
   if (session?.mode === 'admin') {
+    // `#admin/sources` names a page. `#admin`, or the artist route a reload
+    // left in the address bar, is the first page on a laptop and the list of
+    // pages on a phone.
+    const section = resolveAdminRoute(page === 'admin' ? arg : null, narrow)
     return (
-      <Layout page="admin" onNav={navigate} admin>
-        <ErrorBoundary label="Page error">
-          <AdminPage />
+      <Layout page={section ? `admin/${section}` : 'admin'} onNav={navigate} admin>
+        {/* Keyed by page, so one page that fails does not leave every other
+            page in the sidebar showing the same error until a reload. */}
+        <ErrorBoundary key={section ?? 'list'} label="Page error">
+          <AdminPage section={section} />
         </ErrorBoundary>
       </Layout>
     )
   }
 
+  // Which Settings page, for this person: an old tab id is read as the page
+  // that replaced it, an owner's page asked for by an artist is the default,
+  // and on a phone a bare `#settings` is the list of pages (`null`).
+  const settingsSection = page === 'settings' ? resolveSettingsRoute(arg, session?.role === 'owner', narrow) : null
+  const routeKey = page === 'settings' ? `settings/${settingsSection ?? 'list'}` : page
+
   return (
-    <Layout page={page} onNav={navigate}>
+    <Layout page={page === 'settings' && settingsSection ? `settings/${settingsSection}` : page} onNav={navigate}>
       <AccountAppearance />
-      <ErrorBoundary label="Page error">
+      <ErrorBoundary key={routeKey} label="Page error">
         {page === 'overview' && <OverviewPage onNav={navigate} />}
         {page === 'review' && <ReviewPage initialFilter={arg} />}
         {page === 'gigs' && <GigsPage initialOpen={arg} />}
@@ -60,7 +76,7 @@ export default function App() {
         {page === 'sync' && <SyncPage />}
         {page === 'promo' && <PromoDraftsPage />}
         {page === 'runs' && <HistoryPage key={arg ?? ''} initialKind={arg} onNav={navigate} />}
-        {page === 'settings' && <SettingsPage initialTab={arg} />}
+        {page === 'settings' && <SettingsPage section={settingsSection} />}
         {page === 'help' && <HelpPage />}
       </ErrorBoundary>
     </Layout>

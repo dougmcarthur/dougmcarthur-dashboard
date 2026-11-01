@@ -121,6 +121,23 @@ date can go stale in the hours between. That cost run 28. CI now runs the suite
 twice, the second time under `TZ=Pacific/Auckland`, so the check CLAUDE.md
 prescribes is no longer one anybody has to remember.
 
+**The zone data is a clock too, and the runner's is newer than this machine's.**
+The first red `Check` runs on PR #45 failed one test, `holds the local hour
+across a daylight-saving change`, which had passed for months. Nothing in the
+repository had changed: tzdata 2026e (released 2026-09-29) puts Manitoba on
+permanent UTC−5 from 2026-11-01, the runner's Node had picked it up, and this
+machine's Node (tzdata 2025c) had not, so "Winnipeg in winter is UTC−6" was true
+here and false there. The digest code was right, since it asks the zone and not
+a table, and the tests were wrong to assume Winnipeg changes its clocks. A test
+about daylight saving now uses `America/Chicago`, which has Winnipeg's summer
+offset and change dates and whose rules are the same in either data, and another
+checks a zone that stopped changing its clocks (`America/Panama`). Two things
+follow. A fixture that names a zone is a claim about that zone's rules, which
+are data and change. And the same applies to the Worker: the digest's "Monday
+08:00 Winnipeg" is right only while the Workers runtime has the new data, so if
+it fires an hour late after 1 November the runtime's zone data is the first place
+to look, not the schedule.
+
 **There is still no HTTP smoke test.** It used to be impossible: Cloudflare
 Access sat in front of `dashboard.dougmcarthur.net`, so a request from a runner
 got the login redirect and never reached the Worker. Since passkey login
@@ -390,6 +407,63 @@ once that removal needs.
 which, rather than shipping three zeroes a screen would render as "none". A
 request counter is a write per request, which is the shape this app keeps
 declining to build, so it needs somewhere outside D1 before it can be honest.
+
+**The admin surface is a sidebar of pages, and every list on it is paged.** It
+was one column eight panels long. `#admin/<page>` names a page, and
+`frontend/src/pages/admin/sections.ts` is the only list of them and their
+names: the sidebar, the tab title and the router all read it, and a link it does
+not know opens the first page. Names say what a page holds in the owner's words,
+which is why "Pages Scout reads" became **External data sources**. Each page has
+one `h1`, a page with several parts gives each an `h2`, and the router keys the
+error boundary by page so one page that fails does not blank the rest.
+
+- **Settings uses the same shell, and on a phone both are a list you tap
+  through, the way the iOS Settings app is.** `SidebarShell` is a sidebar from
+  1024px up. Below that `#settings` and `#admin` are a grouped list of pages with
+  a chevron and a badge on each row, a row opens its page, and a link at the top
+  of the page goes back to the list. It was a row of links that scrolled
+  sideways, which hid most of the pages off the edge of the screen. `useNarrow`
+  decides in script, not CSS, because it changes what is drawn and rendering
+  both would load every card twice; `resolveSettingsRoute` and
+  `resolveAdminRoute` return `null` for the list. That makes a bare `#settings`
+  a list on a phone, so anything that means a particular page has to name it:
+  the Google consent callback now returns to `#settings/google?…` (the notice
+  about how the trip went is drawn by that page), and the connection alerts link
+  to `#settings/google`. The four old Settings tab ids still resolve
+  (`connections` is Google account, `account` is Profile) because emails and
+  notifications already sent point at them. Owner-only pages are an "Owner"
+  group that an artist's list does not contain.
+- **Lists page through `shared/pagination.ts`.** The sizes are a closed set (10,
+  25, 50) because a limit the browser can set to a million is a way to ask the
+  database for everything, and the size is the one preference shared across the
+  lists, kept in this browser. The small lists are fetched whole and sliced
+  (`PagedList`); the two that can be long (listings, findings) page in the
+  Worker with `limit`, `offset` and a `total` from a count of the same filter, so
+  "of 212" is true of the database and not of the slice that arrived. Findings
+  used to stop at eighty and listings at a hundred with nothing to say there was
+  more. `test/adminPages.test.ts` fails if a list stops paging.
+- **A source has a switch and a frequency.** `cadence_hours` has been a column
+  since migration 0037 and nothing could change it. It is set from a closed set
+  of five (`shared/sourceControls.ts`: every 6 hours to weekly) through the same
+  PATCH as `enabled`, because the poller is hourly and takes a few a tick, so
+  "every 20 minutes" would promise what it cannot do. A new frequency counts from
+  the last read and keeps the back-off a failing source has earned: counting from
+  the click would let the dropdown postpone a read already due, and counting from
+  nothing would forgive a dead page the week it had waited. The page says when
+  the frequencies chosen ask for more reads a day than the cron can make (3 an
+  hour), which would otherwise be silent, the queue just running late.
+- **A source that is off goes last and is drawn quietly**, and its frequency is
+  disabled with it. It is a decision already taken, not what the page is for.
+  Listings that are hidden stay where they are and are drawn quietly, because a
+  switch that moved its own row to another page would hide what you just did.
+- **A switch is for something that takes effect at once.** Reading a source and
+  showing a listing are. Opening the public survey is not: it has preconditions
+  (a contact address, saved edits) and a consequence, so it stays a button with
+  its reasons beside it.
+- **The sidebar's counts come from the queries the pages use**, under the same
+  keys, so a badge and the page it points at cannot disagree. A source the owner
+  switched off is never counted: it is a decision, and it is how a badge on a
+  dead source clears.
 
 **An invitation is a credential that grants an account.** The biggest one
 this app hands out — a passkey signs into an account that exists, this one
@@ -2305,7 +2379,7 @@ public host (never a Doc, Drive file or mail thread), and it is a festival,
 showcase, funding call or sync organisation. The backfill could not know who
 filed older rows, so it published only ones the artist never acted on — the
 seed's "Mainstage Invitation" is an offer, not a call, and was the example.
-Admin mode's **Public listings** shows and hides anything.
+Admin mode's **Landing page listings** page shows and hides anything.
 
 **Requesting an invitation creates nothing.** `invite_requests` holds a name,
 an address and a reason from somebody with no account. No email is sent to
@@ -2325,6 +2399,19 @@ was shown. It never carries what was on the page. `feedback` (migration 0032)
 is a platform table like `agent_tokens`, read on the admin surface, deleted by
 tenant removal; the owner hears through the bell. `test/feedback.test.ts` pins
 the rules.
+
+**Explanatory text is always tucked behind an info icon.** A sentence about what
+a screen is for, how something works or what a setting means is not shown by
+default: it goes in an `Explainer` (or an `InfoToggle` where there is no title
+for it to sit under), which draws the icon and opens the note in place. The owner
+asked for this when the admin-mode pill carried a whole sentence and the
+sentence was most of the header; the pill says "Admin mode" now and the rest is
+behind its icon, and `SectionHeader` and the admin search field do the same.
+What stays visible is what a person needs in order to act: labels, counts,
+statuses, errors, and the line beside a button that says what pressing it is about
+to do. The `showHints` appearance setting hides every icon, so a note never holds
+the only copy of a warning. `.claude/skills/ui-rules` has it too, since that is
+what is read before a UI change.
 
 **Buttons and inputs come from `components/ui/`.** `Button` takes a variant
 named for meaning (`primary`, `neutral`, `quiet`, `good`, `danger`, `info`),

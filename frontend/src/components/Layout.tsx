@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { api } from '../api'
 import { useAppearance } from '../hooks/useAppearance'
@@ -13,6 +13,7 @@ import { useSignOut } from '../hooks/useSignOut'
 import { HelpMenu } from './HelpMenu'
 import { FeedbackModal } from './FeedbackModal'
 import { Button } from './ui/Button'
+import { InfoToggle } from './ui/Explainer'
 
 const NAV_LINKS = [
   { id: 'overview', label: 'Overview' },
@@ -84,6 +85,49 @@ function LeaveAdminMode() {
   )
 }
 
+/**
+ * "Admin mode", in the header, with what it means behind the info icon.
+ *
+ * It was a sentence in the pill, and the sentence was most of the header. The
+ * pill says which mode this is, which is the part you need at a glance; what
+ * you can and cannot see in it is explanation, and explanation lives behind the
+ * info icon everywhere else in the app, so it does here.
+ *
+ * The note opens as a row of its own under the header's line and not beside the
+ * pill, for the reason `Explainer`'s `aside` exists: a note stuck in the cell of
+ * a two-word label is a ribbon four words wide. So the two are siblings in the
+ * header's flex-wrap row, which is why this returns a fragment.
+ */
+function AdminModeBadge({ offered }: { offered: boolean }) {
+  const [open, setOpen] = useState(false)
+  const noteId = useId()
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open])
+
+  return (
+    <>
+      <div className="order-last basis-full md:order-none md:basis-auto flex items-center justify-between gap-3 min-w-0">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="rounded-full bg-warn-bg px-3 py-1 text-xs font-medium text-warn-fg">Admin mode</span>
+          {offered && <InfoToggle open={open} onClick={() => setOpen((o) => !o)} controls={noteId} name="Admin mode" />}
+        </div>
+        <LeaveAdminMode />
+      </div>
+      {offered && open && (
+        <p id={noteId} className="order-last basis-full text-xs leading-relaxed text-muted">
+          Admin mode shows who is on the platform and what their accounts cost. You cannot see anyone&rsquo;s work,
+          including your own, and nothing here can open it.
+        </p>
+      )}
+    </>
+  )
+}
+
 interface LayoutProps {
   children: ReactNode
   page: string
@@ -112,6 +156,9 @@ export function Layout(props: LayoutProps) {
 }
 
 function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
+  // A page with pages of its own is `settings/profile`; the navigation only
+  // cares which top-level page that is.
+  const here = page.split('/')[0]
   const { appearance, set, resolved } = useAppearance()
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
@@ -155,7 +202,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
 
   const linkClass = (id: string, mobile = false) =>
     `px-3.5 ${mobile ? 'py-2' : 'py-1.5'} rounded-md text-sm font-medium transition-colors ${
-      page === id ? 'bg-raised text-ink shadow-inset' : 'text-muted hover:text-ink hover:bg-sunken'
+      here === id ? 'bg-raised text-ink shadow-inset' : 'text-muted hover:text-ink hover:bg-sunken'
     }`
 
   return (
@@ -191,19 +238,14 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
             </a>
 
             {admin ? (
-              <div className="order-last basis-full md:order-none md:basis-auto flex items-center justify-between gap-3 min-w-0">
-                <p className="min-w-0 text-xs font-medium text-warn-fg bg-warn-bg rounded-lg md:rounded-full px-3 py-1">
-                  Admin mode — you cannot see anyone&rsquo;s work, including your own
-                </p>
-                <LeaveAdminMode />
-              </div>
+              <AdminModeBadge offered={appearance.showHints} />
             ) : (
             <nav aria-label="Primary" className="hidden md:flex gap-0.5">
               {NAV_LINKS.map((l) => (
                 <a
                   key={l.id}
                   href={`#${l.id}`}
-                  aria-current={page === l.id ? 'page' : undefined}
+                  aria-current={here === l.id ? 'page' : undefined}
                   className={linkClass(l.id)}
                 >
                   {l.label}
@@ -281,7 +323,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                             <a
                               key={l.id}
                               href={`#${l.id}`}
-                              aria-current={page === l.id ? 'page' : undefined}
+                              aria-current={here === l.id ? 'page' : undefined}
                               className={`block ${linkClass(l.id, true)}`}
                             >
                               {l.label}
@@ -293,7 +335,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                           <a
                             key={l.id}
                             href={`#${l.id}`}
-                            aria-current={page === l.id ? 'page' : undefined}
+                            aria-current={here === l.id ? 'page' : undefined}
                             className={`block ${linkClass(l.id, true)}`}
                           >
                             {l.label}
@@ -317,7 +359,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                           <hr className="border-line my-1" />
                           <a
                             href="#help"
-                            aria-current={page === 'help' ? 'page' : undefined}
+                            aria-current={here === 'help' ? 'page' : undefined}
                             className={`block ${linkClass('help', true)}`}
                           >
                             Help

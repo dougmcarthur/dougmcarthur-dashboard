@@ -1,24 +1,30 @@
 import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { slugFor } from '../shared/slug'
+import { DEFAULT_SETTINGS_SECTION, settingsSectionFromArg } from '../frontend/src/pages/settings/sections'
 
 /**
- * Settings is four tabs, and every link into it still lands where it meant to.
- * Connections is the default because that is where Google's consent round trip
- * and the bell's connection alerts point; the digest's opt-out names its own
- * section. Source-level, because these are routing facts spread across the
- * Worker and the frontend.
+ * Settings is a sidebar of pages, and every link into it still lands where it
+ * meant to. Google account is the default because that is where Google's
+ * consent round trip and the bell's connection alerts point; the digest's
+ * opt-out names its own page. Source-level, because these are routing facts
+ * spread across the Worker and the frontend. The pages themselves are in
+ * `test/settingsPages.test.ts`.
  */
 describe('Settings sections', () => {
   const page = readFileSync('frontend/src/pages/SettingsPage.tsx', 'utf8')
 
-  it('opens on Connections unless the address names another section', () => {
-    expect(page).toMatch(/isSettingsSection\(initialTab\) \? initialTab : 'connections'/)
-    expect(readFileSync('frontend/src/App.tsx', 'utf8')).toContain('<SettingsPage initialTab={arg} />')
+  it('opens on Google account unless the address names another page', () => {
+    expect(DEFAULT_SETTINGS_SECTION).toBe('google')
+    expect(settingsSectionFromArg(null, false)).toBe('google')
+    expect(settingsSectionFromArg('nope', true)).toBe('google')
+    expect(readFileSync('frontend/src/App.tsx', 'utf8')).toContain('<SettingsPage section={settingsSection} />')
   })
 
-  it('sends the digest opt-out to the section that switches it off', () => {
+  it('sends the digest opt-out to the page that switches it off', () => {
     expect(readFileSync('src/lib/digestMail.ts', 'utf8')).toContain('#settings/reminders')
+    expect(settingsSectionFromArg('reminders', false)).toBe('reminders')
+    expect(page).toMatch(/case 'reminders':[\s\S]*<DigestSettingsCard \/>/)
   })
 
   it('no longer carries reference documents, which moved to the Artist page', () => {
