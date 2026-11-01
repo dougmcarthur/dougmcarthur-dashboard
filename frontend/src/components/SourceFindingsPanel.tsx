@@ -4,6 +4,7 @@ import { api, type CandidateView, type CatalogCandidateItem } from '../api'
 import { PUBLIC_CATEGORIES } from '../../../shared/opportunityCatalog'
 import { orderSources } from '../../../shared/sourceControls'
 import { shortDate } from '../format'
+import { useNote } from './ui/Explainer'
 import { Select } from './ui/Field'
 import { Pager, useFitPage, usePaging } from './ui/Pager'
 import { Banner, Card, EmptyState } from './ui/Surface'
@@ -42,6 +43,8 @@ export function SourceFindingsPanel() {
   const [view, setView] = useState<CandidateView>('calls')
   const [source, setSource] = useState<number | null>(null)
   const paging = usePaging()
+  // What the tab holds, behind the info icon like every other explanation.
+  const hint = useNote('this tab')
 
   // The same query the sources page and the sidebar badge use.
   const sources = useQuery({ queryKey: ['admin', 'catalog', 'sources'], queryFn: api.admin.catalogSources })
@@ -82,8 +85,8 @@ export function SourceFindingsPanel() {
           }}
         />
 
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-          <p className="text-xs text-muted max-w-prose">{VIEW_HINT[view]}</p>
+        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
+          {hint.button}
           <label className="flex items-center gap-2 text-xs text-muted">
             From
             <Select
@@ -104,6 +107,8 @@ export function SourceFindingsPanel() {
             </Select>
           </label>
         </div>
+
+        {hint.note(VIEW_HINT[view], 'max-w-prose')}
 
         {candidates.isLoading ? (
           <div className="h-16 bg-sunken rounded-xl animate-pulse" />

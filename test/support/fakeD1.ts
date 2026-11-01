@@ -1,13 +1,13 @@
 /**
  * The smallest D1 that the auth middleware needs.
  *
- * There is no D1 in the test environment, which is why the route tests only
- * ever assert what a handler does *before* it touches the database. That was
- * enough while the middleware was a string compare against `API_TOKEN`. It is
- * not enough now: a request resolves to a **tenant** before any route sees it,
- * and resolving one is a read (src/lib/actor.ts). Without a binding, every
- * route test 500s in the middleware and stops testing what it was written to
- * test.
+ * The route tests that only assert what a handler does *before* it touches the
+ * database run without a real D1 (`sqliteD1.ts` is the real one, for tests
+ * where the WHERE is the point). That was enough while the middleware was a
+ * string compare against `API_TOKEN`. It is not enough now: a request resolves
+ * to a **tenant** before any route sees it, and resolving one is a read
+ * (src/lib/actor.ts). Without a binding, every route test 500s in the
+ * middleware and stops testing what it was written to test.
  *
  * So this is a fake, and it is deliberately a bad database: it answers with the
  * rows it was handed and ignores every `WHERE`. That is fine for the one job it

@@ -147,7 +147,12 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
           </Explainer>
         </div>
         <div className="flex items-center gap-2">
-          <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)} className={FILTER}>
+          <select
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value)}
+            aria-label="Filter the library by kind"
+            className={FILTER}
+          >
             <option value="">Everything</option>
             {ASSET_KINDS.map((k) => (
               <option key={k} value={k}>{ASSET_KIND_META[k].plural}</option>

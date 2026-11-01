@@ -1,2583 +1,1021 @@
 # Sun Dogs Music Scout
 
-Cloudflare Worker (Hono) + D1 + a React/Vite/Tailwind dashboard, for one
-person's gig, sync and promo pipeline. Deployed by GitHub Actions on every push
-to `main`.
-
-**The name is a house mark plus a product name**, and the shape is deliberate:
-*Scout*, by *Sun Dogs Music*. The bare word attracts an aggressive rights
-holder — Scouting America litigates on a dilution theory, including against
-businesses in unrelated trades — so the product is never branded on "Scout"
-standing alone. Say Scout, write Sun Dogs Music Scout. "Music Scout" is
-avoided on purpose: in the trade that phrase means an A&R person who scouts
-*talent*, which is the reverse of what this does.
-
-The D1 database still carries the old name, `dougmcarthur-music-hq`: it is not
-user-visible, and a D1 rename is a data migration. The Worker is
-`sun-dogs-scout`, renamed in the Cloudflare dashboard on 2026-09-14, which kept
-its custom domain and secrets — cheaper than the new-Worker-plus-reattach this
-file used to predict.
-
-**A dashboard rename and `name` in `wrangler.toml` have to land together.**
-`wrangler deploy` finds its Worker by name, so a stale name does not fail: it
-creates a second Worker with no domain and no secrets, but with the D1 binding,
-the email binding and the hourly cron — a copy that runs the scheduled jobs
-against production beside the real one. The rename's first CI run did exactly
-that, and the stray `dougmcarthur-dashboard` had to be deleted by hand. The
-repository, `package.json` and `README.md` keep the old name; nothing deploys by
-those.
-
-## Database changes go through wrangler migrations, applied by CI
-
-Write a numbered file in `migrations/` and merge it. The deploy workflow runs
-`wrangler d1 migrations apply --remote` before deploying the Worker — nothing to
-run by hand, and the `d1_migrations` ledger stays honest on its own.
-
-**Never hand-run schema SQL against production**, through the Cloudflare API or
-anything else. A statement applied outside the ledger is invisible to it, so
-the next CI run re-runs the file and aborts the batch on a duplicate column.
-0006, 0007 and 0008 were each applied by hand before CI did this, and had to be
-back-filled into the ledger afterwards; `SELECT name FROM d1_migrations` is the
-check if anything looks off.
-
-`npm run db:migrate:local` works from a clean checkout. It did not until
-recently: migration 0001 opens with `ALTER TABLE gig_opportunities`, because
-production was created from `schema.sql` by hand before anything went through
-the ledger, so the remote database has carried that baseline all along and an
-empty local one died on `no such table` at the first file.
-`scripts/bootstrap-local-db.mjs` applies `schema.sql` first, and only when the
-baseline is missing — a check rather than rewriting that file's statements to
-be idempotent, since it is the verbatim record of what production looked like
-before 0001. No `0000` migration was introduced, so the remote ledger has
-nothing new to reconcile.
-
-`wrangler` cannot authenticate from a Claude Code session — the credentials
-live in GitHub Actions secrets and a remote session does not inherit them. That
-is now fine rather than an obstacle: merging is how a migration gets applied.
-
-The CI token needs **D1 · Edit**, not Read. `wrangler d1 migrations list` hits
-the write-capable `/query` endpoint, so a read-scoped token fails with
-`code: 7403` — and because `wrangler deploy` never touches D1, that gap stays
-invisible until a migration step tries to use it.
-
-### Migrations must be additive
-
-CI migrates *before* it deploys, so for the half-minute between those two steps
-the new schema runs under the currently-live Worker. Every migration has to be
-readable by the code already in production.
-
-Adding a column or a table is always safe that way. **Renaming a stored value
-is not**, and is done as two deploys instead:
-
-1. Teach the code to read both spellings, and ship that.
-2. Migrate the data in a later change.
-
-`normaliseGigStatus` in `shared/gigStatus.ts` is what step 1 looks like — it
-maps `approved` to `shortlisted` on read and on write, which is also what lets
-the out-of-repo research agents keep POSTing the old vocabulary indefinitely.
-
-A migration that errors is rolled back by wrangler with the previous one left
-applied, and the failed step stops the deploy — so a bad migration leaves old
-code against old schema, which is at least a consistent pair.
-
-## The deploy, and how to read a red run
-
-`.github/workflows/deploy.yml` on every push to `main`: typecheck, tests, tests
-again a day ahead, build, list migrations, apply them, deploy, report what went
-live. Six of the first 37 runs failed, and they fall into four kinds — worth
-knowing apart, because only one of them is still live and it is the one that
-looks most alarming.
-
-**A red run does not mean nothing shipped.** `wrangler deploy` is three API
-calls — upload the assets, upload the Worker, set the triggers — and the Worker
-is live after the second. Twice the third has failed on
-
-```
-No targets deployed for dougmcarthur-dashboard
-✘ [ERROR] Some triggers failed to deploy:
-    - Received a malformed response from the API
-```
-
-which is the Cloudflare API returning something wrangler cannot parse, usually
-an HTML error or block page instead of JSON. It says nothing about this
-repository, a re-run fixed it both times, and by the time it fires the deploy
-has *mostly succeeded*: what did not happen is the cron schedule being
-re-sent. The deploy step now retries three times, since the whole command is
-idempotent — re-uploading the same bundle and re-sending the same cron list
-converges. `Deployed … triggers` in the log is the line that says the third
-call landed; `No targets deployed` on its own is normal here, because
-`workers_dev = false` and the custom domain is attached in the dashboard rather
-than declared as a route.
-
-**"Show pending migrations" failing means the token, not the code.** `wrangler
-d1 migrations list` hits the write-capable `/query` endpoint, so a read-scoped
-token fails `code: 7403` — see above. It is a pure read, so it retries too;
-`migrations apply` deliberately does not, because "try it again" is the wrong
-instinct about a write that may have half-landed.
-
-**A test that passed locally and fails in CI is probably the clock.** The
-runners are UTC and this is written in Winnipeg, so a fixture with a hardcoded
-date can go stale in the hours between. That cost run 28. CI now runs the suite
-twice, the second time under `TZ=Pacific/Auckland`, so the check CLAUDE.md
-prescribes is no longer one anybody has to remember.
-
-**The zone data is a clock too, and the runner's is newer than this machine's.**
-The first red `Check` runs on PR #45 failed one test, `holds the local hour
-across a daylight-saving change`, which had passed for months. Nothing in the
-repository had changed: tzdata 2026e (released 2026-09-29) puts Manitoba on
-permanent UTC−5 from 2026-11-01, the runner's Node had picked it up, and this
-machine's Node (tzdata 2025c) had not, so "Winnipeg in winter is UTC−6" was true
-here and false there. The digest code was right, since it asks the zone and not
-a table, and the tests were wrong to assume Winnipeg changes its clocks. A test
-about daylight saving now uses `America/Chicago`, which has Winnipeg's summer
-offset and change dates and whose rules are the same in either data, and another
-checks a zone that stopped changing its clocks (`America/Panama`). Two things
-follow. A fixture that names a zone is a claim about that zone's rules, which
-are data and change. And the same applies to the Worker: the digest's "Monday
-08:00 Winnipeg" is right only while the Workers runtime has the new data, so if
-it fires an hour late after 1 November the runtime's zone data is the first place
-to look, not the schedule.
-
-**There is still no HTTP smoke test.** It used to be impossible: Cloudflare
-Access sat in front of `dashboard.dougmcarthur.net`, so a request from a runner
-got the login redirect and never reached the Worker. Since passkey login
-replaced Access the request does reach the Worker — and gets a 401, because
-every `/api` route now needs a credential. So the reason changed and the
-conclusion did not: a check that can only ever see the front door proves
-nothing and adds a way for a good deploy to go red. `wrangler deployments
-status` is the last step instead: it asks Cloudflare what is serving traffic
-rather than inferring it from an exit code. It retries as well, since it runs
-the instant the deploy returns and once caught the API mid-switchover
-(`code: 10013`) after the new version was already live.
-
-The app is served at `scout.sundogsmusic.ca`. The old hostname,
-`dashboard.dougmcarthur.net`, still had an Access application in front of it
-in September 2026 with nothing using it — a request there lands on the Access
-login page, which says nothing about whether the Worker is healthy.
-
-`wrangler` is at 4.129.1 and `@cloudflare/workers-types` at 5. They move
-together — 4.129 peers on `^5`, so bumping one alone fails to resolve. The
-types major turned out to cost nothing here: nothing this Worker names changed,
-which is worth knowing mainly so the next bump is not put off on the assumption
-that it will hurt. Neither was a fix for the flake above, which is server-side.
-
-The one behaviour CI genuinely depends on, and which nothing in the repo would
-catch if it changed, is that `d1 migrations apply` answers its own confirmation
-prompt when stdin is not a terminal — `🤖 Using fallback value in
-non-interactive context: yes`. There is no `--yes` flag to fall back on. Check
-that line still appears in the run log after a wrangler bump.
-
-## Conventions worth knowing before changing things
-
-**The Worker is the security boundary now, and it was not before.** Cloudflare
-Access used to authenticate at the edge — it emailed a six-digit one-time PIN,
-and its login page also offered *Sign in with Cloudflare*, which signed you
-into the Cloudflare **account** and dropped you at `dash.cloudflare.com`
-instead of here. `src/index.ts` had no auth in it at all as a result. Login is
-a WebAuthn passkey now, verified in the Worker, which changes what a mistake
-costs: a route that is not authenticated is public to the internet rather than
-public to whoever Access already trusted. So the check is **one middleware over
-`/api/*` with a written-down exemption list** (`PUBLIC_API_PREFIXES`) rather
-than something each router opts into — a router added tomorrow is covered by
-doing nothing. See `docs/passkey-login.md`.
-
-**Email still sends a code, and the code is not a login.** A passkey lives on a
-device and a device can be lost; D1 is not somewhere you can reset a login from
-and there is no identity provider in front any more, so there has to be a way
-back that does not need hardware you no longer have. The emailed code
-authorises **adding a passkey** — single use, five guesses, fifteen minutes,
-one live at a time — and the session you end up with is the one enrolment
-produced. A code that opened a session directly would be the old Access login
-wearing the new screen's clothes, which is why `test/uiConsistency.test.ts`
-fails if the code reaches a login endpoint or if the button taking it stops
-saying *Add a passkey*.
-
-**The recovery address is never typed by the person asking for it.** An email
-box on the login screen that decides where an enrolment code goes is an
-account-takeover vector: anyone who can load the page mails themselves a code
-and enrols a passkey. So `enrolmentRecipient` reads deployment configuration
-and nothing else — not a settings row either, which would be a way to redirect
-the recovery channel from inside the app, exactly what an attacker holding a
-session would reach for.
-
-It had a hardcoded personal address as its fallback, which worked for one
-deployment and would have silently mailed a stranger's inbox on any other.
-There is no default now: unset means `recoveryAvailable: false` and the screen
-says so, because a missing input is never a guess.
-
-**When accounts arrive the shape changes but the rule does not.** The typed
-address becomes a *lookup key* — the code still goes to the address already on
-file for the matching account, never to what was typed — and the screen says
-the same thing whether or not an account matched, since anything else is an
-account-existence oracle. With Google as the primary sign-in the address comes
-from the grant, so there is nothing to type at signup at all.
-
-**Changing who can sign in costs a passkey touch, and almost nothing else
-does.** A session is thirty days — the right length for using the app, the
-wrong credential for changing how you get into it. `POST /auth/register/*` and
-`DELETE /auth/passkeys/:id` took a session alone until migration 0020, so a
-stolen cookie could enrol its own passkey and delete every other, which
-survives *sign out everywhere*: that clears sessions, not credentials. The
-button you would reach for on being compromised was the one that would not
-help.
-
-Both now need a recent assertion. `elevationState` in `shared/auth.ts` is the
-fifteen-minute window, `auth_sessions.elevated_at` records the touch, and
-`/auth/elevate/*` is the login assertion run again under its own challenge
-purpose — so a challenge issued for signing in cannot be replayed to raise a
-session's privilege. Signing in is deliberately *not* elevation: the cookie a
-sign-in produces is the thing being defended against.
-
-**The emailed code is exempt and has to be.** It exists for the case where
-there is no passkey left to touch, so requiring one would make recovery need
-the thing you are recovering from losing. `test/uiConsistency.test.ts` fails if
-either route drops its check *or* if the code branch of `authoriseEnrolment`
-gains one.
-
-The rule stays narrow — an action that changes who can get in, or destroys data
-across a boundary — because a prompt you see constantly is one you stop
-reading. Bulk writes, Gmail connect and status changes are reversible and
-tenant-scoped, and none of them ask. Admin mode is the next thing that will
-(`docs/multi-tenant-plan.md`); the client tries first and re-asserts only on
-refusal, so a burst of removals costs one touch, and retries exactly once.
-
-**A request resolves to an artist before any route runs.** Seventeen tables
-hold rows that belong to one person, and `src/db/scope.ts` is the only way to
-reach them: `scoped(table, tenant, ...rest)` builds the `WHERE`, `withTenant`
-builds the values, and `TenantId` is a **branded** type with one constructor,
-so a user id or a label cannot be passed where a tenant belongs. The
-resolution happens once, in the middleware, exactly like authentication — a
-router added next month is scoped by doing nothing, or it is a hole. From a
-route inward the tenant is an *argument*, never fetched, for the reason
-`buildReviewQueue` takes `today` instead of reading the clock: a function that
-fetches its own scope can fetch the wrong one silently.
-
-Admin mode (`docs/multi-tenant-plan.md`) resolves to **null**, not a wildcard,
-and `TenantId` is not nullable — so an admin-mode request reaching for
-`gig_opportunities` fails to compile rather than returning a stranger's rows.
-
-**A missing filter is a test failure, not a leak.**
-`test/tenantScope.test.ts` reads the source and fails when one of the seventeen
-is named in a query that does not pass through `scoped` or `withTenant`. It
-has to be source-level: an unscoped query typechecks, runs, and returns the
-right rows for as long as there is one artist — it starts being wrong on the
-day nobody is re-reading these queries. Exemptions are a list with a written
-reason each, and there is one (event retention, which is a platform rule).
-
-**The two shapes that used to hide a missing scope.** A `.where()` that was
-skipped entirely when no filters applied — `conditions.length > 0 ? … : …` in
-the gig and sync list routes — is now one branch with the tenant
-unconditional. And an `inArray(id, ids)` where the ids came from the browser:
-the tenant filter beside it is not redundant, it is the whole check.
-
-**The cron has no request to read a scope from, and gives three answers.**
-Housekeeping runs per tenant, because which notification marks are dead is
-derived from that artist's own feed; event retention runs once beside it. **The
-digest is every account's own**: its switch and schedule live in
-`tenant_settings`, off until the artist turns it on, and an artist's goes to the
-address they sign in with. That address is never typed into a settings row, for
-the reason a recovery address is never typed, so the `tenant` mail audience
-reaches only an address on an account in that artist's tenant, and the owner's
-digest keeps its configurable recipient (`src/lib/digestSettings.ts`). The
-owner's old `app_settings` rows still answer where the owner has set nothing of
-their own, which is why nothing was migrated and their digest never stopped.
-**The reply scan runs for the owner's tenant only**, because the mailbox is one
-`GMAIL_REFRESH_TOKEN` pointing at one inbox, and looping it over every tenant
-would scan the owner's mail on a stranger's behalf. An artist's own mailbox is
-a grant they would make, like Gmail drafting, and is not built. The notes
-backfill runs for every tenant under one marker, because the marker is platform
-state and writing it after the first would record the job as done.
-
-**An `ON CONFLICT` target is part of an interface.** Four uniqueness
-constraints had to grow a leading `tenant_id` (`gig_correspondents(kind,
-value)`, `google_grants(purpose)`, `notification_marks(dedupe_key)`,
-`notification_events(dedupe_key)`) and migration 0021 deliberately left them
-alone: live code named two of them in an upsert target, and SQLite requires
-that target to match a unique constraint exactly, so widening the key would
-have *errored* those statements under the old Worker rather than staled them.
-Migration 0022 widens them — and it is only safe because the statements no
-longer name a constraint at all. `storeGrant` is a delete-then-insert, and the
-two mark writers are an update followed by an insert that conflicts to
-nothing; both work against the schema on either side of the migration.
-`digest_reports` keeps its target, because `entity_id` is a global
-autoincrement and two artists cannot collide on one. 0022 also drops 0018's
-single-column indexes, whose window closed when the reads started leading with
-`tenant_id`.
-
-**The Worker in the migrate-then-deploy gap is the *deployed* one, which can be
-much older than the previous step.** This repository ships in branches, so
-"additive" is measured against production, not against the commit before. That
-is the rule, and it is the permanent part of this section.
-
-It was written when the deployed Worker was from migration 0009, with passkeys,
-agents in CI, Gmail drafting, tenants, oversight and invitations all unmerged
-and landing in one CI run. **That release shipped on 2026-09-11** (run 61,
-"Merge: tenants, the oversight surface, invitations, and agents as routines"),
-so production now runs the tenant-scoped Worker and migrations 0021–0024 are
-applied. The gap that paragraph described is closed, and the note is kept
-because the rule outlives the situation — the next long-lived branch recreates
-it exactly.
-
-What the old gap bought: 0022 kept a narrow unique index on
-`notification_marks(dedupe_key)` because the *then*-deployed Worker named it in
-an `ON CONFLICT` target, and `notification_marks` was the only one of the four
-widened tables that existed in production at all. 0024 dropped that prop in the
-same release, before an invitation could create a second tenant. Both applied in
-run 61, so the prop is gone and did its job.
-
-The `tenant_id` **defaults** from 0021 are still there, and so is the nullable
-column on the scoped tables — migration 0024 makes only `users.tenant_id`
-`NOT NULL`, and says why at length. Three reasons, shortest first: with the
-defaults in place a write cannot produce a NULL anyway, so the constraint
-guards a state `withTenant` and `test/tenantScope.test.ts` already make
-unreachable; the plan's precondition ("live long enough to trust") could not
-hold for code that had not been live — **it has been live since 2026-09-11, so
-that objection has started to expire**, and of 0024's three conditions the
-first is now met while the other two (comparing production's schema against
-what the migrations produce, and no row carrying a NULL tenant) are still
-unchecked; `GET /api/admin/health` answers the third. And SQLite has no
-`ALTER COLUMN`, so it means
-a table rebuild each, transcribing a column list that can only come from the
-*local* schema — while production predates the ledger and was partly
-hand-applied. A production-only column would be dropped by a statement that
-succeeds. `GET /api/admin/health` counts rows with no owner so the precondition
-is something to look at rather than assume.
-
-**The agents' token belongs to somebody, and the shared one is retired.**
-`API_TOKEN` was a Worker secret with no tenant attached — correct with one
-artist, wrong with two, and wrong invisibly: a gig filed to the wrong tenant
-just appears on a stranger's Overview. `agent_tokens` (migration 0022) is a
-hashed, revocable, per-tenant credential, issued and revoked through
-`/api/agent-tokens` behind a passkey touch, because minting a token that can
-write to your account is squarely "changes who can get in". An agent cannot
-manage tokens: a credential issuing its own successor makes revoking one a
-race rather than an ending.
-
-`actorForBearer` accepted `API_TOKEN` beside issued tokens for a while — the
-"read both spellings" move `normaliseGigStatus` makes — so the agents could
-move across without a coordinated cut-over. It stopped once they had: the
-routines and the GitHub fallback (`SCOUT_API_TOKEN` in
-`.github/workflows/agent-run.yml`) each hold an issued token, every agent is now
-limited to `shared/agentRoutes.ts`, and the route tests come in as a signed-in
-session rather than through the old unlimited door. A leftover `API_TOKEN`
-secret on the Worker is inert, and `test/routes.test.ts` proves it: the secret
-set, a request bearing it, 401. `test/agentRoutes.test.ts` fails if anything
-in `src/` reads it again. **Settings → Agent tokens** issues and revokes them;
-the token is shown once and held only in the card's state, never the query
-cache.
-
-**Admin mode is a different surface, not a bigger one.** The owner has two
-jobs and one account; `auth_sessions.mode` (migration 0023) says which surface
-a session is on. In artist mode it resolves to the owner's own tenant; in
-admin mode it resolves to **no tenant** — and that is a type rather than a
-null. `AppEnv` carries an `actor` and `AdminEnv` carries an `admin`, the two
-do not overlap, and `AdminActor` has no tenant field at all, so an oversight
-route reaching for `gig_opportunities` has nothing to hand `scoped()` and does
-not compile. `src/index.ts` is the only place that sets either.
-
-**Both refusals matter.** An artist-mode session is refused `/api/admin/*`,
-and an admin-mode session is refused everything else. Drop the second and
-admin mode becomes an artist session with extra pages, with the promise made
-to an invited artist resting on the owner not clicking a link. Each refusal
-names the mode the request would need (`needsMode`), so the client can offer
-the switch instead of an error — and the app renders one surface or the other,
-because a page of 403s is the design working and looking broken.
-
-Entering costs a passkey touch, which is the one thing a separate owner
-account would have bought that a mode does not: credential separation. Leaving
-costs nothing, because giving up privilege is not a privileged act. There is
-no impersonation and no "act as this artist", deliberately — a support tool
-that quietly breaks the promise is worse than no support tool, and
-`test/adminMode.test.ts` fails if the oversight screen so much as carries the
-vocabulary, or links to a route that surface cannot reach.
-
-**Oversight reads three tables and writes one thing.** `tenants`, `users` and
-the `usage_daily` rollup — the counts are written by the cron running *as the
-tenant*, which emits a number, and the owner reads the number. The one write
-that crosses the line is removing an artist: a tenant-scoped delete across the
-seventeen, previewed first as a **count per table**, which names no column and
-returns no row. The owner's own tenant is refused, because deleting it takes
-the account holding the surface with it. `test/adminMode.test.ts` fails if the
-admin router names one of the seventeen, or uses `asTenantId` more than the
-once that removal needs.
-
-**Three of the rollup's seven counters have no writer, and the API says so.**
-`domain_rows`, `gig_rows`, `promo_rows` and `agent_runs` are measured;
-`api_requests`, `gmail_drafts` and `ai_calls` are not. `MEASURED_FIELDS` names
-which, rather than shipping three zeroes a screen would render as "none". A
-request counter is a write per request, which is the shape this app keeps
-declining to build, so it needs somewhere outside D1 before it can be honest.
-
-**The admin surface is a sidebar of pages, and every list on it is paged.** It
-was one column eight panels long. `#admin/<page>` names a page, and
-`frontend/src/pages/admin/sections.ts` is the only list of them and their
-names: the sidebar, the tab title and the router all read it, and a link it does
-not know opens the first page. Names say what a page holds in the owner's words,
-which is why "Pages Scout reads" became **External data sources**. Each page has
-one `h1`, a page with several parts gives each an `h2`, and the router keys the
-error boundary by page so one page that fails does not blank the rest.
-
-- **Settings uses the same shell, and on a phone both are a list you tap
-  through, the way the iOS Settings app is.** `SidebarShell` is a sidebar from
-  1024px up. Below that `#settings` and `#admin` are a grouped list of pages with
-  a chevron and a badge on each row, a row opens its page, and a link at the top
-  of the page goes back to the list. It was a row of links that scrolled
-  sideways, which hid most of the pages off the edge of the screen. `useNarrow`
-  decides in script, not CSS, because it changes what is drawn and rendering
-  both would load every card twice; `resolveSettingsRoute` and
-  `resolveAdminRoute` return `null` for the list. That makes a bare `#settings`
-  a list on a phone, so anything that means a particular page has to name it:
-  the Google consent callback now returns to `#settings/google?…` (the notice
-  about how the trip went is drawn by that page), and the connection alerts link
-  to `#settings/google`. The four old Settings tab ids still resolve
-  (`connections` is Google account, `account` is Profile) because emails and
-  notifications already sent point at them. Owner-only pages are an "Owner"
-  group that an artist's list does not contain.
-- **Lists page through `shared/pagination.ts`.** The sizes are a closed set (10,
-  25, 50) because a limit the browser can set to a million is a way to ask the
-  database for everything, and the size is the one preference shared across the
-  lists, kept in this browser. The small lists are fetched whole and sliced
-  (`PagedList`); the two that can be long (listings, findings) page in the
-  Worker with `limit`, `offset` and a `total` from a count of the same filter, so
-  "of 212" is true of the database and not of the slice that arrived. Findings
-  used to stop at eighty and listings at a hundred with nothing to say there was
-  more. `test/adminPages.test.ts` fails if a list stops paging.
-- **A source has a switch and a frequency.** `cadence_hours` has been a column
-  since migration 0037 and nothing could change it. It is set from a closed set
-  of five (`shared/sourceControls.ts`: every 6 hours to weekly) through the same
-  PATCH as `enabled`, because the poller is hourly and takes a few a tick, so
-  "every 20 minutes" would promise what it cannot do. A new frequency counts from
-  the last read and keeps the back-off a failing source has earned: counting from
-  the click would let the dropdown postpone a read already due, and counting from
-  nothing would forgive a dead page the week it had waited. The page says when
-  the frequencies chosen ask for more reads a day than the cron can make (3 an
-  hour), which would otherwise be silent, the queue just running late.
-- **A source that is off goes last and is drawn quietly**, and its frequency is
-  disabled with it. It is a decision already taken, not what the page is for.
-  Listings that are hidden stay where they are and are drawn quietly, because a
-  switch that moved its own row to another page would hide what you just did.
-- **A switch is for something that takes effect at once.** Reading a source and
-  showing a listing are. Opening the public survey is not: it has preconditions
-  (a contact address, saved edits) and a consequence, so it stays a button with
-  its reasons beside it.
-- **The sidebar's counts come from the queries the pages use**, under the same
-  keys, so a badge and the page it points at cannot disagree. A source the owner
-  switched off is never counted: it is a decision, and it is how a badge on a
-  dead source clears.
-
-**An invitation is a credential that grants an account.** The biggest one
-this app hands out — a passkey signs into an account that exists, this one
-brings one into being — so it gets the strictest handling. Stored hashed and
-shown **once**, like an agent token: nothing can print it again, and losing it
-costs a withdrawal and a reissue. Thirty days, single use, withdrawable until
-redeemed. The address is typed by the owner and fixed at issue, which is the
-signup half of the recovery-address rule: at signup there is nothing on file,
-so it has to come from somewhere trusted.
-
-**The token lives in the URL fragment, never the path.** `#join/<token>`. A
-fragment is never sent to the server, never lands in an access log and never
-appears in a `Referer` header; the client reads it and POSTs it in a body.
-`test/invites.test.ts` fails if a join call starts putting it in a path, or if
-the list route ever grows a `token` field.
-
-**Redemption spends the invitation last.** The tenant, the account and the
-first passkey are written in one flow, and the invite is marked used only after
-the credential verifies — so a cancelled prompt leaves the link working, which
-is what somebody whose browser gave up needs and costs nothing, because it is
-still single use once it lands. The owner finds out through the bell, as an
-**event**: "somebody joined on Tuesday" is not recoverable from Wednesday's
-state. The title says their name, never a tenant id and never an address.
-
-**A passkey user handle is per account now.** It was one fixed string — right
-for one user, a bug with two, because an authenticator *replaces* a credential
-sharing a handle and two people enrolling on one device would replace each
-other. The owner keeps the original string, since their authenticators already
-hold credentials under it and switching would leave a duplicate keychain entry
-for nothing; everybody else is keyed by their account id.
-
-**Scout mails invitations and per-artist setup codes, and the boundary moved
-into the code to do it.** The `send_email` binding used to carry an allowlist
-of one address, the owner's, which meant the Worker could not mail anywhere
-else even if the code was wrong. That had to go for anybody else to get mail,
-so `sendMail` in `src/lib/mailer.ts` is the boundary now: every send names an
-**audience**, and `shared/recipients.ts` refuses an address that audience has
-no record of — the digest reaches only the owner's addresses, a setup code
-only an address already on an account, an invitation only the address a live
-invitation was issued to. That is weaker in exactly one way, and worth saying:
-a bug there widens it, where a bug could not widen the allowlist. So it is one
-function with one caller, and `test/recipients.test.ts` fails if anything but
-the mailer touches `env.EMAIL` or if the check stops running before the send.
-The binding still enforces the *sender* (`allowed_sender_addresses`).
-
-The digest audience is deliberately narrower than "on file": an artist's
-address is on an account, and still not somewhere the owner's digest may go.
-`PATCH /api/digest/settings` and `POST /api/digest/send` are owner-only for
-the same reason — with the allowlist gone, an artist able to set the recipient
-could have had the owner's digest mailed to themselves.
-
-**Recovery is per account, and the typed address is a lookup key.** The
-sign-in screen asks for the account's email; `recoveryAccount` in
-`src/lib/auth.ts` matches it against `AUTH_EMAIL` (the owner) or `users.email`
-(fixed by the invitation), and the code goes to the address *on file*. The
-answer is the same sentence whether or not anything matched, the cooldown is
-applied silently rather than as a 429, and the work runs after the response so
-the timing matches too. Codes are one live per account rather than one per
-deployment, so one artist asking cannot cancel another's, and the address is
-sent again with the code at `register/*` so the check lands on that account's
-attempt counter.
-
-**The research agents lost their front door and were given a token.** They POST
-and PATCH from outside this repo and outside a browser, so they cannot do a
-passkey ceremony — WebAuthn has no non-interactive mode. A bearer is their
-credential — first the shared `API_TOKEN`, now an issued agent token — checked
-before the session because an agent never sends a cookie. When passkeys
-replaced Access, a credential missing *at deploy time* was how every agent
-request would silently have become a 401. **Not at
-Access-removal time**, which is the easy thing to get backwards: Access
-authenticated at the edge and the Worker then trusted whatever arrived, so it
-never supplied a credential this middleware would accept. The secret and the
-agents' side of it are prerequisites of the deploy. That ordering is the one
-dangerous step in the rollout and it is written down in
-`docs/passkey-login.md`.
-
-**`DASHBOARD_URL` stopped being cosmetic.** Its hostname is the WebAuthn
-relying-party ID, which is baked into every credential at registration and
-checked on every assertion — so changing the hostname invalidates every passkey
-already enrolled. It is read from the var rather than from the request because
-a request header is written by whoever is asking; the request URL is only
-consulted when nothing is configured, or when what is configured is itself
-`localhost`. `relyingParty` in `shared/auth.ts` is where that decision lives,
-and local development is deliberately two origins, because Vite serves the
-browser on 5173 and proxies to wrangler on 8787.
-
-**Run the Worker locally with `npm run dev:api`, never bare `wrangler dev`.**
-`wrangler dev` reads `[vars]`, so it serves with the production
-`DASHBOARD_URL` — the relying party becomes `scout.sundogsmusic.ca`, and "Add a
-passkey" at `localhost:8787` fails with *The RP ID "scout.sundogsmusic.ca" is
-invalid for this domain*. It used to say "nothing configured in practice means
-`wrangler dev`" here, which was never true while the var sat in `[vars]`.
-`dev:api` passes `--var DASHBOARD_URL:http://localhost:8787`, which outranks
-`[vars]`; a local value hands the decision back to the request host, so
-`127.0.0.1` works as well. It is a script argument rather than a `.dev.vars`
-line because `.dev.vars` is gitignored and copied by hand, so a clean checkout
-would still be broken. `test/auth.test.ts` fails if the script loses it.
-
-The local database scripts run wrangler through `scripts/lib/wrangler.mjs` —
-wrangler's own bin under `process.execPath` — rather than `npx`: on Windows npx
-is `npx.cmd`, which `execFileSync` cannot find, and `shell: true` would let
-cmd.exe re-split the SQL and paths the scripts pass.
-
-**The read path is three unbounded scans, and they are indexed now.**
-`composeFeed` and `buildReviewQueue` both open by reading every gig, every
-sync target and every promo draft, newest first. None of those orderings had
-an index, so production answered `SCAN gig_opportunities` + `USE TEMP B-TREE
-FOR ORDER BY` and reported **68 rows read to return 34**. Migration 0018 adds
-the three, plus `task_runs(run_at)` and two on `reminders`. The doubling is
-not why it matters: `WHERE tenant_id = ?` against an unindexed table scans
-*everybody's* rows to draw one artist's page, so **when `tenant_id` arrives
-every one of those indexes becomes a composite with `tenant_id` first** — an
-index that does not lead with the filtered column is one the planner declines
-to use.
-
-**The bell polls every five minutes, not every minute.** It costs a full
-`composeFeed` — about 155 rows on this database — so a tab open for eight
-hours was spending ~74,000 D1 row reads a day watching for a badge that
-rarely moved. Nothing in the feed is minute-sensitive; deadlines are measured
-in days and events arrive on an hourly cron. `refetchOnWindowFocus` is what
-makes it feel live, so the interval is the floor for a tab you are already
-staring at, not the delay before you learn anything.
-
-**Compressing stored text was measured and rejected; do not re-propose it.**
-Every piece of prose in production — gig notes, reference docs, reply
-snippets, sync notes, event bodies — totals about **76 KB**, inside a **408 KB**
-database, against a **5 GB** free-tier allowance. And per-row gzip, which is
-how a column would actually store it, gets only **1.5×** on these strings
-(22,985 bytes of gig notes → 15,301): 672-byte values are too short for the
-dictionary to pay for itself, and base64-ing the result back into a TEXT
-column gives most of that back. The costs that bind here are **rows read** and
-**requests**, and compression moves neither.
-
-The CPU half of that argument was overstated and is worth correcting rather
-than repeating: this account is on **Workers Paid**, where the limit is 30
-seconds per request by default and configurable to five minutes — not the free
-plan's 10 ms. Decompressing prose on every queue build would be affordable. It
-is still not worth doing, for the size reasons above, which are the ones that
-actually carry the decision. Retention is likewise already handled where it
-churns — `notification_events` and `notification_marks` both prune at 30 days,
-and no other table grows fast enough to have a policy worth writing.
+Cloudflare Worker (Hono) + D1 + a React/Vite/Tailwind dashboard for one person's
+gig, sync and promo pipeline, with invited artists as separate tenants. Served at
+`scout.sundogsmusic.ca` and deployed by GitHub Actions on every push to `main`.
+
+This file is the working state of the app: what is true, the rules the code holds,
+and why a rule exists where the why is not obvious. Deep dives are in `docs/`.
+Most rules are pinned by a test named beside them; read that test's comment before
+changing the rule.
+
+**The name is a house mark plus a product name.** *Scout*, by *Sun Dogs Music*:
+write "Sun Dogs Music Scout" and never brand on "Scout" alone (Scouting America
+enforces on a dilution theory, including against unrelated trades). "Music Scout" is
+avoided because in the trade it means an A&R person scouting *talent*. Email
+subjects and the From name lead with the product name; respondent-facing survey
+text names Sun Dogs Music and no product. The header, the landing page, the sign-in
+title and the welcome screens all carry the whole name in one weight.
+
+**Names that look stale are not.** The D1 database is still `dougmcarthur-music-hq`
+(a rename is a data migration) and the Worker is `sun-dogs-scout`. The repository,
+`package.json` and `README.md` keep `dougmcarthur-dashboard`; nothing deploys by
+those. **`name` in `wrangler.toml` and the Worker's name in the Cloudflare dashboard
+change together**: `wrangler deploy` finds its Worker by name, so a stale name
+quietly creates a second Worker with the D1 binding, email binding and hourly cron
+but no domain or secrets, running the scheduled jobs against production beside the
+real one. The 2026-09-14 rename did this once.
+
+**Keeping this file current.** When a change alters a rule, edit the sentence that states
+it. Do not add how the problem was found, what the rule replaced, or a count measured
+once: the commit message and `docs/` hold that. A paragraph earns its place when a
+future change would otherwise undo it or miss it, and a dropped idea stays only if
+someone would plausibly propose it again (see the last section).
+
+## Principles the code keeps
+
+These recur in every area below. They are stated once here and not repeated.
+
+- **Read both spellings.** To rename a stored value, first ship code that accepts
+  the old and new on read and write, then migrate the data in a later change
+  (`normaliseGigStatus`, `gigStatusFromStored`, the old Settings tab ids, the
+  calendar secrets fallback in `calendarTarget`). It is also what lets the
+  out-of-repo research agents keep POSTing old vocabulary.
+- **A missing input is never a guess and never a zero.** The recovery address, the
+  home base and the Drive picker values have no default; a cost with no `nights`
+  names the gap in `unknowns`; a sync target's `submission_policy` of null is never
+  worded as permission; a deadline recovered from prose is shown with its prose.
+- **The clock and the scope are arguments.** `buildReviewQueue({ today })`, the
+  tenant passed to a route, preferences passed into a reconcile: a function that
+  fetches its own scope or date can fetch the wrong one silently, and a fixture that
+  reads the clock passes today and fails tomorrow.
+- **Automation only moves toward caution.** A refusal replaces anything; an
+  invitation fills only an empty field; a source that answers but is empty or stale
+  says so; a timeout is no verdict about a credential.
+- **A state is not a fault.** `unverified`, `unreviewed`, `never` and `declared`
+  are states apart from `rejected`, `overdue` and `broken`: not having checked is
+  not a negative claim.
+- **The app copies; it never sends or submits.** Drafts have Copy and, where they
+  fit, a compose-window link; there is no Send. Applications are drafted, never
+  filed. Recording that something was sent is not blocked.
+- **A control that names a move is a claim about legality.** Buttons derive from
+  `nextGigStatuses`, `NUDGE_KINDS[].choices` and the stage language, so a screen
+  cannot offer what the route refuses.
+- **A bulk write previews first** (`Disclosure`), names what it skipped and why,
+  and the Worker re-plans rather than trusting ids from a stale screen.
+- **Screens name things and never print identifiers.** `taskLabel` (`shared/taskLabels.ts`) renders an
+  agent's `task_id`, table names go through `tableLabel`, the set of agents is not
+  closed so anything unknown is humanised. The exception is the integration cards,
+  where the variable name is the actionable fact, and only to the owner: an artist
+  cannot set a Worker secret, so they read a plain sentence instead.
+
+## Working here
+
+- **Run the Worker with `npm run dev:api`, never bare `wrangler dev`.** `wrangler dev`
+  reads `[vars]` and serves the production `DASHBOARD_URL`, so the passkey relying
+  party is wrong at `localhost`. `dev:api` overrides it; `test/auth.test.ts` fails if
+  the script loses that.
+- **`npm run build` deploys** (`build:ui && deploy`) and the owner's machine is
+  logged in to Cloudflare, so use `npm run build:ui` to check a build. A remote
+  Claude Code session has no Cloudflare credentials: merging is how a migration
+  gets applied.
+- **Local database:** `npm run db:migrate:local` works from a clean checkout
+  (`scripts/bootstrap-local-db.mjs` applies `schema.sql` first when the baseline is
+  missing, because migration 0001 alters a table production had from `schema.sql`).
+  `npm run db:seed:local -- --apply` writes a fixture of *shapes, not data*: a prose
+  deadline, an application silent past `NO_REPLY_DAYS`, `info_requested` outranking a
+  deadline, a visa risk, a stopped agent, an uncredited photo, and a second tenant
+  that must never appear on the owner's screens. Its dates are computed when it
+  runs, because a hardcoded one quietly stops being "due in nine days". It seeds one
+  enrolment code (a fresh database has no passkey and no mailer) and refuses
+  `--remote`. The database scripts run wrangler through `scripts/lib/wrangler.mjs`,
+  not `npx`, because on Windows `npx.cmd` is invisible to `execFileSync`.
+- **Local dev is two origins:** Vite on 5173 proxies to wrangler on 8787.
+  `relyingParty` in `shared/auth.ts` decides the passkey origin; a configured
+  `localhost` value hands the decision back to the request host.
+
+### Testing
+
+- `npm test` (vitest) and `npm run typecheck` (Worker, frontend and agent scripts).
+  Pure logic in `shared/` is covered directly; routes run against a `node:sqlite`
+  stand-in for D1 built from `schema.sql` and every migration
+  (`test/support/sqliteD1.ts`).
+- **Fixtures use dates relative to their own `TODAY`, never the real clock.**
+  `TZ=Pacific/Auckland npm test` runs a day ahead and is a cheap check; CI runs both.
+- **Zone data is a clock too.** tzdata 2026e puts Manitoba on permanent UTC−5 from
+  2026-11-01. The CI runner's Node ships it (22.23.4, per Node's changelog) and an older
+  local Node does not, so a test that assumes "winter Winnipeg is UTC−6" passes
+  here and fails there. Daylight-saving tests use `America/Chicago`, and a zone that
+  never changes (`America/Panama`) covers the other case. The Worker is the same:
+  "Monday 08:00 Winnipeg" is right only while the Workers runtime has the new data,
+  so a digest an hour late points at the runtime's zone data, not the schedule.
+- **Some mistakes typecheck and render**, so they need source-level tests that read
+  the JSX or the route: `test/uiConsistency.test.ts` (dead hover states, a
+  re-declared input class, a Send button), `test/tenantScope.test.ts`,
+  `test/gigRows.test.ts` and others named below. Each records what went wrong.
+- **Screenshots verify design, not geometry.** Probe computed styles when layout
+  matters, and run a rendered contrast scan across every palette, light and dark,
+  plus high contrast: token tests cannot catch faint text on a tinted fill.
+- **Line endings are LF everywhere.** `.gitattributes` (`* text=auto eol=lf`) overrides
+  Windows' `core.autocrlf`, so a checkout reads the same bytes as the CI runner's. Before
+  it, a test matching a literal newline in source passed on Linux and failed on Windows
+  (`test/challengerPhase2.test.ts` still normalises, harmlessly). A clone made before the
+  file existed keeps CRLF until its files are rewritten.
+
+## Database and deploy
+
+**Database changes go through wrangler migrations, applied by CI.** Write a numbered
+file in `migrations/` and merge it. `deploy.yml` runs `wrangler d1 migrations apply
+--remote` before deploying the Worker. **Never hand-run schema SQL against
+production**: a statement outside the ledger is invisible to it, so the next CI run
+re-runs the file and aborts the batch on a duplicate column (`SELECT name FROM
+d1_migrations` is the check if anything looks off). The CI token needs **D1 · Edit**,
+not Read: `d1 migrations list` hits the write-capable `/query` endpoint and a
+read-scoped token fails with `code: 7403`, which `wrangler deploy` never reveals.
+
+**Migrations must be additive.** CI migrates *before* it deploys, so for the
+half-minute between the two the new schema runs under the Worker already in
+production. "Additive" is measured against what is *deployed*, which on a long-lived
+branch can be far older than the previous commit. Adding a column or table is always
+safe; renaming a stored value is two deploys (read both spellings, then migrate). A
+migration that errors rolls back and stops the deploy, leaving old code on old
+schema, which is a consistent pair.
+
+**The scoped tables keep a nullable `tenant_id` with defaults.** Only
+`users.tenant_id` is `NOT NULL` (migration 0024). With the defaults in place a write
+cannot produce a NULL, and SQLite has no `ALTER COLUMN`, so the constraint is a
+table rebuild whose column list can only come from the *local* schema while
+production predates the ledger and was partly hand-applied: a production-only column
+would be dropped by a statement that succeeds. Still unchecked: production's schema
+against what the migrations produce. `GET /api/admin/health` counts rows with no
+owner so that precondition is something to look at.
+
+**`ON CONFLICT` target is part of an interface.** SQLite requires it to match a
+unique constraint exactly, so widening a key under live code that names it would
+*error* those statements. `google_grants`, `notification_marks` and
+`notification_events` therefore avoid naming a constraint (`storeGrant` deletes then inserts, or
+update-then-insert that conflicts to nothing) and work against the schema on either
+side of a migration. `digest_reports` keeps its target because `entity_id` is a
+global autoincrement.
+
+### Reading a red run
+
+`deploy.yml` on every push to `main`: typecheck, tests, tests a day ahead, build,
+list and apply migrations, deploy, report what went live. `check.yml` runs the first
+four (typecheck, tests, tests a day ahead, the frontend build) on a pull request, with
+no secrets and no way to touch D1, so a red run lands on the change and not on `main`.
+
+- **A red run does not mean nothing shipped.** `wrangler deploy` is three API calls
+  (assets, Worker, triggers) and the Worker is live after the second. A failure of
+  the third (`Received a malformed response from the API`, usually an HTML error page)
+  says nothing about this repository and a re-run converges; the step retries three
+  times because the whole command is idempotent. `Deployed … triggers` is the line
+  that says the third call landed. `No targets deployed` alone is normal, because
+  `workers_dev = false` and the custom domain is attached in the dashboard.
+- **"Show pending migrations" failing means the token**, not the code (see D1 · Edit).
+  It is a pure read, so it retries; `migrations apply` deliberately does not, because
+  "try it again" is the wrong instinct about a write that may have half-landed.
+- **A test that passed locally and fails in CI is probably a clock**, a UTC runner or
+  newer zone data (see Testing).
+- **There is no HTTP smoke test, on purpose.** A request from a runner reaches the
+  Worker and gets a 401, because every `/api` route needs a credential, so a check
+  that only sees the front door proves nothing and adds a way for a good deploy to go
+  red. The last step is `wrangler deployments status`, which asks Cloudflare what is
+  serving; it retries because it once caught the API mid-switchover (`code: 10013`).
+- **`wrangler` and `@cloudflare/workers-types` move together** (wrangler peers on a
+  types major, so bumping one alone fails to resolve).
+- **CI depends on one behaviour nothing else would catch:** `d1 migrations apply`
+  answers its own confirmation prompt when stdin is not a terminal (`🤖 Using fallback
+  value in non-interactive context: yes`; there is no `--yes`). Check that line still
+  appears after a wrangler bump.
+
+## Sign-in, sessions and credentials
+
+**The Worker is the security boundary.** Login is a WebAuthn passkey verified in the
+Worker, so a route that is not authenticated is public to the internet. The check is
+**one middleware over `/api/*` with a written-down exemption list**
+(`PUBLIC_API_PREFIXES`) rather than something each router opts into: a router added
+tomorrow is covered by doing nothing. See `docs/passkey-login.md`.
+
+- **`DASHBOARD_URL`'s hostname is the WebAuthn relying-party ID**, baked into every
+  credential at registration, so changing the hostname invalidates every passkey. It
+  is read from the var and not the request (a header is written by whoever is asking);
+  the request URL is consulted only when nothing is configured or the value is
+  `localhost`.
+- **Email sends a code, and the code is not a login.** It authorises *adding a
+  passkey* (single use, five guesses, fifteen minutes, one live per account) and the
+  session you end with is the one enrolment produced. A code that opened a session
+  would be the old edge login wearing a new screen. `test/uiConsistency.test.ts`
+  fails if the code reaches a login endpoint or the button stops saying *Add a
+  passkey*. The code stays out of the subject, preheader and first paragraph of the
+  text body (what a locked phone shows), and the body says whoever enters it can add
+  a passkey (`src/lib/authMail.ts`).
+- **The recovery address is never typed by the person asking.** The sign-in screen
+  asks for the account's email as a *lookup key*: `recoveryAccount` matches it against
+  `AUTH_EMAIL` (owner) or `users.email` (fixed by the invitation) and the code goes to
+  the address *on file*. The answer is the same sentence whether or not anything
+  matched, the cooldown is silent, and the work runs after the response so timing
+  matches, because anything else is an account-existence oracle. `enrolmentRecipient`
+  reads deployment configuration only, not a settings row (which an attacker with a
+  session could redirect), and has no default: unset means `recoveryAvailable: false`.
+- **Changing who can sign in costs a passkey touch.** A session is thirty days, the
+  wrong credential for adding a passkey or deleting one (a stolen cookie could enrol
+  its own and delete the rest, which survives *sign out everywhere*).
+  `POST /auth/register/*` and `DELETE /auth/passkeys/:id` need a recent assertion (migration 0020):
+  `elevationState` in `shared/auth.ts` is the fifteen-minute window,
+  `auth_sessions.elevated_at` records it, `/auth/elevate/*` runs the login assertion
+  under its own challenge purpose so a sign-in challenge cannot be replayed to raise
+  privilege. Signing in is deliberately not elevation. The emailed code is exempt,
+  because recovery cannot require the thing being recovered (`authoriseEnrolment`; tests fail if either
+  route drops its check or the code branch gains one). The rule stays narrow, because
+  a prompt you see constantly is one you stop reading: bulk writes, Gmail connect and
+  status changes ask for nothing. The client tries first, re-asserts only on refusal,
+  and retries once.
+- **A passkey user handle is per account.** An authenticator *replaces* a credential
+  sharing a handle, so two people on one device would replace each other. The owner
+  keeps the original string; everybody else is keyed by account id.
+- **Invitations are credentials that create an account.** Stored hashed, shown once,
+  thirty days, single use, withdrawable until redeemed. The address is typed by the
+  owner and fixed at issue (the signup half of the recovery rule). The token lives in
+  the URL fragment (`#join/<token>`), never a path, so it is never sent to the server,
+  logged or put in a `Referer`; `test/invites.test.ts` fails if it moves. Redemption
+  spends the invitation last, after the passkey verifies, so a cancelled prompt leaves
+  the link working. The owner hears through a bell *event* naming the person, never a
+  tenant id or an address. Unused invitations prune 90 days after they lapse
+  (`UNUSED_INVITE_RETENTION_DAYS`). `invite_requests` (a name, address and reason from
+  somebody with no account) creates nothing and emails nobody; **Invite** only
+  pre-fills the real form. A honeypot, a per-sender limit on a salted hash and a daily
+  ceiling keep a flood cheap; answered requests prune at 90 days, the rest at a year.
+- **Research agents hold an issued token, not a session.** WebAuthn has no
+  non-interactive mode, so a bearer is their credential, checked before the session
+  because an agent never sends a cookie (`actorForBearer`). `agent_tokens` is hashed, revocable and
+  per-tenant, issued and revoked at `/api/agent-tokens` behind a passkey touch (owner
+  only; an agent cannot manage tokens, since a credential issuing its successor makes
+  revoking one a race). The token is shown once and held only in the card's state.
+  The old shared `API_TOKEN` is retired: a leftover secret is inert
+  (`test/routes.test.ts`) and `test/agentRoutes.test.ts` fails if `src/` reads it.
+  Settings → Owner → Agent tokens issues and revokes.
+
+## Tenancy and admin mode
+
+**A request resolves to an artist before any route runs.** Seventeen tables hold rows
+that belong to one person and `src/db/scope.ts` is the only way to reach them:
+`scoped(table, tenant, ...rest)` builds the `WHERE`, `withTenant` builds values, and
+`TenantId` is a **branded** type with one constructor, so a user id cannot be passed
+where a tenant belongs. Resolution happens once, in the middleware, like
+authentication. From a route inward the tenant is an *argument*, never fetched.
+
+- **A missing filter is a test failure, not a leak.** `test/tenantScope.test.ts`
+  reads the source and fails when one of the seventeen is named in a query that does
+  not pass through `scoped` or `withTenant`: an unscoped query typechecks and returns
+  the right rows for as long as there is one artist. One exemption (event retention,
+  a platform rule), with its reason written down. Two shapes used to hide a gap: a
+  `.where()` skipped when no filters applied, and an `inArray(id, ids)` with ids from
+  the browser, where the tenant filter beside it is the whole check.
+- **The cron has no request to read a scope from.** Housekeeping runs per tenant;
+  event retention runs once. The **digest is every account's own**: its switch and
+  schedule live in `tenant_settings`, off until turned on, and an artist's goes to the
+  address they sign in with (the `tenant` mail audience reaches only an address on an
+  account in that tenant; the owner's keeps its configurable recipient,
+  `src/lib/digestSettings.ts`). **The reply scan runs for the owner's tenant only**:
+  the mailbox is one `GMAIL_REFRESH_TOKEN` pointing at one inbox, and looping it would
+  scan the owner's mail on a stranger's behalf. The notes backfill runs for every
+  tenant under one platform marker.
+- **The deployment's mailbox, calendar and sending address are the owner's.**
+  Anything that reads `GMAIL_REFRESH_TOKEN`, `GOOGLE_REFRESH_TOKEN` or
+  `GOOGLE_CALENDAR_ID` on a tenant's behalf asks `isOwnerTenant` first
+  (`src/lib/actor.ts`): the reply scan and sent-mail reconcile
+  (`refuseUnlessMailboxOwner`), the calendar secrets path (`calendarWay`), the bell's
+  Gmail and email rows. An artist's own mailbox is a grant they would make and is not
+  built. Publishing to the shared catalog is the owner's agents only
+  (`agentMayPublish`). `test/ownerOnly.test.ts` fails on a route that reads the
+  mailbox without asking.
+
+**Admin mode is a different surface, not a bigger one.** `auth_sessions.mode`
+(migration 0023, `docs/multi-tenant-plan.md`) says which surface a session is on. In artist mode it resolves to the
+owner's own tenant; in admin mode to **no tenant**, as a type: `AppEnv` carries an
+`actor`, `AdminEnv` carries an `admin`, and `AdminActor` has no tenant field, so an
+oversight route reaching for `gig_opportunities` has nothing to hand `scoped()` and
+does not compile. `src/index.ts` is the only place that sets either.
+
+- **Both refusals matter.** Artist mode is refused `/api/admin/*`; admin mode is
+  refused everything else. Drop the second and admin mode becomes an artist session
+  with extra pages, with the promise to invited artists resting on the owner not
+  clicking a link. Each refusal names the mode needed (`needsMode`), and the app
+  renders one surface or the other.
+- **Entering costs a passkey touch; leaving costs nothing.** There is no
+  impersonation and no "act as", deliberately: `test/adminMode.test.ts` fails if the
+  oversight screen carries the vocabulary or links to a route that surface cannot
+  reach.
+- **Oversight reads three tables and writes one thing.** `tenants`, `users` and the
+  `usage_daily` rollup (counts written by the cron running *as the tenant*). The one
+  write that crosses the line is removing an artist: a tenant-scoped delete across
+  the seventeen, previewed as a **count per table**; the owner's own tenant is
+  refused. The test fails if the admin router names one of the seventeen or uses
+  `asTenantId` more than that once. `MEASURED_FIELDS` names the four counters with a
+  writer (`domain_rows`, `gig_rows`, `promo_rows`, `agent_runs`); a request counter
+  is a write per request, which this app declines to build.
+- **Every successful admin write leaves a sentence in `admin_changes`**, never the
+  request body, so no address or key is in it (`shared/adminLog.ts`, pruned at a year).
+- **The admin surface is a sidebar of pages, and every list on it is paged.**
+  `#admin/<page>`; `frontend/src/pages/admin/sections.ts` is the only list of pages and
+  names (the sidebar, tab title and router read it). One `h1` per page, an `h2` per
+  part, and the error boundary is keyed by page.
+  - Lists page through `shared/pagination.ts` in sizes 10, 25, 50 (a limit the browser
+    can set is a way to ask for everything) with one stored preference. Small lists
+    are sliced in the browser (`PagedList`); listings and findings page in the Worker
+    with `limit`, `offset` and a `total` counted over the same filter.
+  - The sidebar's counts come from `GET /admin/badges` (two counts and the source
+    rows, never a candidate: `/catalog/sources` aggregates them all). The query
+    client's mutation cache invalidates `['admin', 'badges']` after any write.
+  - A switch is for something that takes effect at once; opening the public survey has
+    preconditions, so it stays a button. A source that is off sorts last and is drawn
+    quietly with its frequency disabled; a hidden listing stays where it is, because a
+    switch that moved its row would hide what you just did.
+  - A source's frequency is `cadence_hours` set from five choices in
+    `shared/sourceControls.ts`; it counts from the last read and keeps a failing
+    source's back-off, and the page says when the choices ask for more reads a day
+    than the cron's three an hour can make.
+  - Settings shares the shell (`SidebarShell`). Below 1024px both are a grouped list
+    you tap through, as the iOS Settings app is; `useNarrow` decides in script because
+    it changes what is drawn. A bare `#settings` is therefore the list on a phone, so
+    links that mean a page name it (`#settings/google`, `#settings/reminders`,
+    `#settings/admin`), and the old tab ids (`connections`, `account`) still resolve
+    because sent emails point at them.
+
+## Mail
+
+- **`sendMail` in `src/lib/mailer.ts` is the boundary.** Every send names an
+  **audience** and `shared/recipients.ts` refuses an address that audience has no
+  record of: the digest reaches only the owner's addresses (narrower than "on file":
+  an artist's address is on an account and still not somewhere the owner's digest may
+  go), a setup code only an address already on an account, an invitation only the
+  address a live invitation was issued to. It is one function with one caller, and
+  `test/recipients.test.ts` fails if anything else touches `env.EMAIL`. The binding
+  still enforces the *sender* (`allowed_sender_addresses`). `PATCH /api/digest/settings`
+  and `POST /api/digest/send` are owner-only for the same reason.
+- **Every email goes through `src/lib/emailTemplate.ts`**, whose footer type makes the
+  author pick `transactional` (states there is no unsubscribe) or `notification`
+  (links to where it is switched off). Both identify the sender by name, mailing
+  address (`MAIL_POSTAL_ADDRESS`) and web address. The setup code and digest are not
+  marketing, but the first message that is needs an unsubscribe that works signed out.
+  The palette is the app's light tokens, since a dark email is re-coloured
+  unpredictably. `test/emailTemplate.test.ts` runs every rule against every email and
+  fails on a subject typed at a call site.
+- **A draft can open a compose window, and that is still not sending.**
+  `shared/mailto.ts` builds a `mailto:` or Gmail-compose URL; `DraftActions` mounts
+  Copy beside them. A `mailto:` URL past the platform ceiling neither truncates nor
+  errors (on Windows the click does nothing), so length is measured *after* encoding
+  and a draft that will not fit gets no button that would lie. Budgets are under the
+  lowest credible figure (`mailto` 1,800, Gmail 4,000). **Copy is never withheld**
+  (`test/uiConsistency.test.ts` fails if it sits behind that test). Encoding is not
+  `encodeURIComponent` alone: it leaves `!'()*` and writes newlines as `%0A` not
+  `%0D%0A`. `sync-pitch-research` is told to write 150 words, for the editorial reason
+  (a cold pitch competes with a hundred others), not the technical one; the tool
+  result feeds the word count back as guidance, never a refusal.
+
+## Google and other connections
+
+**Google is one connection, stored as several grants.** "Connect Google account" is
+one consent for Calendar, Tasks, Gmail drafts and Drive (`BUNDLE_PURPOSES`,
+`GET /api/google/connect`, finished by `completeBundle`). Google shows them as
+separate checkboxes, so each is checked and stored as its own `google_grants` row
+sharing one refresh token, keyed by **purpose** so revoking drafting cannot blind
+another service. An unticked service is skipped, never stored broken; one that fails
+to set up does not sink the rest; a service already on a *different* account stays
+there. `prompt=consent` and `access_type=offline` are set explicitly, because Google
+returns a refresh token only on a fresh consent. Reconnecting the same account reuses
+the calendar, list and folder it made. Disconnecting an account revokes its token at
+Google. The refresh token is **AES-GCM encrypted** with `TOKEN_ENCRYPTION_KEY`: the
+only value in D1 that is a credential somewhere else.
+
+- **Both purposes return to `/api/gmail/callback`** and `state` carries which grant is
+  being completed (`src/lib/googleOAuth.ts`); the path keeps the name of the feature
+  that registered it because a second redirect URI would be something to configure in
+  the Google console. The callback redirects to `#settings/google?…` and
+  `connectNotice` (`shared/integrations.ts`) turns every outcome, including a partial
+  one, into a sentence, drawn by that page. Calendar and Tasks also have their own connect routes
+  (`/api/calendar`, `/api/tasks`).
+- **Each scope is the narrowest that works, and where Google enforces the limit the
+  test pins it.** `calendar.app.created` lets Scout make and edit a secondary calendar
+  called **Sun Dogs Music Scout** and reach nothing else; `drive.file` reaches only the
+  folder Scout made and files the artist picked (`test/calendarGrant.test.ts` fails if
+  a broad Calendar or Drive scope appears in `src/`). Where Google offers nothing
+  narrow, the limit is enforced here and stated plainly: **`gmail.compose` also
+  permits sending**, so the guarantee is that there is no send call in
+  `src/lib/googleGrant.ts` and `test/uiConsistency.test.ts` fails if a Send button
+  appears; **`tasks` has no narrow scope** (it reaches every list; there is no `tasks.app.created`), so
+  `src/lib/googleTasks.ts` names one list and never enumerates, and the Integrations
+  row says so (`test/integrations.test.ts`); **`calendar.events.owned`** (the artist's
+  own calendar) is an opt-in behind `PRIMARY_CALENDAR_OPT_IN`, because declaring that
+  scope on the OAuth client puts it in front of Google's review for every user, so `calendar.primary` stays out of the bundle.
+- **Gmail is explained before Google asks, and "no" means Google never asks.**
+  `GoogleConsentModal` opens first, with **Connect without Gmail** as the primary
+  button (`/api/google/connect?gmail=skip`, target `google.nogmail`). It is exact in both directions: as
+  alarming as the permission is and no more. Every route to the Gmail permission goes
+  through it (`test/googleAccounts.test.ts`). The inbox scan (`gmail.readonly`) is not
+  in this flow: it is the owner's server-held secret.
+- **"Is the calendar connected" has one answer.** `calendarWay` (`test/calendarWay.test.ts`, run against the production schema) makes the choice
+  `calendarTarget` acts on, from stored rows alone, and the bell asks it too. A grant
+  that exists but is refused writes nowhere rather than falling back to the owner's
+  secrets calendar. `calendarTarget` still prefers a grant and falls back to the old
+  secrets path (read both spellings). Gmail's and Email's bell rows are still the
+  deployment's secrets and binding, right for the owner and wrong the day an invited
+  artist's own grant is what a screen reads.
+- **Credential health.** Cards ask whether a credential *works*, not whether a secret
+  is set (`shared/credentialHealth.ts`, `src/lib/credentialCheck.ts`). The probe
+  *spends* the credential (exchanging the refresh token), a refusal (400, 401, 403) is a
+  verdict and a timeout or 500 is none (only `rejected` reaches the bell), `unverified`
+  is a state not a fault, and sending is unprobeable (a check that mails you on every
+  open is worse) so that card reads `declared`. It runs on the daily housekeeping tick
+  and on `POST /api/health/check`, neither needing a passkey touch, and is not in
+  `AGENT_ROUTES`.
+- **The Drive picker's API key and project number are admin-mode settings**
+  (`drive.pickerApiKey`, `drive.pickerAppId` in `app_settings`,
+  `src/lib/pickerSettings.ts`), with no environment fallback: a public value typed once
+  is not a commit and a deploy, and two places for one value is how the one you
+  changed is not the one read. The panel offers the project number its Google client
+  ID names and warns on a mismatch (a picker under another project hands Scout files
+  it cannot read). `test/pickerSettings.test.ts` fails if the old variable names
+  (`GOOGLE_PICKER_API_KEY`, `GOOGLE_CLOUD_PROJECT_NUMBER`)
+  return. Picking a *folder* grants the folder, not its contents; picked files are
+  copied, never moved; organising previews first; sharing is one permission on the folder that every
+  file inherits; nothing is deleted.
+- **Bandsintown is read with the artist's own key** (`artist_connectors`, AES-GCM
+  encrypted), which never reaches a page. Saving probes first and a refused key is not
+  stored (a timeout still saves). Shows are read on request, not copied. Bandsintown
+  echoes the caller's `app_id` into every link, so `shared/bandsintown.ts` strips it
+  (`test/bandsintown.test.ts`). `today` comes from the browser. A platform doing this
+  for many artists wants their partner programme first. `docs/artist-profile-plan.md`.
+- **Association profiles are read from the address the artist gives, never found by
+  name** (a search by name files a stranger's bio the day there are two of you).
+  `shared/manitobaMusic.ts` has its own parser; every other site goes through
+  `shared/associationProfile.ts`, which reads **by subtraction** (it drops every link,
+  paragraph and share image the homepage shares, so the association's own Instagram is
+  not filed as the artist's). One connector row per association (`association:<id>`).
+  Connecting shows the name and photo ("Is this you?") before saving; the import is
+  preview-then-write, everything lands unreviewed, contact details are never copied.
+  `shared/musicAssociations.ts` lists the ten worth reading (`test/musicAssociations.test.ts`
+  fails if the registry names a source the gig agent's prompt does not). `scanProfiles`
+  re-reads connected profiles on the daily tick and only talks: the first read is a
+  baseline, an item is announced once ever (`seen_sources`), nothing is written.
+- **The travel band is measured once and cached, and a home nobody set is no
+  distance.** `enrichTravel` (`src/lib/travelEnrich.ts`, hourly, ten gigs at a time,
+  one request per 1.1s) geocodes the gig's place with OpenStreetMap's Nominatim and
+  routes the drive from the artist's home base with OSRM (`src/lib/geo.ts`).
+  **Cached, not fetched on read** (both services allow about one request a second from
+  the whole app and require results stored; `geo_place` and `geo_home` record what an
+  answer was for). **The home base is the artist's own** (`travel.home` in
+  `tenant_settings`, Settings → Profile) and has no default. A measured distance
+  outranks the place-name guess and yields to a band a person set, and it is checked:
+  a road shorter than the straight line is the router snapping an endpoint and counts
+  as no route. Only "Town, Region" is looked up. The card says what leaves the app, and
+  screens credit OpenStreetMap beside a measured figure.
+
+## Research agents and the catalog
 
 **The research agents run as Claude Code routines, and their instructions are
-files.** They were scheduled Claude sessions on one laptop until August 2026,
-then GitHub Actions driving them through the Claude API — which worked, and
-whose first two runs spent $20 of API credit and filed nothing. Server-side
-web search puts every result into the same request and the model re-reads the
-growing context before each next search, so a sweep compounds; that is
-structural, not a bad week. The schedules are routines now: cloud sessions on
-the artist's Claude plan, with no machine that has to stay awake.
-`.github/workflows/agents.yml` is a hand-triggered, paid fallback. See
+files.** Cloud sessions on the artist's Claude plan, not per-token API credit (a sweep
+compounds: server-side web search re-reads the growing context before each search, and
+the first API-driven runs spent $20 and filed nothing). `.github/workflows/agents.yml`
+is a hand-triggered, paid fallback. The prompts are `scripts/agents/prompts/*.md`,
+in the repository on purpose so a change in behaviour arrives as a diff; a routine's
+saved prompt only names an agent and points at `scripts/agents/routine.md`. See
 `docs/agent-routines.md`.
 
-The prompts are `scripts/agents/prompts/*.md` — in the repository on purpose:
-a change to how an agent behaves arrives as a diff somebody can read, and an
-agent that disappears leaves a hole in `git log` rather than in a UI nobody
-opens. A routine's saved prompt only names an agent and points at
-`scripts/agents/routine.md`, for the same reason.
+- **A routine has a shell, so the Worker decides what an agent may do.** The token is
+  added by Anthropic's proxy to *any* request for the host, so hiding it does not stop
+  `curl -X DELETE`. `shared/agentRoutes.ts` limits an issued token to eleven routes
+  (six reads, four creates, the run log), for every agent including the CI fallback, which holds an issued token as `SCOUT_API_TOKEN`
+  (`.github/workflows/agent-run.yml`).
+  **Which routes is half of it; what they carry is the other half.** `agentWrite`
+  (`src/lib/agentWrites.ts`) sits in front of `POST /api/gigs`, `/sync`, `/promo` and
+  `/task-runs` and, for an issued token only, requires exactly the tool's fields
+  (`.strict()`, `status` limited to `discovered`), bounds each text field, refuses past
+  a trailing day's ceiling (`AGENT_DAILY_LIMITS`) and answers 409 with the row it
+  repeats. A task run's `run_at` is never taken from an agent.
+  `test/agentWrites.test.ts` checks the schemas against `TOOL_SPECS`.
+- **Agents get named, typed tools and never a general HTTP tool**
+  (`scripts/agents/tools.ts`; `run.ts` hands them to the model, `cli.ts` exposes the
+  same names as subcommands for routines). JSON Schema, not `betaZodTool`: it is built
+  for Zod 4 and every route validator here is Zod 3. Dry run is the default, with
+  `--apply` to write (`run.ts`, `cli.ts`, `scripts/issue-agent-token.ts`,
+  `scripts/backfill-deadlines.ts`).
+- **A routine has no calendar connector and must not get one**: the Google Calendar
+  connector has create and delete tools it would use unasked, and connectors bypass
+  the route list. "My calendar" means `list_shows` (`GET /api/shows`: Bandsintown, the Manitoba
+  Music profile and calendar, and *booked* gigs, one row per night); only booked gigs
+  are announced, since announcing a show that then falls through is worse than none.
+  `list_existing_promo_drafts` gives each draft's status, the only account the agent has
+  of what the artist did: `draft` unread, `approved` liked, `published` posted.
+- **The heartbeat is the agent's job.** A routine that crashes or forgets `log_run`
+  leaves no row. What catches it is `shared/taskCadence.ts`: a schedule that goes
+  quiet raises a **condition** (derived, self-healing) rated `critical`, because
+  nothing retries a stopped schedule. **The cadence is measured, not configured** (the
+  median gap between a task's own runs, so one holiday cannot blind the check) and it
+  **under-reports on purpose** (a three-day floor, a 45-day ceiling). A task that has
+  never run cannot be missed. `parseRunAt` reads a zoneless stamp as UTC.
+- `SCOUT_API_URL` falls back on empty as well as unset (`resolveBaseUrl` uses `||`):
+  GitHub renders a missing variable as `""`. In `run.ts` the tool runner does not
+  auto-resume `pause_turn`, so it iterates and records a run that still ends paused as
+  `incomplete`, and it streams because a turn of searches outlasts the SDK's timeout.
+- **A document-reader routine** reads PDFs a Worker cannot (a stage plot drawn as
+  shapes), lists documents labelled stage plot, rider or input list
+  (`shared/documentReadings.ts`) and files a transcription; the write is checked
+  against the asset's current file address. Photos, videos and spec pages are not read.
+
+**Listing facts live once, in a shared catalog.** `opportunities` holds what is true of
+a call for everybody and has no tenant and no column for anything an artist decided;
+gig and sync rows link by `opportunity_id`. `src/lib/catalog.ts` writes it by
+read-by-key then insert (no `ON CONFLICT`); a later sighting fills gaps and never
+overwrites, so one poisoned page cannot rewrite what every artist sees; linking is
+best-effort so a catalog failure never costs a filed gig, and `relinkMissing` retries
+on the daily tick by the backfill's rule (untouched rows only). Sync targets are
+catalogued only when they are organisations. An entry is public by default only when a
+research agent filed it, it has a listing URL on a public host (never a Doc, Drive
+file or mail thread) and it is a festival, showcase, funding call or sync
+organisation; the owner's **Landing page listings** page shows and hides anything.
+
+**Scout reads the pages that list calls; agents are for finding new ones.**
+`src/lib/sourcePoll.ts` reads `catalog_sources` (seeded from
+`shared/musicAssociations.ts`, which stays the truth for the ones it names) on the
+hourly cron, three a tick, with the same honest user agent as every fetch. Two readers,
+**found by markup and never by host**: `shared/feedParse.ts` (RSS, Atom, iCal) and
+`shared/listingParse.ts`. Neither reads prose: a deadline comes only from a line saying
+*deadline* beside a date, and a year-less date stays words (`splitDeadline`).
+`shared/callClassifier.ts` gives each item a verdict and **the sentence that decided
+it** (`unclear` is a real answer); its test table (`test/callClassifier.test.ts`, mostly real titles) is a regression guard, and accuracy is
+read from the owner's **Ignored** tab. `docs/catalog-ingestion.md` has what the first
+real reads showed; read it before changing a rule.
+
+- **A candidate is not an opportunity**: nothing here reaches the catalog, because the
+  announcing page is usually not the programme's own page and publishing it would key
+  the catalog on the wrong address. **A source that answers is not a source that
+  works** (`sourceState` reads what came *back*: `stale`, `empty`); a refusal is a
+  verdict on our access, a timeout is none; first sight is a baseline; a broken source
+  is read less (retries at 2×, 4×, up to a week); an unchanged one costs a 304 or a
+  compared hash; the body is capped at 3 MB and a stranger's markup only ever becomes
+  strings, never followed, run or passed to a model.
+- **A programme that comes round again is the same programme, and Pass means this
+  intake** (`shared/intakes.ts`, run per artist on the 3am tick before the reminder
+  reconcile). A passed or missed intake is offered again as a new row when the entry
+  holds a later date and the old row is left as it was (deleting the row is how
+  somebody says never). A New row nobody decided on is advanced in place, which moves
+  `updated_at` and so wakes a snooze. Nothing In progress or Applied is touched.
+  `reopened_at` restarts the three-day holding period. **Only the platform's own
+  research moves a deadline, only forward, and only one that has gone**
+  (`advanceIntake` in `catalogueEntry`): a page naming a later date may name another
+  stream, and a poisoned page must not push a live deadline out of sight.
+  `refreshProgrammes` reads a public entry's page once its deadline passes (three a
+  tick, a week apart, stopping after eighteen months); `readNextDeadline` requires a
+  year, so recall is low and it is a partial feeder. One bell event a night; suggestions
+  off means no new rows but existing rows still move; ten re-offers a night at most.
+- **A new account is shown what is open to nearly anyone before it has said
+  anything** (`StartHere`, `shared/startLanes.ts`, `GET /api/matching/start`): grants
+  open across Canada, festivals and showcases in their province, and sync companies
+  whose own sites say they take submissions and ask for no exclusivity. Gig lanes are
+  cut from `matchCatalog`. **A missing input is never a guess**: a grant is "national"
+  only where its place says so, and a province lane with no province asks for one. A
+  sync company is shown only on its own words, with the sentences; silence about
+  exclusivity is listed apart, and companies that ask for exclusivity or refuse cold
+  pitches are counted and never listed (`readExclusivity`, `shared/syncExclusivity.ts`,
+  follows `syncTerms.ts`: caution beats reassurance, and a sentence about what a
+  *customer* gets is not about the artist). Every add is re-checked server-side
+  (`POST /start/add` and `/start/sync`; a refusing company is a 409). It retires once
+  they say not now, switch suggestions off, or have twelve rows (`START_UNTIL_ROWS`). `checkTarget` mirrors
+  findings onto the catalog entry **only for the owner's tenant** (another artist could
+  point an organisation's name at a page of their choosing).
+- **Suggestions are ordered, never removed** (`shared/artistFocus.ts`, `focusFor`).
+  What was asked for outranks how far it is, and a deadline outranks both; only
+  undecided items are ordered; something beyond their chosen reach is noted and sorts
+  later, never hidden, since a ranker that hides what it scores low never learns it was
+  wrong. "My province" is the province in the home base, never a guess.
+
+**A sync target says whether it takes pitches, and the app reads the answer instead of
+trusting that somebody did.** Each target carries `submission_policy` (`open`, `closed`
+or null), `policy_evidence` (the sentence), `policy_url`, `policy_checked_at` and
+`policy_overridden_at` (the artist's "pitch anyway", its own column so a re-check can
+never undo it). `shared/syncTerms.ts`, `src/lib/syncTerms.ts`.
+
+- **Null is two things, and neither is a green light** (never checked; read and found
+  silent), and a site nobody could read is a third. Nothing writes the policy except
+  automation moving toward caution and the artist's override (the columns are not in
+  the PATCH schema). An agent's `open` has to carry the sentence (`startingTerms`
+  refuses it otherwise) and a refusal on the site beats an agent that said open.
+- **The Worker reads the site itself**: on filing, when the address changes, on the
+  button, nightly for anything unread (six a night per tenant, `checkPendingTerms`),
+  and *Read their sites* on the Sync page (`CheckAllTerms`, a target at a time from the
+  browser, picked by `targetsToRead`). It never touches `updated_at`. It follows the
+  links worth following **and** asks for conventional pages (`POLICY_PATHS`) once per
+  host, because a redirected home page can hide an old `/about.html` that holds the
+  refusal. Only plain public websites are fetched (`isFetchable`). It does not search
+  the web, covers sync targets only, and the card says how many pages were read rather
+  than that the target is fine.
+- **A refusal needs somebody refusing and something refused.** Every rule in `CLOSED`
+  needs a thing a pitch is made of (`THING`), skips a clause where the company is the
+  one sending (`THEY_SEND`), and treats an instruction about the route (`A_CHANNEL`) as
+  such; "by invitation only" needs a submission in the sentence; page text breaks
+  lines only at block tags. Precision is measured on real sites, and a sentence that
+  taught something is a test. `retractFalseRefusal` withdraws a refusal on file that
+  the current rules would not make (nothing else could, since automation only moves
+  toward caution); `RETIRED_CLOSED` and `refusalRetracted` are deleted once every row
+  has been read again.
+- **The gate is on every way out.** A refusal removes Copy, the mail links and Mark
+  Pitched from the Sync row and the Review pane, offers Archive, ranks the row near the
+  top (`no_unsolicited`, 98) and puts it on the weekly email; the bulk Gmail drafts
+  leave out refusals and unread targets. Recording a send is not blocked.
+  `test/syncTermsUi.test.ts` fails if a surface that renders a pitch beside Copy or a
+  mail link stops asking `mayPitch`. **Agents must say**: `create_sync_target` requires
+  `submissionPolicy` (`unknown` is honest, silence is not).
+- Gmail bulk drafts preview first, re-plan server-side, list **skipped** with a reason
+  each (no address, no pitch, already pitched), and **write no status**: a draft in
+  your drafts folder is not a pitch that went out.
+
+## The gig pipeline
+
+**Statuses say who decided.** `shortlisted`/`passed` are the artist's decisions,
+`invited`/`declined` the organiser's; turning an offer down yourself is `withdrawn`.
+`normaliseGigStatus` maps legacy spellings (`approved`, `rejected`) forward on read
+and write because the research agents live outside this repo. `nextGigStatuses`
+(`shared/gigStatus.ts`) says which moves a status offers and the PATCH route refuses
+anything else, whoever calls it (`invited → declined` is allowed, because an offer is
+not a booking; the button says **Offer fell through**). See `docs/gig-pipeline-plan.md`.
+
+**Screens show four stages over fourteen stored statuses.** **New** (apply or pass),
+**In progress** (you said yes; only confirming it went out moves it), **Applied**
+(waiting; only a settled answer ends it) and **Closed** with an outcome (Accepted, Not
+selected, Passed, Missed, Withdrawn). `shared/gigStage.ts` is that view (`GET /api/gigs?stage=`) and every
+screen reads it. `preparing` is In progress with a draft; `acknowledged` is a receipt
+offered as **Answered**; `info_requested` and `invited` are **flags** on Applied;
+**Accepted means the terms are settled** (a signed contract, or written confirmation
+for a grant, via `settledByAward`), so an invitation stays Applied and nothing reaches
+the calendar until Accepted. `archived` shows as Closed with no outcome.
+
+- **Storage holds `status` plus `outcome` and `flag`** (migrations 0030, 0031). The
+  code still reasons in the fourteen and translates at one boundary:
+  `src/db/gigRows.ts` (`readGig`/`readGigs` on every select, `gigStatusColumns` on
+  every write). `test/gigRows.test.ts` fails when a file selects gig rows without the
+  translation, `test/gigStage.test.ts` when a screen imports `GIG_STATUSES`,
+  `GIG_STATUS_META` or `gigStatusMeta`. `gigStatusFromStored` still accepts the
+  fourteen (read both spellings) and `test/gigStatusMigration.test.ts` runs 0031 against
+  the production schema. Status columns are typed `string` on purpose: production
+  rows carry values outside every union the UI offers.
+- **Two statuses mean the ball is back with you.** `awaitsYourReply` splits
+  `info_requested` and `invited` out of "waiting on the organiser" and they carry a
+  `reply_due` flag that outranks every deadline; **Waiting on them** is the filter for
+  the other side.
+- **Silence is a signal, and the only one that is an absence.** `submissionSilence`
+  measures from `submitted_at` (migration 0010), becomes a `no_reply` flag past
+  `NO_REPLY_DAYS` and is the second explicit exception in `awaitingDecision`.
+  `submitted_at` was **not backfilled**: `updated_at` moves on every edit and would
+  over-report. Older rows fall back with `exact: false` and every surface says
+  "about"; the fallback can only under-report.
+- **Every choice is logged with what the screen showed** (`decision_log`, migration
+  0038, the seventeenth scoped table; nothing reads it yet). The snapshot
+  (`shared/decisionLog.ts`) is built **field by field from the row as it was before the
+  move**, with the queue's own flags and derived days and cost: no spread, so notes,
+  drafts and addresses are absent by construction. `via` records the door, because a
+  step is not a choice (`isChoice`); the write is append-only and best-effort
+  (`test/decisionLog.test.ts` fails on an update or delete, and on a new status writer
+  that neither logs nor has a written reason). Not logged: filing a gig, the nightly
+  revisit, edits that leave the status alone. `score` is reserved and null.
+- **Performance dates are typed, not parsed.** `performance_start`/`performance_end`
+  never hold prose (`shared/performance.ts`); a bad pair makes `showSpan` return null,
+  which the reconcile reads as "remove the entry". Google's all-day `end.date` is
+  exclusive, hence `endDateExclusive` at every layer.
+- **Deadlines are often prose** ("None, rolling artist roster intake"). Anything
+  wanting a date goes through `splitDeadline`, which returns null rather than guess,
+  and a recovered date is shown with its prose.
+- **The visa lead time counts from the deadline, not from today** (`visaLead`,
+  `visa_risk`, weighted above every deadline): a P-2 takes about ninety days and
+  cannot be filed before somebody agrees you are performing, which is after
+  applications close. An unstated `performance_kind` keeps the ninety days.
+- **Cost is a denominator, never a criterion** (`shared/gigCost.ts`): no `value`,
+  `efficiency` or blended score, because the weights have not been elicited. Every
+  figure is a **range**, `local` is its own band (`NIGHTS_BY_BAND`: 0–0 nights; a Manitoba address bands
+  as a drive at worst), a missing input is named in `unknowns`, and `outlook` is
+  decided from the range, never a midpoint: *Income*, *Investment* or *Could pay its
+  way*. The words are chosen: a showcase that does not break even is spending on being
+  heard, so `test/gigCost.test.ts` fails if a word of loss returns. No pay recorded is
+  not zero pay. `docs/gig-pipeline-plan.md` §7.
+- **The note parser moved to write time; it did not go away.** The agents write prose
+  from outside this repo, so extraction has to keep happening. `shared/noteColumns.ts`
+  stores six facts (`submission_state`, `blocked_on`, `submission_method`,
+  `fee_amount`/`fee_currency`, `location`) on insert and on a rewritten note;
+  `withStoredColumns` merges them over a parsed note so a corrected column reaches the
+  screen, and a null column falls back to the parse. A column that holds something is
+  never overwritten (one exception: `fee_currency`, which defaults to `USD`) and
+  `updated_at` is left alone, or every snooze would wake. `POST /api/backfill/notes`
+  and a one-shot on the cron (`runNotesBackfillOnce`, marker `once.notesBackfill` written after success)
+  cover older rows. Rendered shapes (`requirements`, `dealTerms`, drafted values) stay
+  derived: a stored copy is a parser cache with a staleness bug. `organizer`,
+  `audience_size`, `genre_fit_score` and `agency_type` stay NULL on purpose, because no
+  note carries them in a form anything can read; the Gigs table hides a column no row
+  has filled (`frontend/src/pages/GigsPage.tsx`).
+- **Note prose names the artist, and the name comes from the account**
+  (`tenants.display_name` as `ArtistNames`). `depersonalise` rewrites it to the second
+  person on the way to the screen and never in drafted field values; pronouns change
+  only inside sentences that named the artist. `test/noPersonInCode.test.ts` fails on a
+  first or last name in source.
+- **One predicate decides what needs a decision.** `awaitingDecision`
+  (`shared/reviewQueue.ts`) is used by the Review filter and the weekly digest, so the
+  email cannot count rows the page refuses to show. The Overview deck deals from its
+  own filter (`deckItems`: a reply owed, then what is new, then what is urgent) and its
+  "all clear" line still tests `needs`. A drafted message is lifted out of a note and
+  shown as its own block (`splitDraftedMessage`, Copy only, never depersonalised).
+- **Scout is for Canadian artists, and says so where it is first read**: costs in CAD,
+  the P-2 rule assumes a Canadian act going to the US. An opportunity abroad is never
+  left out; it comes with what it takes to get there (`test/canadianCopy.test.ts`).
+
+**Reminders: a calendar entry means you show up; a task means there is work to do.**
+Confirmed shows go to the calendar; deadlines, windows opening and replies owed go to
+**Google Tasks**. `shared/nudgeRouting.ts` holds the rules (no clock, no database);
+`src/lib/gigNudges.ts` reconciles wanted against present. Preferences are per tenant
+(`tenant_settings`) and **passed into** the reconcile. Destinations differ per kind and
+are typed (`NUDGE_KINDS[].choices`). The opening task is due a day *after* the window
+opens, because the daily tick reads the form at 3am. Four nudges follow from an edit and
+one does not: `NO_REPLY_DAYS` passes with nothing written to the row, so
+`reconcileAllGigs` runs on the daily tick, idempotently. A task you ticked off is left ticked (a
+completed task still exists, which is how `readTaskOn` tells done from deleted). See `docs/nudge-routing.md`.
+
+## Forms, replies and the artist library
+
+**The app drafts an application; it never submits one** (`ApplicationPanel`: Copy and
+*This one is right*, no Send; `docs/application-prep-plan.md`). Reading a form is
+tolerant and states what it could not do:
+
+- **A suggestion is not an answer.** `answer_state` is a column apart from `answer`; the
+  readiness line reports *answered* and *read* separately and `sendable` needs the
+  second. Re-reading re-stages only `empty` and `suggested` fields. **An over-long answer
+  is worse than an empty box** (paste truncates silently mid-word), so it is the one
+  field problem rated `danger` alone.
+- **A login wall is a fact about the opportunity, not an error.** `prep_status` is
+  `blocked` (found, behind an account or JavaScript: fill it in by hand), `failed`
+  (timeout or 403: worth another go) or `not_found` (a window that has not opened).
+- **The address on a listing is usually the page that announces the form.**
+  `readApplicationForm` follows **one** Apply link (`chooseFormLink`: a known form host
+  outranks wording, vendors and volunteers are marked down, two alike buttons are
+  reported rather than picked). A newsletter box is not an application. FestivalPro has
+  its own reader (`parseFestivalProForm`), found by markup; follow-ups its script hides are marked not required (a required question nobody sees would
+  stop the application ever reading ready); fixtures are real captures in `test/fixtures/`.
+- **Scout goes back for the form, and the research agents do not** (`revisitForms`,
+  daily, per tenant, In progress gigs only; triggered by `opens_at`, daily for fourteen
+  days then weekly; no date means weekly, not never). It **never moves a status and
+  never touches `updated_at`** (`requested` on `prepareApplication`: only the button
+  starts an application; `test/formRevisitRun.test.ts` runs it against the production schema),
+  and it says what it found with a bell event; silence from an
+  undated window is the expected answer. A cron is free and cannot be skipped; a routine
+  would cost allowance and leave nothing behind when it crashed.
+- **A Google Form can open pre-filled with only what you have read**
+  (`shared/formPrefill.ts`): a `suggested` answer or a choice the form does not offer
+  stays out and is named; budget 6,000 encoded characters; Google Forms only.
+- **The answers can sit in a window above the form** (`PopOutProvider` in `Layout`,
+  `AnswerSheet`; `docs/submission-helper-plan.md`). Every clipboard write goes through
+  `writeClipboard(text, win)` (`frontend/src/clipboard.ts`) with the window of the button pressed, because a click in
+  the window focuses it and not the page holding the code (`test/popOut.test.ts`). The
+  window lasts as long as the page that opened it, which is why the provider sits in
+  `Layout`, and it has its own document, so absolutely positioned text needs a
+  positioned ancestor and the title is set on its own document.
+
+**Replies.** `docs/reply-matching-plan.md`.
+
+- **A reply is matched by name, not by domain** (`shared/replyMatch.ts`): organisers
+  reply from form services, portals and personal addresses. The event's name scores in
+  the subject or body, with the domain a weaker corroborator. Names are tokenised two
+  ways: without splitting camel case ("LieLow" stays one token) and with it ("BreakOut
+  West" yields BOW). **Matching reads the whole body; classification reads only the top
+  post**, because the quoted receipt below a reply often holds the only mention of the
+  event and is never the organiser's answer.
+- **Confirm once, then remember** (`gig_correspondents`); two equal matches store the
+  reply with no gig. **The scan never reads this app's own mail** (`shared/ownMail.ts`
+  names the senders as exact addresses, tied to `wrangler.toml` by
+  `test/ownMail.test.ts`; they are left out of the Gmail query, since the fetch is
+  capped at 60). It runs three times a day (`REPLY_SCAN_HOURS` 7, 12, 18 local) and
+  **never writes a status**: accepting binds the correspondent, and moving the row is
+  `PATCH /api/gigs/:id`, so two things that can be wrong independently are two actions.
+- `classifyReply` scores all four readings and takes the strongest, returning `unclear`
+  when two are close; the deciding sentence is stored verbatim. `recogniseAsks` runs at
+  scan time (the body is gone afterwards) and the answer is drafted on read against the
+  library as it then is; the ask vocabulary is closed, `composeReplyDraft` always
+  leaves a gap, and the draft is Copy-only.
+
+**The artist database expires on purpose.** Each `artist_assets` row carries a
+`review_by` seeded from its kind (six months for a follower count, two years for a
+press photo); `assetHealth` reads it against a `today` it is handed. `unreviewed` is a
+state apart from `overdue`, and a photo with no credit is *broken* from the day it is
+added. `shared/artistSource.ts` fills the library from the reference documents with three
+rules that read no sentence: a `##` heading is a question (`classifyQuestion`), a
+parenthetical is the `variant`, a labelled URL on its own line is a link (not inside a
+list item). A section it cannot file is named in `skipped`. Everything sourced lands with
+`review_by` null; `GET /api/artist/source` previews and `POST` writes. `GET
+/api/artist?freshness=` refuses a value it does not know.
+
+- **An EPK is a view, not a document** (`assembleEpk`), assembled on read so it can say
+  what went stale. A share link (`#epk/<token>`, token in the fragment, POSTed to
+  `/api/public/epk`) publishes only what the artist has claimed
+  (`shared/publicEpk.ts`: reviewed assets, no uncredited photo, facts and documents
+  only from an allow-list); `epk_shares` is a credential like `agent_tokens` (`test/epkShare.test.ts` pins where the token
+  travels and that `withheld` is stripped). The page
+  never renders a library value raw (`shared/epkProfile.ts` splits along the documents'
+  seams; a link labelled *private* is withheld).
+- **Answers at hand** (`GET /api/artist/answers`, `shared/answersAtHand.ts`) is the
+  library cut for the moment a form is open. It says what is wrong before the paste,
+  names the questions the artist's applications ask that nothing answers (never by
+  matching paperwork by label), and never edits.
+- **The Library opens as a profile**; Profile, Grid and Table are layouts of one
+  `detail`, so a view never grows its own edit path. Values go through `plain()`.
+- **A stage plot is derived, not drawn** (`StagePlotFlow`, `shared/stagePlot.ts`): the
+  survey asks what a musician knows offhand and derives the input list, stereo pairs,
+  phantom power, stands, monitor mixes, power drops (every plot asks for at least one)
+  and layout; `shared/stagePlotClues.ts` offers suggestions from the documents, never
+  silently. The stage is drawn as cards (`frontend/src/pages/artist/StageCards.tsx`) with line art
+  in `currentColor`; connections use their own `conn-*` tokens and paper is always
+  monochrome. The answers are one `tenant_settings` row.
+- **A new account gets a checklist, and every tick is read off the account**
+  (`shared/onboarding.ts`); only the goals (`onboarding.goals` in `tenant_settings`) and "hidden" are stored. The name and goals are
+  asked full screen (`OnboardingFlow`), hosted by the page, not the card, because
+  answering can complete the checklist and unmount the card.
+
+## Notifications, History and the feedback form
+
+**Notifications are two mechanisms behind one API.** *Conditions* are derived on every
+read and self-heal; *events* are rows, because a run finishing is not recoverable from
+current state. Dismissing a condition lasts a day, an event is permanent
+(`shared/notifications.ts`, `docs/notifications-plan.md`). The bell polls every five
+minutes (a full `composeFeed` is the cost); `refetchOnWindowFocus` is what makes it feel
+live.
+
+- **History is the bell with the cap taken off** (`#runs/<type>`): a run is listed
+  from `task_runs`, kept forever, never from its echo in `notification_events`
+  (pruned at thirty days), joined by `runEventKey` in `shared/runEvents.ts`. A
+  dismissed event is still listed. `test/historyRoute.test.ts` runs the queries against
+  the production schema.
+- **A report is laid out, never interpreted** (`shared/runSummary.ts`); nothing is
+  stored, so a better reader improves every old run. Event bodies are cut to 140
+  characters in `buildNotifications`; the bell shows what a run filed (`runGist`) rather than the
+  report. Stored titles are not retrospectively fixed.
+- **The notifications can be pinned beside the page from 1280px**; `pinned` and `open`
+  are separate flags in `localStorage` and only the bell polls
+  (`test/historyUi.test.ts`). `docs/side-panel-plan.md`.
+- **Feedback is a form, not telemetry** (`feedback`, migration 0032). It attaches the
+  page, the trail, failed requests from the last half hour in this tab, the build and the
+  browser, kept in memory by `frontend/src/diagnostics.ts`, listed before the button
+  through `describeContext` (which the owner's inbox uses too). It never carries what was
+  on the page; `test/feedback.test.ts` pins the rules.
+- **Read-path indexes lead with `tenant_id`** (migration 0018 and after): an index that
+  does not lead with the filtered column is one the planner declines to use, and `WHERE
+  tenant_id = ?` on an unindexed table scans everybody's rows to draw one artist's page.
+  Rows read and requests are the costs that bind here.
+
+## Frontend conventions
+
+Read `.claude/skills/ui-rules` before changing anything under `frontend/src`; it is the
+checklist for what `test/uiConsistency.test.ts` enforces.
+
+- **Explanatory text is always tucked behind an info icon.** What a screen is for, how
+  something works or what a setting means is not shown by default. It goes in an
+  `Explainer`, or where there is no title to sit under, an `InfoToggle` or `useNote`
+  (the button and the note in different places). The owner asked for this when the
+  admin-mode pill carried a whole sentence. What stays visible is what a person needs in
+  order to act: labels, counts, statuses, errors, and the line beside a button saying
+  what pressing it will do. `showHints` hides every icon, so a note never holds the only
+  copy of a warning. A one-line hint under a page title on a first visit, dismissed once
+  to collapse behind the icon for that account, is decided but not built (see the last
+  section); until it is, nothing explanatory shows by default.
+- **Buttons and inputs come from `components/ui/`.** `Button` takes a variant named for
+  meaning (`primary`, `neutral`, `quiet`, `good`, `danger`, `info`); `Field` exports
+  `FIELD` and `FILTER`; `SectionHeader`, `SidebarShell`, `Pager`/`PagedList`, `Toggle`
+  and `Disclosure` are shared. `test/uiConsistency.test.ts` fails on a hover state that
+  repeats the fill, a re-declared input class, or a third hand-rolled `Disclosure`. A
+  filter control has no visible label, so it carries an `aria-label`; the same file fails
+  on one that does not.
+- **A control that names a status is a claim about legality.** The Review bar and the
+  Overview deck derive from `nextGigStatuses` through `decisionFor`; a same-status target
+  counts as refused (it wrote nothing and dealt the same card back).
+- **Text a person has to read is never `text-faint`** (3.6 to 1); `test/historyUi.test.ts`
+  fails on it. Colours are tokens (`tailwind.config.js`, and `--c-*` channels so `/NN`
+  alpha works); a token that does not exist renders as nothing.
+- **Colour themes are data, and the stylesheet is generated from them.** Eight ship:
+  Sun Dogs (default, `shared/themeSunDogs.ts`), Pebble, Opal and Harvest (aesthetic,
+  derived from Figma palettes by `scripts/themes/derive.mjs` into
+  `shared/themeData.ts`) and four accessible ones (High contrast, Colour-blind safe,
+  Greyscale, Low glare), each stating its own standard in `STANDARD` in
+  `test/themes.test.ts`. `frontend/src/themes.css` is written by `npm run themes:css`
+  and a test fails if it is edited by hand. The default and accessible themes are held to
+  strict contrast and colour-blind gates; an aesthetic theme is held by a ratchet
+  (`shared/themeBaselines.ts`, which may only go up) plus ink and body text at 4.5:1. The
+  meaning colours (green go, ochre waiting, clay broken) keep their hues in aesthetic
+  themes. A `palette` of `null` means nothing chosen and follows the device
+  (`prefers-contrast: more` selects High contrast); print is always the default's light
+  palette. The palette follows the account (`tenant_settings` `appearance.palette`, `GET`
+  and `PUT /api/appearance`, refused to agent tokens, absent in admin mode); everything
+  else in Appearance stays per device. `docs/themes-plan.md`.
+- **Surfaces that read as a document are static HTML**: `/privacy/` and
+  `/terms-of-service/` are Vite entries (`vite.config.ts`) of plain HTML with no Worker route, so they read
+  with JavaScript off and have an address a regulator or Google's OAuth review can fetch.
+  `/survey-results` is a Worker route that redirects to `#survey-results`.
+
+## Public pages and legal
+
+**The logged-out page shows a small sample of the catalog** (`LandingPage`, eight open
+calls from `/api/public/opportunities`, which reads only the catalog). The fee column is
+the fee as the listing stated it and nothing more: the page never says "entry fee" and
+never "Free" for a fee nobody stated. Publishing is conservative (see the catalog).
+
+**The privacy policy's numbers are the code's.** `/privacy/` names Sun Dogs Music
+Manitoba, a sole proprietorship Doug McArthur registered on 2024-12-30 (registry number
+10219396, three years from filing, so **renew it before December 2027**); he is the
+privacy officer. The law is PIPEDA (Manitoba's own Act has no proclamation found; Bill
+C-36, tabled 2026-06-15, would replace PIPEDA and is not law, so reread the page when it
+passes). The owner decided: 18 or older; the AI paragraph states today's practice
+(operator's routines on Claude, public pages and the operator's own account) and promises
+notice and consent before it changes; fonts are self-hosted (`frontend/src/fonts.ts`) and
+emails link none; English only, which is a real gap in Quebec (Charter of the French
+language s. 55 wants a French version handed over first for a contract of adhesion).
+`test/privacyPolicy.test.ts` ties the page to the session, challenge, setup-code,
+elevation, notification, invitation and usage lengths, to the absence of any outside
+host, analytics or web font, and to account removal reaching the invitation row; change a
+number in code and the test fails until the page says it, and change the page and its date
+together. Gaps it says out loud: no self-service export or deletion (a request by email,
+answered in 30 days, removal is `removeTenant`), and if the document reader is ever
+pointed at a file in an artist's Drive, "never passed to an AI service" stops being true
+and Google's Limited Use rules need explicit consent.
+
+**The terms of service sit beside it** (`/terms-of-service/`,
+`docs/terms-of-service-research.md`). Agreement is one action in words beside the button
+(setting up a passkey creates the account and is agreeing); a checkbox would be firmer
+evidence and costs a click on a deliberately one-action screen, so it is the owner's
+decision, not a default. The terms promise only what the policy promises, and every claim
+about the service is pinned to the code that makes it true (`test/termsOfService.test.ts`:
+free, never sends, an agent token can only read and add, a press kit link can be switched
+off, an invitation lapses after `INVITE_TTL_DAYS`). Artists cannot issue agent tokens, so
+the terms say tokens are issued only by us. The figures are the owner's (a $100 cap,
+30-day notice, Manitoba law, a narrow indemnity): change the number and the sentence
+together, with the page's date.
 
-Things about it that are not obvious:
-
-- **A routine has a shell, so the Worker decides what an agent may do.** In CI
-  the model held named tools and the script made every request. A routine is
-  a full Claude Code session reading festival pages written by strangers. Its
-  token is an API credential on the cloud environment, added by Anthropic's
-  proxy after a request leaves the VM, so the session cannot leak it — but the
-  proxy attaches it to *any* request for the host, so hiding it does not stop
-  `curl -X DELETE`. `shared/agentRoutes.ts` limits an issued token to eleven
-  routes: six reads, four creates and the run log. That limit applies to every
-  agent: the unlimited shared `API_TOKEN` is retired, so the CI runner holds an
-  issued token too.
-- **Which routes is half of it; what they carry is the other half.** The
-  create routes were written for the artist's own form, so an issued token
-  could still send a gig already `booked` with show dates (which the nightly
-  reconcile puts on the calendar), a field of any length, or a run stamped next
-  year (which makes a stopped schedule look alive, since cadence is measured
-  from the newest `run_at`). `agentWrite` in `src/lib/agentWrites.ts` sits in
-  front of `POST /api/gigs`, `/sync`, `/promo` and `/task-runs` and, for an
-  issued token only, requires the body to be exactly the tool's fields
-  (`.strict()`, with `status` limited to `discovered`), bounds each text field,
-  refuses past a trailing day's ceiling (`AGENT_DAILY_LIMITS` in
-  `shared/agentWrites.ts`), and answers 409 with the row it repeats (a promo
-  draft repeats on the same title in the same month, or the same words under
-  another title; a recurring heading across months is not one). Rows carry
-  no record of who filed them, so the ceiling counts the tenant's rows of that
-  kind rather than the token's; a person adding sixty gigs in a day holds the
-  agent off until tomorrow. `test/agentWrites.test.ts` checks the schemas
-  against `TOOL_SPECS`, so a field added to a tool and not to the Worker fails
-  there rather than as a 400 in a routine nobody is watching. A task run's
-  `run_at` is never taken from an agent: the body may not carry one, and the
-  route stamps its own clock if one did.
-- **The promo check-in is shown the artist's shows and its own history,
-  because its prompt asks for both.** It was told to write about "an upcoming
-  show" while `list_existing_gigs` returned id, name, url, status and deadline,
-  so it could only guess one from a name; and it had no way to read its earlier
-  drafts, so a single announcement still sitting at `draft` was written again
-  the next month. Shows come from `list_shows` (`GET /api/shows`): Bandsintown,
-  the Manitoba Music profile and calendar, and booked gigs, one row per night,
-  so a house concert that was never filed as a gig is written about like any
-  other. A routine has no calendar connector and must not get one for this —
-  the Google Calendar connector has create and delete tools it would use
-  without asking, and connectors bypass the route list — so "my calendar" means
-  this list. A personal Google Calendar is not readable by the routine, and
-  Scout's own calendar grant (`calendar.app.created`) can only see what Scout
-  put there. A gig carries `performanceStart`, `performanceEnd` and `location`
-  in `list_existing_gigs` when it has show dates (and only then, so the
-  research agents' list is the size it was); that is how the check-in knows a
-  dated gig is *not* a show yet. Dates alone do not settle one — only `booked`
-  gigs reach `list_shows`, and the prompt tells the agent not to announce the
-  rest, since an announcement of a show that then falls through is worse than
-  none. `list_existing_promo_drafts` (`GET /api/promo`) gives each draft's
-  status and the opening of its copy; status is the only account it gets of
-  what the artist did: `draft` unread, `approved` liked, `published` posted.
-  `/api/shows` is a read, but it uses the artist's Bandsintown key inside the
-  Worker and records a failed probe on the connector row; the key is never
-  returned. Still unseen, and where the next gains are: the morning profile
-  scan's new releases and videos, and radio and playlist calls the classifier
-  files as `kind: 'radio'`.
-- **The agents get named, typed tools and never a general HTTP tool.**
-  `create_gig_opportunity` is one prompt injection away from being safe;
-  `http_request` would be one away from `DELETE /api/gigs/12`.
-  `scripts/agents/tools.ts` defines them once; `run.ts` hands them to the
-  model and `cli.ts` exposes the same names as subcommands for routines, so
-  the prompts mean the same thing under both runners.
-- **The heartbeat became the agent's job, and that is a real loss.** `run.ts`
-  posts it in a `finally` that a crash cannot skip — verified: a run that died
-  on a timeout still filed a `failed` row carrying the error. A routine has to
-  call `log_run` itself, and one that crashes or forgets leaves no row. What
-  still catches it is `shared/taskCadence.ts`: a schedule that goes quiet
-  raises a critical within its own cadence. One missed run is invisible; a
-  stopped schedule is not.
-- **`SCOUT_API_URL` falls back on empty, not just on unset.** GitHub renders a
-  missing repository variable as `""`, `??` passed it straight through, and
-  the first CI run died on `Failed to parse URL from /api/task-runs`.
-  `resolveBaseUrl` uses `||`.
-- **In `run.ts`, the tool runner does not auto-resume `pause_turn`, and web
-  search is what triggers one.** Left alone, a long sweep stops mid-way and
-  returns as if it had finished. `run.ts` iterates the runner and pushes the
-  paused turn back; a run that still ends paused is recorded `incomplete`,
-  never `ok`. It streams, because a turn full of server-side searches outlasts
-  the SDK's HTTP timeout — the second CI run died on exactly that.
-- **JSON Schema, not the Zod helper.** `betaZodTool` is built against Zod 4 and
-  this repo is on Zod 3, which every route validator uses. Upgrading Zod to get
-  nicer tool definitions would put the Worker's request validation in the blast
-  radius of a script.
-
-Dry run is the default, as in `scripts/backfill-deadlines.ts`: nothing is
-written without `--apply` — in `run.ts`, in `cli.ts`, and in
-`scripts/issue-agent-token.ts`.
-
-**A sync target says whether it takes pitches, and the app reads the answer
-instead of trusting that somebody did.** The research agent filed a library as
-ready to pitch, with a note calling its submission route "confirmed and
-simple", and its own About page said "NO unsolicited material please." A listed
-address is a way to reach a company. It is not permission, and a pitch to one
-that refuses is ignored at best and remembered at worst. So each target carries
-`submission_policy` (`open`, `closed`, or null), the sentence that says so
-(`policy_evidence`), the page it was on (`policy_url`), when somebody last
-looked (`policy_checked_at`) and the artist's own decision to go ahead anyway
-(`policy_overridden_at`, its own column so a re-check can never undo it). Migration 0036,
-`shared/syncTerms.ts`, `src/lib/syncTerms.ts`.
-
-- **Null is two things, and neither is a green light.** Never checked, and read
-  and found silent, are different states, and a site nobody could read (no
-  address, or it did not open) is a third. "No policy found" is never worded as
-  permission, and a card that cannot say a site was read does not say it.
-- **Automation only moves toward caution.** A refusal replaces anything; an
-  invitation fills only an empty policy; notes are read for refusals and never for
-  invitations, since a note is a claim about a page. An agent's `open` has to carry
-  the sentence (`startingTerms` refuses it otherwise), and a refusal on the site
-  beats an agent that said open. A person can say "pitch anyway" with the quote
-  beside the button, and nothing else writes the policy: the columns are not in
-  the PATCH schema.
-- **The Worker reads the site itself**, on filing, when the address changes, on
-  the button, and nightly for anything unread, six a night per tenant like the
-  form revisit (`checkPendingTerms`). It never touches `updated_at`. Reading is
-  not following the home page: the first target's domain redirects `/` to a rebuilt
-  site on every spelling and still serves the old `/about.html`, which nothing
-  links to and which holds the refusal. So it follows the links worth following
-  and also asks for the conventional pages (`POLICY_PATHS`) once per host,
-  whatever the root did. A first version skipped hosts whose root redirected away
-  and found nothing on the real site; `scanSite` is tested against a model of
-  that shape and was run against the real one. Only plain public websites are
-  fetched (`isFetchable`).
-- **The gate is on every way out.** A refusal removes Copy and the mail links, and
-  Mark Pitched, from the Sync row and the Review pane, offers Archive instead,
-  ranks the row near the top (`no_unsolicited` flag, 98) and puts it on the weekly
-  email. The bulk Gmail drafts leave out refusals and also targets nobody has
-  read, since seven drafts at once is where one mistake costs most. Recording a
-  send is not blocked, because refusing to write down what happened would make the
-  app lie. `test/syncTermsUi.test.ts` fails if a surface that renders a pitch
-  draft beside Copy or a mail link stops asking `mayPitch`.
-- **A refusal needs somebody refusing and something refused.** The word
-  "unsolicited" beside a "never" was enough at first, and the first night's
-  History showed what that costs: *We NEVER send unsolicited texts about job
-  opportunities* closed a company that screens submissions, a postal address
-  saying *do not send demos to this or any address* closed one whose next line
-  was "Send it to demos@…", and *PLEASE DO NOT SEND AUDIO FILES TO THIS ADDRESS*
-  closed a label that asks for links by email. Every rule in `CLOSED` now needs a
-  thing a pitch is made of (`THING`, which leaves out texts, calls, offers and
-  attachments, since a notice about those is about scams), skips a clause where
-  the company is the one sending (`THEY_SEND`), and takes an instruction about
-  the route (`A_CHANNEL`: by mail, to this address, use the form) for what it is.
-  "By invitation only" needs a submission in the sentence too, since it is as
-  often a private show. A refusal is looked for clause by clause, so a notice
-  beside one does not hide it. The same pass fixed a miss in the other direction:
-  page text kept a newline from the source as a line break, so a hard-wrapped
-  paragraph ("We do not" / "accept unsolicited material.") read as two fragments
-  and refused nothing. Only a block tag ends a line now. Precision was measured on
-  real sites rather than on sentences made up for the rules, and a sentence that
-  taught something is a test.
-- **A refusal on file that the rules would not make now is withdrawn, because
-  nothing else could.** Automation only moves toward caution, so no later read
-  of the site could undo a wrong refusal, and "pitch anyway" would have left a
-  made-up quote labelled as the artist's choice. `retractFalseRefusal` runs first
-  in every check and in the nightly pass: a row whose refusal the retired rules
-  read and the current ones do not goes back to unread (the override with it,
-  since it was a decision about a sentence that said nothing of the kind), its
-  earlier bell entry is replaced by a plain correction, and the site is read again.
-  It touches only that difference, so a refusal in an agent's own words, which the
-  rules merely do not recognise, is never cleared by it. `RETIRED_CLOSED` and
-  `refusalRetracted` are deleted once every row has been read again.
-- **Agents must say.** `create_sync_target` requires `submissionPolicy`
-  (`unknown` is an honest answer, silence is not); the prompt tells it to read the
-  target's own pages, search the domain for the phrase because old pages outlive
-  redesigns, and file a refusal with its quote and no pitch.
-
-What this does not do: it does not search the web, so a refusal that exists only
-on a page the site neither links to nor names conventionally is still missed, and
-the card says how many pages were read rather than that the target is fine. It
-covers sync targets only, not gig calls. Production is not backfilled by SQL: the
-rows already on file are read by the nightly pass, six a night, or by pressing
-*Check their site*, or all at once by *Read their sites* at the top of the Sync page
-(`CheckAllTerms`). That one runs from the browser, a target at a time through the same
-route as the row button, because a Worker request that read thirty sites would meet its
-own limits, and it picks its targets with `targetsToRead`, which is the nightly pass's
-own rule, so the two cannot disagree about what is waiting. It shows nothing once every
-site has been read, and it names the refusals it found. The Create and Edit forms on
-the Sync page sent `null` for every blank field and the route answered 400, so a target with any field blank
-could not be saved from the screen; the schema takes `nullish` now.
-
-**Screens name things; they never print identifiers.** The bell shipped saying
-*"gig-festival-scan has not run in 28 days"* — that string is the `task_id` an
-agent POSTs, a handle rather than a name, and it had reached three surfaces
-before anybody read one out loud: the notification title, the run-event title
-and the History page. A slug reads as a leak in a product and as a bug in a
-screenshot.
-
-`taskLabel` in `shared/taskLabels.ts` is the only way to render one, and the
-shape of it matters: **the set is not closed.** The agents live outside this
-repo and send whatever id they like, so a lookup table alone would render the
-next new agent as a slug again. Known ids get a written name; anything else is
-humanised — the same treatment `shared/types.ts` gives status columns, and for
-the same reason. Sentence case, because these appear mid-sentence.
-
-Stored titles are not retrospectively fixed. `notification_events` keeps the
-title verbatim from when the run happened, so rows written before this change
-keep the old wording until they prune at thirty days. Rewriting stored prose
-at read time is the debt `reviewParse.ts` already is, and it would be a worse
-trade here than waiting a month.
-
-`test/uiConsistency.test.ts` guards all of it: no `{row.taskId}` in JSX, no
-notification title built from a raw id, no WebAuthn vocabulary in an error a
-signed-out person reads, and no `.md` path from this repository rendered in a
-`<code>` element.
-
-**The one place developer-speak stays is the integration cards**, which name
-the missing variables — `GOOGLE_REFRESH_TOKEN` and friends — because on a
-configuration screen the variable name *is* the actionable fact and "some
-settings are missing" helps nobody. What went was the repository file path
-beside it: whoever reads that card may not hold the source.
-
-**Those cards asked whether a secret was set, which is not whether it works.**
-`gmailConfigured` checks that three environment variables exist, so a refresh
-token Google stopped accepting weeks ago painted the pill green while the reply
-scan quietly did nothing — the Artist page's lesson again, that a check which
-cannot answer you is how you conclude everything is fine.
-`shared/credentialHealth.ts` holds the states and `src/lib/credentialCheck.ts`
-does the asking. Four things decide the shape:
-
-- **The probe spends the credential rather than reading data.** Exchanging the
-  refresh token for an access token is one request, is what every real use does
-  first anyway, and tests the credential itself — a probe that lists a message
-  fails for reasons that are not the token.
-- **A failed probe is two different facts.** A refusal (400, 401, 403) is a
-  verdict about the credential and is yours to act on; a timeout or a 500 is a
-  fact about the network and *no* verdict at all. Only `rejected` reaches the
-  bell. Recording the second as the first would raise a critical row every time
-  a request lost a race, which is how a bell stops being read.
-- **`unverified` is a state, not a fault**, exactly as `unreviewed` is a state
-  apart from `overdue`: the absence of a check is not a negative claim.
-- **Sending is unprobeable and says so.** The only way to test a Worker binding
-  is to send something, and a health check that mails somebody every time you
-  open Settings is worse than not checking. That card reads `declared` and
-  explains why, rather than showing a tick that means less than it looks like.
-
-It runs on the **daily housekeeping tick**, which is what makes a dead
-credential findable at all — the jobs that break are the ones nobody watches,
-so waiting for somebody to open Settings and wonder is waiting indefinitely.
-`POST /api/health/check` is the same check on a button. Neither needs a passkey
-touch: it changes nothing about who can get in, and the worst it can do is tell
-you the truth. It is not in `AGENT_ROUTES`, so an issued agent token cannot
-reach it by doing nothing.
-
-**A stopped agent is a condition, and nothing was watching for it.** The three
-research agents — `gig-festival-scan`, `sync-pitch-research`,
-`monthly-promo-checkin` — ran on a cadence from June, stopped within a week of
-each other in early August, and nobody noticed for a month. Every part needed
-to notice already existed: `task_runs` logs every run, the bell has a feed,
-housekeeping runs daily. None was looking. A missing gig is invisible in a way
-a wrong one is not — there is no row to be wrong.
-
-`shared/taskCadence.ts` fixes that, and it is a **condition** rather than an
-event because staleness is derivable from current state and self-heals the
-moment a run posts; an event row would outlive the situation it describes.
-Three things about how it decides:
-
-- **The cadence is measured, not configured.** Nothing declares that
-  `gig-festival-scan` is weekly — the schedule lives outside this repo, and a
-  settings row saying "weekly" is a second place for the truth to drift from.
-  The median gap between its own runs is the only claim available, and it
-  re-measures itself when a schedule changes. Median, not mean, so one holiday
-  cannot double the threshold and blind the check for a month.
-- **It is rated `critical`, unlike a failed run.** `runTier` rates a failure
-  `attention` because the next tick retries it. Nothing retries a schedule that
-  has stopped, which puts it squarely in what `critical` is reserved for —
-  plumbing broken now, costing you silently.
-- **It under-reports on purpose.** A floor of three days stops a task that ran
-  twice in a morning alarming by lunchtime; a ceiling of 45 days stops the
-  monthly agent — three runs, two gaps — from setting a threshold near eighty.
-  At the time of writing the monthly one is 35 days quiet and this does not
-  flag it. That is the safe direction: an alarm you learn to dismiss is worse
-  than none, and the ceiling still raises it inside six weeks.
-
-**A task that has never run cannot be missed**, because absence leaves no row.
-The check is a floor, not a guarantee.
-
-The parser earns its own test. Two production rows hold `2026-07-17 19:24:50` —
-a space instead of a `T`, no zone — which `Date.parse` may read as *local*
-time. Under `TZ=Pacific/Auckland` that is twelve hours out, enough to move a
-day count. `parseRunAt` reads a zoneless stamp as UTC, because that is the
-runner that wrote it.
-
-**Statuses say who decided.** `shortlisted`/`passed` are the artist's
-decisions; `invited`/`declined` are the organiser's. The old `approved` and
-`rejected` failed this and caused a real misreading — `rejected` meant *you*
-passed. `normaliseGigStatus` maps legacy spellings forward on read and write,
-because the research agents that POST rows live outside this repo. See
-`docs/gig-pipeline-plan.md`.
-
-**Notifications are two mechanisms behind one API.** *Conditions* are derived
-on every read and self-heal when they stop being true; *events* are rows,
-because a run finishing is not recoverable from current state. Dismissing a
-condition lasts a day; dismissing an event is permanent. See
-`docs/notifications-plan.md` and `shared/notifications.ts`.
-
-**History is the bell with the cap taken off, and it is two tables.** `#runs`
-used to open the run log, a column of agent prose; it is the History page now
-(`#runs/<type>` opens on a type), a timeline by the reader's own day with
-what needs attention now above it. Standing conditions are listed apart from the
-timeline because they are not history: they stop being listed when they stop
-being true. A run is listed from `task_runs`, which has the structured fields
-and the whole report and is kept forever, never from its echo in
-`notification_events`, which is pruned at thirty days and is read for one thing,
-whether the run is still unread on the bell. The join is one string,
-`runEventKey` in `shared/runEvents.ts`, defined once for the writer and the
-reader, and `runTitle` and `runTier` moved there with it so both build the same
-sentence. A dismissed event is still listed: dismissing puts it away from the
-bell, it does not unhappen. `test/historyRoute.test.ts` runs the queries against
-the production schema, because what they let through, and whose it is, is the
-whole question.
-
-**A report is laid out, never interpreted.** `shared/runSummary.ts` finds a
-numbered or bulleted list, names each entry by what is before its dash, strips
-the `(#32)` row number, and breaks long paragraphs at sentence ends. It reads
-layout and nothing else, and when a report has no list it hands the paragraphs
-back untouched. In a single run-together paragraph nothing marks where the last
-entry ends, so the last entry keeps the tail rather than the parser guessing.
-Nothing is stored: a better reader next year improves every old run. The bell
-shows what a run filed (`runGist`) where it used to show the report, and every
-other event body is cut to 140 characters at a word, in `buildNotifications`
-rather than the component, so a writer that does not exist yet gets the same
-answer. A group's line is its newest member.
-
-**The notifications can be pinned beside the page, from 1280px up.** The bell
-becomes the switch for the panel once it is pinned, and `pinned` and `open` are
-separate flags so hiding the panel does not unpin it. Both live in
-`localStorage`, since they describe one screen. The threshold is the Gigs table's
-measured width plus the panel, not a taste. Only the bell polls; the panel reads
-what it keeps fresh, and `test/historyUi.test.ts` fails if both poll. What else
-might be pinned, and whether the navigation should move to the left, is in
-`docs/side-panel-plan.md`.
-
-**Answers at hand is the library cut for the moment a form is open.** The
-column's second panel (and a dialog below 1280px) lists what applications ask
-for, one Copy button each, from `GET /api/artist/answers`. The reads are the
-library and a count of `application_fields.question_kind`, both scoped, in
-`src/lib/answers.ts`; what is made of them is `shared/answersAtHand.ts`, pure and
-given `today` by the browser. Three rules to keep. It says what is wrong before
-the paste (`assetHealth`: a photo with no credit is broken, past its review date
-is overdue, unreviewed is a quiet note and never a problem). It names the
-questions the artist's own applications ask that nothing on file answers, and
-never matches paperwork by its label, since the classifier reads "minutes" as a
-set length and a hidden gap is worse than a gap named twice. And it never edits:
-a second place to edit an entry is a second place for it to be wrong. Text a
-person has to read is never `text-faint`, which is 3.6 to 1; a rendered contrast
-scan caught "Asked 4 times on your applications" in it, and
-`test/historyUi.test.ts` now fails on it.
-
-**The pipeline is a shape, not a free-for-all.** `nextGigStatuses` in
-`shared/gigStatus.ts` says which moves a status offers, and the PATCH route
-refuses anything else, whoever is calling it. Declining is always their verb;
-turning an offer down yourself is `withdrawn`. `invited → declined` used to be
-refused outright and is allowed now, because an offer is not a booking and
-terms can fall through on their side — the only button that writes it says
-**Offer fell through**, which nobody clicks by reflex.
-
-**Screens show four stages; storage still holds fourteen statuses.** The work
-has three phases and an end — **New** (apply or pass), **In progress** (you
-said yes; only confirming it went out moves it), **Applied** (waiting; only a
-settled answer ends it) and **Closed** with an outcome: Accepted, Not
-selected, Passed, Missed or Withdrawn. `shared/gigStage.ts` is that view, and
-every screen reads it: the badge, the filter (`GET /api/gigs?stage=`), the
-row's buttons, the Review bar, the reply inbox and the new-gig form.
-`gigMoves` is `nextGigStatuses` in the stage language and never wider.
-
-What used to be a status and is now smaller: `preparing` is In progress with
-a draft; `acknowledged` is a receipt, offered only as **Answered** to clear a
-question; `info_requested` and `invited` are **flags** on Applied — *they need
-more* and *offer — contract pending*. **Accepted means the terms are settled**:
-a signed contract for a festival or showcase, a written confirmation for a
-grant or award (`settledByAward` reads the free-text type). An invitation is
-exciting and is not a booking, so it stays Applied and nothing reaches the
-calendar until it is Accepted. `archived` rows show as Closed with no outcome,
-because archiving never recorded why.
-
-**Storage is moving to the same shape, in two steps.** Deploy 1 put stages
-on screen over the old values. Deploy 2a (migration 0030) adds `outcome` and
-`flag` beside `status`, and new writes store the stage in `status` with those
-two beside it. Deploy 2b (migration 0031) converts the rows written before
-0030; it had to be a later merge, because CI migrates before it deploys, and
-the Worker in that gap must already read `closed` — deploy 1 reads it as a gig
-nobody has looked at.
-
-0031 converts only the seventeen spellings it knows, the fourteen statuses and
-four legacy words (`rejected` becomes Closed/passed — your decision, never
-theirs). Anything else, NULL included, is left as written: an unknown value
-already reads as a new gig, and rewriting it to `new` would read the same and
-destroy what it said. It leaves `updated_at` alone, so no snooze wakes.
-`test/gigStatusMigration.test.ts` builds the production schema in
-`node:sqlite` from `schema.sql` and every earlier migration, runs the file, and
-fails if any row reads back as a different stage. The local seed ends by
-applying the same file, so the fixture holds the shape production does.
-
-**The dual read stays.** `gigStatusFromStored` still accepts the fourteen, the
-"read both spellings" move `normaliseGigStatus` makes: it is what made 0031
-safe to run under the Worker before it, and removing it buys nothing while it
-guards a row somebody writes by hand.
-
-**The code still reasons in the fourteen statuses, and that is deliberate.**
-The queue, the reply matcher, the nudges and the pipeline all read them and
-did not need to change, so storage is translated at one boundary:
-`src/db/gigRows.ts` — `readGig`/`readGigs` on every select, `gigStatusColumns`
-on every write. The API the screens and the agents read still says
-`status: 'booked'`. `preparing` and `acknowledged` do not survive a round trip;
-they are In progress and Applied, which is what they always meant.
-`normaliseGigStatus` accepts `new`, `in_progress`, `applied` and `closed` on
-write. `test/gigRows.test.ts` fails when a file selects gig rows without the
-translation, the way `test/tenantScope.test.ts` fails on a missing scope, and
-`test/gigStage.test.ts` fails if a screen imports `GIG_STATUSES`,
-`GIG_STATUS_META` or `gigStatusMeta` again.
-
-**A screen never offers a move the pipeline refuses.** The PATCH route
-validates against `nextGigStatuses`, so a button naming a status is a claim
-about legality, and two decision surfaces made that claim wrong: the Review
-action bar offered a fixed *Will apply / Applied / Pass / Archive* whatever the
-row's status was — on a `submitted` gig all four returned 400, and an `invited`
-one had no way to record a booking — while the Overview deck resolved its
-intents through a table in the browser that nothing could check. Both now
-derive from `nextGigStatuses`, and `decisionFor` drops any action the row's
-status does not offer. A same-status target counts as refused too: *"Keep for
-next cycle"* on an already-shortlisted gig wrote nothing and dealt the
-identical card straight back. `test/uiConsistency.test.ts` fails if either
-surface starts naming statuses again.
-
-**Every choice is logged with what the screen showed, and nothing reads it
-yet.** A gig's status says where it ended up, not what the artist was looking
-at: a gig passed on because it closed in a week and one passed on because it
-cost $2,400 to reach are the same row afterwards, and the deadline was a week
-away *then*. Scoring opportunities for an artist, and finding out later
-whether a score was any good, needs that second fact, and it cannot be
-reconstructed — so `decision_log` (migration 0038, the seventeenth scoped
-table) is written first and read later. One row per move: a status change on a
-gig or sync target, a snooze set or cleared, a row removed. The snapshot
-(`shared/decisionLog.ts`) is built **field by field from the row as it was
-before the move**, with the review queue's own flags, `parseDeadline`'s days
-and `estimateGigCost`'s range — what the screen derived, not a second opinion
-about it. No spread: notes, drafts, links, addresses and everything the artist
-or an agent wrote are absent by construction, which is what lets the log live
-as long as the account and go with it. A missing input stays missing (a null
-cost is not a zero range; `unknowns` counts what could not be counted), and
-`score` is reserved and null until opportunities are scored.
-
-`via` records which door the move came through, because **a step is not a
-choice**: starting an application after saying yes (`application_start`)
-follows a decision already made, and a research agent PATCHing a row
-(`actor = agent`) is not the artist at all. `isChoice` says which. The write is
-append-only — `test/decisionLog.test.ts` fails if anything updates the table or
-deletes from it by name — and **best-effort**, like `linkGig`: the status has
-already changed, so a log row that will not insert is logged and swallowed
-rather than refusing the artist's pass. The same file fails when a new writer of
-a gig status or a sync target appears that neither logs nor has a written
-reason, which is the only way a hole in a log nobody reads yet gets noticed.
-Not logged on purpose: filing a gig (nobody decided anything about an offered
-item), the nightly revisit (it moves nothing), and edits that leave the status
-alone.
-
-**Two statuses mean the ball is back with you.** `info_requested` and `invited`
-sit in the follow-up phase, so `hasBeenSubmitted` was filing them under
-"waiting on the organiser" and the queue treated the whole phase as settled —
-which meant `info_requested`, the state that exists *because* it stalls if
-nobody notices, was the one state guaranteed to go unnoticed. `awaitsYourReply`
-in `shared/gigStatus.ts` splits them out; they carry a `reply_due` flag that
-outranks every deadline. The Review screen has a **Waiting on them** filter for
-the other side of that line, because clicking "Applied" used to make a gig
-vanish from every filter but Everything.
-
-**Silence is a signal, and the only one that is an absence.** An unanswered
-application produces no note, no status change and no deadline, so nothing
-could raise it until `submitted_at` existed to measure from (migration 0010).
-`submissionSilence` in `shared/reviewQueue.ts` returns the days and an `exact`
-flag; past `NO_REPLY_DAYS` it becomes a `no_reply` flag, which is the second
-explicit exception in `awaitingDecision` — `isSettled` is right that a sent
-application is settled, and silence is the case where waiting for the queue to
-raise it on its own means waiting forever.
-
-`submitted_at` was **not backfilled**, on purpose. `updated_at` is the only
-candidate and it is the wrong answer: any later edit moves it forward, so a row
-sent in January and touched in February reports one month of silence instead of
-two. Rows that reached the phase before 0010 fall back to `updated_at` with
-`exact: false`, and every surface that shows the number says "about" — the same
-treatment a deadline gets when its date was recovered from prose. The fallback
-can only *under*-report, which is the safe direction for a nudge, but only
-while nothing displays it as certain.
-
-**Performance dates are typed, not parsed.** `performance_start` /
-`performance_end` are the only dates that mean a stage, and unlike `deadline`
-they never hold prose — they come off an agreement, so a value that is not a
-date is a mistake rather than something to recover a date from.
-`shared/performance.ts` validates them and builds the calendar span; a bad pair
-makes `showSpan` return null, which the reconcile reads as "remove the entry"
-rather than writing a wrong one. Google's all-day `end.date` is exclusive, which
-is why the field is called `endDateExclusive` at every layer.
-
-**Status columns are not a closed set.** `shared/types.ts` types them as
-`string` deliberately — production rows carry values outside every union the UI
-offers. Narrowing them is a claim the data does not support.
-
-**The artist database expires on purpose.** Every row in `artist_assets`
-carries a `review_by`, seeded from its kind when one is not given —  six months
-for a follower count, two years for a press photo. `assetHealth` in
-`shared/artistAssets.ts` reads that against a `today` it is handed, never the
-clock. `unreviewed` is a separate state from `overdue` on purpose: "this
-lapsed" and "nobody ever claimed this was checked" are different conversations.
-Separately from any date, an asset can be *broken* — a press photo with no
-photographer credit is unusable the day it is added.
-
-**An EPK is a view, not a document.** `assembleEpk` cuts the same library
-differently per audience and reports what is stale or missing inside it. A file
-exported in March cannot tell you its photo credit went missing in April, which
-is the whole reason this is assembled on read.
-
-**A calendar entry means you show up; a task means there is work to do.**
-Everything used to go on the calendar — the day a window opened, the day it
-closed, the show — and two of the three were the wrong shape. Nothing happens
-at 9am on a deadline except that a form closes, and a diary entry for it sits
-beside a festival you are playing looking identical, which is the `🎵 {name}`
-mistake again. Some of what Scout knows is not a date at all: a reply you owe
-wants chasing, and an all-day entry claiming an hour is a lie about a time.
-
-So confirmed shows go to the calendar and the work — deadlines, windows
-opening, replies owed — goes to **Google Tasks**. `shared/nudgeRouting.ts`
-holds the rules, reads no clock and no database, and is where the tests are;
-`src/lib/gigNudges.ts` reconciles the plan against what exists, on two
-surfaces, with the same wanted-against-present shape `syncGigCalendar` had.
-Preferences are per tenant (`tenant_settings`, the fifteenth scoped table) and
-are **passed into the reconcile, never fetched by it** — the rule `scoped()`
-and `buildReviewQueue` already hold, and what makes the whole thing testable
-without a database. See `docs/nudge-routing.md`.
-
-**The available destinations differ per kind, and it is typed.** A show cannot
-become a task and a reply cannot become a calendar entry, so
-`NUDGE_KINDS[].choices` is the list, the PATCH route validates against it, and
-the select reads it — a screen cannot offer a combination the writer refuses.
-Same rule as `nextGigStatuses`: a control naming a destination is a claim about
-legality.
-
-**The opening task is due a day late on purpose.** A form that was not
-accepting applications yesterday has no fields to read until it is, so on the
-morning a window opens nothing has read it and `ApplicationPanel` has nothing
-staged — a task due that morning sends you to an empty panel. The daily tick
-reads it at 3am (`revisitForms`, below), so a form that opens during the day is
-read the night after. `openingLeadDays` is a preference because that cadence
-belongs to the deployment. This paragraph used to credit "the prep agent" and
-"the overnight run", which did not exist: only the button ever read a form, and
-for a while the task did send you to an empty panel.
-
-**Four of the five nudges follow from an edit and one does not.** An
-application crosses `NO_REPLY_DAYS` because *time passed*, and nothing writes
-to the row on the day it does, so reconciling on PATCH can never notice it —
-waiting for an edit to spot silence is waiting for the thing silence is the
-absence of. `reconcileAllGigs` runs on the daily housekeeping tick, per tenant,
-and also catches connecting Tasks for the first time and changing where a kind
-of reminder goes. It is idempotent, which is what makes nightly affordable.
-
-**Tasks has no narrow scope, and there is no pretending otherwise.**
-`tasks.readonly` cannot write and `tasks` is read and write over every list in
-the account; there is no `tasks.app.created`. So it is the `gmail.compose`
-trade rather than the `calendar.app.created` one: `src/lib/googleTasks.ts`
-names one list, takes its id as an argument and never enumerates, and the
-Integrations row says out loud that the permission reaches every other list.
-`test/integrations.test.ts` fails if that disclosure goes. A task you ticked
-off is left ticked — a completed task still exists, which is the only way
-`readTaskOn` can tell "done" from "deleted".
-
-**Writing to the artist's own calendar is an opt-in, and a bad trade stated
-plainly.** The narrowest scope that reaches a primary calendar is
-`calendar.events.owned` — read and write over every event on every calendar
-they own — to place the handful of all-day entries a year the calendar now
-carries. It is its own grant purpose, its own consent screen, and `cannot: []`
-because there is no guarantee to make. It is also gated on
-`PRIMARY_CALENDAR_OPT_IN`: declaring that scope on the OAuth client puts it in
-front of Google's review for *every* user of the deployment, including
-everybody who never opts in, so a deployment that has not done that work hides
-the row rather than offering a button that ends at an error page.
-`test/calendarGrant.test.ts` pins all three, and still fails on the genuinely
-broad scopes.
-
-**The calendar is connected with a button, and Google enforces the limit.**
-Calendar wanted `GOOGLE_REFRESH_TOKEN` and `GOOGLE_CALENDAR_ID` as Worker
-secrets, got by hand at a terminal — and **they were never set in production**,
-so every booked gig silently created no event from the day the feature shipped.
-`/api/calendar/connect` is one press: consent in the browser, the token written
-to `google_grants` under the `calendar` purpose, no key to obtain and nothing
-to paste.
-
-The scope is `calendar.app.created`, and choosing it is the interesting part.
-It permits making *secondary* calendars and editing events on those — so Scout
-creates one called **Sun Dogs Music Scout** and can reach nothing else. It
-cannot read the artist's own calendar and cannot alter an event it did not
-create, **whatever this code does**. That is the exact inverse of the
-`gmail.compose` trade below, where Google offered nothing narrow enough and the
-guarantee had to be rebuilt by hand; here the structural version was available
-and is what `test/calendarGrant.test.ts` pins — it fails if the broad
-`calendar` or `calendar.events` scope appears anywhere in `src/`.
-
-Two consequences worth knowing. `GOOGLE_CALENDAR_ID` stops being configuration,
-because under that scope there is only one calendar Scout can reach and it made
-it — migration 0025 hangs the id off the grant, so a new grant is a new
-calendar. And **the redirect URI does not change**: it is registered in the
-Google console, so a second one would be a thing somebody has to configure,
-which is the cost the button exists to avoid. Both purposes return to
-`/api/gmail/callback` and `state` carries which grant is being completed
-(`src/lib/googleOAuth.ts`) — the path is named after the feature that
-registered it rather than what it now does, deliberately.
-
-The secrets path still works. `calendarTarget` in `src/lib/gigNudges.ts`
-prefers a grant and falls back to it, the same "read both spellings" move
-`normaliseGigStatus` makes. A grant that exists but is refused writes nowhere
-rather than falling back — the artist connected a calendar, and writing to the
-owner's instead would be worse than writing nothing.
-
-**"Is the calendar connected" has one answer, and the bell asks it too.**
-`calendarWay` in the same file is the choice `calendarTarget` acts on, made from
-stored rows alone so it costs two D1 reads and never a refresh token. The
-bell's `connection:calendar` row used to ask `calendarConfigured(env)` — the
-Worker secrets, which were never set in production — so a calendar connected
-with the button read *Working* in Settings and *Google Calendar disconnected*
-on the bell, with a Reconnect that reconnected nothing. `test/calendarWay.test.ts`
-runs both against the production schema. Gmail's and Email's rows are still
-the deployment's secrets and binding, which is right for the owner's mailbox
-scan and the mailer, but is the same shape of mistake the day an invited
-artist's own grant is what a screen should be reading.
-
-**Bandsintown is read with the artist's own key, and the key never reaches a
-page.** Bandsintown issues one API key per artist, so a deployment-wide key
-would be one artist's key used for another; `artist_connectors` (migration
-0027, the sixteenth scoped table) holds each tenant's, AES-GCM encrypted like a
-Google refresh token. Saving probes first and a key Bandsintown refuses is not
-stored; a timeout still saves, because it is not a verdict. Shows are read on
-request rather than copied into D1, since Bandsintown is where the artist edits
-them. **Bandsintown echoes the caller's `app_id` into every event and ticket
-link it returns**, so `shared/bandsintown.ts` strips it from each URL before a
-show leaves the Worker — `test/bandsintown.test.ts` pins that with the real
-shape. `today` comes from the browser, because a show tonight in Winnipeg is
-upcoming until midnight there, not UTC. Their terms allow artists and their
-teams to display events "on their website or app"; a platform doing it for
-many artists wants their partner programme first. See
-`docs/artist-profile-plan.md`, which also holds the storage and social-scan
-research.
-
-**A Manitoba Music profile is read from the address the artist gives, never
-found by name.** Most of the next testers are Winnipeg artists with a member
-profile, which carries a bio, links, videos, releases, downloads and photos in
-the same server-rendered markup on every page. `profileUrl` in
-`shared/manitobaMusic.ts` accepts `/profiles/view,<n>/<slug>` and the short
-`manitobamusic.com/<slug>` form members put in their link lists (not a site
-section), and nothing else; a short link already in the library is offered on
-the Settings card without pasting,
-and connecting shows the name and photo on that page — "Is this you?" — before
-saving, because a search by name files a stranger's bio the day there are two
-of you. The import is the reference-document shape: preview, then write, all
-never reviewed, a proposal dropped when its source *or* its value is already
-on file. Contact details are never copied. Its photos refuse a foreign
-`Referer`, so an EPK that displays one needs its own copy. See
-`docs/artist-profile-plan.md`.
-
-**Every provincial association is a source, read the same way.**
-`shared/musicAssociations.ts` lists the ten worth reading — what each site
-offers was fetched, not assumed from Manitoba's. Seven have public member
-profiles on four different platforms; Music BC's are behind a login and
-MusicNL's and Music Yukon's are drawn in the browser, and the card says so
-rather than failing. Music NWT is left out because its site was carrying
-injected spam, and ADISQ has no artist profiles. Manitoba Music keeps its own
-parser and its `manitoba_music` row; every other site goes through
-`shared/associationProfile.ts`, which reads **by subtraction**: it fetches the
-association's homepage beside the profile and drops every link, paragraph and
-share image the two share. That removes the association's own Instagram and
-Facebook — which a naive read files as the artist's — without knowing one
-class name, so a redesign does not break it. A paragraph with an email or
-phone number in it is never taken. One connector row per association
-(`association:<id>`), because an artist who moved provinces can belong to two.
-The gig agent reads each province's calls and feeds, and
-`test/musicAssociations.test.ts` fails if the registry names a source the
-prompt does not.
-
-**Connected profiles are re-read every morning, and the re-read only
-talks.** `scanProfiles` runs on the daily housekeeping tick, per tenant, one
-profile after another (small sites, no bursts). It writes nothing to the
-library: new items ring the bell as an `automation` event pointing at the
-import panel, which still previews. `shared/profileScan.ts` keeps it quiet —
-the first read after connecting sets a baseline and says nothing, an item is
-announced once ever (`artist_connectors.seen_sources`, migration 0029, is
-everything announced, not what is pending, so an unimported item is not
-re-announced each morning), and anything already on file never counts.
-*Check for changes now* on the Settings card is the same call.
-
-**A share link publishes only what the artist has claimed.** The EPK
-profile page (`#epk/<token>`, token in the fragment, POSTed to
-`/api/public/epk` — the second entry in `PUBLIC_API_PREFIXES`) renders
-`shared/publicEpk.ts`: reviewed assets only, no uncredited photo, and facts
-and documents only from an allow-list, so a phone number or a W-8BEN never
-reaches a stranger because nobody classified it. `epk_shares` (migration
-0028) is a credential like `agent_tokens`: hashed, shown once, resolved in
-`src/lib/actor.ts`, not a domain table, deleted by tenant removal by name.
-`test/epkShare.test.ts` pins where the token travels and that the public route
-strips `withheld`.
-
-**The page never renders a library value raw.** Those values were written for
-forms: "Artist Name" is three lines of markdown, "Genre" a paragraph plus an
-FFO list plus influences, the quote carries its source on a dash line. The
-first version printed them verbatim and shipped a heading reading "Doug" under
-four lines of uppercase. `shared/epkProfile.ts` splits each along the seams the
-documents use and nothing cleverer; one-liners are a tagline, not a bio; a
-link whose label says *private* is withheld, a sync pitch page only shows on
-the sync version, and anything sourced from the writing style guide stays off
-— it describes how to write, not the artist.
-
-**The Drive folder is `drive.file`, and Google enforces the limit.** Scout
-reaches the folder it made on connect and files the artist picked in Google's
-picker — nothing else in their Drive, whatever this code does;
-`test/calendarGrant.test.ts` fails if a broad Drive scope appears in `src/`.
-Picking a *folder* grants the folder, not its contents, so the picker tells the
-artist to select the files inside. Picked files are copied, never moved;
-organising previews first; sharing is one permission on the folder that every
-file inherits; nothing is deleted. The picker needs an API key and the Cloud
-project's number, and both are **settings in admin mode** (Google Drive file
-picker), stored as `drive.pickerApiKey` and `drive.pickerAppId` in
-`app_settings` and read per request by `src/lib/pickerSettings.ts`. They were
-`GOOGLE_PICKER_API_KEY` and `GOOGLE_CLOUD_PROJECT_NUMBER` in `wrangler.toml`,
-commented out and never set in production, and they are gone from the file and
-from `Env` with no fallback: the owner's rule is that a public value typed once
-is not a commit and a deploy, and two places for one value is how the one you
-changed is not the one that is read. The panel offers the number its own Google
-client ID names (the digits before the first dash) and warns when a saved number
-differs, because a picker opened under another project hands Scout files it
-cannot read; it never saves that number for the owner.
-`test/pickerSettings.test.ts` fails if either old name comes back.
-
-**Google is one connection, stored as several grants.** "Connect Google
-account" on Settings is one consent for Calendar, Tasks, Gmail drafts and
-Drive (`BUNDLE_PURPOSES`, `GET /api/google/connect`, finished by
-`completeBundle`), because most people keep all four under one account.
-Google shows them as separate checkboxes and any can be unticked, so each is
-checked and stored as its own `google_grants` row sharing one refresh token —
-which is why nothing that *uses* a grant changed. An unticked service is
-skipped, never stored broken; one that fails to set up (no Calendar API on the
-Cloud project, say) does not sink the rest; and a service already on a
-*different* account stays there, because that is the edge case the screen
-allows: each service's own consent sits behind "Use a different Google account
-for one service". `prompt=consent select_account` makes Google ask which
-account rather than take the browser's default. Reconnecting the same account
-reuses the calendar, list and folder it made rather than making a second.
-Disconnecting an account revokes its token at Google, so it leaves the
-account's third-party-access page too; the per-service disconnects do not,
-since one token backs several services. `calendar.primary` stays out of the
-bundle — it is the broad opt-in with its own warning.
-
-**The callback's outcome reaches the screen now.** It always redirected to
-`#settings?calendar=failed` and nothing read it, so a connect that Google said
-yes to and Scout failed to finish looked exactly like one never tried — which
-is how a calendar was "connected" with no row stored. `connectNotice` in
-`shared/integrations.ts` turns every outcome into a sentence, and a partial one
-names each service it could not connect and why.
-
-**Gmail drafting is a grant the person makes, not a secret somebody pasted.**
-Every Google token before this one was obtained at a terminal and stored with
-`wrangler secret put`. That cannot work for a feature where the *user* decides
-whether to connect: consent happens in their browser and what comes back has
-to be written at runtime. Secrets cannot be written at runtime, so migration
-0019 adds `google_grants` — keyed by **purpose**, so revoking drafting cannot
-also blind the read-only reply matcher.
-
-**The scope is wider than this repo's habit, knowingly.** Gmail's narrowest
-scope that creates a draft is `gmail.compose`, and it also permits *sending*;
-there is no drafts-only option. So the guarantee that nothing goes out on its
-own stops being enforced by Google and starts being enforced here — by there
-being no send call in `src/lib/googleGrant.ts` and by
-`test/uiConsistency.test.ts` failing if a Send button appears. The connect
-screen says exactly that, in those words, because a permission that protects
-less than the reader assumes is the kind of thing to write down rather than
-imply.
-
-**Gmail is explained before Google asks, and no means Google never asks.**
-"Connect Google account" bundles Gmail drafting with Calendar, Tasks and Drive,
-so pressing it opens `GoogleConsentModal` first: what each service is for, and
-for Gmail what Google's permission allows (reading, changing and deleting
-drafts, and sending as you), what Scout does with it, what it cannot do (read
-the inbox — `gmail.compose` does not authorise `messages.get`), and that
-nothing depends on it, since every draft already has Copy and Open in Gmail.
-**Connect without Gmail** is the primary button and requests a consent that
-never mentions Gmail (`/api/google/connect?gmail=skip`, target
-`google.nogmail`); the Settings notice afterwards calls that a choice, not a
-gap. The rule the modal holds is that it is exact in both directions — as
-alarming as the permission is, and no more. Every route to the Gmail
-permission goes through it, including the Sync drafts panel and a second
-account; `test/googleAccounts.test.ts` fails if one goes straight to Google or
-if the key sentences are softened. The inbox scan (`gmail.readonly`) is not in
-this flow at all: it is the owner's server-held secret, and reads the whole
-mailbox as far as Google is concerned — the narrowness is this code's.
-
-The refresh token is **AES-GCM encrypted** with `TOKEN_ENCRYPTION_KEY`. It is
-the only value in D1 that is a credential somewhere else; everything else in
-there is prose.
-
-Three properties the route keeps:
-
-- **It previews first**, like the other two bulk writes, and the interesting
-  half of the preview is the **skipped** list. "Drafted four of seven" without
-  saying which three is a worse answer than not drafting, and the three
-  reasons — no address, no pitch, already pitched — each want something
-  different done about them.
-- **It re-plans server-side** rather than trusting the ids the screen sends. A
-  preview can be minutes old, and a target pitched in the meantime must not be
-  drafted because a stale screen still listed it.
-- **It writes no status.** A draft in your drafts folder is not a pitch that
-  went out, so nothing moves to `pitched` here. Same separation the reply
-  router keeps, for the same reason: two things that can be wrong
-  independently should be two actions.
-
-`prompt=consent` and `access_type=offline` are set explicitly rather than left
-to default, because Google returns a refresh token only on a fresh consent —
-without them the grant appears to work and stops an hour later.
-
-**Every email Scout sends goes through one template, and its footer is a
-claim.** `src/lib/emailTemplate.ts` is the header, the palette (the app's
-light tokens — a dark email is one clients re-colour unpredictably), the
-Outlook-proof markup, and a footer whose type makes the author pick a kind:
-`transactional` states in words that there is no unsubscribe, `notification`
-links to where it is switched off. Both identify the sender by name, mailing
-address (`MAIL_POSTAL_ADDRESS`) and web address. Neither the setup code nor
-the digest is marketing — transactional or relationship mail under CAN-SPAM,
-not a commercial electronic message under CASL — so the identification is
-carried because it is cheap and because the first message that *does* promote
-something needs an unsubscribe that works signed out, which a Settings link is
-not. `test/emailTemplate.test.ts` runs every rule against every email, and
-fails on a subject line typed at a call site: the product name leads every
-subject and the From display name, because "Scout" alone is the mark this
-product avoids.
-
-**The setup code email said the code was harmless, and it was not.** "Adding a
-passkey still needs your device to approve it" — the device being whichever
-one the code is typed into. Anybody who reads the code can enrol a passkey of
-their own. So the code stays out of the subject, the preheader and the first
-paragraph of the text body, which are what a locked phone shows, and the body
-says whoever enters it can add a passkey. `src/lib/authMail.ts`.
-
-**A draft can open a compose window, and that is still not sending.**
-`shared/mailto.ts` builds a `mailto:` or Gmail-compose URL from a subject and
-body; `DraftActions` mounts Copy beside them wherever a draft is rendered —
-the reply draft and the sync pitch, which are the same shape and were the
-second copy, so the shell was extracted rather than written twice. A pre-filled
-compose window is not a send: the person's own Send button is still the last
-step, which is the line this app has always stopped at.
-
-The reason it is a module rather than a template is **length, and how it
-fails**. A `mailto:` URL past the platform ceiling does not truncate and does
-not error — on Windows the click does nothing at all. That is the same defect
-as the 150-character field that truncates mid-word on paste, so the length is
-measured *after* encoding and a draft that will not fit is not given a button
-that would lie about working; the screen names the handler and says why
-instead. Budgets are deliberately under the lowest credible figure —
-`mailto` 1,800, Gmail 4,000 — because being conservative costs a Copy button
-and being optimistic costs a click that does nothing. **Copy is never withheld**;
-it is the fallback that always works, and `test/uiConsistency.test.ts` fails if
-it ever sits behind the same length test.
-
-Encoding is not `encodeURIComponent` alone: it leaves `!'()*` alone, which some
-clients read as delimiters and truncate on, and it writes a newline as `%0A`
-where the RFC wants `%0D%0A`.
-
-**The two handlers are judged separately**, which is the whole reason both are
-offered: measured on real pitch prose, `mailto` runs out at about **190 words**
-and Gmail carries roughly 450. A 200-word pitch therefore gets Copy and Gmail,
-with mailto hidden and named. Encoding costs about 1.45×, mostly newlines
-tripling.
-
-So `sync-pitch-research` is told to write **150 words**, and the reason given
-to it is the editorial one rather than the technical one: a cold pitch to a
-music supervisor is competing with a hundred others and the short one gets
-read. "Our URL encoder has a limit" is a bad reason to shorten a pitch and
-"supervisors do not read four paragraphs" is a good one, and they happen to
-land in the same place. The tool result feeds the word count back when a draft
-runs long, so the agent can correct on the *next* target in the same run rather
-than only on the next run. It is guidance, never a refusal — a hard reject at
-the API would let a URL encoding limit veto editorial judgement, and lose the
-draft on the way.
-
-**The app drafts an application; it never submits one.** Phase 3 reads the
-form, stages an answer per field from the artist database and lists what has to
-be attached — and then stops, because an application filed by automation is a
-good way to be blacklisted. The output is text to copy. `ApplicationPanel` has
-Copy and *This one is right*, no Send, and `test/uiConsistency.test.ts` fails if
-a button appears claiming otherwise. See `docs/application-prep-plan.md`.
-
-**A Google Form can open pre-filled, and only with what you have read.**
-`shared/formPrefill.ts` builds `viewform?usp=pp_url&entry.<id>=…` from the ids
-the form reader already keeps. A `suggested` answer stays out — typing it into
-the form would erase the unread state at the moment it matters — and so does a
-choice the form does not offer, because Google drops it silently and the box
-arrives empty. Everything left out is named with a reason. The budget is 6,000
-encoded characters, under the common 8 KB request-line limit since Google does
-not publish its own. Other platforms need builder-side field names and
-Airtable renders in JavaScript, so this is Google Forms only.
-
-**The answers can sit in a window above the form, and every copy takes the
-window it was clicked in.** A Document Picture-in-Picture window, or a pop-up
-where that is missing, lists an application's questions in the form's order
-with Copy, Enter for copy-and-next and "This one is right", beside the form's
-own tab (`PopOutProvider` in `Layout`, `AnswerSheet`; what was measured and what
-was built is in `docs/submission-helper-plan.md`). It writes one thing, approving
-an answer the artist has read, and cannot reach the form. Three things are not
-obvious. **The clipboard:** a click in the window focuses the window and not the
-page that holds the code, so `navigator.clipboard` called from that code fails
-with "Document is not focused" while the window's own clipboard works. Every
-write therefore goes through `writeClipboard(text, win)` in
-`frontend/src/clipboard.ts`, with the window taken from the button that was
-pressed, and `test/popOut.test.ts` fails if anything the window draws reaches
-for the global one. **Its life:** it lasts exactly as long as the page that
-opened it, so a reload or a sign-out redirect closes it and a change of `#`
-route does not, which is why the provider sits in `Layout`. **Its document:** the
-window has its own, so absolutely positioned text with no positioned ancestor,
-such as the copy buttons' screen-reader labels, is placed against that document
-and stretches it. The shell is positioned and clipped, the highlighted row is
-scrolled into view by the list alone and never by `scrollIntoView`, and the
-window's title is set on its own document: `document.title` is the tab's.
-
-**A suggestion is not an answer.** `answer_state` is a column apart from
-`answer` for the same reason `unreviewed` is a state apart from `overdue`: "the
-app proposed this" and "you read it and said yes" are different claims, and an
-application of twelve unread suggestions is the failure pre-fill introduces if
-nothing distinguishes them. The readiness line reports *answered* and *read*
-separately, and `sendable` needs the second. Re-reading a form re-stages only
-`empty` and `suggested` fields — your writing is never overwritten by a fetch.
-
-**An over-long answer is worse than an empty box.** A 150-character field
-truncates on paste, silently, mid-word, so an answer past `maxLength` is the one
-field problem rated `danger` with nothing else wrong. An empty box is at least
-honest about being empty.
-
-**A login wall is a fact about the opportunity, not an error.** `prep_status`
-has three ways of not having the form. `blocked` is a form that was found and is
-behind an account or drawn by JavaScript (Submittable, a Typeform) — retrying is
-pointless, this one is filled in by hand. `failed` is a timeout or a 403 — worth
-another go, and the HTTP status is kept because 403 and 404 are different
-stories. `not_found` is a page with no application on it, which is what a window
-that has not opened looks like. It was `blocked` until it was split out, and
-that told the artist nothing would happen about a form that was only not up yet;
-`prepStateOf` still reads an old `blocked` row with the no-form note as
-`not_found`, and the next read replaces it.
-
-**Scout goes back for the form, and the research agents do not.**
-`revisitForms` (`src/lib/formRevisit.ts`, the rule in `shared/formRevisit.ts`)
-runs on the daily tick, per tenant, ahead of the reminder reconcile. Agents file
-a gig when they find it — often before its window opens, as Canmore's "check
-back in September" row did — and nothing went back until the button was pressed.
-Only **In progress** gigs are looked at, since an agent files far more than
-anyone decides on. The trigger is `opens_at`: not before it, daily for fourteen
-days, then weekly. **No date means weekly, not never** — agents file `opens_at`
-only for a stated day, and a month is not one, so most gigs have nothing to
-trigger on. It stops at the deadline, leaves a read form and a `blocked` one
-alone (looking again at a login wall changes nothing), and retries a `failed`
-read the next day. A few gigs a night, one at a time, oldest look first.
-
-**The revisit never moves a status and never touches `updated_at`.** That is
-`requested` on `prepareApplication`, the function the route and the cron share:
-only the button may start an application (`shortlisted` → `preparing`) or count
-as an edit. You said yes; you did not start, and a gig changing stage because a
-form went live overnight is Scout deciding something that is yours.
-`updated_at` moving would wake every snooze in the table. `test/formRevisitRun.test.ts`
-runs it against the production schema and fails on either.
-
-**It says what it found, because "went back" is only a promise you can rely on
-if you can see it happen** — the agents stopped for a month in August and nobody
-knew. One bell event when a form is read (linking to `#gigs/<id>`, which opens
-that row), one when a form is found but must be filled in by hand, and one — for
-a *dated* window only — when a week on there is still no form. Silence is right
-for the rest: no news from an undated window is the expected answer.
-
-**Why a cron and not a research routine.** A routine could search the web for a
-form the listing does not link to. It would cost plan allowance, need an agent
-token that can write an address into a gig (none of its routes does), and
-leave nothing behind when a run crashed — the heartbeat is the agent's job. The
-cron is free and cannot be skipped. What it cannot reach — a form the listing
-does not link to, and a `ready` read that was really a newsletter box from before
-the reader learned the difference — it leaves for the button, and says so. The
-agents' part is in their prompt: file `opensAt` for a stated day, and point `url`
-at the page the Apply link is on, not the home page.
-
-**The address on a listing is usually the page that announces the form, not the
-form.** `readApplicationForm` follows **one** Apply link when the page it was
-given has no application on it. Canmore's artist-info page
-(`canmorefolkfestival.com/get-involved/artist-info`) carries an *APPLY NOW!*
-button to `canmorefolkfest.festivalpro.com/form/…`, a different host. The address
-it lands on is the one saved as `application_url`. It follows only when a single
-link clearly stands out (`chooseFormLink`): a known form host outranks any
-wording, a link that names vendors or volunteers is marked down, and two buttons
-that read alike are reported by name rather than picked between, because a wrong
-pick stages answers against the wrong form. One hop is deliberate — the
-festival's home page is two clicks from the form and is reported as having none.
-
-**A newsletter box is not an application.** The generic reader counted any
-`<input>` on the page, so a listing page came back `ready` with one field —
-"Enter your email", from the footer's Mailchimp form — and the artist's address
-staged against it. Forms whose tag names a newsletter, subscription or search
-are skipped, and a read that yields only a single email field is `blocked`
-rather than a one-question form. "Sign-up" is deliberately *not* in that list,
-since some festivals call the application that.
-
-**FestivalPro gets its own reader (`parseFestivalProForm`), found by markup
-rather than host.** Its questions are `div.ibFormOption` rows with the text in
-`div.attributeName` and no `<label for>` reaching the input, so the generic
-reader labelled every question with its field number — "765", "2933". The field
-number stays the `fieldKey`, which is what lets a re-read rename rows already
-stored instead of duplicating them. Follow-ups the page's script hides until a
-switch is on (`$('.ibFieldID1359').hide()`) are marked not required with a note
-saying what they depend on, because a required question nobody sees would stop
-an application ever reading as ready. Fixtures are real captures:
-`test/fixtures/festivalpro-artist-form.html`, `canmore-artist-info.html`.
-
-**A reply is matched by name, not by domain.** Of eight real organiser replies
-in this mailbox exactly one came from the festival's own domain; the rest came
-from Wufoo, Jotform, a portal, a parent organisation and two personal gmail
-addresses. `shared/replyMatch.ts` scores the event's *name* in the subject or
-body — full name with punctuation squashed, most distinctive word, and
-abbreviations including of part of the name (FOTR, FDV, "Road to BOW") — with
-the domain as a corroborator worth less than the name. Names are tokenised two
-ways on purpose: without splitting camel case, so "LieLow" stays one
-distinctive token rather than `lie` + `low`; and with splitting it, so
-"BreakOut West" yields BOW. Getting that backwards loses LieLow entirely, which
-is how it was found.
-
-**The scan never reads this app's own mail.** The weekly digest names the gigs
-that need a decision and lands in the owner's inbox, so a search for a gig's name
-found it, matched it to the first gig it listed and offered to bind `digest@` to
-that application — four of them sat in Review as "Not sure". `-in:sent` does not
-catch it, because the Worker sends through Cloudflare's binding and Gmail never
-files that as sent. `shared/ownMail.ts` names the senders (the two the binding's
-`allowed_sender_addresses` accepts, which `test/ownMail.test.ts` ties to
-`wrangler.toml`, plus the configured digest and sign-in senders), as exact
-addresses and never the domain, since the artist's own mail lives there too. They
-are left out of the Gmail query, because the fetch is capped at 60 messages and a
-digest a week would crowd real replies out, and skipped again after it. Rows an
-earlier scan filed are deleted at the start of the next scan, unresolved ones
-only: the query no longer returns that mail, so the clear-on-no-match branch
-could never reach it.
-
-**Matching reads the whole body; classification reads only the top post.** The
-quoted form receipt underneath a reply is often the only place the event is
-named — LieLow's rejection has the festival nowhere in its subject — and it is
-never the organiser's answer. Two questions, two texts.
-
-**Confirm once, then remember.** Accepting a match writes the sender address
-and the thread into `gig_correspondents`, and bindings are decisive rather than
-ranked against guesses. That is what makes an unrelated sender domain a
-one-time cost. When two gigs match equally well the reply is stored with no gig
-attached: naming one would invent the answer the matcher just said it lacked.
-
-**Every rejection opens by thanking you for applying.** So `classifyReply`
-scores all four readings and takes the strongest, returning `unclear` when two
-are close — a first-match rule that checked acknowledgement early would file
-every rejection under it. Two more things the real mail taught: rejections
-mostly avoid "unfortunately" ("we won't be moving forward", "was not
-selected"), and a conditional — "if you don't hear from us by June, it means we
-weren't able to make it work" — is an acknowledgement carrying a date, not a
-rejection. The deciding sentence is stored verbatim; a reading you cannot check
-is a reading you should not trust.
-
-**An ask is recognised while the body is in hand; the answer is drafted on
-read.** `gig_replies` keeps a 400-character snippet, not the email, so
-`recogniseAsks` runs at scan time and stores what was asked for — the same
-move `classifyReply` already makes with the deciding sentence. Composing the
-reply happens later, against the artist database *as it is then*, so an answer
-missing in March and on file in April appears without a re-scan. A row stored
-before migration 0015 is re-read from the snippet and marked `approximate`,
-the treatment a deadline recovered from prose gets.
-
-The ask vocabulary is closed on purpose: it matches nouns the library already
-has a kind for, and a request sentence matching none of them is reported in
-`unrecognised` rather than guessed at. `composeReplyDraft` fills what is on
-file, marks what is not, lists files to attach and never claims one is
-attached — and always leaves a gap, because a draft that reads as finished is
-the one that gets sent unfinished. Copy, no Send;
-`test/uiConsistency.test.ts` fails if a Send button appears, and that guard
-matches a short element label rather than any prose so the caption telling you
-to send it yourself does not trip it.
-
-**The mailbox is swept on the cron, three times a day.** `REPLY_SCAN_HOURS`
-is 7, 12 and 18 local, pinned like housekeeping's 3am rather than tracked in a
-settings row: no state, no drift, and a missed tick costs a few hours of
-noticing. The property that makes this safe was already there — a reply you
-have resolved is never re-proposed — it was just unused, so a reply sat unseen
-exactly as long as you went without opening the page. The scan still writes no
-status.
-
-**The reply router never writes a status.** Accepting binds the correspondent
-and records the judgement, and stops; moving the row is `PATCH /api/gigs/:id`,
-which owns what a transition means. Two calls is the correct number — they can
-be wrong independently, and a wrong auto-transition tells you that you were
-rejected when you were not. See `docs/reply-matching-plan.md`.
-
-**The artist database fills itself from the documents that already describe
-him.** `artist_assets` was empty in production from migration 0009 until
-`shared/artistSource.ts`, which is why every application panel said "Nothing
-on file answers this yet" — the facts were never missing, they sat in
-`reference_docs` and nothing read them. Three rules do the extraction and none
-of them reads a sentence: a `##` heading is a question (`classifyQuestion`
-maps it, the same function that maps a form field's label), a parenthetical in
-that heading is the `variant`, and a labelled URL on a line of its own is a
-link. Deliberately **not** a labelled URL inside a list item — a Spotify link
-under an album is about that album, and mining those would file six records
-under one question. A section it cannot file is named in `skipped`, never
-guessed at: prose parsing is what `reviewParse.ts` is, and that is the debt
-this repo is trying to delete rather than repeat.
-
-Everything sourced lands with **`review_by` null**, which reads as
-`unreviewed`. A hand-added asset gets a date seeded from its kind because
-adding one yourself is a claim it is right; a document saying so is not the
-same claim. `GET /api/artist/source` previews and `POST` writes, and
-`test/uiConsistency.test.ts` fails if the panel loses the preview step. The
-known false positive is pinned rather than patched: the writing style guide's
-"Voice in One Sentence" reads as a one-liner, which `classifyQuestion` is
-right to think and a human is right to archive.
-
-**A cost is a denominator, never a criterion.** `shared/gigCost.ts` estimates
-what a trip costs and stops there. It returns no `value`, no `efficiency` and
-no blended score, because the swing weights that would produce one have not
-been elicited and inventing them is worse than not having them — and because a
-single number is how you apply to something that scored 78 without noticing it
-costs $4,000.
-
-`local` is a band because its absence was not cosmetic. A show at Birds Hill
-Park — where the Winnipeg Folk Festival is held, half an hour out — priced as
-a **regional flight** at $450–850, and one in Winnipeg itself as a $120–400
-drive, because the four bands started at "drive" and the inference had no
-answer for home. Both errors run the same way: they make home-town gigs look
-expensive, for an artist whose stated goal is expanding *beyond* Winnipeg. A
-Manitoba address now bands as a drive at worst whether or not the town is on
-any list — the province is 1,200 km end to end and the far corner is still not
-a flight — and `NIGHTS_BY_BAND` gives `local` 0–0, because nobody books a
-hotel in the city they live in.
-
-Nights are the one input inferred as a *range*: `NIGHTS_BY_BAND` gives a drive
-0–1 and an international 3–5, so a row nobody has edited still costs its
-lodging instead of reporting a gap — which was all 34 of them. That is not the
-silent default the module refuses; a guessed span widens the total rather than
-moving it, and it is marked inferred like every other guess. A stated `nights`
-still wins and is still exact. Two rules the module holds throughout: every figure is a
-**range**, since `$1,847` is a lie with a decimal place; and **a missing input
-is never a zero** — no `nights` leaves lodging out of the sum and names it in
-`unknowns` rather than becoming a day trip. A band nobody set is inferred from
-the prose location and labelled as guessed, the same treatment a deadline
-recovered from prose gets. See `docs/gig-pipeline-plan.md` §7.
-
-**A distance is measured once and cached, and a home nobody set is no
-distance.** The travel band used to be guessed from a list of place names
-written for Winnipeg, which is wrong for any other artist and cannot judge the
-boundary that costs money: Regina, Thunder Bay and Minneapolis are on no list.
-`enrichTravel` (`src/lib/travelEnrich.ts`) runs on the hourly tick, per tenant,
-ten gigs at a time and one request every 1.1 seconds, geocoding the gig's place
-with OpenStreetMap's Nominatim and routing the drive from the artist's home
-base with OSRM (`src/lib/geo.ts`, migration 0039). Three rules hold it.
-**Cached, not fetched on read**, because both services allow about one request
-a second from the whole app and require results to be stored: `geo_place` and
-`geo_home` record which place and home an answer was for, so only an edit or a
-moved home base asks again, and a place Nominatim does not know is remembered
-as such while a network failure writes nothing and is retried. **The home base
-is the artist's own** (`travel.home` in `tenant_settings`, Settings → Account)
-and has no default, for the reason the recovery address has none: without it
-the job does nothing and the cost panel keeps the place-name guess and says so,
-since a distance from a home nobody set is a guess dressed as a measurement.
-**A measured distance outranks the guess and yields to a band a person set**,
-and it is checked rather than believed: a road shorter than the straight line
-is the router snapping an endpoint somewhere it could reach (Glasgow came back
-as a 1,004 km drive from Winnipeg, 5,789 km away) and is treated as no route,
-and a place with no road gets a straight-line figure marked `straight_line`.
-Only "Town, Region" is looked up (`mappablePlace`): a bare province geocodes to
-the middle of it. What leaves the app is the gig's place text and the home
-base the artist typed, to two public OpenStreetMap services; the card says so,
-and the screens credit OpenStreetMap beside a measured figure.
-
-**A drafted message is lifted out of a note and shown as its own block.** The
-agents write an outreach message into a gig's note when there is no form to
-fill, and the Gigs row printed it inside the reasoning with no way to copy it.
-`splitDraftedMessage` separates it and `DraftedMessage` shows the channel, the
-text verbatim and Copy, never depersonalised, since "I'm Doug McArthur" is the
-message. Copy only, no send. On the Review pane it takes `canCopy={mayPitch}`
-for a sync target, so a refusal that removes Copy from the pitch draft removes
-it from this too.
-
-**The visa lead time counts from the deadline, not from today.** A Canadian
-musician doing a paid US performance needs a P-2: about $800 and ninety days.
-You cannot file for a performer before somebody has agreed you are performing,
-and nobody agrees before applications close — so a show 150 days out whose
-deadline is 100 days out has *fifty* days, not 150. `visaLead` measures it that
-way and `visa_risk` is the flag, weighted above every deadline: a deadline can
-still be met, and paperwork that takes ninety days cannot be hurried. An
-unstated `performance_kind` keeps the ninety days rather than resolving to the
-free answer, and says it is asking rather than asserting — the cheap
-resolution is how you find out with sixty days left.
-
-**The note parser moved to write time; it did not go away.** Migration 0001's
-columns were never filled, so `shared/reviewParse.ts` re-derived them on every
-read — the oldest debt in the repo. `shared/noteColumns.ts` now extracts the
-six worth storing (`submission_state` and `blocked_on` from migration 0016,
-`submission_method`/`fee_amount`/`fee_currency` from 0001, `location` from
-0013) and the gig and sync routes run it **on insert and on a rewritten
-note**, with `POST /api/backfill/notes` applying the same extraction to older
-rows behind a preview.
-
-**The column wins over the prose, and the fallback stays.** `withStoredColumns`
-merges the stored values over a parsed note in `gigItem` and `syncItem`, so a
-`submission_state` you correct by hand actually reaches the screen — until it
-existed, the queue re-derived from the note on every render and a corrected row
-changed the database and nothing you could see, with the conflict flag still
-firing at a question already answered. A null column still falls back to the
-parse, because null means "the note makes no claim" on most rows and "nothing
-has extracted this yet" on any row that reached D1 without a route; both want
-the same answer. Unreadable `blocked_on` JSON falls back too rather than
-reporting an empty list — "nothing is blocked" is a claim, and a column nobody
-can parse is not entitled to make it. The four facts with columns are
-overridden; everything else stays derived.
-
-The plan's last step — "once backfilled, the parser is deleted" — is not
-reachable, and this is the thing to know before trying again: the research
-agents write prose from outside this repo, so a backfill alone leaves every
-*future* row with a filled note and empty columns. Extraction has to keep
-happening; only its timing changed.
-
-The backfill runs two ways. `POST /api/backfill/notes` is the button on
-Settings, and `runNotesBackfillOnce` is a **one-shot on the cron**, guarded by
-`once.notesBackfill` in `app_settings` — the extraction is code rather than
-SQL, so it cannot ride in a migration, and the Worker is the only thing that
-can reach both the parser and the rows. Not pinned to an hour like the reply
-scan: it happens once, so waiting for 7am would be a delay with nothing on the
-other side of it. The marker is written *after* success, like
-`digest.lastSentAt`, so a failure retries on the next tick — and running twice
-is harmless anyway, which is the actual safety.
-
-Two rules hold it together. **A column that already holds something is never
-overwritten** — with exactly one exception, `fee_currency`, because it
-defaults to `'USD'` at insert and so is never empty, while two rows say `CAD`
-in their own fee text. A currency the text *names* outranks a column default;
-a currency it does not name leaves the default alone. Nothing else gets that
-treatment, and the narrowness is the safety — (`changesFor`), so a value you set by hand survives an extractor
-re-run and the backfill is idempotent — and `updated_at` is left alone, because
-filling a column from a note that already said so is not a change to the row
-and would wake every snooze in the table. **Cached rendering is not a schema**:
-`requirements`, `dealTerms`, `provenance` and the drafted values are rendered
-and never queried, so storing JSON copies would be a parser cache with a
-staleness bug the read-time version cannot have. They stay derived, and
-`organizer`, `audience_size`, `genre_fit_score` and `agency_type` stay NULL,
-because no note carries them in a form anything can read.
-
-**Deadlines are often prose.** 26 of 34 gig rows hold things like "None —
-rolling artist roster intake" in `deadline`. Anything wanting a real date must
-go through `splitDeadline`, which returns null rather than guessing. Where a
-date *is* recovered from prose, show the prose too — a recovered date must not
-look as certain as one the column actually held.
-
-**The queue never reads the clock.** `buildReviewQueue({ today })` threads that
-date all the way through, including into `parseDeadline` and `daysUntil`. Do
-not reach for `new Date()` in queue, digest or flag logic; take the date as an
-argument.
-
-This was half-true for a long time and cost a deploy: `today` reached the
-snooze maths while `daysUntil` read the real clock, so a fixture asserting a
-row was "due soon" passed until real time crossed its deadline, then failed in
-CI on an unrelated change. Same inputs must mean the same thing on every run.
-
-**One predicate decides what needs a decision.** `awaitingDecision` in
-`shared/reviewQueue.ts` is used by the Review filter *and* the weekly digest.
-They answered separately once, and the email counted rows under a bucket whose
-link the page then refused to show. The digest still reports more than the
-queue — the idle piles carry no flags and are the shape of the backlog — but
-anything it counts under a *flag* bucket has to be something the filter will
-show.
-
-**The Overview deck deals from its own filter, on purpose.** It used to deal
-"needs a decision" by flag weight, which kept dealing gigs you had already said
-yes to, put conflicts (weight 100) above opportunities nobody had looked at,
-and never dealt a discovered gig with no flag at all. `deckItems` deals a reply
-owed first, then what is new (`isNew`), then what bites (`isUrgent`); the In
-progress stage is a count and a link instead of cards. A reply owed goes ahead
-of what is new because it is the one urgent thing with nowhere else on the
-Overview — deadlines have the timing strip, conflicts the health block and the
-bell. The "all clear" line still tests `needs` as well, so a conflict or a
-silent application leaving the deck does not make the page claim nothing is
-wrong. Cards show `decision.badge` rather than the sentence, and the sentence
-moved to the Review detail, which had never shown it; `test/uiConsistency.test.ts`
-fails if either half goes.
-
-**Note prose names the artist, and the name comes from the account.** The
-research agents wrote their notes about whoever they were working for, so the
-prose reads "pending Jane's review". `depersonalise` rewrites that name into the
-second person on the way to the screen; the stored text is untouched. The name
-is `tenants.display_name`, handed in as `ArtistNames` (`artistNames()` in
-`shared/reviewParse.ts`, read by `artistNamesFor` in `src/lib/artistName.ts`) to
-`parseNote`, `buildReviewQueue` and `gigNoteColumns`. It is never in this
-repository: `test/noPersonInCode.test.ts` fails on a first or last name in
-source, and on a flag or function named after a person. What needs the artist
-is `needsArtist`. An account with no name set matches "the artist" and nothing
-more, so a note written about somebody by name keeps the name until the account
-has one, and the welcome questions ask for it. Two rules it must keep:
-pronouns are only rewritten inside sentences that named them, or "his deadline"
-in a sentence about an organiser becomes yours; and drafted field *values* are
-exempt, because "Contact Name: Jane Smith" is the answer that goes on the form,
-not the app talking. A first name that is a day or a month ("Sun Dogs") is not
-used on its own, or "Sat/Sun" would become "Sat/you".
-
-**Scout is for Canadian artists, and says so where it is first read.** Costs
-are in Canadian dollars, the P-2 rule assumes a Canadian act going to the US,
-and the funding and associations are Canadian. That is a statement of who it
-serves, not a restriction on what is shown: an opportunity abroad is never
-left out, it comes with what it takes to get there. The landing page, the
-welcome questions, Help and the page description say it, and
-`test/canadianCopy.test.ts` fails if they stop.
-
-**The privacy policy is a page of its own, and each number in it is the code's.**
-`/privacy/` is `frontend/privacy/index.html`, a second Vite entry
-(`vite.config.ts`) of plain HTML, so it reads with JavaScript off and has an
-address a regulator, a search engine or Google's OAuth review can fetch. The
-Worker names no route for it: static assets serve it, and `/privacy` redirects
-to the slash. It is not a hash route, which is what `/survey-results` is, on
-purpose: a redirect onto a client-rendered page is not a document.
-
-- **Who it names.** Sun Dogs Music Manitoba, a sole proprietorship Doug McArthur
-  registered on 2024-12-30 under the Business Names Registration Act (registry
-  number 10219396, three years from filing, so renew it before December 2027).
-  He is the privacy officer, which PIPEDA's openness principle and Quebec's
-  Law 25 both want named. The postal address is his residence and the
-  registered place of business, and it was already in every email footer.
-- **Which law.** PIPEDA, which covers a Manitoba business and anything crossing
-  a border. Manitoba's own Act (S.M. 2013, c. 17) says it comes into force "on a
-  day to be fixed by proclamation" and nothing found says one was fixed. Bill
-  C-36 (tabled 2026-06-15) would replace PIPEDA and is not law: reread the page
-  when it passes. Quebec residents' Law 25 rights are named, and the page is
-  English only, which the Charter of the French language may not forgive for
-  Quebec users. That is a known gap, not a decision.
-- **Four decisions the owner made.** 18 or older. The AI paragraph states
-  today's practice (the operator's routines on Anthropic's Claude, public pages
-  and the operator's own account) and promises notice and consent before it
-  changes, rather than a flat promise, because per-artist model matching is
-  planned (`docs/matching-gaps.md`). Fonts are self-hosted
-  (`frontend/src/fonts.ts`) so the page can say no company except Cloudflare
-  sees a visitor's address; emails link no web font either, since a client
-  fetching one tells the font service the message was opened. English only.
-- **What pins it.** `test/privacyPolicy.test.ts` ties the page to the session,
-  challenge, setup-code, elevation, notification, invitation and usage lengths,
-  to the Google connection cookie's ten minutes, to the absence of any outside
-  host, analytics or web font, to the Limited Use sentence, and to account
-  removal reaching the invitation row. Change a number in code and the test
-  fails until the page says the new one. Change the page and its date together.
-- **Gaps it says out loud rather than hides.** There is no self-service export
-  or deletion: both are a request by email, answered within 30 days, and the
-  removal is `removeTenant`. An invitation nobody used was never pruned until
-  `pruneInvites`; it now goes 90 days after it expires or is withdrawn
-  (`UNUSED_INVITE_RETENTION_DAYS` in `shared/invites.ts`), the retention list
-  says that, and the test reads the number from the constant. Until then its
-  name and address stay. If the document reader is ever pointed at a file in
-  an artist's Drive, "what we receive from Google is never passed to an AI
-  service" stops being true, and Google's Limited Use rules need explicit
-  consent for that transfer.
-
-**The terms of service are a page of their own, written beside the policy.**
-`/terms-of-service/` is `frontend/terms-of-service/index.html`, a third Vite
-entry in the same shape as `/privacy/`: plain HTML, no route in the Worker,
-`src/terms.ts` borrowing the policy's entry for the stylesheet and appearance.
-`docs/terms-of-service-research.md` is the clause-by-clause comparison it was
-revised against (Bandsintown, SOCAN, SubmitHub, Bandzoogle, FACTOR,
-ReverbNation, Groover, Submittable), including what was left out on purpose.
-
-- **It is agreed to at one action, in words, beside the button.** The invitation
-  screen says that setting up a passkey creates the account and that doing so is
-  agreeing to the terms; the terms say the same sentence back. A checkbox would
-  be firmer evidence and costs a click on the one screen that is deliberately
-  one action, so it is a decision for the owner rather than a default.
-- **It promises only what the policy promises.** No sale, no AI service without
-  asking, content read only with permission, the same four uses of information,
-  the same 30-day answer and backup window. Those are checked against the
-  policy's own sentences, so changing one page and not the other fails.
-- **Every claim about the service is pinned to the code that makes it true.**
-  Free (no payment processor anywhere in the source), never sends (no send call
-  in the Worker), an agent token can only read and add (`AGENT_ROUTES` holds no
-  DELETE, PATCH or PUT), a press kit link can be switched off and a switched-off
-  link stops resolving, an invitation lapses after `INVITE_TTL_DAYS`.
-  `test/termsOfService.test.ts`.
-- **It does not point artists at a screen they never see.** The Agent tokens
-  card is rendered for the owner only, and `/api/agent-tokens` refuses
-  everybody else, so the terms say that tokens are issued only by us and an
-  artist cannot issue one. The privacy policy says the same in its own words,
-  and both tests read the owner refusal out of the route source.
-- **The figures are the owner's, and are written down as such.** The $100 cap,
-  the 30-day notice, Manitoba law with exclusive courts, and a narrow indemnity.
-  Change the number and the sentence together, and the page's date with them.
-- **English only, as the policy is, and that is a real gap in Quebec.** Section 55
-  of the Charter of the French language has wanted a French version handed over
-  first, then an express choice of English, for any contract of adhesion since
-  1 June 2023, and the commentary does not limit it to consumers or exclude
-  website terms. The page asks a Quebec resident to write before creating an
-  account, and an invitation is how the owner holds that until there is a French
-  version. `docs/terms-of-service-research.md` has the sources.
 **An account records which terms it agreed to, and nothing reads it yet.**
-`users.terms_version` and `users.terms_accepted_at` (migration 0041) are written
-by `redeemInvite`, in the write that creates the account, which is after the
-passkey verifies and so after the point the invitation is spent. The version is
-`TERMS_VERSION` in `shared/terms.ts`, the date the page says it was last updated,
-and the instant is the same `now` the route hands the rest of the redemption, so
-it equals `created_at`. `test/termsAcceptance.test.ts` fails when the page's
-"Last updated" line and the constant disagree, so moving one without the other is
-a red test rather than an account recorded against words it never saw.
+`users.terms_version` and `terms_accepted_at` (migration 0041) are written by
+`redeemInvite` after the passkey verifies; `TERMS_VERSION` in `shared/terms.ts` is the
+date the page says it was last updated (`test/termsAcceptance.test.ts` fails if they
+disagree). Null means no record and is never backfilled; the version is the Worker's,
+never the browser's. It is for a re-acceptance prompt that is not built, so until then the
+terms rely on 30 days' notice and continued use. Moving `TERMS_VERSION` is for a change to
+the terms themselves, not a typo. Exactly two files may name either column.
 
-- **Null means no record, and it is never backfilled.** The owner and every artist
-  invited before 0041 read null in both columns. A date written in afterwards
-  would be a claim nobody made, so the record says what is true: nobody recorded
-  an acceptance. Both columns are nullable with no default.
-- **The version is the Worker's, never the browser's.** A value from whoever is
-  asking is a claim rather than a record. The cost is a window: a person who
-  loaded the invitation screen the moment before a deploy changed the terms is
-  recorded against the new ones. The terms promise 30 days' notice of a change,
-  which keeps that window to a deploy that has already been announced.
-- **It is for a re-acceptance prompt, which is not built.** The same two columns
-  are what a later prompt would read: null and an older version alike mean "ask
-  again", and answering writes them. Until that exists the terms rely on 30 days'
-  notice and continued use, which is the weaker form of agreement. Moving
-  `TERMS_VERSION` is for a change to the terms themselves; a typo corrected on
-  the page is not a new version, and moving the date would mark every account
-  stale.
-- **It is shown nowhere.** `test/termsAcceptance.test.ts` allows exactly two files
-  to name either column, the schema and `redeemInvite`, so a list route, the
-  oversight surface or a screen that starts carrying it fails there and has to
-  say why. The row goes with the account in `removeTenant`, which deletes the user
-  row, and the privacy policy's retention line for an account already says that.
-  The policy's list of what is held about an account names the record in its
-  "Who you are" line, including that an older account has none, and the same test
-  pins that sentence, so dropping the columns means changing the page too.
+**The artist survey is public, anonymous, and ships closed.** It measures how artists
+decide whether an opportunity is worth their time so the scoring weights are measured
+and not invented; questionnaire and method are in `docs/artist-survey-questionnaire.md`.
 
-**Goals and reach order what is undecided, and remove nothing.** The welcome
-questions are read in `shared/artistFocus.ts`, and the queue carries the result
-on each item (`ReviewItem.focus`). Two rules: *what was asked for outranks how
-far it is* (a grant when they said gigs sorts below a festival a flight away),
-and a deadline outranks both, because a date that bites is not a preference.
-Only items nobody has decided on are ordered; a gig already sent is left where
-it is. "My province" is the province in the home base set in Settings, never a
-guess, and with no home base a Canadian place is neither within reach nor
-beyond it. Something beyond the reach they chose gets a note saying so and
-sorts later; it is never hidden, since a ranker that hides what it scores low
-never learns it was wrong. The routes read the two settings (`focusFor`) and
-hand them in, like `today`.
-
-**A trip is income, an investment, or could be either.** `estimateGigCost`
-returns the estimated total cost (`gross`), the pay itemised (`payLines`) and an
-`outlook`, decided from the range and never a midpoint: *Income* when it pays
-more than it costs even at the expensive end, *Investment* when it costs more
-than it pays even at the cheap end, and *Could pay its way* when the two
-overlap. The words are chosen. A showcase that does not break even is spending
-on being heard, and "loss" makes the most useful rooms look like mistakes, so
-`test/gigCost.test.ts` fails if a word of loss comes back. No pay recorded is
-not zero pay: an investment then says so. Lines say what they are, with a
-sentence of what is inside (flights, accommodation, meals, local transport),
-and food is split from getting around without moving the total.
-
-**The deployment's mailbox, calendar and sending address are the owner's.**
-`GMAIL_REFRESH_TOKEN` is one inbox, `GOOGLE_REFRESH_TOKEN` and
-`GOOGLE_CALENDAR_ID` one calendar. Anything that reads them on a tenant's
-behalf is reading the owner's, so it asks `isOwnerTenant` first
-(`src/lib/actor.ts`): the reply scan and the sent-mail reconcile
-(`refuseUnlessMailboxOwner`), the calendar's secrets path (`calendarWay`), the
-bell's Gmail and email rows, and the Settings rows that describe them. An
-artist's own mailbox is a grant they would make, like Gmail drafting, and is
-not built. Publishing to the shared catalog is the owner's agents only
-(`agentMayPublish`). Artists are not issued agent tokens (`/api/agent-tokens`
-refuses everybody but the owner), so that check is a second lock on the same
-door: a token that still exists for another tenant, issued before the route
-closed, files a stranger's claim about a page, catalogued and linked to their
-own row and not shown to anybody else until the owner shows it.
-`test/ownerOnly.test.ts` fails on a route that reads the mailbox without asking.
-
-**A bulk write previews first, and the shell that does it is shared.**
-`Disclosure` in `components/ui/` is the closed-row → open → preview → apply
-shape, extracted when the second copy appeared rather than the fourteenth.
-Both users write across every row of a table, and a bulk write you cannot look
-at first is one you find out about afterwards, so the shell makes the preview
-the path of least resistance for the next one. `test/uiConsistency.test.ts`
-fails if a third panel hand-rolls it, or if one calls its write endpoint
-before its preview.
-
-**A count you cannot reach is a number, not a signal.** The Artist page's
-"overdue" and "never reviewed" tallies are filters, because one sourcing run
-puts twenty-two assets in the second bucket and finding them meant scrolling
-the library for a grey badge. `GET /api/artist?freshness=` refuses a value it
-does not know rather than quietly showing everything — a filter that ignores
-you is how you conclude the library is fine.
-
-**A new account gets a checklist, and every tick is read off the account.**
-`shared/onboarding.ts` derives the steps — name, goals, a profile, Google —
-from state that exists for its own reasons, so a step done from Settings ticks
-itself and one undone comes back. The only thing stored is what nothing else
-could answer: the goals the artist chose (`tenant_settings`,
-`onboarding.goals`) and whether they hid the card. It sits on the Overview
-until the required steps are done, suppresses "All clear" while it is up
-(true and misleading on an empty account), and Help can show it again. It
-promises nothing about research running for an account nobody has set it up
-for.
-
-The name and goals are asked full screen, one question per screen, driven by
-the keyboard (`OnboardingFlow`: Enter, letters, ↑/↓, Esc). It opens by itself
-once per tab for an account that has never answered, and never otherwise.
-Each answer saves as its screen is left, so Esc keeps what was said. **The
-page hosts it, not the card**: answering can complete the checklist, and the
-card unmounting took the questions with it mid-answer the first time.
-
-**The Library opens as a profile.** Profile (default), Grid and Table are
-three layouts of the same entries (`pages/artist/LibraryViews.tsx`); what an
-entry says and its actions are one `detail` the page renders in all three, so
-a view never grows its own edit path. The choice is a per-browser preference.
-Values are shown through `plain()`, which strips markdown for reading and
-leaves the stored text alone.
-
-**A stage plot is derived, not drawn.** The survey (`StagePlotFlow`, the same
-full-screen shell as the welcome questions) asks what a musician knows
-offhand — solo, duo or band, who plays and sings what, named gear, monitors,
-playback — and `shared/stagePlot.ts` derives the rest: the input list in
-console order, stereo pairs, phantom power, stands, monitor mixes, power
-drops and the layout. Every source on the drawing carries its channel
-number from the input list (`channelsFor`), so the two can be checked
-against each other. A pickup never asks for phantom power, and every plot
-asks for at least one power drop (`poweredPerformers`) — "nothing needs
-power" is how a solo act arrives to no socket for its tuner. An act of three
-or fewer with no kit stands in one line, and a small act's gear is spread
-(`stationSpread`) rather than only scaled. The answers are one `tenant_settings` row
-(`stagePlot`), not a new table. `shared/stagePlotClues.ts` reads the
-documents and library for the line-up, members and named gear, with closed
-vocabularies and the quoting sentence, and the survey offers them as
-suggestions — nothing is filled in silently. Printing is the export.
-**The stage is drawn as cards** (`pages/artist/StageCards.tsx`): each
-performer where they stand, upstage or downstage, read stage right to stage
-left (`stageLines`), with a photo per card — any library photo the artist picks for that
-person, "no photo", or by default the press photo on the artist's own card
-only (`performerPhoto`) — and a row per instrument, voice, other named gear, monitor and power drop
-(`shared/stagePlotCards.ts`). Named gear goes on the instrument its maker or
-words say it belongs to; what cannot be placed is its own row rather than a
-guess. The artist can move people and the arrangement is stored as
-`stage` on the plot — an arrangement that misses somebody still places them.
-Connections are coloured by kind from their own `conn-*` tokens, since the
-categorical tokens are neutral on purpose; the toolbar switches to the
-monochrome print view, and paper is always monochrome. The line art is in `pages/artist/stagePlotIcons.tsx` — every
-instrument the survey offers plus amp, wedge, mic, DI, power and in-ears —
-drawn in a 48 box with `currentColor` and non-scaling strokes, so it follows
-the theme and prints as vectors. Each performer is a station: held
-instruments beside them, keyboards and laptops in front, the amp behind, DI
-and power either side. Names only under a station; a role line collided with
-the next one on a front line of three. `stationScale` draws small acts larger
-and the layout moves the front line up to make room. **A stage plot PDF is read by a routine, not the Worker.** The artist's
-own Manitoba Music plot is a PDF whose every word is drawn as shapes, so a
-text extractor finds nothing. The `document-reader` routine — on the
-artist's Claude plan, not per-token credit — lists library documents labelled
-as a stage plot, rider or input list (`shared/documentReadings.ts`), opens
-each with Claude Code's file reader and files a transcription; the survey
-treats it as one more clue source, quoted and confirmed like the rest. The
-write is checked against the asset's current file address, so a changed file
-is read again. Photos, videos and manufacturer spec pages are still **not**
-read.
-
-**Listing facts live once, in a shared catalog.** `opportunities` (migration
-0033) holds what is true of a call for everybody — name, page, closing date,
-place — and has no tenant and no column for anything an artist decided; each
-artist's gig and sync rows link to it by `opportunity_id`. `src/lib/catalog.ts`
-writes it: read-by-key then insert (no `ON CONFLICT`), a later sighting fills
-gaps and never overwrites — one research session reading a poisoned page must
-not rewrite what every artist sees — and linking is best-effort so a catalog
-failure never costs a filed gig. A row that missed its link is retried by
-the daily housekeeping tick (`relinkMissing`): the backfill is one-shot, and
-this module once said it would catch such rows when it would not. A retry does
-not know who filed the row, so it publishes by the backfill's rule — untouched
-rows only. Sync targets are catalogued only when they
-are organisations; a supervisor's name stays on the artist's own row.
-
-**Scout reads the pages that list calls, and agents are for finding new ones.**
-A research sweep spends most of its effort opening pages already known to list
-calls and reading what is on them, which is mechanical, and a Worker doing it
-costs a request. `src/lib/sourcePoll.ts` does it on the hourly cron — three
-sources a tick, one at a time, with the same honest user agent as every other
-fetch here — from `catalog_sources` (migration 0037), seeded from
-`shared/musicAssociations.ts`, which stays the truth for the ones it names. What
-an agent is for is *finding* a page nobody knew about; once found it belongs in
-the registry and is read from there on. `docs/catalog-ingestion.md` has what the
-first real reads showed, and it is worth reading before changing a rule.
-
-Two readers, both **found by markup and never by host**: `shared/feedParse.ts`
-(RSS, Atom, iCal) and `shared/listingParse.ts`, which reads a linked headline
-with a `Deadline:` line beneath it — SaskMusic's page has forty-six, thirty with
-dates — and a dated list of linked headlines, as MusicOntario's news is. Neither
-reads prose: a deadline is taken only from a line that says *deadline* beside a
-date, and a year-less "November 20" stays the words, through `splitDeadline`.
-`shared/callClassifier.ts` gives each item one of three verdicts and **the
-sentence that decided it** — `unclear` is a real answer, since "mentions a grant
-and says nothing is open" is neither of the other two. Its table in
-`test/callClassifier.test.ts` is almost all real titles, hand-labelled by the
-person who wrote the rules, so it is a regression guard and not a measure of accuracy:
-accuracy is read from the owner's **Ignored** tab, because a rule missing real
-calls only shows from that side.
-
-**A candidate is not an opportunity, and nothing here reaches the catalog.** An
-announcement is usually not the programme's own page — SaskMusic's "Read More"
-goes to SaskMusic — so publishing it would key the catalog on the wrong address
-and duplicate the entry the day the real one is found. Following the link is the
-next step. **A source that answers is not a source that works**: the first reads
-found Music BC's "feed" (a republished newsletter, newest item nineteen months
-old), Music PEI's calendar (200, empty body) and MusicNL's "member
-opportunities" (a login wall), and `sourceState` reads what came *back*, so each
-says so — `stale`, `empty` — instead of reading as healthy. A refusal (401, 403,
-429) is a verdict on our access and a timeout is none, as in
-`shared/credentialHealth.ts`. First sight sets a baseline, so a feed's last ten
-items are stale when they are more than ninety days old and not news. A broken
-source is read less, not more: one failure retries at the usual time, then 2×,
-4×, up to a week. An unchanged one costs a 304, or a hash compared and nothing
-written. The body is capped at 3 MB (Music BC's feed is 1.6 MB for ten items)
-and a stranger's markup only ever becomes strings: it is never followed, run or
-passed to a model.
-
-**A programme that comes round again is the same programme, and Pass means this
-intake.** One catalog entry is one programme, keyed by its address, and it held
-the first deadline it was filed with for good. A passed row was never offered
-again, a snooze woke with the old date, and a New call whose date had gone sat in
-the deck as "Deadline passed" for ever. `shared/intakes.ts` is the rule and
-`src/lib/intakes.ts` runs it per artist on the 3am tick, ahead of the reminder
-reconcile so the new date has its reminders that night. The owner decided the
-first two points below on 2026-10-14; the rest follows from them.
-
-- **Pass is about one intake.** A passed or missed intake is offered again as a
-  new New row when the programme's entry holds a later date, opening with the
-  sentence that says what it is and which intake they passed on, and the old row
-  is left exactly as it was. The decision log's account of what they were looking
-  at when they passed is not rewritten. Deleting the row is how somebody says
-  never: no linked row means nothing to re-offer. The Pass button's own
-  tooltip says so, and Help does.
-- **A row nobody decided on follows the programme.** A New row whose own date has
-  gone is advanced in place. That is a change to what the row says, so
-  `updated_at` moves and a snooze made against the old intake is woken, which is
-  the case `snoozeState` was written for. It is the one place a row of the
-  artist's is rewritten from the catalog, and it is the only sound reading of a
-  row they never decided on.
-- **It re-offers only what they did not apply for.** Passed and missed. A call
-  they applied to and lost, one they won, one they withdrew from and one they
-  archived are different sentences; archived has no outcome and is how somebody
-  says never without deleting. Nothing In progress or Applied is touched:
-  "Missed the deadline" is the move that closes an intake and lets this run. It
-  also waits for the old intake to have closed, since a row whose own date is
-  ahead may be a different stream.
-- **A new intake is a new arrival.** `reopened_at` (migration 0043) restarts the
-  same three-day holding period `first_seen_at` starts, so the owner can block
-  it in the same window, and `delivery = 'approved'` skips the wait.
-  `isDeliverable` reads the later of the two.
-- **Only the platform's own research moves a deadline, only forward, and only
-  one that has gone.** `catalogueEntry` applies `advanceIntake` for an agent
-  sighting and never for an artist re-typing a row; an entry whose date is still
-  ahead is not moved by a later one, since a page naming a later date may be
-  naming another stream and a poisoned page must not be able to push a live
-  deadline out of sight. An entry with no date is never given one by this: that
-  is how a rolling programme would be closed.
-- **Something has to deliver the next date, and it is the Worker, for free.**
-  `refreshProgrammes` (`src/lib/programmeRefresh.ts`) reads the page of a
-  public entry whose deadline has passed, three a tick and a week between looks at
-  one, and stops after eighteen months. `readNextDeadline`
-  (`shared/programmeDates.ts`) takes a date only from a line that says
-  deadline, closes or due, requires a year, takes the earliest still ahead, and
-  returns the count so the entry says the page lists several. It was written
-  against a real capture of Canada Council's Arts Across Canada and Abroad page:
-  ten funding opportunities, two of them rolling ("Any time before your departure
-  date"), seven listing several dates each, one a season. Of the eight pages that
-  opened, from six funders, only that one stated a date in its server-rendered
-  text, and three more did not open at all (a 404, a 410, a refused connection),
-  so recall is low and the page reader is a partial feeder. The agents are not asked
-  to re-file a programme on file; if one does, the same advance applies.
-- **Told on the bell, one event a night.** "N programmes are open again", with a
-  sentence each. It is not a choice, so it is not in the decision log: the new
-  row is filed and the old row moved by Scout, and the artist's choice about the
-  new one is logged as any choice is.
-- **Suggestions off means no new rows.** Moving a row they already have is not a
-  suggestion and happens regardless; filing a fresh one is. Ten re-offers a night
-  at most, the rest the next.
-
-**A new account is shown what is open to nearly anyone, before it has said
-anything.** The Overview of an account with no rows used to be a checklist and
-an empty deck, and the starter set waited for the welcome questions and then
-sat behind a button. `StartHere` replaced it (`shared/startLanes.ts`,
-`GET /api/matching/start`): three lanes, each headed by a sentence that says the
-finding. Grants open to artists anywhere in Canada, festivals and showcases in
-their province, and sync companies whose own sites say they take submissions and
-ask for no exclusivity. The gig lanes are cut from `matchCatalog`'s output, so a
-call that has closed, one already on the list and one for another province's
-residents are removed there, once, for the reasons they are removed everywhere.
-
-- **A missing input is never a guess.** A grant is "national" only where its
-  place says so (National, Canada, nationwide) and no province is in the place or
-  the column and nobody is restricted to residents. A grant with no place at all
-  is not called national, since a Winnipeg-only grant shown to a Vancouver artist
-  is the mistake a first screen cannot afford. The province lane asks for a
-  province in place when there is none, and "Outside Canada" is not offered there
-  because it names nothing to look in. Home is the Settings home base, then the
-  province said in the welcome questions, and it is read without goals:
-  `focusFor` is null until goals are chosen, which is why `provinceFor` exists.
-- **A sync company is shown only on its own words, with the sentences.** The
-  catalog entry carries `submission_policy` and `exclusivity` with the evidence
-  and the page each came from (migration 0042). Silence about exclusivity is
-  listed apart under its own sentence ("silence is not the same as asking for
-  none"), companies that ask for exclusivity or refuse cold pitches are counted
-  and never listed, and one nobody has read for exclusivity says so rather than
-  reading as fine. `readExclusivity` (`shared/syncExclusivity.ts`) follows
-  `syncTerms.ts`'s rules: caution beats reassurance across every page read, a
-  sentence about what a *customer* gets is not about the artist (every library
-  calls its licence to customers non-exclusive), and a reassurance needs an
-  artist-side subject where a caution needs only that the sentence is not about a
-  buyer.
-- **Measured on real sites, and thin.** Run through `scanSite` against sixteen
-  real sync libraries and publishers on 2026-10-14, one stated its terms in a form
-  the reader accepts (Epidemic Sound: a non-exclusive agreement, on its artists
-  page), five returned no readable pages, and the existing policy reader made one
-  false "open" (a TuneCore blog sentence). Expect the lane to be short and to say
-  so. It reads only the pages `scanSite` already fetches, and `POLICY_PATHS` is
-  unchanged on purpose: adding terms pages would feed legalese to a refusal reader
-  that was measured without it.
-- **Only the owner's research reaches the catalog.** `checkTarget` mirrors a
-  finding onto the entry the row is linked to (`src/lib/orgTerms.ts`) only for
-  the owner's tenant, since the address a target is read from is typed by whoever
-  owns the row, and another artist could point a catalog organisation's name at a
-  page of their choosing. It folds toward caution with `foldFinding` and
-  `foldExclusivity`, never records a site that would not open as having been
-  looked at (`terms_read_at` stays empty), and never mirrors the artist's
-  override. The nightly pass mirrors what rows already say with no network, then
-  reads the owner's targets whose entry has never been looked at, last in line
-  and behind the same six-a-night cap.
-- **Every add is checked again.** `POST /start/add` and `/start/sync` take ids
-  as a request and check them against what the lanes would offer this artist now,
-  so a stale screen or a request made by hand adds nothing the preview would not
-  have shown. A company whose own site refuses pitches is a 409. Adding a company
-  files a `draft_ready` Sync target carrying the policy sentence, which is where
-  the Sync page's own form starts one typed in by hand.
-- **It is a first visit and it retires.** Hidden once they have said not now,
-  switched suggestions off, or have twelve rows between gigs and Sync targets
-  (`START_UNTIL_ROWS`, the size the starter set was). The route answers that
-  before reading the catalog, since the Overview loads it every visit and rows
-  read is the cost that binds. The old `/starter` routes and the daily trickle
-  are unchanged.
-- **A programme that comes round again returns to the lanes.** The entry's
-  deadline can move forward (see "A programme that comes round again" below), so
-  a national grant no longer leaves its lane for good the day its first-seen date
-  passes.
-
-**The logged-out page shows the catalog, and publishing is conservative.**
-Strangers see `LandingPage` (a browser that has signed in before still gets
-the sign-in screen; `#welcome` and `#signin` cross over). It shows a small
-**sample** — eight open calls mixed across the categories by `publicSample`,
-in a miniature of the app's table (category, fee, closing date) faded out at
-the bottom so it reads as an example — from `/api/public/opportunities`,
-which reads only the catalog. The fee column is the fee as the listing
-stated it and nothing more: agents fill `fee_amount` without being told which
-way the money goes (the seed uses it for a guarantee), so the page never says
-"entry fee" and never says "Free" for a fee nobody stated. An entry is public
-by default only when a research agent filed it, it has a listing URL on a
-public host (never a Doc, Drive file or mail thread), and it is a festival,
-showcase, funding call or sync organisation. The backfill could not know who
-filed older rows, so it published only ones the artist never acted on — the
-seed's "Mainstage Invitation" is an offer, not a call, and was the example.
-Admin mode's **Landing page listings** page shows and hides anything.
-
-**Requesting an invitation creates nothing.** `invite_requests` holds a name,
-an address and a reason from somebody with no account. No email is sent to
-it — a typed address is exactly what `shared/recipients.ts` refuses — the
-bell tells the owner, and **Invite** only pre-fills the real invitation form.
-A honeypot field, a per-sender limit on a salted hash of the address (never
-the address) and a daily ceiling keep a flood cheap. Answered requests prune
-at 90 days, the rest at a year, which the form promises.
-
-**Feedback is a form, not telemetry.** The header's question mark (the
-drawer, on a phone) opens Help and *Send feedback*. The form attaches the page,
-the pages before it, failed requests from the last half hour in this tab, the
-build and the browser — kept in memory by `frontend/src/diagnostics.ts`, never
-stored or posted on its own — and lists all of it before the button, through
-`describeContext`, which the owner's inbox uses too, so what arrives is what
-was shown. It never carries what was on the page. `feedback` (migration 0032)
-is a platform table like `agent_tokens`, read on the admin surface, deleted by
-tenant removal; the owner hears through the bell. `test/feedback.test.ts` pins
-the rules.
-
-**Explanatory text is always tucked behind an info icon.** A sentence about what
-a screen is for, how something works or what a setting means is not shown by
-default: it goes in an `Explainer` (or an `InfoToggle` where there is no title
-for it to sit under), which draws the icon and opens the note in place. The owner
-asked for this when the admin-mode pill carried a whole sentence and the
-sentence was most of the header; the pill says "Admin mode" now and the rest is
-behind its icon, and `SectionHeader` and the admin search field do the same.
-What stays visible is what a person needs in order to act: labels, counts,
-statuses, errors, and the line beside a button that says what pressing it is about
-to do. The `showHints` appearance setting hides every icon, so a note never holds
-the only copy of a warning. `.claude/skills/ui-rules` has it too, since that is
-what is read before a UI change.
-
-**Buttons and inputs come from `components/ui/`.** `Button` takes a variant
-named for meaning (`primary`, `neutral`, `quiet`, `good`, `danger`, `info`),
-`Field` exports `FIELD` and `FILTER`. Fourteen hand-rolled button strings and
-five copies of the input string preceded them, and eight of those buttons set
-`hover:bg-X` while already painted `bg-X` — a hover that rendered as none.
-`test/uiConsistency.test.ts` fails if either comes back.
-
-**The artist survey is public, anonymous, and ships closed.** It asks artists
-how they decide whether an opportunity is worth their time, so the scoring
-weights the pipeline plan was waiting on can be measured instead of invented.
-The questionnaire, the method and every reason are in
-`docs/artist-survey-questionnaire.md`; this records what the code must keep.
-
-- **Nothing identifies a respondent, and a test fails if that changes.**
-  `survey_responses` has no IP, user agent, email or hash of any of them —
-  `test/surveyRoutes.test.ts` fails if a column is added, if the route reads any
-  header but the body length, or if it hashes anything. A salted hash of an address
-  is still derived from one, and the notice says none is stored, which is why
-  `publicSite`'s per-sender rate limit was deliberately not copied: the limits
-  are global (an hourly cap and a total cap), plus Turnstile and a honeypot.
-- **The response id never appears in a path.** It is the only credential for its
-  response and the request logger prints paths, so every call that names one sends
-  it in the body (`/survey/answer`, `/survey/resume`, …). Same rule as the
-  invitation token living in the URL fragment.
+- **Nothing identifies a respondent**: no IP, user agent, email or hash of one, and the
+  rate limits are global (an hourly and a total cap) plus Turnstile and a honeypot
+  (`test/surveyRoutes.test.ts`). The response id is the only credential for its response
+  and never appears in a path, only in a body.
 - **The server builds the plan and the browser invents nothing.** `buildPlan`
-  (`shared/surveyDesign.ts`) decides, from one seed, which ranking screens, in what
-  order, which choice-design version and which option order — and the plan is
-  *stored* with the answers, so what was shown is a record rather than something
-  rebuilt from code that may have changed. `checkAnswer` turns away anything the
-  plan never offered. The ranking's thirteen blocks are a difference set modulo 13
-  (`{0,1,3,9}`): every factor appears four times and every pair together exactly
-  once, which a test checks, and which survives the shuffle.
-- **Nobody's list is shortened because of who they are.** Hiding factors from, say,
-  hobby-level artists was considered and refused (principle 12 in the document): it
-  assumes the answer the survey exists to measure, the "least" pick already records
-  irrelevance, and showing different factors to different people breaks the
-  arithmetic. Which nine of thirteen is decided by the seed, not the person.
-- **Ships closed, and the owner's switch is in admin mode, not `wrangler.toml`.**
-  Whether it is open, the contact address and Turnstile's public site key are rows
-  in `app_settings` (`src/lib/surveySettings.ts`), changed from the survey panel and
-  read on every request, so closing a public survey never waits on a build. It opens
-  only when the switch is on **and** a contact address is stored, because the notice
-  promises one; `writeSurveySettings` refuses to turn it on without one and refuses
-  to strip the address from an open survey, which would close it behind a switch
-  that reads on. There is deliberately no environment variable for any of it:
-  `test/surveyUi.test.ts` fails if one comes back, because two switches for one
-  thing is how a survey you closed stays open. The one exception is the Turnstile
-  **secret**, a Worker secret (`TURNSTILE_SECRET_KEY`) since a secret cannot be saved
-  from a screen — and a dashboard *variable* would not do for the site key, because
-  the next `wrangler deploy` wipes any variable the file does not name. The panel
-  warns when the spam check is not complete, and says the notice describes a check
-  that would not be running. It warns rather than blocks: the survey runs without
-  it, and that is the owner's call.
-- **The results address in the notice is a real page, and what is on it is a snapshot
-  the owner reviewed.** `/survey-results` is a route of the Worker that redirects to
-  `#survey-results`. It is not configurable, because a link that went nowhere makes the
-  notice's promise read as false. It says the results have not been posted until the
-  owner publishes, and what it then shows is one stored row (`survey.published` in
-  `app_settings`, `src/lib/surveyPublication.ts`), never a view computed from the
-  responses on a visit: a page computed per visit reports a small group the moment the
-  tenth person in a category has not yet answered, which the notice promises never
-  happens.
-- **Publishing is review, then a digest.** `shared/surveyPublic.ts` builds the snapshot
-  from an allow-list, so a field added to the owner's summary next year is not public
-  until somebody decides it should be. `GET /api/admin/survey/publication` builds what
-  would be published now, and `POST` carries only the digest of what was looked at and
-  the exclusions. The Worker rebuilds, and if responses came in between it answers 409
-  and the owner reviews the new version first, so what is reviewed is what is shown.
-  The browser never sends the content. It needs `PUBLISH_FLOOR` (30) completed
-  responses, and the preview and the public page are the same component
-  (`ResultsView`) over the same object. `test/surveyPublic.test.ts` fails if a response
-  id, a channel tag, a free-text answer or any of age, gender, community and income
-  reaches it, and each rule in the file was mutation-checked.
-- **The public numbers are no firmer than the data.** Intervals come from the spread
-  between artists, each scored once per factor, not from the screens, because one
-  person answers several and treating them as independent makes the result look surer.
-  A factor is "clearly above average" only when its whole range is; two are "tied" when
-  their ranges overlap; and a dollar of entry fee is called "about a dollar" only when
-  the range is narrow around one (`RATIO_NARROW`), because the fee effect is small next
-  to pay and the range is often from nothing to three dollars. The headline of each
-  section is a sentence from the same functions as the "In short" list, so a heading
-  cannot be firmer than the chart under it.
-- **Say against do compares only reasons that at least ten artists gave.** B4 offers
-  fourteen reasons, so in a first wave most are under ten and may not be shown, and
-  ranking those as zero would draw a line to a number nobody may see. The chart says how
-  many were left out.
-- **How the page reads and looks is held by tests, because it was asked for.** No em
-  dash in anything a person reads, no small caption above a heading, no coloured bar
-  down the left edge of a rounded card, and only the app's colour tokens
-  (`test/surveyUi.test.ts`). Every card and headline is a whole sentence, and the cards
-  open on their figure so they read aloud as one (`test/surveyResultsHero.test.ts`).
-- **The analysis is checked by planting preferences and recovering them.**
-  `test/surveyAnalysis.test.ts` simulates respondents with known utilities and
-  fails if the estimator does not find them — and it was mutation-checked: an
-  unflipped sign on the "worst" stage, the wrong dollar scale and letting the
-  planted attention check into the model each turn it red. A survey method fails
-  silently (a wrong estimator still returns tidy numbers), so that is the only
-  convincing test. A dollar value is a ratio to the pay effect, so when pay cannot
-  be told from zero nothing is converted to dollars.
-- **A group under ten is never shown** in the owner's summary, and a spreadsheet
-  cell that begins with `=`, `+`, `-` or `@` is quoted in the export, since free text
-  typed by a stranger is exactly where a formula would arrive. The raw export is not
-  suppressed and is the owner's alone.
-- Respondent-facing text never says "Scout" (the bare word is the mark this product
-  avoids): the survey names Sun Dogs Music and no product, and a test walks every
-  string.
+  (`shared/surveyDesign.ts`) decides the ranking screens, their order and the choice
+  design from one seed, and the plan is *stored* with the answers; `checkAnswer` rejects
+  anything it never offered. The thirteen ranking blocks are a difference set mod 13
+  (`{0,1,3,9}`), so every factor appears four times and every pair together once.
+- **Nobody's list is shortened because of who they are**: hiding factors by respondent
+  characteristics assumes the answer the survey measures (principle 12 in the document).
+- **Open or closed is an admin-mode setting** (`app_settings`,
+  `src/lib/surveySettings.ts`), not `wrangler.toml`, so closing never waits on a build;
+  it opens only with the switch on **and** a contact address stored (`writeSurveySettings` refuses to
+  turn it on without one and to strip it from an open survey), and there is no
+  environment variable for any of it (`test/surveyUi.test.ts`). The Turnstile secret is a
+  Worker secret (`TURNSTILE_SECRET_KEY`); the panel warns, and does not block, when the
+  spam check is incomplete.
+- **Results are a stored snapshot the owner reviewed** (`survey.published` in `app_settings`), not a view computed per visit,
+  because a per-visit page reports a small group the moment the tenth person arrives.
+  `shared/surveyPublic.ts` builds it from an allow-list; `POST` carries only the digest of
+  what was reviewed and the Worker answers 409 if responses arrived since. It needs
+  `PUBLISH_FLOOR` (30) completes and a group under ten is never shown
+  (`test/surveyPublic.test.ts` fails if a response id, channel tag, free text or any of
+  age, gender, community and income reaches it). Intervals come from the spread between
+  artists, not screens; a dollar of entry fee is called "about a dollar" only when the range is narrow around one
+  (`RATIO_NARROW`); a dollar value is a ratio to the pay effect, so when pay cannot
+  be told from zero nothing is converted; "say against do" compares only reasons at
+  least ten artists gave. A spreadsheet cell beginning `=`, `+`, `-` or `@` is quoted in
+  the export.
+- The analysis is checked by planting preferences and recovering them
+  (`test/surveyAnalysis.test.ts`, mutation-checked). The page's look is held by tests: no
+  em dash, no small caption above a heading, no coloured left-edge bar, only the app's
+  tokens (`test/surveyUi.test.ts`, `test/surveyResultsHero.test.ts`).
 
-**Colour themes are data, and the stylesheet is generated from them.** Eight ship:
-Sun Dogs (the default, drawn by hand in `shared/themeSunDogs.ts`), Pebble, Opal and
-Harvest (aesthetic, derived from Figma palettes by `scripts/themes/derive.mjs` into
-`shared/themeData.ts`) and four accessible themes: High contrast, Colour-blind safe, Greyscale (no colour
-at all; go, waiting and broken differ by at least 15 L*, held to 4.5:1 where the
-others hold 7:1) and Low glare (dim and warm, no white, and a ceiling of 12:1 on ink
-and body as well as a floor). Each accessible theme states its own standard in
-`STANDARD` in `test/themes.test.ts`. The file
-`frontend/src/themes.css` is written from them by `npm run themes:css`, and a test
-fails if it is edited by hand. Two standards, on purpose: the default and the
-accessible themes are held to strict contrast and colour-blind gates, while an
-aesthetic theme is held by a ratchet (`shared/themeBaselines.ts`, which may only go
-up) plus one floor, ink and body text at 4.5:1. The meaning colours (green go, ochre
-waiting, clay broken) keep their hues in every aesthetic theme, and the accessible
-themes redraw them as blue, gold and rose. Light is the default; a `palette` of
-`null` means nothing has been chosen and follows the device (`prefers-contrast:
-more` selects High contrast); print is always the default's light palette on white.
-The colour theme (`palette`) follows the account: one `tenant_settings` row,
-`appearance.palette`, behind `GET`/`PUT /api/appearance`, read once after sign-in and
-written in the background when the artist chooses, with the browser's own copy still
-the first paint so nothing waits on the network. It is refused to agent tokens and does
-not exist in admin mode. Everything else in Appearance (light or dark, text size,
-typeface, width, contrast, motion, links) stays per device, in the browser. See
-`docs/themes-plan.md`.
+## Decided, and not to be reopened without new evidence
 
-## Testing
-
-`npm test` (vitest) — pure logic in `shared/` is well covered; routes are only
-tested for registration and validation, because there is no D1 in the test
-environment. `npm run typecheck` covers both the Worker and the frontend.
-
-Screenshots verify design, not geometry. A chart whose bars all had width 0
-passed visual review twice — probe computed styles when layout correctness
-matters.
-
-Fixtures use dates relative to their own `TODAY`, never to the real clock. A
-suite that passes today and fails tomorrow is worse than one that fails now,
-because it fails in CI on somebody else's change. `TZ=Pacific/Auckland npm test`
-is a cheap check: it runs a day ahead.
-
-**The local database has a fixture, and it is shapes rather than data.**
-`npm run db:seed:local` prints what it would write; `-- --apply` writes it.
-Overview, Review and Gigs are screens about density and triage, so an empty
-local database renders empty states and a UI change cannot be judged against
-anything — the same trap as the chart whose bars were all width 0. The rows
-exist to produce *states*: a prose deadline, an application silent past
-`NO_REPLY_DAYS` both exactly and approximately, `info_requested` outranking a
-deadline, a visa risk, a stopped schedule beside a monthly one that is
-deliberately not flagged, an uncredited press photo, and one row on a second
-tenant that must never appear on the owner's screens.
-
-Its dates are **computed when it runs**, which is the opposite of the rule
-above and the same reasoning: a seeded row with a hardcoded date quietly stops
-being "due in nine days", and the screen stops showing the state it was seeded
-to show. It also seeds one enrolment code, because a fresh local database has
-no passkey and no mailer, so without it the fixture is a database nobody can
-sign in to look at. Local only — it refuses `--remote` rather than ignoring it.
-
-Some mistakes typecheck and render, so they need source-level tests rather than
-behavioural ones — see `test/uiConsistency.test.ts`, which reads the JSX and
-fails on a dead hover state or a re-declared input class.
+- **No compression of stored text.** Every piece of prose in production is tens of
+  kilobytes in a database far under the free tier, per-row gzip gets about 1.5× on
+  strings this short, and neither rows read nor requests move. Retention is handled
+  where it churns (`notification_events` and `notification_marks` prune at 30 days).
+- **No request counter in D1**: a write per request is the shape this app declines to
+  build, so `api_requests`, `gmail_drafts` and `ai_calls` have no writer and the API
+  says so.
+- **No HTTP smoke test** (see Reading a red run) and **no deleting the note parser**:
+  backfill alone leaves every future row with a filled note and empty columns.
+- **No hiding survey factors** by who the respondent is, and **no model-matching per
+  artist** without notice and consent (the privacy policy promises it; the plan is
+  `docs/matching-gaps.md`).
+- **Decided, not built yet:** on a phone the main navigation becomes a bottom tab bar
+  (Overview, Review, Gigs, Artist, Sync, the rest under More; today it is a menu, and
+  top versus left navigation on a desktop is still open), and the first-visit hint
+  described under Frontend conventions. Both were decided on 2026-10-31.

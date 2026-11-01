@@ -43,7 +43,9 @@ padding or the rounding.
 content — page-header controls), plus `Input`, `Textarea` and `Select`
 (`<Select filter>` for the header treatment). A file outside `ui/` that contains
 `border border-line-strong rounded-md … focus:ring-accent` fails the guard —
-that is the copy being caught.
+that is the copy being caught. A filter has no visible label (`<Select filter>` or
+a `<select>` using `FILTER`), so it carries an `aria-label`, and the guard fails
+on one that does not.
 
 **`Disclosure`** is the closed-row → open → preview → apply shell. Anything that
 writes across many rows uses it. A third hand-rolled copy fails the guard, and
@@ -59,14 +61,20 @@ it. The owner asked for this by name (it was a sentence in the admin-mode pill,
 and the sentence was most of the header), so apply it to anything new without
 being asked.
 
+One exception is decided but not built: a one-line hint under a page title on a
+first visit, dismissed once to collapse behind the icon for that account. Until
+that exists, apply the rule as written.
+
 - **`Explainer`** (`components/ui/Explainer.tsx`) is the way. Its `title` is the
   heading or the label, its children are the note, and it draws the icon beside
   the title and opens the note in place under it. A page's own description goes
   through `SectionHeader`, which wraps it.
-- **`InfoToggle`** is the same button on its own, for a note that cannot sit
-  under a title of its own: the admin-mode pill in the header, the admin search
-  field. Same glyph, colours and screen-reader name. Open the note as a row under
-  the control, not as a ribbon beside it (that is why `Explainer` has `aside`).
+- **`InfoToggle`** is the same button on its own, and **`useNote(name)`** wraps it
+  with the open state, the id, Escape and the `showHints` setting, for a note that
+  cannot sit under a title of its own: the admin-mode pill, the admin search field,
+  the tabs on a list. `const { button, note } = useNote('this tab')`, then render
+  `button` beside the control and `note(text)` as a row below it. Open the note
+  under the control, not as a ribbon beside it (that is why `Explainer` has `aside`).
 - **What stays visible** is what the person needs in order to act: a field's
   label, a count, a status, an error, and the notice beside a button that says
   what pressing it is about to do ("asks for your passkey first"). The
@@ -120,8 +128,9 @@ filters query on it — printing it is not.
 
 Do not render a path inside this repository either: `<code>docs/gmail-setup.md</code>`
 fails, because whoever reads that card may not hold the source. Variable names
-like `GOOGLE_REFRESH_TOKEN` *do* stay on configuration cards — there the
-variable name is the actionable fact.
+like `GOOGLE_REFRESH_TOKEN` *do* stay on configuration cards for the owner, where
+the variable name is the actionable fact. An artist cannot set a Worker secret, so
+anything that reaches them says the same thing in plain words.
 
 ## The app copies; it does not send
 

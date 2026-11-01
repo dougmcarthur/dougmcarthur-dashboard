@@ -65,7 +65,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
   if (error || !data) {
     return (
       <div className="rounded-xl bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
-        Failed to load overview — {(error as Error)?.message}
+        Failed to load overview: {(error as Error)?.message}
       </div>
     )
   }
@@ -102,7 +102,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
             <div className="h-40 rounded-xl border border-line bg-surface shadow-card animate-pulse" />
           ) : queue.error ? (
             <div className="rounded-xl bg-danger-bg border border-danger-line px-4 py-3 text-sm text-danger-fg">
-              Could not load the decision queue — {(queue.error as Error).message}
+              Could not load the decision queue: {(queue.error as Error).message}
             </div>
           ) : (
             <DecisionDeck
@@ -164,7 +164,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
         (queue.data?.summary.timing.length ?? 0) === 0 &&
         (queue.data?.summary.backlog.openEnded ?? 0) === 0 &&
         dueReminders.length === 0 && (
-          <p className="text-muted text-sm">All clear — nothing needs attention right now.</p>
+          <p className="text-muted text-sm">All clear. Nothing needs attention right now.</p>
         )}
     </div>
   )

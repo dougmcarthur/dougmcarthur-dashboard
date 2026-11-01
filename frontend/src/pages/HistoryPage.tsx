@@ -11,7 +11,7 @@ import {
 import { NOTIFICATION_KINDS } from '../../../shared/notifications'
 import { groupByDay } from '../../../shared/history'
 import { isOkRun } from '../../../shared/runSummary'
-import { clockTime, dayHeading, localDay, localToday, relativeTime } from '../format'
+import { clockTime, dayHeading, localDay, localToday, relativeTimeInline } from '../format'
 import { FilterChip, Icon, KindIcon } from '../components/notificationParts'
 import { StatusBadge } from '../components/StatusBadge'
 import { SkeletonList } from '../components/Skeleton'
@@ -174,7 +174,7 @@ function AttentionRow({ note, onOpen }: { note: AppNotification; onOpen: (n: App
         {note.body && <p className="mt-0.5 text-sm text-muted">{note.body}</p>}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <span className="text-xs text-muted">
-            Noticed {relativeTime(note.firstSeen).toLowerCase()} &middot; {KIND_LABELS[note.kind]}
+            Noticed {relativeTimeInline(note.firstSeen)} &middot; {KIND_LABELS[note.kind]}
           </span>
           {note.action && (
             <Button size="sm" variant="neutral" onClick={() => onOpen(note)}>

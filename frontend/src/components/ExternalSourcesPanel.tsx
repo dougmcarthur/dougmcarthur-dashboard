@@ -4,6 +4,7 @@ import { api, type CatalogSourceItem, type SourceStateId } from '../api'
 import { SOURCE_CADENCES, cadenceLabel, needsAttention, orderSources, readsPerDay } from '../../../shared/sourceControls'
 import { relativeTime, shortDate } from '../format'
 import { Button } from './ui/Button'
+import { useNote } from './ui/Explainer'
 import { Select } from './ui/Field'
 import { PagedList } from './ui/Pager'
 import { Banner, Card, EmptyState } from './ui/Surface'
@@ -62,6 +63,7 @@ const EMPTY: Record<Exclude<Filter, 'all'>, string> = {
 export function ExternalSourcesPanel() {
   const qc = useQueryClient()
   const [filter, setFilter] = useState<Filter>('all')
+  const load = useNote('how many reads a day')
 
   const sources = useQuery({ queryKey: ['admin', 'catalog', 'sources'], queryFn: api.admin.catalogSources })
 
@@ -82,12 +84,24 @@ export function ExternalSourcesPanel() {
     })
   const bulk = useMutation({
     mutationFn: async (enabled: boolean) => {
-      for (const id of picked) await api.admin.updateSource(id, { enabled })
+      // One request each, because each is its own write and its own line in the
+      // change log. A failure does not stop the rest, and is said afterwards:
+      // stopping at the first would leave some sources changed and the owner not
+      // knowing which, and stopping silently was how a half-done change looked
+      // like a whole one.
+      let failed = 0
+      for (const id of picked) {
+        try {
+          await api.admin.updateSource(id, { enabled })
+        } catch {
+          failed++
+        }
+      }
+      if (failed) throw new Error(`${failed} of ${picked.size} could not be changed. The others were.`)
     },
-    onSuccess: () => {
-      setPicked(new Set())
-      refresh()
-    },
+    onSuccess: () => setPicked(new Set()),
+    // Partly done is still done: what changed shows, and the selection stays so the rest can be tried again.
+    onSettled: refresh,
   })
   const readOne = useMutation({ mutationFn: (id: number) => api.admin.readSource(id), onSuccess: refresh })
 
@@ -95,6 +109,9 @@ export function ExternalSourcesPanel() {
   const failing = all.filter((s) => s.enabled && needsAttention(s.state))
   const switchedOff = all.filter((s) => !s.enabled)
   const shown = orderSources(filter === 'attention' ? failing : filter === 'off' ? switchedOff : all)
+
+  // A selection survives a change of tab or page, so say when some of it is out of sight.
+  const outOfView = [...picked].filter((id) => !shown.some((s) => s.id === id)).length
 
   const last = sources.data?.lastPoll ?? null
   const asked = readsPerDay(all)
@@ -131,6 +148,7 @@ export function ExternalSourcesPanel() {
       {update.error && (
         <Banner>{update.error instanceof Error ? update.error.message : 'Could not change that source.'}</Banner>
       )}
+      {bulk.error && <Banner>{bulk.error instanceof Error ? bulk.error.message : 'Could not change them.'}</Banner>}
 
       {sources.isLoading ? (
         <div className="h-24 bg-sunken rounded-xl animate-pulse" />
@@ -138,20 +156,31 @@ export function ExternalSourcesPanel() {
         <Banner>Could not load the sources: {(sources.error as Error).message}</Banner>
       ) : (
         <div className="space-y-3">
-          <Tabs
-            label="Show sources"
-            active={filter}
-            onSelect={setFilter}
-            tabs={[
-              { id: 'all', label: `All (${all.length})` },
-              { id: 'attention', label: `Needs attention (${failing.length})` },
-              { id: 'off', label: `Switched off (${switchedOff.length})` },
-            ]}
-          />
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <Tabs
+                label="Show sources"
+                active={filter}
+                onSelect={setFilter}
+                tabs={[
+                  { id: 'all', label: `All (${all.length})` },
+                  { id: 'attention', label: `Needs attention (${failing.length})` },
+                  { id: 'off', label: `Switched off (${switchedOff.length})` },
+                ]}
+              />
+            </div>
+            {capacity > 0 && asked <= capacity && load.button}
+          </div>
+          {capacity > 0 &&
+            asked <= capacity &&
+            load.note(
+              `At these settings Scout reads about ${asked} ${asked === 1 ? 'source' : 'sources'} a day, of the ${capacity} it can.`,
+            )}
 
           {picked.size > 0 && (
             <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2 text-xs text-muted">
               {picked.size} selected
+              {outOfView > 0 && `, ${outOfView} not in this view`}
               <Button size="sm" variant="neutral" disabled={bulk.isPending} onClick={() => bulk.mutate(true)}>
                 Turn on
               </Button>
@@ -195,18 +224,13 @@ export function ExternalSourcesPanel() {
             </PagedList>
           )}
 
-          {capacity > 0 &&
-            (asked > capacity ? (
-              <Banner tone="warn" size="sm">
-                These frequencies ask for about {asked} reads a day, and Scout reads at most {capacity} ({capacity / 24} an
-                hour). The oldest are read first, so some sources will be read later than chosen. Make some less frequent,
-                or switch off the ones that no longer answer.
-              </Banner>
-            ) : (
-              <p className="text-xs text-muted">
-                At these settings Scout reads about {asked} {asked === 1 ? 'source' : 'sources'} a day, of the {capacity} it can.
-              </p>
-            ))}
+          {capacity > 0 && asked > capacity && (
+            <Banner tone="warn" size="sm">
+              These frequencies ask for about {asked} reads a day, and Scout reads at most {capacity} ({capacity / 24} an
+              hour). The oldest are read first, so some sources will be read later than chosen. Make some less frequent,
+              or switch off the ones that no longer answer.
+            </Banner>
+          )}
         </div>
       )}
     </section>

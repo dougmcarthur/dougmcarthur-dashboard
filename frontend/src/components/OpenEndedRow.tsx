@@ -42,7 +42,7 @@ export function OpenEndedRow({ backlog, onNav }: { backlog: Backlog; onNav: (pag
       <p className="text-sm text-ink">
         <span className="font-semibold tabular-nums">{openEnded}</span>{' '}
         {openEnded === 1 ? 'opportunity has' : 'opportunities have'} no deadline
-        <span className="text-muted"> — open right now, nothing forcing the issue.</span>
+        <span className="text-muted">. They are open right now, with nothing forcing the issue.</span>
       </p>
       <p className="text-xs text-muted mt-1">
         {untouched > 0 && (

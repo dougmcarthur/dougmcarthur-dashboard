@@ -325,7 +325,7 @@ export function DecisionDeck({
             </span>
           </div>
 
-          <h3 className="display text-xl font-bold text-ink leading-tight">{item.title}</h3>
+          <h2 className="display text-xl font-bold text-ink leading-tight">{item.title}</h2>
           {/* What it is and where, in one line. Why it is here is the badge;
               the full sentence is in the item's detail, one click away. */}
           {(item.subtitle || item.parsed.location) && (
@@ -405,7 +405,7 @@ export function DecisionDeck({
 
           {(patch.isError || snooze.isError) && (
             <p className="mt-2 text-xs text-danger-fg">
-              Could not save that —{' '}
+              Could not save that:{' '}
               {((patch.error ?? snooze.error) as Error).message}
             </p>
           )}

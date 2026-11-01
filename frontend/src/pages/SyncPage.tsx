@@ -316,6 +316,7 @@ export function SyncPage() {
         <div className="flex flex-wrap gap-2 items-center">
           <Select
             filter
+            aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >

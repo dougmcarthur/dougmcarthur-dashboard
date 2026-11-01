@@ -25,7 +25,7 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { and, asc, desc, eq, inArray, like, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, like, or, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import {
   adminChanges,
@@ -50,7 +50,7 @@ import { inviteEmail } from '../lib/authMail'
 import { readTenantHealth } from '../lib/tenantHealth'
 import { PER_TICK, pollOne, pollSources, readLastPoll } from '../lib/sourcePoll'
 import { nextDueAt as followingRead, sourceState } from '../../shared/catalogSources'
-import { isCadence } from '../../shared/sourceControls'
+import { isCadence, needsAttention } from '../../shared/sourceControls'
 import { parsePaging } from '../../shared/pagination'
 import { describeAdminChange } from '../../shared/adminLog'
 import { MEASURED_FIELDS } from '../lib/usage'
@@ -79,6 +79,31 @@ admin.use('*', async (c, next) => {
   } catch (err) {
     console.error('admin change not logged:', err)
   }
+})
+
+/**
+ * The three numbers the sidebar shows: unread feedback, requests waiting for an
+ * answer, and sources that have stopped working.
+ *
+ * Its own route and not the three lists, because the lists are not cheap and the
+ * sidebar is on every admin page: `/catalog/sources` aggregates every candidate
+ * to count what each source found, which is the cost CLAUDE.md says the bell's
+ * polling was cut for. This reads two counts and the source rows (a few dozen)
+ * and never a candidate. A source the owner switched off is a decision and is not
+ * counted, by the same `needsAttention` the Sources page filters with.
+ */
+admin.get('/badges', async (c) => {
+  const db = getDb(c.env.DB)
+  const [unread, open, sources] = await Promise.all([
+    db.select({ n: sql<number>`count(*)` }).from(feedback).where(isNull(feedback.readAt)),
+    db.select({ n: sql<number>`count(*)` }).from(inviteRequests).where(eq(inviteRequests.status, 'new')),
+    db.select().from(catalogSources),
+  ])
+  const now = new Date()
+  const failing = sources.filter(
+    (s) => s.enabled === 1 && needsAttention(sourceState({ ...s, enabled: true }, now).state),
+  ).length
+  return c.json({ feedbackUnread: Number(unread[0].n), requestsOpen: Number(open[0].n), sourcesFailing: failing })
 })
 
 /** The change log, newest first, a screenful at a time. */

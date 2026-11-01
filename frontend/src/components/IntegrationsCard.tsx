@@ -695,20 +695,28 @@ export function IntegrationsCard() {
       {/*
         Said once at the top rather than three times down the list. One missing
         Worker secret blocks every grant, so it is a fact about the deployment
-        and not about any row — and naming the variable is the actionable part.
-        This is the one place developer-speak stays, for exactly that reason.
+        and not about any row, and naming the variable is the actionable part
+        for whoever runs the deployment. This is the one place developer-speak
+        stays, and only for the owner: an artist cannot set a Worker secret, so
+        they are told in plain words that connecting is not available.
       */}
       {blocked.length ? (
         <p className="mt-3 rounded-md border border-warn-line bg-warn-bg/60 px-3 py-2 text-xs text-warn-fg">
-          Connecting is switched off on this deployment:{' '}
-          {blocked.map((name, i) => (
-            <span key={name}>
-              {i > 0 ? (i === blocked.length - 1 ? ' and ' : ', ') : ''}
-              <code className="font-mono">{name}</code>
-            </span>
-          ))}{' '}
-          {blocked.length > 1 ? 'are' : 'is'} not set on the server. Everything already connected
-          keeps working.
+          {data?.platform === false ? (
+            'Connecting to Google is not available right now. Everything already connected keeps working.'
+          ) : (
+            <>
+              Connecting is switched off on this deployment:{' '}
+              {blocked.map((name, i) => (
+                <span key={name}>
+                  {i > 0 ? (i === blocked.length - 1 ? ' and ' : ', ') : ''}
+                  <code className="font-mono">{name}</code>
+                </span>
+              ))}{' '}
+              {blocked.length > 1 ? 'are' : 'is'} not set on the server. Everything already connected
+              keeps working.
+            </>
+          )}
         </p>
       ) : null}
 

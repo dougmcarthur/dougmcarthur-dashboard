@@ -100,15 +100,6 @@ function named(arg: string | null | undefined, owner: boolean): SettingsSectionI
 }
 
 /**
- * The page a route argument names, for this person. Anything else (a page that
- * does not exist, or an owner's page asked for by an artist) is the default, so
- * a stale link still lands somewhere.
- */
-export function settingsSectionFromArg(arg: string | null | undefined, owner: boolean): SettingsSectionId {
-  return named(arg, owner) ?? DEFAULT_SETTINGS_SECTION
-}
-
-/**
  * Which page to draw: the one the route names, or `null` for the list of pages.
  *
  * Only a narrow screen has a list (the way the iOS Settings app opens), so a

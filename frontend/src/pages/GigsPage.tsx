@@ -312,6 +312,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
         <div className="flex flex-wrap gap-2 items-center">
           <Select
             filter
+            aria-label="Filter by stage"
             value={stageFilter}
             onChange={(e) => setStageFilter(e.target.value as GigStage | '')}
           >
@@ -323,6 +324,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
             ))}
           </Select>
           <Input
+            aria-label="Search gigs by name"
             placeholder="Search by name…"
             value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
             onChange={(e) => table.getColumn('name')?.setFilterValue(e.target.value)}

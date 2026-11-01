@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { ADMIN_GROUPS, DEFAULT_ADMIN_SECTION, adminSectionFromArg, adminSectionLabel } from '../frontend/src/pages/admin/sections'
+import { ADMIN_GROUPS, DEFAULT_ADMIN_SECTION, adminSectionLabel, resolveAdminRoute } from '../frontend/src/pages/admin/sections'
 import { pageLabel, pageTitle } from '../frontend/src/hooks/usePageAnnouncement'
 
 /**
@@ -33,10 +33,10 @@ describe('the pages and the menu agree', () => {
   })
 
   it('opens the first page for a link it does not know', () => {
-    expect(adminSectionFromArg(null)).toBe(DEFAULT_ADMIN_SECTION)
-    expect(adminSectionFromArg('nope')).toBe(DEFAULT_ADMIN_SECTION)
-    expect(adminSectionFromArg('')).toBe(DEFAULT_ADMIN_SECTION)
-    for (const s of sections) expect(adminSectionFromArg(s.id)).toBe(s.id)
+    expect(resolveAdminRoute(null, false)).toBe(DEFAULT_ADMIN_SECTION)
+    expect(resolveAdminRoute('nope', false)).toBe(DEFAULT_ADMIN_SECTION)
+    expect(resolveAdminRoute('', false)).toBe(DEFAULT_ADMIN_SECTION)
+    for (const s of sections) expect(resolveAdminRoute(s.id, false)).toBe(s.id)
   })
 
   it('says which page it is in the tab, so a row of tabs tells them apart', () => {
@@ -161,11 +161,22 @@ describe('the sidebar', () => {
     expect(admin).not.toContain('aria-current')
   })
 
-  it('counts what needs the owner from the queries the pages already use, and never a source that is off', () => {
-    expect(admin).toContain("queryKey: ['admin', 'feedback']")
-    expect(admin).toContain("queryKey: ['admin', 'invite-requests']")
-    expect(admin).toContain("queryKey: ['admin', 'catalog', 'sources']")
-    expect(admin).toMatch(/s\.enabled && needsAttention\(s\.state\)/)
+  it('counts what needs the owner from one cheap route, and never reads a candidate to do it', () => {
+    expect(admin).toContain("queryKey: ['admin', 'badges']")
+    expect(admin).not.toContain("'catalog', 'sources'")
+    const router = withoutComments(read('src/routes/admin.ts'))
+    const from = router.indexOf("admin.get('/badges'")
+    expect(from).toBeGreaterThan(-1)
+    const route = router.slice(from, router.indexOf('\nadmin.', from + 1))
+    // The sources page's list aggregates every candidate; the sidebar is on every admin page.
+    expect(route).not.toContain('catalogCandidates')
+    expect(route).toMatch(/s\.enabled === 1 && needsAttention\(/)
+  })
+
+  it('is refreshed by any write, without knowing which pages can write', () => {
+    const main = read('frontend/src/main.tsx')
+    expect(main).toContain('new MutationCache(')
+    expect(main).toContain("invalidateQueries({ queryKey: ['admin', 'badges'] })")
   })
 
   it('says what a badge counts to a screen reader', () => {
@@ -197,10 +208,22 @@ describe('search is a field, not a page', () => {
     expect(box).toContain('onClick={clear}')
   })
 
+  it('works from the keyboard: down into the results, up and down between them, Enter for the first', () => {
+    expect(box).toContain("e.key === 'ArrowDown' && showing")
+    expect(box).toContain("e.key === 'Enter' && showing")
+    expect(box).toContain("e.key === 'ArrowUp'")
+    // Escape from inside the results puts focus back in the field.
+    expect(box).toMatch(/e\.key === 'Escape'\) \{\s*clear\(\)\s*field\(\)\?\.focus\(\)/)
+  })
+
+  it('announces the answer once, and does not wrap the links in a live region that reads each one', () => {
+    expect(box).toContain('role="status"')
+    expect(box).not.toContain('aria-live')
+  })
+
   it('keeps what it covers behind the info icon, as every explanation is', () => {
-    expect(box).toContain('<InfoToggle')
+    expect(box).toContain("useNote('search')")
     expect(box).toContain('never anybody&rsquo;s work')
-    expect(box).toContain('appearance.showHints')
   })
 })
 
@@ -210,20 +233,26 @@ describe('the admin-mode pill in the header', () => {
   it('says which mode this is and nothing more, with the rest behind the info icon', () => {
     const pill = layout.slice(layout.indexOf('function AdminModeBadge'), layout.indexOf('interface LayoutProps'))
     expect(pill).toContain('>Admin mode</span>')
-    expect(pill).toContain('<InfoToggle')
+    expect(pill).toContain("useNote('Admin mode')")
     // The sentence that used to be the pill is the note now, not the pill.
     expect(pill).not.toMatch(/>\s*Admin mode\s*[—-]/)
-    expect(layout).toContain('<AdminModeBadge offered={appearance.showHints} />')
+    expect(layout).toContain('<AdminModeBadge />')
   })
 
   it('opens the note as a full-width row of its own, and closes it on Escape', () => {
-    expect(layout).toContain('order-last basis-full text-xs')
-    expect(layout).toMatch(/e\.key === 'Escape' && setOpen\(false\)/)
+    expect(layout).toContain("'order-last basis-full'")
+    // Escape, the id that ties the button to the text, and the setting that hides every note are the hook's.
+    const explainer = read('frontend/src/components/ui/Explainer.tsx')
+    const hook = explainer.slice(explainer.indexOf('export function useNote'), explainer.indexOf('export interface ExplainerProps'))
+    expect(hook).toMatch(/e\.key === 'Escape' && setOpen\(false\)/)
+    expect(hook).toContain('appearance.showHints')
+    expect(hook).toContain('useId()')
   })
 
   it('shares one info button with every other note in the app', () => {
     const explainer = read('frontend/src/components/ui/Explainer.tsx')
     expect(explainer).toContain('export function InfoToggle')
     expect(explainer).toContain('<InfoToggle open={open}')
+    expect(explainer).toContain('<InfoToggle open={open} onClick={() => setOpen((o) => !o)} controls={id}')
   })
 })

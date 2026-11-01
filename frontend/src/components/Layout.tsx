@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { api } from '../api'
 import { useAppearance } from '../hooks/useAppearance'
@@ -13,7 +13,7 @@ import { useSignOut } from '../hooks/useSignOut'
 import { HelpMenu } from './HelpMenu'
 import { FeedbackModal } from './FeedbackModal'
 import { Button } from './ui/Button'
-import { InfoToggle } from './ui/Explainer'
+import { useNote } from './ui/Explainer'
 
 const NAV_LINKS = [
   { id: 'overview', label: 'Overview' },
@@ -98,31 +98,24 @@ function LeaveAdminMode() {
  * a two-word label is a ribbon four words wide. So the two are siblings in the
  * header's flex-wrap row, which is why this returns a fragment.
  */
-function AdminModeBadge({ offered }: { offered: boolean }) {
-  const [open, setOpen] = useState(false)
-  const noteId = useId()
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open])
+function AdminModeBadge() {
+  const { button, note } = useNote('Admin mode')
 
   return (
     <>
       <div className="order-last basis-full md:order-none md:basis-auto flex items-center justify-between gap-3 min-w-0">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="rounded-full bg-warn-bg px-3 py-1 text-xs font-medium text-warn-fg">Admin mode</span>
-          {offered && <InfoToggle open={open} onClick={() => setOpen((o) => !o)} controls={noteId} name="Admin mode" />}
+          {button}
         </div>
         <LeaveAdminMode />
       </div>
-      {offered && open && (
-        <p id={noteId} className="order-last basis-full text-xs leading-relaxed text-muted">
+      {note(
+        <>
           Admin mode shows who is on the platform and what their accounts cost. You cannot see anyone&rsquo;s work,
           including your own, and nothing here can open it.
-        </p>
+        </>,
+        'order-last basis-full',
       )}
     </>
   )
@@ -224,21 +217,21 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
       <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md border-b border-line print:hidden">
         <div className="shell px-4 sm:px-6 lg:px-8">
           {/* Wraps, so admin mode can take a second row on a phone. The brand
-              cannot give up the room — the product is never named on "Scout"
-              alone — and squeezed into one row the admin sentence was 80px
-              wide and 170px tall, spilling out of the header both ways. In
-              artist mode everything fits and this stays one 56px row — at
-              320px with 3px to spare, which is why the gap is 3 and not 4. */}
+              cannot give up the room: the product is never named on "Scout"
+              alone, so the header carries the whole name, and squeezed into
+              one row the admin sentence was 80px wide and 170px tall,
+              spilling out of the header both ways. In artist mode everything
+              fits and this stays one 56px row, at 320px with room to spare. */}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 min-h-14 py-2">
             <a
               href={admin ? '#admin' : '#overview'}
               className="font-semibold text-ink text-sm tracking-tight hover:text-body transition-colors shrink-0"
             >
-              Scout <span className="text-muted font-normal">— Sun Dogs Music</span>
+              Sun Dogs Music Scout
             </a>
 
             {admin ? (
-              <AdminModeBadge offered={appearance.showHints} />
+              <AdminModeBadge />
             ) : (
             <nav aria-label="Primary" className="hidden md:flex gap-0.5">
               {NAV_LINKS.map((l) => (

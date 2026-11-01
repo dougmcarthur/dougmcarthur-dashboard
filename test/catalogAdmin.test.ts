@@ -414,3 +414,63 @@ describe('the change log and the search', () => {
     expect((await t.call('GET', '/api/admin/search?q=zz', 'artist')).status).toBe(403)
   })
 })
+
+describe('the sidebar badges', () => {
+  async function withThings() {
+    stubNetwork()
+    const t = await setup()
+    for (let i = 0; i < 3; i++) await t.call('POST', '/api/admin/catalog/poll', 'owner')
+    const message = t.db.prepare(
+      `INSERT INTO feedback (tenant_id, kind, message, context, created_at, read_at) VALUES ('tnt_0001', 'idea', ?, '{}', '2026-10-06T00:00:00Z', ?)`,
+    )
+    message.run('first', null)
+    message.run('second', null)
+    message.run('third, already read', '2026-10-06T01:00:00Z')
+    const request = t.db.prepare(
+      `INSERT INTO invite_requests (name, email, message, status, created_at) VALUES (?, ?, 'hello', ?, '2026-10-06T00:00:00Z')`,
+    )
+    request.run('Waiting', 'waiting@example.test', 'new')
+    request.run('Answered', 'answered@example.test', 'invited')
+    return t
+  }
+
+  const ATTENTION = ['overdue', 'stale', 'empty', 'refused', 'unreachable']
+  const failingOf = async (t: Awaited<ReturnType<typeof setup>>) => {
+    const { items } = await (await t.call('GET', '/api/admin/catalog/sources', 'owner')).json()
+    return items.filter((s: { enabled: boolean; state: string }) => s.enabled && ATTENTION.includes(s.state))
+  }
+
+  it('counts what is unread, what is waiting and what has stopped answering, and nothing answered or read', async () => {
+    const t = await withThings()
+    const failing = await failingOf(t)
+    // The fixtures include a dead feed, an empty calendar and a 404, so this is not a count of zero.
+    expect(failing.length).toBeGreaterThan(0)
+    const badges = await (await t.call('GET', '/api/admin/badges', 'owner')).json()
+    expect(badges).toEqual({ feedbackUnread: 2, requestsOpen: 1, sourcesFailing: failing.length })
+  })
+
+  it('does not count a source the owner has switched off, which is how a badge on a dead one clears', async () => {
+    const t = await withThings()
+    const before = await failingOf(t)
+    await t.call('PATCH', `/api/admin/catalog/sources/${before[0].id}`, 'owner', { enabled: false })
+    const after = (await (await t.call('GET', '/api/admin/badges', 'owner')).json()).sourcesFailing
+    expect(after).toBe(before.length - 1)
+  })
+
+  it('is zero everywhere on an empty deployment', async () => {
+    const t = await setup()
+    expect(await (await t.call('GET', '/api/admin/badges', 'owner')).json()).toEqual({
+      feedbackUnread: 0,
+      requestsOpen: 0,
+      sourcesFailing: 0,
+    })
+  })
+
+  it('is the owner’s alone', async () => {
+    const t = await setup()
+    expect((await t.call('GET', '/api/admin/badges', 'nobody')).status).toBe(401)
+    for (const who of ['artist', 'agent', 'ownerArtistMode'] as const) {
+      expect((await t.call('GET', '/api/admin/badges', who)).status, who).toBe(403)
+    }
+  })
+})

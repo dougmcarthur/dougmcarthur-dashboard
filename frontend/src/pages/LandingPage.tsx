@@ -48,9 +48,7 @@ export function LandingPage({ onSignIn }: { onSignIn: () => void }) {
     <div className="min-h-screen bg-canvas">
       <header className="border-b border-line">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-          <p className="font-semibold text-ink text-sm tracking-tight">
-            Scout <span className="text-faint font-normal">— Sun Dogs Music</span>
-          </p>
+          <p className="font-semibold text-ink text-sm tracking-tight">Sun Dogs Music Scout</p>
           <Button variant="neutral" onClick={onSignIn}>
             Sign in
           </Button>
@@ -275,7 +273,7 @@ function SamplePreview() {
             className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-b from-surface/0 via-surface/80 to-surface flex items-end justify-center pb-5"
             aria-hidden
           >
-            <span className="text-xs font-medium text-muted">An example — members see the full list</span>
+            <span className="text-xs font-medium text-muted">An example: members see the full list</span>
           </div>
         </div>
       )}
@@ -311,7 +309,7 @@ function RequestInvitation() {
 
         {send.isSuccess ? (
           <div className="rounded-lg border border-success-line bg-success-bg px-4 py-3 space-y-1" role="status">
-            <p className="text-sm font-medium text-success-fg">Thanks, {name.trim().split(' ')[0] || 'friend'} — your request is in.</p>
+            <p className="text-sm font-medium text-success-fg">Thanks, {name.trim().split(' ')[0] || 'friend'}. Your request is in.</p>
             <p className="text-sm text-body">We’ll reply to {email.trim()}.</p>
           </div>
         ) : (
