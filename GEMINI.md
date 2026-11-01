@@ -1,6 +1,6 @@
 # Sun Dogs Music Scout — Project Instructions & Invariants
 
-> **Context for Antigravity**: This project was originally built with Claude Code. `CLAUDE.md` (163 KB / 2,460 lines) is an append-only architectural narrative and exceeds Antigravity's 24 KB per-file rule limit. This `GEMINI.md` distils every active rule, invariant, and convention into a single always-on reference. Consult `CLAUDE.md` and `docs/*.md` when investigating the history of a specific subsystem.
+> **Context for Antigravity**: This project was originally built with Claude Code. `CLAUDE.md` (about 74 KB / 1,000 lines) is the full current-state reference and still exceeds Antigravity's 24 KB per-file rule limit. This `GEMINI.md` distils every active rule, invariant, and convention into a single always-on reference. Consult `CLAUDE.md` and `docs/*.md` when investigating the history of a specific subsystem.
 
 ---
 
