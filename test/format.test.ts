@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shortDate, relativeTime, localDay, dayHeading } from '../frontend/src/format'
+import { shortDate, relativeTime, relativeTimeInline, localDay, dayHeading } from '../frontend/src/format'
 
 const now = new Date('2026-08-24T12:00:00Z')
 
@@ -47,6 +47,25 @@ describe('relativeTime', () => {
 
   it('passes an unparseable value through rather than rendering Invalid Date', () => {
     expect(relativeTime('rolling intake', now)).toBe('rolling intake')
+  })
+})
+
+describe('relativeTimeInline', () => {
+  const now = new Date('2026-08-25T12:00:00.000Z')
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString()
+  const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR
+
+  it('lowers the two words that start with a capital', () => {
+    expect(relativeTimeInline(ago(20 * 1000), now)).toBe('just now')
+    expect(relativeTimeInline(ago(1 * DAY), now)).toBe('yesterday')
+  })
+
+  // The History page used to lower-case the whole string, so a date read "oct 7".
+  it('leaves a date and the other forms as they are', () => {
+    expect(relativeTimeInline(ago(23 * DAY), now)).toBe('Aug 2')
+    expect(relativeTimeInline(ago(9 * MIN), now)).toBe('9m ago')
+    expect(relativeTimeInline(ago(4 * DAY), now)).toBe('4 days ago')
+    expect(relativeTimeInline('rolling intake', now)).toBe('rolling intake')
   })
 })
 

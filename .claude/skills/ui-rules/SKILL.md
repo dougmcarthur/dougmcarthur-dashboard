@@ -43,7 +43,9 @@ padding or the rounding.
 content — page-header controls), plus `Input`, `Textarea` and `Select`
 (`<Select filter>` for the header treatment). A file outside `ui/` that contains
 `border border-line-strong rounded-md … focus:ring-accent` fails the guard —
-that is the copy being caught.
+that is the copy being caught. A filter has no visible label (`<Select filter>` or
+a `<select>` using `FILTER`), so it carries an `aria-label`, and the guard fails
+on one that does not.
 
 **`Disclosure`** is the closed-row → open → preview → apply shell. Anything that
 writes across many rows uses it. A third hand-rolled copy fails the guard, and
@@ -58,6 +60,10 @@ note in the app does, so a screen holds what you act on and not paragraphs about
 it. The owner asked for this by name (it was a sentence in the admin-mode pill,
 and the sentence was most of the header), so apply it to anything new without
 being asked.
+
+One exception is decided but not built: a one-line hint under a page title on a
+first visit, dismissed once to collapse behind the icon for that account. Until
+that exists, apply the rule as written.
 
 - **`Explainer`** (`components/ui/Explainer.tsx`) is the way. Its `title` is the
   heading or the label, its children are the note, and it draws the icon beside
@@ -122,8 +128,9 @@ filters query on it — printing it is not.
 
 Do not render a path inside this repository either: `<code>docs/gmail-setup.md</code>`
 fails, because whoever reads that card may not hold the source. Variable names
-like `GOOGLE_REFRESH_TOKEN` *do* stay on configuration cards — there the
-variable name is the actionable fact.
+like `GOOGLE_REFRESH_TOKEN` *do* stay on configuration cards for the owner, where
+the variable name is the actionable fact. An artist cannot set a Worker secret, so
+anything that reaches them says the same thing in plain words.
 
 ## The app copies; it does not send
 

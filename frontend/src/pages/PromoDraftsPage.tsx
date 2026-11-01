@@ -70,11 +70,12 @@ export function PromoDraftsPage() {
       (monthFilter === '' || d.month === monthFilter),
   )
   const filtered = statusFilter !== '' || monthFilter !== ''
+  const posted = data.filter((d) => d.status === 'published').length
 
   if (error) {
     return (
       <Banner>
-        Failed to load promo drafts — {(error as Error).message}
+        Failed to load promo drafts: {(error as Error).message}
       </Banner>
     )
   }
@@ -144,12 +145,13 @@ export function PromoDraftsPage() {
                     {draft.status === 'draft' && (
                       <Button variant="good" size="sm"
                         disabled={patchMutation.isPending}
+                        title="Records that you posted this yourself. Scout does not post it for you."
                         onClick={(e) => {
                           e.stopPropagation()
                           patchMutation.mutate({ id: draft.id, body: { status: 'published' } })
                         }}
                       >
-                        Publish
+                        Mark published
                       </Button>
                     )}
                     <Button
@@ -208,7 +210,9 @@ export function PromoDraftsPage() {
 
       {!isLoading && (
         <p className="text-xs text-muted tabular-nums">
-          {filtered ? `${visible.length} of ${data.length} drafts` : `${data.length} drafts`}
+          {filtered
+            ? `${visible.length} of ${data.length} ${data.length === 1 ? 'draft' : 'drafts'}`
+            : `${data.length} ${data.length === 1 ? 'draft' : 'drafts'}${posted > 0 ? `, ${posted} marked published` : ''}`}
         </p>
       )}
       {ConfirmDialog}

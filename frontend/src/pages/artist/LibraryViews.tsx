@@ -231,8 +231,14 @@ export function ProfileView({
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
             {[hometown, genre, lineup].map((a) =>
               a ? (
-                <button key={a.id} type="button" onClick={() => onOpen(a)} className="hover:text-ink transition-colors text-left">
-                  {firstLine(a.value).slice(0, 60)}
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => onOpen(a)}
+                  title={firstLine(a.value)}
+                  className="min-w-0 max-w-full truncate hover:text-ink transition-colors text-left"
+                >
+                  {firstLine(a.value)}
                 </button>
               ) : null,
             )}

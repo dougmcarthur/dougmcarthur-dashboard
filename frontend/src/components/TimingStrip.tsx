@@ -153,7 +153,7 @@ export function TimingStrip({
             // and saying so is the difference between a countdown you can act
             // on and one you have to go and verify first.
             meta={`${row.approximate ? 'about ' : ''}${shortDate(row.date)}${
-              row.approximate ? ' — recovered from the note' : ''
+              row.approximate ? ', recovered from the note' : ''
             }`}
             tone={BAND_STYLE[row.band]}
             right={countdown(row.band, row.daysUntil)}

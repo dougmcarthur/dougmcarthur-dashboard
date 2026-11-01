@@ -64,6 +64,18 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
 }
 
 /**
+ * `relativeTime` for the middle of a sentence: "noticed yesterday", "last used
+ * Oct 7".
+ *
+ * Only the two words that open with a capital are lowered. A blanket
+ * `toLowerCase()` turned a date into "oct 7", because the value can be either.
+ */
+export function relativeTimeInline(iso: string, now: Date = new Date()): string {
+  const shown = relativeTime(iso, now)
+  return shown === 'Just now' || shown === 'Yesterday' ? shown.toLowerCase() : shown
+}
+
+/**
  * The reader's own calendar day for an instant, as YYYY-MM-DD.
  *
  * What a timeline groups by. The server's UTC day is wrong for exactly the

@@ -85,7 +85,8 @@ function Segmented<T extends string>({
 }
 
 
-const APPEARANCE_TEXT = 'Saved in this browser only. The dashboard itself is unchanged for anyone else.'
+const APPEARANCE_TEXT =
+  'Your colour theme follows your account. The other settings are saved in this browser only. Nobody else sees any of them.'
 
 export function AppearanceSettings({ titled = true }: { /** False where the page already carries the title. */ titled?: boolean } = {}) {
   const { appearance: a, set, reset, resolved } = useAppearance()

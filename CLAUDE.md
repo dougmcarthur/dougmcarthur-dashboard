@@ -14,7 +14,8 @@ write "Sun Dogs Music Scout" and never brand on "Scout" alone (Scouting America
 enforces on a dilution theory, including against unrelated trades). "Music Scout" is
 avoided because in the trade it means an A&R person scouting *talent*. Email
 subjects and the From name lead with the product name; respondent-facing survey
-text names Sun Dogs Music and no product.
+text names Sun Dogs Music and no product. The header, the landing page, the sign-in
+title and the welcome screens all carry the whole name in one weight.
 
 **Names that look stale are not.** The D1 database is still `dougmcarthur-music-hq`
 (a rename is a data migration) and the Worker is `sun-dogs-scout`. The repository,
@@ -65,7 +66,8 @@ These recur in every area below. They are stated once here and not repeated.
 - **Screens name things and never print identifiers.** `taskLabel` (`shared/taskLabels.ts`) renders an
   agent's `task_id`, table names go through `tableLabel`, the set of agents is not
   closed so anything unknown is humanised. The exception is the integration cards,
-  where the variable name is the actionable fact.
+  where the variable name is the actionable fact, and only to the owner: an artist
+  cannot set a Worker secret, so they read a plain sentence instead.
 
 ## Working here
 
@@ -877,12 +879,16 @@ checklist for what `test/uiConsistency.test.ts` enforces.
   admin-mode pill carried a whole sentence. What stays visible is what a person needs in
   order to act: labels, counts, statuses, errors, and the line beside a button saying
   what pressing it will do. `showHints` hides every icon, so a note never holds the only
-  copy of a warning.
+  copy of a warning. A one-line hint under a page title on a first visit, dismissed once
+  to collapse behind the icon for that account, is decided but not built (see the last
+  section); until it is, nothing explanatory shows by default.
 - **Buttons and inputs come from `components/ui/`.** `Button` takes a variant named for
   meaning (`primary`, `neutral`, `quiet`, `good`, `danger`, `info`); `Field` exports
   `FIELD` and `FILTER`; `SectionHeader`, `SidebarShell`, `Pager`/`PagedList`, `Toggle`
   and `Disclosure` are shared. `test/uiConsistency.test.ts` fails on a hover state that
-  repeats the fill, a re-declared input class, or a third hand-rolled `Disclosure`.
+  repeats the fill, a re-declared input class, or a third hand-rolled `Disclosure`. A
+  filter control has no visible label, so it carries an `aria-label`; the same file fails
+  on one that does not.
 - **A control that names a status is a claim about legality.** The Review bar and the
   Overview deck derive from `nextGigStatuses` through `decisionFor`; a same-status target
   counts as refused (it wrote nothing and dealt the same card back).
@@ -1009,3 +1015,7 @@ and not invented; questionnaire and method are in `docs/artist-survey-questionna
 - **No hiding survey factors** by who the respondent is, and **no model-matching per
   artist** without notice and consent (the privacy policy promises it; the plan is
   `docs/matching-gaps.md`).
+- **Decided, not built yet:** on a phone the main navigation becomes a bottom tab bar
+  (Overview, Review, Gigs, Artist, Sync, the rest under More; today it is a menu, and
+  top versus left navigation on a desktop is still open), and the first-visit hint
+  described under Frontend conventions. Both were decided on 2026-10-31.

@@ -357,7 +357,7 @@ const PUBLISH_PROMO: PromoMove = {
  * status: two checks side by side, with only a tooltip to tell them apart,
  * and Approve still showing on copy already published. A card takes the first
  * move here; the Review bar lists them all, since going straight from draft to
- * published is allowed — the Promo page's Publish button does exactly that.
+ * published is allowed — the Promo page's Mark published button does exactly that.
  *
  * The column is free text (see shared/types.ts), so a status not named here is
  * read as approved, which is what the sentence says about it too: only

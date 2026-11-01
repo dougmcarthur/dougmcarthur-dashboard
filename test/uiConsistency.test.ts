@@ -1014,3 +1014,41 @@ describe('Phase 2 ergonomics and primitives', () => {
   })
 })
 
+
+/**
+ * A filter in a page header has no visible label, so without an `aria-label` it
+ * is announced as "combobox" and nothing else. The Gigs stage select and search,
+ * the Sync status select and the Artist category select all shipped that way.
+ */
+function openingTag(src: string, start: number): string {
+  let depth = 0
+  for (let i = start; i < src.length; i++) {
+    const c = src[i]
+    if (c === '{') depth++
+    else if (c === '}') depth--
+    else if (c === '>' && depth === 0) return src.slice(start, i + 1)
+  }
+  return src.slice(start)
+}
+
+describe('filter controls have a name', () => {
+  it('gives every header filter an aria-label', () => {
+    const offenders: string[] = []
+    for (const file of FILES.filter((f) => !/[\/]ui[\/]/.test(f))) {
+      const src = withoutComments(readFileSync(file, 'utf8'))
+      for (const m of src.matchAll(/<(?:Select|select)\b/g)) {
+        const tag = openingTag(src, m.index!)
+        const isFilter = /\bfilter\b/.test(tag) || /\bFILTER\b/.test(tag)
+        // Named by its own attribute, by an id that a label points at, or by
+        // sitting inside a <label> that is still open.
+        const before = src.slice(Math.max(0, m.index! - 600), m.index!)
+        const wrapped = before.lastIndexOf('<label') > before.lastIndexOf('</label>')
+        const named = /aria-label(?:ledby)?=/.test(tag) || /\bid=/.test(tag) || wrapped
+        if (isFilter && !named) {
+          offenders.push(`${file}: ${tag.replace(/\s+/g, ' ').slice(0, 70)}`)
+        }
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})

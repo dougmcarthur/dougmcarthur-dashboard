@@ -472,7 +472,7 @@ Prior to delivering any frontend changes, all automated verification gates must 
 - [x] **TypeScript Multi-Config Compilation (`npm run typecheck`)**: Must produce 0 errors across `tsconfig.json`, `tsconfig.frontend.json`, and `tsconfig.scripts.json`.
 
 ### 7.2 Non-Negotiable Product Invariant Audit
-- [x] **Brand Lockup**: Header says "Scout — Sun Dogs Music" with `text-muted` subtitle; public survey pages say "Sun Dogs Music" with 0 occurrences of "Scout".
+- [x] **Brand Lockup**: Header says "Sun Dogs Music Scout" in one weight; public survey pages say "Sun Dogs Music" with 0 occurrences of "Scout".
 - [x] **Scout Never Sends or Submits**: All external communication actions say **Copy**, **Create drafts**, or **Open in Gmail**.
 - [x] **Preview-Then-Apply Disclosures**: Bulk operations (`/api/sync/reconcile`, `/api/gmail/drafts`, `/api/backfill/notes`, `/api/connectors/associations/:id/import`) strictly retain `<Disclosure>` read-only previews.
 - [x] **Credential / Token Security**: Tokens in `#join/<token>` and `#epk/<token>` remain strictly in URL fragments and request bodies; never in path params.

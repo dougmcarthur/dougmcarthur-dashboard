@@ -140,9 +140,7 @@ export function FlowShell({
       </div>
 
       <div className="flex items-center justify-between px-4 sm:px-8 py-3 shrink-0">
-        <p className="text-sm font-semibold text-ink">
-          Scout <span className="text-faint font-normal">— Sun Dogs Music</span>
-        </p>
+        <p className="text-sm font-semibold text-ink">Sun Dogs Music Scout</p>
         <Button variant="quiet" size="sm" onClick={onClose}>
           {closeLabel} <Kbd>Esc</Kbd>
         </Button>

@@ -217,17 +217,17 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
       <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md border-b border-line print:hidden">
         <div className="shell px-4 sm:px-6 lg:px-8">
           {/* Wraps, so admin mode can take a second row on a phone. The brand
-              cannot give up the room — the product is never named on "Scout"
-              alone — and squeezed into one row the admin sentence was 80px
-              wide and 170px tall, spilling out of the header both ways. In
-              artist mode everything fits and this stays one 56px row — at
-              320px with 3px to spare, which is why the gap is 3 and not 4. */}
+              cannot give up the room: the product is never named on "Scout"
+              alone, so the header carries the whole name, and squeezed into
+              one row the admin sentence was 80px wide and 170px tall,
+              spilling out of the header both ways. In artist mode everything
+              fits and this stays one 56px row, at 320px with room to spare. */}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 min-h-14 py-2">
             <a
               href={admin ? '#admin' : '#overview'}
               className="font-semibold text-ink text-sm tracking-tight hover:text-body transition-colors shrink-0"
             >
-              Scout <span className="text-muted font-normal">— Sun Dogs Music</span>
+              Sun Dogs Music Scout
             </a>
 
             {admin ? (
