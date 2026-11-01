@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import { AuthGate } from './components/AuthGate'
 import { AppearanceProvider } from './hooks/useAppearance'
@@ -14,7 +14,15 @@ import './index.css'
 // screen — the thing dark mode is most often turned on to avoid.
 applyAppearance(loadAppearance())
 
-const queryClient = new QueryClient({
+const queryClient: QueryClient = new QueryClient({
+  // Any successful write may change what the admin sidebar counts, and it is
+  // cheaper to ask again than to know which writes can. Nothing happens when the
+  // badges are not on screen: an inactive query is only marked stale.
+  mutationCache: new MutationCache({
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'badges'] })
+    },
+  }),
   defaultOptions: {
     queries: { staleTime: 30_000, retry: 1 },
   },

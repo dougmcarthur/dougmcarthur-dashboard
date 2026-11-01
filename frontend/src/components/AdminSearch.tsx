@@ -1,8 +1,7 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { api } from '../api'
-import { useAppearance } from '../hooks/useAppearance'
-import { InfoToggle } from './ui/Explainer'
+import { useNote } from './ui/Explainer'
 import { Input } from './ui/Field'
 
 /**
@@ -25,10 +24,9 @@ export function AdminSearch() {
   const [typed, setTyped] = useState('')
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(true)
-  const [noteOpen, setNoteOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
-  const noteId = useId()
-  const { appearance } = useAppearance()
+  const panel = useRef<HTMLDivElement>(null)
+  const { button, note } = useNote('search')
 
   useEffect(() => {
     const t = window.setTimeout(() => setQ(typed.trim()), 300)
@@ -59,6 +57,10 @@ export function AdminSearch() {
     setQ('')
   }
 
+  const hits = () => [...(panel.current?.querySelectorAll<HTMLAnchorElement>('a') ?? [])]
+  const field = () => document.getElementById('admin-search') as HTMLInputElement | null
+  const hitCount = groups.reduce((n, g) => n + g.hits.length, 0)
+
   return (
     <div ref={box} className="relative">
       <div className="flex items-center gap-3">
@@ -76,27 +78,62 @@ export function AdminSearch() {
             setOpen(true)
           }}
           onFocus={() => setOpen(true)}
+          aria-controls="admin-search-results"
           onKeyDown={(e) => {
             if (e.key === 'Escape') clear()
+            // Down goes into the results and Enter takes the first, so the field
+            // can be used without leaving the keyboard.
+            else if (e.key === 'ArrowDown' && showing) {
+              e.preventDefault()
+              hits()[0]?.focus()
+            } else if (e.key === 'Enter' && showing) {
+              const first = hits()[0]
+              if (first) {
+                e.preventDefault()
+                first.click()
+              }
+            }
           }}
         />
-        {appearance.showHints && (
-          <InfoToggle open={noteOpen} onClick={() => setNoteOpen((o) => !o)} controls={noteId} name="search" className="ml-1" />
-        )}
+        {button && <span className="ml-1">{button}</span>}
       </div>
 
-      {appearance.showHints && noteOpen && (
-        <p id={noteId} className="mt-2 text-xs leading-relaxed text-muted">
+      {note(
+        <>
           Looks in artist names, requests to join, feedback, external data sources and landing page listings. It finds
           names and wording, never anybody&rsquo;s work.
-        </p>
+        </>,
+        'mt-2',
       )}
+
+      {/* Said once when the answer arrives, from a region that was already there.
+          The results themselves are links, and a live region around links reads
+          every one of them out as it appears. */}
+      <p role="status" className="sr-only">
+        {showing && !found.isLoading && !found.error ? (hitCount === 0 ? 'Nothing matches that.' : `${hitCount} results`) : ''}
+      </p>
 
       {showing && (
         <div
+          ref={panel}
+          id="admin-search-results"
           role="region"
           aria-label="Search results"
-          aria-live="polite"
+          onKeyDown={(e) => {
+            const all = hits()
+            const at = all.indexOf(document.activeElement as HTMLAnchorElement)
+            if (e.key === 'ArrowDown') {
+              e.preventDefault()
+              all[Math.min(at + 1, all.length - 1)]?.focus()
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault()
+              if (at <= 0) field()?.focus()
+              else all[at - 1]?.focus()
+            } else if (e.key === 'Escape') {
+              clear()
+              field()?.focus()
+            }
+          }}
           className="absolute inset-x-0 top-full z-30 mt-1.5 max-h-[70vh] overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-pop lg:right-auto lg:w-[26rem]"
         >
           {found.error ? (

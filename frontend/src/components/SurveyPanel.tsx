@@ -483,11 +483,14 @@ function ResultsTab({
 function PublishTab({ config, failedCheck, speeders }: { config: SurveyConfigView; failedCheck: boolean; speeders: boolean }) {
   return (
     <>
-      <p className="text-xs text-muted">
-        {failedCheck || speeders
-          ? `Leaving out ${[failedCheck && 'those who failed the attention check', speeders && 'the fastest'].filter(Boolean).join(' and ')}, as chosen on the Results tab.`
-          : 'Nobody is left out. The Results tab has the two exclusions that would apply here.'}
-      </p>
+      {/* A state, so it stays visible, and only when there is one: it says what is
+          about to be left out of a public page. Nothing left out needs no sentence. */}
+      {(failedCheck || speeders) && (
+        <p className="text-xs text-muted">
+          Leaving out {[failedCheck && 'those who failed the attention check', speeders && 'the fastest'].filter(Boolean).join(' and ')}
+          , as chosen on the Results tab.
+        </p>
+      )}
       <SurveyPublish
         failedCheck={failedCheck}
         speeders={speeders}

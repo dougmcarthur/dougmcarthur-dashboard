@@ -97,6 +97,44 @@ export function InfoToggle({
   )
 }
 
+/**
+ * A note whose button and text sit in different places: the button beside a
+ * control, the text as a row of its own below. It owns the state, the id that
+ * ties them together, Escape to close, and the appearance setting that hides
+ * every note, so the places that cannot be an `Explainer` (the admin-mode pill,
+ * the admin search field, the tabs on a list) each get all four rather than
+ * writing them out again.
+ *
+ * `button` is `null` when the person has switched explanations off, and so is
+ * what `note()` returns, which is what lets a caller render both unconditionally.
+ */
+export function useNote(name: string): {
+  button: ReactNode
+  note: (text: ReactNode, className?: string) => ReactNode
+} {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  const { appearance } = useAppearance()
+  const offered = appearance.showHints
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open])
+
+  return {
+    button: offered ? <InfoToggle open={open} onClick={() => setOpen((o) => !o)} controls={id} name={name} /> : null,
+    note: (text, className = '') =>
+      offered && open ? (
+        <p id={id} className={`text-xs leading-relaxed text-muted ${className}`}>
+          {text}
+        </p>
+      ) : null,
+  }
+}
+
 export interface ExplainerProps {
   /** The title it sits beside. A string, because it is also the button's name. */
   title: ReactNode

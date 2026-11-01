@@ -63,10 +63,12 @@ being asked.
   heading or the label, its children are the note, and it draws the icon beside
   the title and opens the note in place under it. A page's own description goes
   through `SectionHeader`, which wraps it.
-- **`InfoToggle`** is the same button on its own, for a note that cannot sit
-  under a title of its own: the admin-mode pill in the header, the admin search
-  field. Same glyph, colours and screen-reader name. Open the note as a row under
-  the control, not as a ribbon beside it (that is why `Explainer` has `aside`).
+- **`InfoToggle`** is the same button on its own, and **`useNote(name)`** wraps it
+  with the open state, the id, Escape and the `showHints` setting, for a note that
+  cannot sit under a title of its own: the admin-mode pill, the admin search field,
+  the tabs on a list. `const { button, note } = useNote('this tab')`, then render
+  `button` beside the control and `note(text)` as a row below it. Open the note
+  under the control, not as a ribbon beside it (that is why `Explainer` has `aside`).
 - **What stays visible** is what the person needs in order to act: a field's
   label, a count, a status, an error, and the notice beside a button that says
   what pressing it is about to do ("asks for your passkey first"). The

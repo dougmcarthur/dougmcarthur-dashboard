@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { slugFor } from '../shared/slug'
-import { DEFAULT_SETTINGS_SECTION, settingsSectionFromArg } from '../frontend/src/pages/settings/sections'
+import { DEFAULT_SETTINGS_SECTION, resolveSettingsRoute } from '../frontend/src/pages/settings/sections'
 
 /**
  * Settings is a sidebar of pages, and every link into it still lands where it
@@ -16,14 +16,14 @@ describe('Settings sections', () => {
 
   it('opens on Google account unless the address names another page', () => {
     expect(DEFAULT_SETTINGS_SECTION).toBe('google')
-    expect(settingsSectionFromArg(null, false)).toBe('google')
-    expect(settingsSectionFromArg('nope', true)).toBe('google')
+    expect(resolveSettingsRoute(null, false, false)).toBe('google')
+    expect(resolveSettingsRoute('nope', true, false)).toBe('google')
     expect(readFileSync('frontend/src/App.tsx', 'utf8')).toContain('<SettingsPage section={settingsSection} />')
   })
 
   it('sends the digest opt-out to the page that switches it off', () => {
     expect(readFileSync('src/lib/digestMail.ts', 'utf8')).toContain('#settings/reminders')
-    expect(settingsSectionFromArg('reminders', false)).toBe('reminders')
+    expect(resolveSettingsRoute('reminders', false, false)).toBe('reminders')
     expect(page).toMatch(/case 'reminders':[\s\S]*<DigestSettingsCard \/>/)
   })
 

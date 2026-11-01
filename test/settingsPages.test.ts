@@ -6,7 +6,6 @@ import {
   LEGACY,
   SETTINGS_GROUPS,
   settingsGroupsFor,
-  settingsSectionFromArg,
   resolveSettingsRoute,
   settingsSectionLabel,
 } from '../frontend/src/pages/settings/sections'
@@ -72,15 +71,15 @@ describe('the pages and the menu agree', () => {
 
 describe('an address that was valid yesterday', () => {
   it('reads the four old tabs as the pages that replaced them', () => {
-    expect(settingsSectionFromArg('connections', false)).toBe('google')
-    expect(settingsSectionFromArg('account', false)).toBe('profile')
-    expect(settingsSectionFromArg('reminders', false)).toBe('reminders')
-    expect(settingsSectionFromArg('appearance', false)).toBe('appearance')
+    expect(resolveSettingsRoute('connections', false, false)).toBe('google')
+    expect(resolveSettingsRoute('account', false, false)).toBe('profile')
+    expect(resolveSettingsRoute('reminders', false, false)).toBe('reminders')
+    expect(resolveSettingsRoute('appearance', false, false)).toBe('appearance')
   })
 
   it('lands somewhere for one that never existed, including none at all', () => {
     for (const arg of [null, undefined, '', 'nope', 'Profile', '../admin']) {
-      expect(settingsSectionFromArg(arg, true)).toBe(DEFAULT_SETTINGS_SECTION)
+      expect(resolveSettingsRoute(arg, true, false)).toBe(DEFAULT_SETTINGS_SECTION)
     }
   })
 
@@ -122,8 +121,8 @@ describe('the owner’s pages', () => {
     const artist = settingsGroupsFor(false).flatMap((g) => g.sections.map((s) => s.id))
     for (const id of ownerIds) {
       expect(artist).not.toContain(id)
-      expect(settingsSectionFromArg(id, false)).toBe(DEFAULT_SETTINGS_SECTION)
-      expect(settingsSectionFromArg(id, true)).toBe(id)
+      expect(resolveSettingsRoute(id, false, false)).toBe(DEFAULT_SETTINGS_SECTION)
+      expect(resolveSettingsRoute(id, true, false)).toBe(id)
     }
     expect(settingsGroupsFor(true).map((g) => g.label)).toContain('Owner')
     expect(settingsGroupsFor(false).map((g) => g.label)).not.toContain('Owner')

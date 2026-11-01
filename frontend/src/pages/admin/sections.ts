@@ -70,13 +70,8 @@ export const DEFAULT_ADMIN_SECTION: AdminSectionId = 'artists'
 
 const ALL: readonly AdminSectionDef[] = ADMIN_GROUPS.flatMap((g) => g.sections)
 
-export function isAdminSection(value: string | null | undefined): value is AdminSectionId {
+function isAdminSection(value: string | null | undefined): value is AdminSectionId {
   return ALL.some((s) => s.id === value)
-}
-
-/** The section a route argument names; anything else is the first page, so a stale link still lands somewhere. */
-export function adminSectionFromArg(arg: string | null | undefined): AdminSectionId {
-  return isAdminSection(arg) ? arg : DEFAULT_ADMIN_SECTION
 }
 
 /**

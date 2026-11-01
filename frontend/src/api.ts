@@ -1016,6 +1016,8 @@ export const api = {
       apiFetch<{ total: number; items: Array<{ id: number; at: string; summary: string }> }>(
         `/admin/changes?limit=${opts.limit}&offset=${opts.offset}`,
       ),
+    /** What wants the owner's attention, as three numbers, for the sidebar. */
+    badges: () => apiFetch<AdminBadges>('/admin/badges'),
     search: (q: string) =>
       apiFetch<{ q: string; groups: Array<{ section: string; label: string; hits: Array<{ id: string; text: string }> }> }>(
         `/admin/search?q=${encodeURIComponent(q)}`,
@@ -1559,6 +1561,12 @@ export interface CatalogSourceItem {
   /** A sentence: what the last read says about it. */
   note: string
   counts: { calls: number; unclear: number; past: number; ignored: number }
+}
+
+export interface AdminBadges {
+  feedbackUnread: number
+  requestsOpen: number
+  sourcesFailing: number
 }
 
 export interface CatalogSources {
