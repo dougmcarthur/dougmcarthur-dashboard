@@ -25,6 +25,12 @@ quietly creates a second Worker with the D1 binding, email binding and hourly cr
 but no domain or secrets, running the scheduled jobs against production beside the
 real one. The 2026-09-14 rename did this once.
 
+**Keeping this file current.** When a change alters a rule, edit the sentence that states
+it. Do not add how the problem was found, what the rule replaced, or a count measured
+once: the commit message and `docs/` hold that. A paragraph earns its place when a
+future change would otherwise undo it or miss it, and a dropped idea stays only if
+someone would plausibly propose it again (see the last section).
+
 ## Principles the code keeps
 
 These recur in every area below. They are stated once here and not repeated.
@@ -700,7 +706,10 @@ the calendar until Accepted. `archived` shows as Closed with no outcome.
   `updated_at` is left alone, or every snooze would wake. `POST /api/backfill/notes`
   and a one-shot on the cron (`runNotesBackfillOnce`, marker `once.notesBackfill` written after success)
   cover older rows. Rendered shapes (`requirements`, `dealTerms`, drafted values) stay
-  derived: a stored copy is a parser cache with a staleness bug.
+  derived: a stored copy is a parser cache with a staleness bug. `organizer`,
+  `audience_size`, `genre_fit_score` and `agency_type` stay NULL on purpose, because no
+  note carries them in a form anything can read; the Gigs table hides a column no row
+  has filled (`frontend/src/pages/GigsPage.tsx`).
 - **Note prose names the artist, and the name comes from the account**
   (`tenants.display_name` as `ArtistNames`). `depersonalise` rewrites it to the second
   person on the way to the screen and never in drafted field values; pronouns change

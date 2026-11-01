@@ -31,12 +31,12 @@
 2. **Every bulk write is preview-then-apply**:
    - Enforced by `test/uiConsistency.test.ts`. Any action that modifies or imports multiple rows (`/api/sync/reconcile`, `/api/gmail/drafts`, `/api/artist/source`, `/api/connectors/associations/:id/import`, `/api/backfill/notes`, `/api/drive/organise`, `/api/admin/artists/:id/removal`) must use `<Disclosure>` from `frontend/src/components/ui/Disclosure.tsx` and fetch a read-only preview before calling the write endpoint.
 3. **A suggestion is not an answer; a missing input is not a zero**:
-   - **Application fields**: `answer_state` is `'empty' | 'suggested' | 'confirmed'`. Editing text or choosing a library option confirms it; drafted/sourced text starts as `'suggested'`.
-   - **Artist library freshness**: Sourced or imported assets (`sourceAssets`, association imports) land with `review_by = null` (`'unreviewed'`), never pre-approved (`fresh`) and never scolded as `'overdue'`.
-   - **Contact details**: Sourced/imported assets and association profile readers (`shared/associationProfile.ts`, `shared/sourceAssets.ts`) **never** copy email addresses or phone numbers from public pages or prose.
+   - **Application fields**: `answer_state` is `'empty' | 'suggested' | 'edited' | 'approved'`. Drafted or sourced text starts as `'suggested'`, and an unread suggestion is never counted as an answer you have read.
+   - **Artist library freshness**: Sourced or imported assets (`shared/artistSource.ts`, association imports) land with `review_by = null` (`'unreviewed'`), never pre-approved (`fresh`) and never scolded as `'overdue'`.
+   - **Contact details**: Sourced/imported assets and association profile readers (`shared/associationProfile.ts`, `shared/artistSource.ts`) **never** copy email addresses or phone numbers from public pages or prose.
    - **Sync terms**: A target whose submission policy hasn't been read is `'unverified'`, not `'rejected'`.
    - **Travel & costs**: Never substitute `0` or a silent default for an unknown cost or distance. Costs are always ranges (`{ low, high }` formatted via `formatCostRange`). When a travel band is inferred without `travel.home` set, `bandGuessed: true` must say so (`"(band inferred — set your home base in Settings)"`).
-   - **Deadlines**: Deadlines recovered from `notes` prose carry `deadlineNote` (`"in notes — confirm on site"`). Closed deadlines are hidden from active review (`deadlinePassed`), while unstated deadlines remain visible as `"deadline not listed"`.
+   - **Deadlines**: A `deadline` is often prose (`"None, rolling intake"`). Anything that needs a date goes through `splitDeadline` (`shared/reviewParse.ts`), which returns null rather than guess, and a date recovered from prose is shown with its prose.
 4. **No clock in pure logic or test fixtures**:
    - Enforced by `test/uiConsistency.test.ts`. Files in `shared/` and `test/*.test.ts` must **never** call `new Date()` or `Date.now()` with no arguments. Pass `today: string` (`YYYY-MM-DD`) explicitly.
    - In the frontend, always use `localToday()` from `frontend/src/format.ts` (viewer's local calendar date), never `new Date().toISOString().slice(0, 10)` (which is UTC and shifts tomorrow's date after 4 PM PST).
@@ -47,29 +47,29 @@
 
 - **Runtime**: Single Cloudflare Worker (`src/index.ts`, Hono) serving both `/api/*` and static SPA assets (`frontend/dist`), backed by Cloudflare D1 (`DB`, Drizzle ORM in `src/db/schema.ts`).
 - **Workspace layout**:
-  - `shared/` — Pure TypeScript domain logic shared by Worker and SPA (scoring, readiness, travel, onboarding, startLanes, epk, stagePlot, survey, sourceAssets, associationProfile). Zero I/O, zero `Date.now()`.
-  - `src/` — Worker routes (`src/routes/`), auth & session middleware (`src/auth.ts`), tenant scoping (`src/lib/tenant.ts`), cron jobs (`src/cron/`), mailers & Google OAuth (`src/lib/`).
-  - `frontend/src/` — React 18 + Vite + Tailwind CSS SPA. Hash-routed (`#overview`, `#review`, `#gigs`, `#sync`, `#shows`, `#promo`, `#artist`, `#epk`, `#help`, `#settings`, plus `#join/<token>`, `#epk/<token>`, `#survey`, `#survey-results`).
-  - `migrations/` — Sequential SQL migrations (`0001_...` through `0043_...`; next free is `0044`).
-  - `test/` — Vitest suites running against `better-sqlite3` (`test/helpers.ts` applies all `migrations/*.sql` in order).
+  - `shared/` — Pure TypeScript domain logic shared by Worker and SPA (scoring, readiness, travel, onboarding, startLanes, epk, stagePlot, survey, artistSource, associationProfile). Zero I/O, zero `Date.now()`.
+  - `src/` — Worker routes (`src/routes/`); the sign-in, tenant and admin-mode middleware (`src/index.ts`, `src/lib/auth.ts`, `src/lib/actor.ts`, `src/context.ts`); tenant scoping (`src/db/scope.ts`); the cron (the `scheduled` handler in `src/index.ts`, with the jobs in `src/lib/`); mailers & Google OAuth (`src/lib/`).
+  - `frontend/src/` — React 19 + Vite + Tailwind CSS SPA. Hash-routed (`#overview`, `#review`, `#gigs`, `#sync`, `#shows`, `#promo`, `#runs` (History), `#artist`, `#epk`, `#help`, `#settings/<page>`, `#admin/<page>` (admin mode only), plus `#join/<token>`, `#epk/<token>`, `#survey`, `#survey-results`).
+  - `migrations/` — Sequential SQL migrations (`0001_...` through `0045_...`; next free is `0046`).
+  - `test/` — Vitest suites. `test/support/sqliteD1.ts` runs the production schema (`schema.sql`, then every `migrations/*.sql` in order) on `node:sqlite` behind the D1 interface; `test/support/fakeD1.ts` only lets a request through the middleware.
 
 ---
 
 ## 4. Security, Auth & Multi-Tenant Rules
 
-1. **Tenant isolation (`src/lib/tenant.ts`)**:
-   - Enforced by `test/tenantScope.test.ts`. All 17 artist-owned tables (`TENANT_TABLES`) must be read through `scoped(table, tenant, ...where)` and inserted with `withTenant(tenant, values)` (or `scopedSql` for raw SQL).
+1. **Tenant isolation (`src/db/scope.ts`)**:
+   - Enforced by `test/tenantScope.test.ts`. All 17 artist-owned tables (`SCOPED_TABLES`) must be read through `scoped(table, tenant, ...where)` and inserted with `withTenant(tenant, values)`.
    - Never query a tenant-scoped table with a bare `.where(eq(table.id, id))`.
 2. **Artist mode vs. Admin mode (`docs/multi-tenant-plan.md`)**:
-   - Enforced by `test/adminMode.test.ts`. A session is in `'artist'` mode or `'admin'` mode (`session_mode`), never both.
-   - `AdminEnv` (`src/routes/admin.ts`) does **not** carry a `tenant` variable. Artist routes 403 while in admin mode; `/api/admin/*` routes 403 unless `role === 'owner'` and `mode === 'admin'`.
-3. **Passkey elevation (`confirmed_until`)**:
-   - Sensitive actions (revoking passkeys, issuing/revoking agent tokens, entering admin mode, removing an artist tenant) require recent passkey confirmation (`requireElevation` on the server, `withConfirmation` in `frontend/src/elevate.tsx`).
+   - Enforced by `test/adminMode.test.ts`. A session is in `'artist'` mode or `'admin'` mode (`auth_sessions.mode`), never both.
+   - `AdminEnv` (`src/context.ts`) carries an `admin` and no tenant, so an oversight route has nothing to hand `scoped()`. An artist-mode session is refused `/api/admin/*`, and an admin-mode session is refused everything else.
+3. **Passkey elevation (`auth_sessions.elevated_at`)**:
+   - Changing who can sign in, or destroying data across a boundary, needs a passkey touch within the last fifteen minutes: adding or removing a passkey, issuing or revoking agent tokens, entering admin mode, removing an artist tenant (`elevationState` in `shared/auth.ts`; the client re-asserts on refusal with `withConfirmation` in `frontend/src/confirmIdentity.ts`). The emailed setup code is exempt, because recovery cannot require the passkey you lost.
 4. **Credentials & tokens never travel in URL paths**:
    - Enforced by `test/uiConsistency.test.ts`. Invite tokens (`#join/<token>`), public EPK share tokens (`#epk/<token>`), and survey response IDs must use URL **fragments** (`#...`) in the browser and **POST request bodies** on the wire so they never appear in `Referer` headers or Worker request logs.
 5. **Agent tokens (`mhq_...`)**:
    - Research agents authenticate with `Authorization: Bearer mhq_...`, resolved per-tenant via SHA-256 hash in `agent_tokens`.
-   - Agent tokens are allowed only on `AGENT_API_PREFIXES` (`src/auth.ts`) and are blocked from `/api/auth`, `/api/admin`, `/api/agent-tokens`, `/api/gmail`, `/api/drive`, `/api/calendar`, `/api/tasks`, `/api/epk`, `/api/profile`, `/api/onboarding`, and `/api/feedback`.
+   - Agent tokens are limited to the routes in `AGENT_ROUTES` (`shared/agentRoutes.ts`: six reads, four creates and the run log), cannot manage tokens, and what the create routes accept is bounded by `agentWrite` (`src/lib/agentWrites.ts`).
 
 ---
 
@@ -87,7 +87,7 @@
   - Always use `<Button>`, `<Input>` / `<Select>` / `<Textarea>` (or `FIELD` / `FILTER`), `<Card>`, `<Caption>`, `<Explainer>`, and `<Disclosure>`.
   - Raw `<button>` is permitted only for tab strip items, table sort headers, calendar cells, or inline text links (`underline`).
 - **Tailwind token discipline**:
-  - Every custom colour class (`bg-*`, `text-*`, `border-*`) must exist in `tailwind.config.js` (`surface`, `raised`, `well`, `hover`, `ink`, `muted`, `faint`, `edge`, `line`, `accent`, `ok`, `warn`, `danger`).
+  - Every custom colour class (`bg-*`, `text-*`, `border-*`) must exist in `tailwind.config.js` (`canvas`, `surface`, `raised`, `sunken`, `line`, `line-strong`, `ink`, `body`, `muted`, `faint`, `accent`, and the `danger-*`, `success-*`, `warn-*`, `info-*` and `cat-*` families; the complete list is in `.claude/skills/ui-rules/SKILL.md`).
   - Never use undefined classes like `text-subtle`, never pair `bg-X` with `hover:bg-X` (dead hover), and never use `text-faint` on readable prose or form labels (`text-muted` is the floor for readable text).
 
 ---
@@ -98,4 +98,4 @@
 - **Required checks before finishing any code change**:
   1. `npm test` — Runs all Vitest suites (including `uiConsistency.test.ts`, `canadianCopy.test.ts`, `tenantScope.test.ts`, `adminMode.test.ts`, `noPersonInCode.test.ts`).
   2. `TZ=Pacific/Auckland npm test` — Verifies date math holds when local time is a calendar day ahead of UTC.
-  3. `npm run typecheck` — Checks all three TypeScript configs (`tsconfig.json`, `tsconfig.worker.json`, `frontend/tsconfig.json`).
+  3. `npm run typecheck` — Checks all three TypeScript configs (`tsconfig.json`, `tsconfig.frontend.json`, `tsconfig.scripts.json`).
