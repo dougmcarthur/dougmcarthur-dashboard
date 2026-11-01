@@ -23,7 +23,6 @@ export type AdminSectionId =
   | 'listings'
   | 'survey'
   | 'drive'
-  | 'search'
   | 'changes'
 
 export interface AdminSectionDef {
@@ -37,10 +36,6 @@ export interface AdminGroupDef {
 }
 
 export const ADMIN_GROUPS: readonly AdminGroupDef[] = [
-  {
-    label: 'Find',
-    sections: [{ id: 'search', label: 'Search' }],
-  },
   {
     label: 'People',
     sections: [
@@ -82,6 +77,18 @@ export function isAdminSection(value: string | null | undefined): value is Admin
 /** The section a route argument names; anything else is the first page, so a stale link still lands somewhere. */
 export function adminSectionFromArg(arg: string | null | undefined): AdminSectionId {
   return isAdminSection(arg) ? arg : DEFAULT_ADMIN_SECTION
+}
+
+/**
+ * Which page to draw: the one the route names, or `null` for the list of pages.
+ *
+ * Only a narrow screen has a list (the way the iOS Settings app opens), so `#admin`
+ * on a phone is the list and on a laptop is the first page; a link it does not
+ * know is the same answer, so a stale one still lands somewhere you can choose from.
+ */
+export function resolveAdminRoute(arg: string | null | undefined, narrow: boolean): AdminSectionId | null {
+  if (isAdminSection(arg)) return arg
+  return narrow ? null : DEFAULT_ADMIN_SECTION
 }
 
 export function adminSectionLabel(id: string): string | null {

@@ -47,7 +47,7 @@ function Column({ children }: { children: ReactNode }) {
   return <div className="max-w-3xl space-y-6">{children}</div>
 }
 
-export function SettingsPage({ section }: { section: SettingsSectionId }) {
+export function SettingsPage({ section }: { section: SettingsSectionId | null }) {
   const session = useSession()
   const owner = session?.role === 'owner'
   const failing = useConnectionAttention()
@@ -60,14 +60,17 @@ export function SettingsPage({ section }: { section: SettingsSectionId }) {
   return (
     <SidebarShell
       label="Settings pages"
+      title="Settings"
       groups={settingsGroupsFor(owner)}
       current={section}
       hrefFor={(id) => `#settings/${id}`}
+      indexHref="#settings"
       badges={badges}
     >
       {/* Keyed, so moving to another page starts it clean rather than carrying
-          a half-typed field across. */}
-      <Page key={section} section={section} owner={owner} />
+          a half-typed field across. Nothing at all for the list of pages a
+          phone opens on: the shell draws that itself. */}
+      {section && <Page key={section} section={section} owner={owner} />}
     </SidebarShell>
   )
 }

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api'
 import { needsAttention } from '../../../../shared/sourceControls'
+import { AdminSearch } from '../../components/AdminSearch'
 import { SidebarShell, type SidebarBadge } from '../../components/ui/SidebarShell'
 import { ADMIN_GROUPS, type AdminSectionId } from './sections'
 
@@ -33,16 +34,19 @@ function useBadges(): Partial<Record<AdminSectionId, SidebarBadge>> {
 }
 
 /** The frame every admin page sits in. The shell itself is `SidebarShell`, shared with Settings. */
-export function AdminShell({ section, children }: { section: AdminSectionId; children: ReactNode }) {
+export function AdminShell({ section, children }: { section: AdminSectionId | null; children: ReactNode }) {
   const badges = useBadges()
 
   return (
     <SidebarShell
       label="Admin pages"
+      title="Admin"
       groups={ADMIN_GROUPS}
       current={section}
       hrefFor={(id) => `#admin/${id}`}
+      indexHref="#admin"
       badges={badges}
+      top={<AdminSearch />}
     >
       {children}
     </SidebarShell>

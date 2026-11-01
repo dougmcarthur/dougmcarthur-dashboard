@@ -4,7 +4,6 @@ import { SurveyPanel } from '../components/SurveyPanel'
 import { DrivePickerPanel } from '../components/DrivePickerPanel'
 import { ExternalSourcesPanel } from '../components/ExternalSourcesPanel'
 import { SourceFindingsPanel } from '../components/SourceFindingsPanel'
-import { AdminSearch } from '../components/AdminSearch'
 import { ChangeLog } from '../components/ChangeLog'
 import { AdminShell } from './admin/AdminShell'
 import { ArtistsSection } from './admin/ArtistsSection'
@@ -25,12 +24,13 @@ import type { AdminSectionId } from './admin/sections'
  * checked in `test/adminMode.test.ts`, which reads this file and everything in
  * `./admin/`.
  */
-export function AdminPage({ section }: { section: AdminSectionId }) {
+export function AdminPage({ section }: { section: AdminSectionId | null }) {
   return (
     <AdminShell section={section}>
       {/* Keyed, so moving to another page starts it clean rather than carrying
-          a half-typed field or a page number across. */}
-      <Section key={section} section={section} />
+          a half-typed field or a page number across. Nothing at all for the
+          list of pages a phone opens on: the shell draws that itself. */}
+      {section && <Section key={section} section={section} />}
     </AdminShell>
   )
 }
@@ -53,8 +53,6 @@ function Section({ section }: { section: AdminSectionId }) {
       return <SurveyPanel />
     case 'drive':
       return <DrivePickerPanel />
-    case 'search':
-      return <AdminSearch />
     case 'changes':
       return <ChangeLog />
   }

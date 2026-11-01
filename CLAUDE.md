@@ -417,6 +417,22 @@ which is why "Pages Scout reads" became **External data sources**. Each page has
 one `h1`, a page with several parts gives each an `h2`, and the router keys the
 error boundary by page so one page that fails does not blank the rest.
 
+- **Settings uses the same shell, and on a phone both are a list you tap
+  through, the way the iOS Settings app is.** `SidebarShell` is a sidebar from
+  1024px up. Below that `#settings` and `#admin` are a grouped list of pages with
+  a chevron and a badge on each row, a row opens its page, and a link at the top
+  of the page goes back to the list. It was a row of links that scrolled
+  sideways, which hid most of the pages off the edge of the screen. `useNarrow`
+  decides in script, not CSS, because it changes what is drawn and rendering
+  both would load every card twice; `resolveSettingsRoute` and
+  `resolveAdminRoute` return `null` for the list. That makes a bare `#settings`
+  a list on a phone, so anything that means a particular page has to name it:
+  the Google consent callback now returns to `#settings/google?…` (the notice
+  about how the trip went is drawn by that page), and the connection alerts link
+  to `#settings/google`. The four old Settings tab ids still resolve
+  (`connections` is Google account, `account` is Profile) because emails and
+  notifications already sent point at them. Owner-only pages are an "Owner"
+  group that an artist's list does not contain.
 - **Lists page through `shared/pagination.ts`.** The sizes are a closed set (10,
   25, 50) because a limit the browser can set to a million is a way to ask the
   database for everything, and the size is the one preference shared across the
@@ -2383,6 +2399,19 @@ was shown. It never carries what was on the page. `feedback` (migration 0032)
 is a platform table like `agent_tokens`, read on the admin surface, deleted by
 tenant removal; the owner hears through the bell. `test/feedback.test.ts` pins
 the rules.
+
+**Explanatory text is always tucked behind an info icon.** A sentence about what
+a screen is for, how something works or what a setting means is not shown by
+default: it goes in an `Explainer` (or an `InfoToggle` where there is no title
+for it to sit under), which draws the icon and opens the note in place. The owner
+asked for this when the admin-mode pill carried a whole sentence and the
+sentence was most of the header; the pill says "Admin mode" now and the rest is
+behind its icon, and `SectionHeader` and the admin search field do the same.
+What stays visible is what a person needs in order to act: labels, counts,
+statuses, errors, and the line beside a button that says what pressing it is about
+to do. The `showHints` appearance setting hides every icon, so a note never holds
+the only copy of a warning. `.claude/skills/ui-rules` has it too, since that is
+what is read before a UI change.
 
 **Buttons and inputs come from `components/ui/`.** `Button` takes a variant
 named for meaning (`primary`, `neutral`, `quiet`, `good`, `danger`, `info`),

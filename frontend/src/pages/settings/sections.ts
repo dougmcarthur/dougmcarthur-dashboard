@@ -91,17 +91,38 @@ export function settingsGroupsFor(owner: boolean): readonly SettingsGroupDef[] {
   return SETTINGS_GROUPS.filter((g) => owner || !g.ownerOnly)
 }
 
+/** The page a route argument names for this person, or null. An old tab id is read as its replacement. */
+function named(arg: string | null | undefined, owner: boolean): SettingsSectionId | null {
+  const id = (arg && LEGACY[arg]) || arg
+  const found = ALL.find((s) => s.id === id)
+  // The server is the lock on the owner's pages; this is only what is drawn.
+  return found && (owner || !found.ownerOnly) ? found.id : null
+}
+
 /**
- * The page a route argument names, for this person. An old tab id is read as
- * its replacement, and anything else (a page that does not exist, or an owner's
- * page asked for by an artist) is the default, so a stale link still lands
- * somewhere. The server is the lock on the owner's pages; this is only what is
- * drawn.
+ * The page a route argument names, for this person. Anything else (a page that
+ * does not exist, or an owner's page asked for by an artist) is the default, so
+ * a stale link still lands somewhere.
  */
 export function settingsSectionFromArg(arg: string | null | undefined, owner: boolean): SettingsSectionId {
-  const named = (arg && LEGACY[arg]) || arg
-  const found = ALL.find((s) => s.id === named)
-  return found && (owner || !found.ownerOnly) ? found.id : DEFAULT_SETTINGS_SECTION
+  return named(arg, owner) ?? DEFAULT_SETTINGS_SECTION
+}
+
+/**
+ * Which page to draw: the one the route names, or `null` for the list of pages.
+ *
+ * Only a narrow screen has a list (the way the iOS Settings app opens), so a
+ * bare `#settings` is the list on a phone and the default page on a laptop.
+ * That is why the OAuth callback now returns to `#settings/google` and not to
+ * `#settings?google=…`: a bare address on a phone is the list, and the notice
+ * about how the trip to Google went has to be on the page that shows it.
+ */
+export function resolveSettingsRoute(
+  arg: string | null | undefined,
+  owner: boolean,
+  narrow: boolean,
+): SettingsSectionId | null {
+  return named(arg, owner) ?? (narrow ? null : DEFAULT_SETTINGS_SECTION)
 }
 
 export function settingsSectionLabel(id: string): string | null {

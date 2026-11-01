@@ -50,6 +50,31 @@ writes across many rows uses it. A third hand-rolled copy fails the guard, and
 so does calling a write endpoint without reading its preview endpoint first: a
 bulk write you cannot look at first is one you find out about afterwards.
 
+## Explanation is tucked behind an info icon, always
+
+A sentence that says what a screen is for, how something works or what a setting
+means is not shown by default. It goes behind the info icon, the way every other
+note in the app does, so a screen holds what you act on and not paragraphs about
+it. The owner asked for this by name (it was a sentence in the admin-mode pill,
+and the sentence was most of the header), so apply it to anything new without
+being asked.
+
+- **`Explainer`** (`components/ui/Explainer.tsx`) is the way. Its `title` is the
+  heading or the label, its children are the note, and it draws the icon beside
+  the title and opens the note in place under it. A page's own description goes
+  through `SectionHeader`, which wraps it.
+- **`InfoToggle`** is the same button on its own, for a note that cannot sit
+  under a title of its own: the admin-mode pill in the header, the admin search
+  field. Same glyph, colours and screen-reader name. Open the note as a row under
+  the control, not as a ribbon beside it (that is why `Explainer` has `aside`).
+- **What stays visible** is what the person needs in order to act: a field's
+  label, a count, a status, an error, and the notice beside a button that says
+  what pressing it is about to do ("asks for your passkey first"). The
+  `showHints` setting hides every icon at once, so a note must never hold the only
+  copy of a warning.
+- **The test**: if the paragraph could be deleted without anyone misreading the
+  screen's state, it is explanation, and it goes behind an icon.
+
 ## Colours are tokens, and a token that does not exist renders as nothing
 
 Tailwind emits no rule for a class it has no colour for, so `text-subtle`

@@ -172,3 +172,58 @@ describe('the sidebar', () => {
     expect(shell).toContain('className="sr-only"')
   })
 })
+
+describe('search is a field, not a page', () => {
+  const box = read('frontend/src/components/AdminSearch.tsx')
+
+  it('is no longer one of the pages in the list', () => {
+    expect(sections.map((s) => s.id)).not.toContain('search')
+    expect(read('frontend/src/pages/AdminPage.tsx')).not.toContain('AdminSearch')
+  })
+
+  it('sits above the pages, in the sidebar and in the list a phone opens on', () => {
+    expect(read('frontend/src/pages/admin/AdminShell.tsx')).toContain('top={<AdminSearch />}')
+    const shell = read('frontend/src/components/ui/SidebarShell.tsx')
+    expect(shell.match(/\{top\}/g)).toHaveLength(2)
+  })
+
+  it('is a search input that shows what it finds under itself, and puts it away again', () => {
+    expect(box).toContain('type="search"')
+    expect(box).toContain('role="region"')
+    expect(box).toContain("e.key === 'Escape'")
+    expect(box).toContain("document.addEventListener('mousedown'")
+    // Each hit goes to the page it lives on, and choosing one clears the field.
+    expect(box).toContain('href={`#admin/${g.section}`}')
+    expect(box).toContain('onClick={clear}')
+  })
+
+  it('keeps what it covers behind the info icon, as every explanation is', () => {
+    expect(box).toContain('<InfoToggle')
+    expect(box).toContain('never anybody&rsquo;s work')
+    expect(box).toContain('appearance.showHints')
+  })
+})
+
+describe('the admin-mode pill in the header', () => {
+  const layout = read('frontend/src/components/Layout.tsx')
+
+  it('says which mode this is and nothing more, with the rest behind the info icon', () => {
+    const pill = layout.slice(layout.indexOf('function AdminModeBadge'), layout.indexOf('interface LayoutProps'))
+    expect(pill).toContain('>Admin mode</span>')
+    expect(pill).toContain('<InfoToggle')
+    // The sentence that used to be the pill is the note now, not the pill.
+    expect(pill).not.toMatch(/>\s*Admin mode\s*[—-]/)
+    expect(layout).toContain('<AdminModeBadge offered={appearance.showHints} />')
+  })
+
+  it('opens the note as a full-width row of its own, and closes it on Escape', () => {
+    expect(layout).toContain('order-last basis-full text-xs')
+    expect(layout).toMatch(/e\.key === 'Escape' && setOpen\(false\)/)
+  })
+
+  it('shares one info button with every other note in the app', () => {
+    const explainer = read('frontend/src/components/ui/Explainer.tsx')
+    expect(explainer).toContain('export function InfoToggle')
+    expect(explainer).toContain('<InfoToggle open={open}')
+  })
+})

@@ -242,7 +242,7 @@ function connectionNotes(health: HealthInput): Draft[] {
       tier: 'critical',
       title: 'Google Calendar disconnected',
       body: 'Approving a gig will not create an event.',
-      href: '#settings',
+      href: '#settings/google',
       action: 'Reconnect',
     })
   }
@@ -254,7 +254,7 @@ function connectionNotes(health: HealthInput): Draft[] {
       tier: 'critical',
       title: 'Gmail disconnected',
       body: 'Sync cannot reconcile pitch statuses from sent mail.',
-      href: '#settings',
+      href: '#settings/google',
       action: 'Reconnect',
     })
   }
@@ -265,7 +265,7 @@ function connectionNotes(health: HealthInput): Draft[] {
       tier: 'critical',
       title: 'Email sending unavailable',
       body: 'The weekly digest cannot be delivered.',
-      href: '#settings',
+      href: '#settings/google',
       action: 'Reconnect',
     })
   }
@@ -289,7 +289,7 @@ function connectionNotes(health: HealthInput): Draft[] {
       tier: 'critical',
       title: `${CREDENTIAL_NAMES[credential.id]} is no longer accepted`,
       body: `${CREDENTIAL_STOPPED[credential.id]} The secret is still set, so nothing looks wrong until you check.`,
-      href: '#settings',
+      href: '#settings/google',
       action: 'Reconnect',
     })
   }
@@ -340,7 +340,7 @@ function healthNotes(summary: QueueSummary): Draft[] {
       tier: 'critical',
       title: `${plural(h.orphanedReminders, 'reminder points', 'reminders point')} at a deleted item`,
       body: 'These will never fire and nothing else will surface them.',
-      href: '#settings',
+      href: '#settings/reminders',
     })
   }
   return out

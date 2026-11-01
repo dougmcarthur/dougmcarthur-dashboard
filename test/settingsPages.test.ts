@@ -7,9 +7,12 @@ import {
   SETTINGS_GROUPS,
   settingsGroupsFor,
   settingsSectionFromArg,
+  resolveSettingsRoute,
   settingsSectionLabel,
 } from '../frontend/src/pages/settings/sections'
 import { pageLabel } from '../frontend/src/hooks/usePageAnnouncement'
+import { resolveAdminRoute } from '../frontend/src/pages/admin/sections'
+import { settingsRedirect } from '../src/lib/googleOAuth'
 
 /**
  * Settings as a sidebar of pages.
@@ -174,5 +177,86 @@ describe('the navigation outside Settings', () => {
     const layout = read('frontend/src/components/Layout.tsx')
     expect(layout).toContain("const here = page.split('/')[0]")
     expect(layout).not.toMatch(/aria-current=\{page === /)
+  })
+})
+
+describe('a phone opens on the list of pages, as the iOS Settings app does', () => {
+  it('is the list for a bare address on a narrow screen, and the first page on a wide one', () => {
+    expect(resolveSettingsRoute(null, false, true)).toBeNull()
+    expect(resolveSettingsRoute(null, false, false)).toBe(DEFAULT_SETTINGS_SECTION)
+    expect(resolveAdminRoute(null, true)).toBeNull()
+    expect(resolveAdminRoute(null, false)).toBe('artists')
+  })
+
+  it('is the list for a link it does not know, so a stale one lands somewhere you can choose from', () => {
+    for (const arg of ['nope', '', '../admin']) {
+      expect(resolveSettingsRoute(arg, true, true)).toBeNull()
+      expect(resolveAdminRoute(arg, true)).toBeNull()
+    }
+  })
+
+  it('is the list, not a page, for an artist who asks for an owner page', () => {
+    expect(resolveSettingsRoute('tokens', false, true)).toBeNull()
+    expect(resolveSettingsRoute('tokens', true, true)).toBe('tokens')
+  })
+
+  it('opens the page a link names, and reads the old tab ids, on either width', () => {
+    for (const narrow of [true, false]) {
+      expect(resolveSettingsRoute('reminders', false, narrow)).toBe('reminders')
+      expect(resolveSettingsRoute('connections', false, narrow)).toBe('google')
+      expect(resolveSettingsRoute('account', false, narrow)).toBe('profile')
+      expect(resolveAdminRoute('sources', narrow)).toBe('sources')
+    }
+  })
+
+  it('has the Google return land on the page that shows how it went, not on the list', () => {
+    // A bare `#settings?google=connected` is the list on a phone, and the notice
+    // about the trip to Google is drawn by the Google account page.
+    const env = { DASHBOARD_URL: 'https://scout.example' } as never
+    expect(settingsRedirect(env, 'google', 'connected')).toBe('https://scout.example/#settings/google?google=connected')
+    expect(settingsRedirect(env, null, 'connected')).toBe('https://scout.example/#settings/google?gmail=connected')
+    expect(settingsRedirect(env, 'calendar', 'failed')).toBe('https://scout.example/#settings/google?calendar=failed')
+    expect(settingsRedirect(env, 'tasks', 'connected')).toContain('#settings/google?tasks=')
+  })
+
+  it('points every connection alert at the page that fixes it', () => {
+    const src = withoutComments(read('shared/notifications.ts'))
+    expect(src).not.toMatch(/href: '#settings'/)
+    expect(src.match(/href: '#settings\/google'/g)).toHaveLength(4)
+    expect(src).toContain("href: '#settings/reminders'")
+  })
+})
+
+describe('the list and the page, on a narrow screen', () => {
+  const shell = read('frontend/src/components/ui/SidebarShell.tsx')
+  const hook = read('frontend/src/hooks/useNarrow.ts')
+
+  it('does not scroll sideways: every page is a row in a list', () => {
+    expect(withoutComments(shell)).not.toContain('overflow-x')
+    expect(withoutComments(shell)).not.toContain('scrollIntoView')
+  })
+
+  it('draws a row per page, with its badge, a chevron and a target a thumb can hit', () => {
+    expect(shell).toContain('min-h-12')
+    expect(shell).toContain('<Chevron />')
+    expect(shell).toContain('<BadgePill badge={badge} />')
+  })
+
+  it('goes back to the list from the top of a page', () => {
+    expect(shell).toContain('href={indexHref}')
+    expect(shell).toContain('aria-label={`Back to ${title}`}')
+    expect(read('frontend/src/pages/SettingsPage.tsx')).toContain('indexHref="#settings"')
+    expect(read('frontend/src/pages/admin/AdminShell.tsx')).toContain('indexHref="#admin"')
+  })
+
+  it('changes at the breakpoint the sidebar used to, one pixel short of lg', () => {
+    // Tailwind's `lg` is 1024px and this repo does not override it.
+    expect(hook).toContain("'(max-width: 1023.98px)'")
+    expect(read('tailwind.config.js')).not.toMatch(/lg:\s*'/)
+  })
+
+  it('is decided in script, so the page and the list are never both in the document', () => {
+    expect(shell).toContain('const narrow = useNarrow()')
+    expect(read('frontend/src/App.tsx')).toContain('const narrow = useNarrow()')
   })
 })
