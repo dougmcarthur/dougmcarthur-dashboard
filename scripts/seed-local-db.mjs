@@ -500,12 +500,12 @@ const events = [
   event({ kind: 'reconcile', tier: 'attention', title: '3 replies found in your mail', body: 'Local Fest: Declined \u00B7 Winter Fest: Info requested \u00B7 Unmatched: Acknowledged', href: '#review/mail', action_label: 'Read them', dedupe_key: `replies:${iso(-5).slice(0, 13)}`, created_at: iso(-5) }),
   event({ kind: 'reconcile', title: 'One reply found in your mail', body: 'Acknowledgements only: nothing needs a decision.', href: '#review/mail', action_label: 'Read them', dedupe_key: `replies:${iso(-20).slice(0, 13)}`, created_at: iso(-20), read_at: iso(-19) }),
   event({ kind: 'automation', title: 'Application form read for Nuit Blanche Winnipeg', body: 'Eleven questions are staged from your library. Nothing is filled in until you read them.', href: '#gigs/3', action_label: 'Open', dedupe_key: 'form-read:3', created_at: iso(-12) }),
-  event({ kind: 'feedback', tier: 'attention', title: 'Something is broken, from Sam', body: 'The deadline on the Overview card says Oct 21 but the listing says Oct 31. I think the year rolled over.', href: '#settings/account', action_label: 'Read it in admin mode', created_at: iso(-8) }),
+  event({ kind: 'feedback', tier: 'attention', title: 'Something is broken, from Sam', body: 'The deadline on the Overview card says Oct 21 but the listing says Oct 31. I think the year rolled over.', href: '#settings/admin', action_label: 'Read it in admin mode', created_at: iso(-8) }),
   event({ kind: 'digest', title: 'Weekly digest sent, 4 to act on', body: 'Sun Dogs Music Scout: your week, 4 to act on', href: '#review/needs', action_label: 'Open queue', dedupe_key: `digest:sent:${day(-1)}`, created_at: iso(-30), read_at: iso(-29) }),
-  event({ kind: 'signup', title: 'Invitation request from Jo Fiddle', body: 'I play fiddle in Brandon and would like to try it.', href: '#settings/account', action_label: 'Read it in admin mode', created_at: iso(-50), read_at: iso(-49) }),
+  event({ kind: 'signup', title: 'Invitation request from Jo Fiddle', body: 'I play fiddle in Brandon and would like to try it.', href: '#settings/admin', action_label: 'Read it in admin mode', created_at: iso(-50), read_at: iso(-49) }),
   // Dismissed in the bell eight days ago: gone there, still here.
   event({ kind: 'digest', title: 'Weekly digest sent, 6 to act on', body: 'Sun Dogs Music Scout: your week, 6 to act on', href: '#review/needs', action_label: 'Open queue', dedupe_key: `digest:sent:${day(-8)}`, created_at: iso(-24 * 8), read_at: iso(-24 * 8 + 1), dismissed_at: iso(-24 * 8 + 1) }),
-  event({ kind: 'reconcile', title: 'Notes backfill found nothing to fill', body: 'Scanned 58 rows; every column the notes could fill already had a value.', href: '#settings/account', action_label: 'See settings', dedupe_key: 'once:notesBackfill', created_at: iso(-24 * 22), read_at: iso(-24 * 22 + 1) }),
+  event({ kind: 'reconcile', title: 'Notes backfill found nothing to fill', body: 'Scanned 58 rows; every column the notes could fill already had a value.', href: '#settings/profile', action_label: 'See settings', dedupe_key: 'once:notesBackfill', created_at: iso(-24 * 22), read_at: iso(-24 * 22 + 1) }),
 ]
 
 /**

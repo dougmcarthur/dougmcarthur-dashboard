@@ -1,4 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
+import { adminSectionLabel } from '../pages/admin/sections'
+import { settingsSectionLabel } from '../pages/settings/sections'
 
 const PRODUCT = 'Sun Dogs Music Scout'
 
@@ -20,6 +22,12 @@ const LABELS: Record<string, string> = {
 }
 
 export function pageLabel(page: string): string {
+  // An admin page is `admin/sources`: the tab says which one, so a row of tabs
+  // opened from the sidebar tells them apart.
+  const adminPage = page.startsWith('admin/') ? adminSectionLabel(page.slice('admin/'.length)) : null
+  if (adminPage) return `${adminPage} · Admin`
+  const settingsPage = page.startsWith('settings/') ? settingsSectionLabel(page.slice('settings/'.length)) : null
+  if (settingsPage) return `${settingsPage} · Settings`
   return LABELS[page] ?? (page ? page.charAt(0).toUpperCase() + page.slice(1) : 'Overview')
 }
 

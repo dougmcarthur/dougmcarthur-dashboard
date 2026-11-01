@@ -996,16 +996,44 @@ export const api = {
       apiFetch<DrivePickerView>('/admin/drive-picker', { method: 'PATCH', body: JSON.stringify(patch) }),
     setInviteRequest: (id: number, status: InviteRequestStatus) =>
       apiFetch<{ ok: boolean }>(`/admin/invite-requests/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
-    listings: () => apiFetch<{ items: ListingItem[] }>('/admin/listings'),
+    /** One screenful of the catalog, newest first, with the count behind it. `q` searches name and organiser. */
+    listings: (opts: { limit: number; offset: number; q?: string }) =>
+      apiFetch<{ total: number; items: ListingItem[] }>(
+        `/admin/listings?limit=${opts.limit}&offset=${opts.offset}${opts.q ? `&q=${encodeURIComponent(opts.q)}` : ''}`,
+      ),
     setListingPublic: (id: number, isPublic: boolean) =>
       apiFetch<{ ok: boolean }>(`/admin/listings/${id}`, { method: 'PATCH', body: JSON.stringify({ public: isPublic }) }),
     /** The pages Scout reads for calls, how each is doing, and what it found there. */
     catalogSources: () => apiFetch<CatalogSources>('/admin/catalog/sources'),
-    catalogCandidates: (view: CandidateView) =>
-      apiFetch<{ view: CandidateView; items: CatalogCandidateItem[] }>(`/admin/catalog/candidates?view=${view}`),
+    catalogCandidates: (opts: { view: CandidateView; limit: number; offset: number; source?: number }) =>
+      apiFetch<{ view: CandidateView; total: number; items: CatalogCandidateItem[] }>(
+        `/admin/catalog/candidates?view=${opts.view}&limit=${opts.limit}&offset=${opts.offset}${
+          opts.source ? `&source=${opts.source}` : ''
+        }`,
+      ),
     pollCatalog: () => apiFetch<CatalogPollReport>('/admin/catalog/poll', { method: 'POST' }),
-    setSourceEnabled: (id: number, enabled: boolean) =>
-      apiFetch<{ ok: boolean }>(`/admin/catalog/sources/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
+    changes: (opts: { limit: number; offset: number }) =>
+      apiFetch<{ total: number; items: Array<{ id: number; at: string; summary: string }> }>(
+        `/admin/changes?limit=${opts.limit}&offset=${opts.offset}`,
+      ),
+    search: (q: string) =>
+      apiFetch<{ q: string; groups: Array<{ section: string; label: string; hits: Array<{ id: string; text: string }> }> }>(
+        `/admin/search?q=${encodeURIComponent(q)}`,
+      ),
+    /** The newest reads of one source, newest first. */
+    sourceReads: (id: number) =>
+      apiFetch<{ items: Array<{ at: string; ok: boolean; items: number; added: number; note: string }> }>(
+        `/admin/catalog/sources/${id}/reads`,
+      ),
+    /** Read one source now, due or not, and say what came of it. */
+    readSource: (id: number) =>
+      apiFetch<{ source: string; ok: boolean; items: number; added: number; note: string }>(
+        `/admin/catalog/sources/${id}/poll`,
+        { method: 'POST' },
+      ),
+    /** Whether a source is read, and how often. Either or both. */
+    updateSource: (id: number, patch: { enabled?: boolean; cadenceHours?: number }) =>
+      apiFetch<{ ok: boolean }>(`/admin/catalog/sources/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     markFeedbackRead: (id: number) =>
       apiFetch<{ ok: boolean }>(`/admin/feedback/${id}/read`, { method: 'POST' }),
     invite: (body: { email: string; displayName?: string; send?: boolean }) =>
@@ -1519,6 +1547,8 @@ export interface CatalogSourceItem {
   kind: 'feed' | 'calendar' | 'page'
   url: string
   enabled: boolean
+  /** How often it is read, in hours: one of `SOURCE_CADENCES`. */
+  cadenceHours: number
   addedBy: string
   lastOkAt: string | null
   lastFetchedAt: string | null
@@ -1533,6 +1563,8 @@ export interface CatalogSourceItem {
 
 export interface CatalogSources {
   lastPoll: { at: string; polled: number; ok: number; failed: number; added: number } | null
+  /** What the cron can read in a day, whatever the frequencies chosen ask for. */
+  capacityPerDay: number
   items: CatalogSourceItem[]
 }
 

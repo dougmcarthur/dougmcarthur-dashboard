@@ -112,6 +112,9 @@ export function Layout(props: LayoutProps) {
 }
 
 function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
+  // A page with pages of its own is `settings/profile`; the navigation only
+  // cares which top-level page that is.
+  const here = page.split('/')[0]
   const { appearance, set, resolved } = useAppearance()
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
@@ -155,7 +158,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
 
   const linkClass = (id: string, mobile = false) =>
     `px-3.5 ${mobile ? 'py-2' : 'py-1.5'} rounded-md text-sm font-medium transition-colors ${
-      page === id ? 'bg-raised text-ink shadow-inset' : 'text-muted hover:text-ink hover:bg-sunken'
+      here === id ? 'bg-raised text-ink shadow-inset' : 'text-muted hover:text-ink hover:bg-sunken'
     }`
 
   return (
@@ -203,7 +206,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                 <a
                   key={l.id}
                   href={`#${l.id}`}
-                  aria-current={page === l.id ? 'page' : undefined}
+                  aria-current={here === l.id ? 'page' : undefined}
                   className={linkClass(l.id)}
                 >
                   {l.label}
@@ -281,7 +284,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                             <a
                               key={l.id}
                               href={`#${l.id}`}
-                              aria-current={page === l.id ? 'page' : undefined}
+                              aria-current={here === l.id ? 'page' : undefined}
                               className={`block ${linkClass(l.id, true)}`}
                             >
                               {l.label}
@@ -293,7 +296,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                           <a
                             key={l.id}
                             href={`#${l.id}`}
-                            aria-current={page === l.id ? 'page' : undefined}
+                            aria-current={here === l.id ? 'page' : undefined}
                             className={`block ${linkClass(l.id, true)}`}
                           >
                             {l.label}
@@ -317,7 +320,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                           <hr className="border-line my-1" />
                           <a
                             href="#help"
-                            aria-current={page === 'help' ? 'page' : undefined}
+                            aria-current={here === 'help' ? 'page' : undefined}
                             className={`block ${linkClass('help', true)}`}
                           >
                             Help

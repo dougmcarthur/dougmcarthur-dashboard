@@ -103,7 +103,7 @@ feedback.post('/', zValidator('json', FeedbackSchema), async (c) => {
       tier: kind === 'broken' ? 'attention' : 'info',
       title: `${feedbackKindLabel(kind)} — from ${who}`,
       body: message.length > 200 ? `${message.slice(0, 199)}…` : message,
-      href: '#settings/account',
+      href: '#settings/admin',
       action: 'Read it in admin mode',
       createdAt,
     })

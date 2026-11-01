@@ -3,6 +3,8 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { useHashRoute } from './hooks/useHashRoute'
 import { useSession } from './hooks/useSession'
 import { AdminPage } from './pages/AdminPage'
+import { adminSectionFromArg } from './pages/admin/sections'
+import { settingsSectionFromArg } from './pages/settings/sections'
 import { OverviewPage } from './pages/OverviewPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { GigsPage } from './pages/GigsPage'
@@ -38,19 +40,28 @@ export default function App() {
    * what keeps it from looking like a bug. See docs/multi-tenant-plan.md.
    */
   if (session?.mode === 'admin') {
+    // `#admin/sources` names a page; `#admin`, or the artist route a reload
+    // left in the address bar, is the first one.
+    const section = adminSectionFromArg(page === 'admin' ? arg : null)
     return (
-      <Layout page="admin" onNav={navigate} admin>
-        <ErrorBoundary label="Page error">
-          <AdminPage />
+      <Layout page={`admin/${section}`} onNav={navigate} admin>
+        {/* Keyed by page, so one page that fails does not leave every other
+            page in the sidebar showing the same error until a reload. */}
+        <ErrorBoundary key={section} label="Page error">
+          <AdminPage section={section} />
         </ErrorBoundary>
       </Layout>
     )
   }
 
+  // Which Settings page, for this person: an old tab id is read as the page
+  // that replaced it, and an owner's page asked for by an artist is the default.
+  const settingsSection = settingsSectionFromArg(arg, session?.role === 'owner')
+
   return (
-    <Layout page={page} onNav={navigate}>
+    <Layout page={page === 'settings' ? `settings/${settingsSection}` : page} onNav={navigate}>
       <AccountAppearance />
-      <ErrorBoundary label="Page error">
+      <ErrorBoundary key={page === 'settings' ? `settings/${settingsSection}` : page} label="Page error">
         {page === 'overview' && <OverviewPage onNav={navigate} />}
         {page === 'review' && <ReviewPage initialFilter={arg} />}
         {page === 'gigs' && <GigsPage initialOpen={arg} />}
@@ -60,7 +71,7 @@ export default function App() {
         {page === 'sync' && <SyncPage />}
         {page === 'promo' && <PromoDraftsPage />}
         {page === 'runs' && <HistoryPage key={arg ?? ''} initialKind={arg} onNav={navigate} />}
-        {page === 'settings' && <SettingsPage initialTab={arg} />}
+        {page === 'settings' && <SettingsPage section={settingsSection} />}
         {page === 'help' && <HelpPage />}
       </ErrorBoundary>
     </Layout>

@@ -6,6 +6,7 @@ import { Button } from './ui/Button'
 import { FIELD } from './ui/Field'
 import { shortDate } from '../format'
 import { Explainer } from './ui/Explainer'
+import { PagedList } from './ui/Pager'
 import { Card } from './ui/Surface'
 
 /**
@@ -104,7 +105,7 @@ export function InvitesPanel({
         rather than background. Neither is the app teaching you how it works.
       */}
       <header>
-        <Explainer as="h2" title="Invitations">
+        <Explainer as="h2" title="Invite an artist">
           An invitation creates an account when it is redeemed. It lasts thirty days, works
           once, and can be withdrawn until it is used.
         </Explainer>
@@ -180,16 +181,20 @@ export function InvitesPanel({
       {invites.isLoading && <div className="h-16 bg-sunken rounded-xl animate-pulse" />}
 
       {live.length > 0 && (
-        <ul className="space-y-2">
-          {live.map((invite) => (
-            <InviteRow
-              key={invite.id}
-              invite={invite}
-              onRevoke={() => revoke.mutate(invite.id)}
-              busy={revoke.isPending}
-            />
-          ))}
-        </ul>
+        <PagedList items={live} noun="invitations">
+          {(rows) => (
+            <ul className="space-y-2">
+              {rows.map((invite) => (
+                <InviteRow
+                  key={invite.id}
+                  invite={invite}
+                  onRevoke={() => revoke.mutate(invite.id)}
+                  busy={revoke.isPending}
+                />
+              ))}
+            </ul>
+          )}
+        </PagedList>
       )}
 
       {past.length > 0 && (
@@ -197,11 +202,17 @@ export function InvitesPanel({
           <summary className="text-sm text-body cursor-pointer">
             {past.length} finished {past.length === 1 ? 'invitation' : 'invitations'}
           </summary>
-          <ul className="mt-3 space-y-2">
-            {past.map((invite) => (
-              <InviteRow key={invite.id} invite={invite} />
-            ))}
-          </ul>
+          <div className="mt-3">
+            <PagedList items={past} noun="finished invitations">
+              {(rows) => (
+                <ul className="space-y-2">
+                  {rows.map((invite) => (
+                    <InviteRow key={invite.id} invite={invite} />
+                  ))}
+                </ul>
+              )}
+            </PagedList>
+          </div>
         </details>
       )}
     </section>
@@ -295,6 +306,9 @@ function InviteRow({
         <p className="text-xs text-muted mt-0.5">
           {STATE_LABELS[invite.state]}
           {invite.state === 'valid' && ` · expires ${shortDate(invite.expiresAt)}`}
+          {invite.state === 'valid' && Date.parse(invite.expiresAt) - Date.now() < 7 * 86_400_000 && (
+            <span className="ml-2 rounded-full bg-warn-bg px-2 py-0.5 font-medium text-warn-fg">Expires within a week</span>
+          )}
           {invite.state === 'redeemed' && invite.redeemedAt && ` ${shortDate(invite.redeemedAt)}`}
           {invite.state === 'revoked' && invite.revokedAt && ` ${shortDate(invite.revokedAt)}`}
         </p>

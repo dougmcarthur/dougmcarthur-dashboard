@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, type SurveyConfigView } from '../api'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { api, type SurveyConfigView, type SurveyResults } from '../api'
 import { relativeTime } from '../format'
 import type { Estimate, RankingResult, Tally } from '../../../shared/surveyAnalysis'
 import { Button } from './ui/Button'
 import { Input } from './ui/Field'
-import { Explainer } from './ui/Explainer'
 import { Banner, Card } from './ui/Surface'
+import { Tabs } from './ui/Tabs'
+import { SectionHeader } from './ui/SectionHeader'
 import { SurveyPublish } from './SurveyPublish'
 
 /**
@@ -271,9 +272,13 @@ function SurveyAccess({ config }: { config: SurveyConfigView }) {
 export function SurveyPanel() {
   const [failedCheck, setFailedCheck] = useState(false)
   const [speeders, setSpeeders] = useState(false)
+  const [tab, setTab] = useState<Tab>('overview')
   const results = useQuery({
     queryKey: ['admin', 'survey', failedCheck, speeders],
     queryFn: () => api.admin.survey({ failedCheck, speeders }),
+    // Ticking an exclusion asks again; the page stays up while it does, so the
+    // tabs and the box just ticked do not blink away and back.
+    placeholderData: keepPreviousData,
   })
 
   if (results.isLoading) return <div className="h-24 bg-sunken rounded-xl animate-pulse" />
@@ -286,18 +291,47 @@ export function SurveyPanel() {
   }
 
   const { config, summary: s, truncated } = results.data
-  const done = s.counts.complete
 
   return (
     <section className="space-y-4">
-      <header>
-        <Explainer as="h2" title="Artist survey">
-          A public, anonymous survey of how artists decide which opportunities are worth their time. Nothing identifies a
-          respondent, so there is nobody here to open. Any group of fewer than ten is hidden, and every estimate carries a
-          range. The questionnaire and the method are written down in the project documents.
-        </Explainer>
-      </header>
+      <SectionHeader title="Artist survey">
+        A public, anonymous survey of how artists decide which opportunities are worth their time. Nothing identifies a
+        respondent, so there is nobody here to open. Any group of fewer than ten is hidden, and every estimate carries a
+        range. The questionnaire and the method are written down in the project documents.
+      </SectionHeader>
 
+      <Tabs label="Survey pages" tabs={TABS} active={tab} onSelect={setTab} />
+
+      {tab === 'overview' && <OverviewTab config={config} s={s} truncated={truncated} />}
+      {tab === 'results' && (
+        <ResultsTab
+          s={s}
+          failedCheck={failedCheck}
+          speeders={speeders}
+          onFailedCheck={setFailedCheck}
+          onSpeeders={setSpeeders}
+        />
+      )}
+      {tab === 'publish' && <PublishTab config={config} failedCheck={failedCheck} speeders={speeders} />}
+    </section>
+  )
+}
+
+type Tab = 'overview' | 'results' | 'publish'
+
+const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'results', label: 'Results' },
+  { id: 'publish', label: 'Publish and export' },
+]
+
+type Summary = SurveyResults['summary']
+
+/** Is it open, who can reach it, and how many have answered. */
+function OverviewTab({ config, s, truncated }: { config: SurveyConfigView; s: Summary; truncated: boolean }) {
+  const done = s.counts.complete
+  return (
+    <>
       <SurveyAccess config={config} />
 
       <Card className="space-y-3">
@@ -319,7 +353,26 @@ export function SurveyPanel() {
         )}
         {truncated && <p className="text-xs text-warn-fg">There are more responses than this page reads. The newest are shown.</p>}
       </Card>
+    </>
+  )
+}
 
+/** What the answers say. The two exclusions here also apply to what is published. */
+function ResultsTab({
+  s,
+  failedCheck,
+  speeders,
+  onFailedCheck,
+  onSpeeders,
+}: {
+  s: Summary
+  failedCheck: boolean
+  speeders: boolean
+  onFailedCheck: (on: boolean) => void
+  onSpeeders: (on: boolean) => void
+}) {
+  return (
+    <>
       <Card className="space-y-3">
         <p className="text-sm font-medium text-ink">Quality</p>
         <p className="text-sm text-body">
@@ -328,11 +381,11 @@ export function SurveyPanel() {
         </p>
         <div className="flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2 text-body">
-            <input type="checkbox" className="h-4 w-4 accent-accent" checked={failedCheck} onChange={(e) => setFailedCheck(e.target.checked)} />
+            <input type="checkbox" className="h-4 w-4 accent-accent" checked={failedCheck} onChange={(e) => onFailedCheck(e.target.checked)} />
             Leave out those who failed the check
           </label>
           <label className="flex items-center gap-2 text-body">
-            <input type="checkbox" className="h-4 w-4 accent-accent" checked={speeders} onChange={(e) => setSpeeders(e.target.checked)} />
+            <input type="checkbox" className="h-4 w-4 accent-accent" checked={speeders} onChange={(e) => onSpeeders(e.target.checked)} />
             Leave out the fastest
           </label>
         </div>
@@ -422,7 +475,19 @@ export function SurveyPanel() {
           </details>
         </Card>
       )}
+    </>
+  )
+}
 
+/** Turning the results into a public page, and getting the raw rows out. */
+function PublishTab({ config, failedCheck, speeders }: { config: SurveyConfigView; failedCheck: boolean; speeders: boolean }) {
+  return (
+    <>
+      <p className="text-xs text-muted">
+        {failedCheck || speeders
+          ? `Leaving out ${[failedCheck && 'those who failed the attention check', speeders && 'the fastest'].filter(Boolean).join(' and ')}, as chosen on the Results tab.`
+          : 'Nobody is left out. The Results tab has the two exclusions that would apply here.'}
+      </p>
       <SurveyPublish
         failedCheck={failedCheck}
         speeders={speeders}
@@ -437,7 +502,7 @@ export function SurveyPanel() {
           The raw rows, one per response. Unlike this page it is not suppressed, so treat it as yours alone.
         </p>
       </div>
-    </section>
+    </>
   )
 }
 

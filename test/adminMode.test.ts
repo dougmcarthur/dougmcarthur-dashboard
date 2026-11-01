@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { getTableName } from 'drizzle-orm'
 import { readMode } from '../src/lib/auth'
@@ -23,7 +23,17 @@ import { SCOPED_TABLES, DOMAIN_TABLES } from '../src/db/scope'
 import { MEASURED_FIELDS } from '../src/lib/usage'
 
 const ADMIN_ROUTER = join('src', 'routes', 'admin.ts')
-const ADMIN_SCREEN = join('frontend', 'src', 'pages', 'AdminPage.tsx')
+/**
+ * The admin screen is a router and a folder of pages, and the rules below are
+ * about all of it: a page added next month is covered by being in the folder.
+ */
+const ADMIN_PAGES_DIR = join('frontend', 'src', 'pages', 'admin')
+const ADMIN_SCREEN_FILES = [
+  join('frontend', 'src', 'pages', 'AdminPage.tsx'),
+  ...readdirSync(ADMIN_PAGES_DIR)
+    .filter((name) => /\.tsx?$/.test(name))
+    .map((name) => join(ADMIN_PAGES_DIR, name)),
+]
 
 function source(path: string): string {
   return readFileSync(path, 'utf8')
@@ -74,7 +84,7 @@ describe('the oversight surface reads no domain table', () => {
 })
 
 describe('the oversight screen offers nothing it cannot do', () => {
-  const src = withoutComments(source(ADMIN_SCREEN))
+  const src = withoutComments(ADMIN_SCREEN_FILES.map(source).join('\n'))
 
   it('links to no artist-facing route', () => {
     // Every one of these 403s for an admin-mode session, so a link to one is a

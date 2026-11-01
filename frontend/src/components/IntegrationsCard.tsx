@@ -633,6 +633,17 @@ function useConnectNotice(): [ConnectNotice | null, () => void] {
   return [notice, () => setNotice(null)]
 }
 
+/**
+ * How many connections need attention, by the rule the card below uses to say
+ * so. The Settings sidebar shows the same number beside Google account, from
+ * the same query and the same function, so the badge and the page it points at
+ * cannot disagree.
+ */
+export function useConnectionAttention(): number {
+  const { data } = useQuery({ queryKey: ['health'], queryFn: api.health, staleTime: 60_000 })
+  return resolveRows(data).filter((r) => rowNeedsAttention(r.spec, r.state)).length
+}
+
 export function IntegrationsCard() {
   const [openId, setOpenId] = useState<IntegrationId | null>(null)
   const [notice, dismissNotice] = useConnectNotice()
@@ -673,7 +684,7 @@ export function IntegrationsCard() {
         between you and the list.
       */}
       <div className="flex flex-col items-start gap-1.5 border-b border-line pb-3">
-        <h2 className="text-sm font-semibold text-ink">Integrations</h2>
+        <h2 className="text-sm font-semibold text-ink">Connected services</h2>
         {attention > 0 ? (
           <p className="text-xs text-warn-fg">
             {attention} of {rows.length} {attention === 1 ? 'needs' : 'need'} attention.

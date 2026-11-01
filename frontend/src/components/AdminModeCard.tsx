@@ -24,7 +24,10 @@ import { Card } from './ui/Surface'
  * Leaving costs nothing, and is on the header rather than here, because it has
  * to be reachable from the surface you are leaving.
  */
-export function AdminModeCard() {
+const ADMIN_MODE_TEXT =
+  'Who is on the platform and what their accounts cost. It is a separate screen, not a bigger version of this one: while you are in it, your own gigs, replies and drafts are out of reach, and so is everybody else’s work.'
+
+export function AdminModeCard({ titled = true }: { /** False where the page already carries the title. */ titled?: boolean } = {}) {
   const [error, setError] = useState<string | null>(null)
 
   const enter = useMutation({
@@ -46,11 +49,13 @@ export function AdminModeCard() {
 
   return (
     <Card className="space-y-3">
-      <Explainer title="Admin mode">
-        Who is on the platform and what their accounts cost. It is a separate screen, not
-        a bigger version of this one — while you are in it, your own gigs, replies and
-        drafts are out of reach, and so is everybody else&rsquo;s work.
-      </Explainer>
+      {titled ? (
+        <Explainer as="h2" title="Admin mode">
+          {ADMIN_MODE_TEXT}
+        </Explainer>
+      ) : (
+        <p className="text-sm text-body">{ADMIN_MODE_TEXT}</p>
+      )}
 
       <Button variant="neutral" onClick={() => enter.mutate()} disabled={enter.isPending}>
         {enter.isPending ? 'Confirming…' : 'Switch to admin mode'}

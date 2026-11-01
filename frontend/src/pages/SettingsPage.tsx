@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { IntegrationsCard } from '../components/IntegrationsCard'
+import type { ReactNode } from 'react'
+import { IntegrationsCard, useConnectionAttention } from '../components/IntegrationsCard'
 import { BandsintownCard } from '../components/BandsintownCard'
 import { AssociationsCard } from '../components/AssociationsCard'
 import { NudgeRoutingCard } from '../components/NudgeRoutingCard'
@@ -12,123 +12,167 @@ import { AgentTokensCard } from '../components/AgentTokensCard'
 import { AdminModeCard } from '../components/AdminModeCard'
 import { ProfileCard } from '../components/ProfileCard'
 import { HomeBaseCard } from '../components/HomeBaseCard'
-import { Tabs } from '../components/ui/Tabs'
+import { SectionHeader } from '../components/ui/SectionHeader'
+import { SidebarShell, type SidebarBadge } from '../components/ui/SidebarShell'
 import { useSession } from '../hooks/useSession'
+import { settingsGroupsFor, settingsSectionLabel, type SettingsSectionId } from './settings/sections'
 
 /**
- * Settings, in four sections rather than one wall.
+ * Settings, a page at a time.
  *
- * It was a two-column grid of a dozen cards, every one on screen at once:
- * appearance beside integrations beside the digest, and your name alone in a
- * card of its own. Somebody coming here has one of four errands, and the tabs
- * are those errands.
+ * It was four tabs over a two-column grid of a dozen cards, so a tab still held
+ * several errands: "Account" was your name, where you travel from, your
+ * passkeys, the agents' tokens and the way into admin mode. Each of those is a
+ * page of its own now, in a sidebar shaped like the admin surface's
+ * (`./settings/sections.ts` has the pages and the names; `SidebarShell` is the
+ * frame both share).
  *
- * **Connections comes first and is the default,** because it is where every
- * link into Settings means to land: Google's consent round trip
- * (`#settings?google=…`) and the bell's "Calendar disconnected". A tab is
- * addressable — `#settings/reminders` is the digest's "switch this off" link —
- * so no link has to land on the wrong section and hope.
+ * **Which page is the router's job.** `App.tsx` reads the address, resolves it
+ * for this person (an old tab id becomes the page that replaced it, an owner's
+ * page asked for by an artist becomes the default) and hands the answer here.
+ * **Google account is the default** because it is where every link into
+ * Settings means to land: Google's consent round trip (`#settings?google=…`) and
+ * the bell's "Calendar disconnected". `#settings/reminders` is the digest's
+ * "switch this off" link, so no link has to land on the wrong page and hope.
  *
- * Reference documents moved to the Artist page: they describe the artist, and
+ * One column, not two. The grid was there so a single reading column pinned to
+ * the left did not bank empty pixels, and the sidebar is what stands there now.
+ *
+ * Reference documents live on the Artist page: they describe the artist, and
  * that is where the Library reads its facts from them.
  */
-const SECTIONS = [
-  { id: 'connections', label: 'Connections' },
-  { id: 'reminders', label: 'Reminders & digest' },
-  { id: 'account', label: 'Account' },
-  { id: 'appearance', label: 'Appearance' },
-] as const
 
-export type SettingsSection = (typeof SECTIONS)[number]['id']
-
-export function isSettingsSection(value: string | null | undefined): value is SettingsSection {
-  return SECTIONS.some((s) => s.id === value)
+/** The width a settings card reads well at. A form stretched across a wide window is a form nobody can scan. */
+function Column({ children }: { children: ReactNode }) {
+  return <div className="max-w-3xl space-y-6">{children}</div>
 }
 
-function Columns({ left, right }: { left: ReactNode; right: ReactNode }) {
-  return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
-      <div className="space-y-8 min-w-0">{left}</div>
-      <div className="space-y-8 min-w-0">{right}</div>
-    </div>
-  )
-}
-
-export function SettingsPage({ initialTab = null }: { initialTab?: string | null }) {
+export function SettingsPage({ section }: { section: SettingsSectionId }) {
   const session = useSession()
-  const [section, setSection] = useState<SettingsSection>(
-    isSettingsSection(initialTab) ? initialTab : 'connections',
-  )
+  const owner = session?.role === 'owner'
+  const failing = useConnectionAttention()
 
-  const choose = (next: SettingsSection) => {
-    setSection(next)
-    // Kept in the address so a reload, or a link somebody copies, returns to
-    // the same section. replaceState, not a hash change: this is not a new
-    // page, and the Back button should leave Settings rather than walk back
-    // through its tabs.
-    window.history.replaceState(null, '', `#settings/${next}`)
-  }
+  // A count only for a connection that has stopped working. A service nobody
+  // has connected is a choice not yet made, and `rowNeedsAttention` says so.
+  const badges: Partial<Record<SettingsSectionId, SidebarBadge>> =
+    failing > 0 ? { google: { count: failing, tone: 'attention', noun: 'needing attention' } } : {}
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-ink tracking-tight">Settings</h1>
-
-      <Tabs label="Settings sections" tabs={SECTIONS} active={section} onSelect={choose} />
-
-      {/* Two columns once there is room, for the sections with more than one
-          card: a single reading column pinned to the left banks empty pixels
-          on a wide display. Appearance is one card and stays one column. */}
-      {section === 'connections' ? (
-        <Columns
-          left={<IntegrationsCard />}
-          right={
-            <>
-              <BandsintownCard />
-              <AssociationsCard />
-            </>
-          }
-        />
-      ) : section === 'reminders' ? (
-        // Every account has its own digest, off until they switch it on.
-        <Columns
-          left={
-            <>
-              <NudgeRoutingCard />
-              <SuggestionsCard />
-            </>
-          }
-          right={<DigestSettingsCard />}
-        />
-      ) : section === 'account' ? (
-        <Columns
-          left={
-            <>
-              <ProfileCard />
-              {/* Beside your name: the other fact about you rather than the app. */}
-              {session?.role === 'owner' ? <HomeBaseCard /> : null}
-              <PasskeysCard />
-            </>
-          }
-          right={
-            <>
-              {session?.role !== 'owner' && <HomeBaseCard />}
-              {/* Beside Passkeys: both answer who and what can get in. The owner's
-                  only: research is collected once for everybody, so an artist has
-                  no agent of their own to give a credential to. */}
-              {session?.role === 'owner' && <AgentTokensCard />}
-              {/* Owners only — and the route says the same thing again, because
-                  a card that is merely not rendered is still a URL. */}
-              {session?.role === 'owner' && <AdminModeCard />}
-              {/* Renders nothing — heading included — unless there is something to fill. */}
-              <NotesBackfillCard />
-            </>
-          }
-        />
-      ) : (
-        <div className="max-w-3xl">
-          <AppearanceSettings />
-        </div>
-      )}
-    </div>
+    <SidebarShell
+      label="Settings pages"
+      groups={settingsGroupsFor(owner)}
+      current={section}
+      hrefFor={(id) => `#settings/${id}`}
+      badges={badges}
+    >
+      {/* Keyed, so moving to another page starts it clean rather than carrying
+          a half-typed field across. */}
+      <Page key={section} section={section} owner={owner} />
+    </SidebarShell>
   )
+}
+
+function Page({ section, owner }: { section: SettingsSectionId; owner: boolean }) {
+  const title = settingsSectionLabel(section) ?? 'Settings'
+
+  switch (section) {
+    case 'profile':
+      return (
+        <section className="space-y-4">
+          <SectionHeader title={title}>Who Scout is working for, and where your trips start from.</SectionHeader>
+          <Column>
+            <ProfileCard />
+            <HomeBaseCard />
+            {/* Renders nothing, heading included, unless there is something to fill. */}
+            <NotesBackfillCard />
+          </Column>
+        </section>
+      )
+
+    case 'security':
+      return (
+        <section className="space-y-4">
+          <SectionHeader title={title} />
+          <Column>
+            <PasskeysCard />
+          </Column>
+        </section>
+      )
+
+    case 'google':
+      return (
+        <section className="space-y-4">
+          <SectionHeader title={title}>
+            Connect Google once for Calendar, Tasks, Gmail drafts and Drive. Each service can be connected on its own
+            account, and each can be disconnected without touching the others.
+          </SectionHeader>
+          <Column>
+            <IntegrationsCard />
+          </Column>
+        </section>
+      )
+
+    case 'services':
+      return (
+        <section className="space-y-4">
+          <SectionHeader title={title}>
+            Outside services Scout reads with your own key or your own profile address.
+          </SectionHeader>
+          <Column>
+            <BandsintownCard />
+            <AssociationsCard />
+          </Column>
+        </section>
+      )
+
+    case 'reminders':
+      return (
+        <section className="space-y-4">
+          <SectionHeader title={title}>
+            Where reminders go, the weekly email, and whether Scout suggests new opportunities.
+          </SectionHeader>
+          <Column>
+            <NudgeRoutingCard />
+            {/* Every account has its own digest, off until they switch it on. */}
+            <DigestSettingsCard />
+            <SuggestionsCard />
+          </Column>
+        </section>
+      )
+
+    case 'appearance':
+      return (
+        <section className="space-y-4">
+          <SectionHeader title={title} />
+          <Column>
+            <AppearanceSettings titled={false} />
+          </Column>
+        </section>
+      )
+
+    case 'tokens':
+      return (
+        <section className="space-y-4">
+          <SectionHeader title={title} />
+          <Column>
+            {/* The owner's only: research is collected once for everybody, so an
+                artist has no agent of their own to give a credential to. And the
+                route says the same thing again, because a card that is merely
+                not rendered is still a URL. */}
+            {owner && <AgentTokensCard titled={false} />}
+          </Column>
+        </section>
+      )
+
+    case 'admin':
+      return (
+        <section className="space-y-4">
+          <SectionHeader title={title} />
+          <Column>
+            {/* Owners only, and the route says the same thing again. */}
+            {owner && <AdminModeCard titled={false} />}
+          </Column>
+        </section>
+      )
+  }
 }

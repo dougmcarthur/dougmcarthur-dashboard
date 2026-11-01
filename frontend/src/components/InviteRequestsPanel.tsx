@@ -4,6 +4,7 @@ import type { InviteRequestStatus } from '../../../shared/inviteRequests'
 import { relativeTime } from '../format'
 import { Button } from './ui/Button'
 import { Explainer } from './ui/Explainer'
+import { PagedList } from './ui/Pager'
 import { Card } from './ui/Surface'
 
 /**
@@ -29,7 +30,7 @@ export function InviteRequestsPanel({ onInvite }: { onInvite: (r: InviteRequestI
   return (
     <section className="space-y-4">
       <header>
-        <Explainer as="h2" title="Invitation requests">
+        <Explainer as="h2" title="Requests to join">
           Sent from the public page. Invite fills the form below; nothing is sent until you create the invitation.
           Answered requests are deleted after 90 days, unanswered ones after a year.
         </Explainer>
@@ -40,52 +41,62 @@ export function InviteRequestsPanel({ onInvite }: { onInvite: (r: InviteRequestI
       ) : open.length === 0 ? (
         <p className="text-sm text-muted">No open requests.</p>
       ) : (
-        <ul className="space-y-3">
-          {open.map((r) => (
-            <Card as="li" key={r.id} className="space-y-2">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <p className="text-sm text-ink">
-                  <span className="font-medium">{r.name}</span>
-                  <span className="text-muted"> · {r.email} · {relativeTime(r.createdAt)}</span>
-                </p>
-                <div className="flex gap-2">
-                  <Button variant="primary" size="sm" onClick={() => onInvite(r)}>
-                    Invite
-                  </Button>
-                  <Button
-                    variant="quiet"
-                    size="sm"
-                    disabled={set.isPending}
-                    onClick={() => set.mutate({ id: r.id, status: 'declined' })}
-                  >
-                    Decline
-                  </Button>
-                </div>
-              </div>
-              <p className="text-sm text-body whitespace-pre-line break-words">{r.message}</p>
-            </Card>
-          ))}
-        </ul>
+        <PagedList items={open} noun="requests">
+          {(rows) => (
+            <ul className="space-y-3">
+              {rows.map((r) => (
+                <Card as="li" key={r.id} className="space-y-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="text-sm text-ink">
+                      <span className="font-medium">{r.name}</span>
+                      <span className="text-muted"> · {r.email} · {relativeTime(r.createdAt)}</span>
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="primary" size="sm" onClick={() => onInvite(r)}>
+                        Invite
+                      </Button>
+                      <Button
+                        variant="quiet"
+                        size="sm"
+                        disabled={set.isPending}
+                        onClick={() => set.mutate({ id: r.id, status: 'declined' })}
+                      >
+                        Decline
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-sm text-body whitespace-pre-line break-words">{r.message}</p>
+                </Card>
+              ))}
+            </ul>
+          )}
+        </PagedList>
       )}
 
       {done.length > 0 && (
         <details className="rounded-lg border border-line bg-surface px-4 py-3">
           <summary className="text-sm text-body cursor-pointer">{done.length} answered</summary>
-          <ul className="mt-3 space-y-1.5">
-            {done.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span className="text-body">
-                  {r.name} <span className="text-muted">· {r.email}</span>
-                </span>
-                <span className="flex items-center gap-2 text-xs text-muted">
-                  {r.status === 'invited' ? 'Invited' : 'Declined'}
-                  <Button variant="quiet" size="sm" onClick={() => set.mutate({ id: r.id, status: 'new' })}>
-                    Reopen
-                  </Button>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-3">
+            <PagedList items={done} noun="answered requests">
+              {(rows) => (
+                <ul className="space-y-1.5">
+                  {rows.map((r) => (
+                    <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <span className="text-body">
+                        {r.name} <span className="text-muted">· {r.email}</span>
+                      </span>
+                      <span className="flex items-center gap-2 text-xs text-muted">
+                        {r.status === 'invited' ? 'Invited' : 'Declined'}
+                        <Button variant="quiet" size="sm" onClick={() => set.mutate({ id: r.id, status: 'new' })}>
+                          Reopen
+                        </Button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </PagedList>
+          </div>
         </details>
       )}
 

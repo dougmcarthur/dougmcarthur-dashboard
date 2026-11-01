@@ -890,3 +890,21 @@ export const catalogCandidates = sqliteTable('catalog_candidates', {
 
 export type CatalogSourceRow = typeof catalogSources.$inferSelect
 export type CatalogCandidateRow = typeof catalogCandidates.$inferSelect
+
+/** One row per read of an external data source. Migration 0044. */
+export const catalogSourceReads = sqliteTable('catalog_source_reads', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sourceId: integer('source_id').notNull(),
+  readAt: text('read_at').notNull(),
+  ok: integer('ok').notNull(),
+  items: integer('items').notNull().default(0),
+  added: integer('added').notNull().default(0),
+  note: text('note').notNull().default(''),
+})
+
+/** A line per change made from admin mode. Migration 0045. */
+export const adminChanges = sqliteTable('admin_changes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  at: text('at').notNull(),
+  summary: text('summary').notNull(),
+})

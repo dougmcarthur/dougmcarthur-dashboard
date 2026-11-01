@@ -44,7 +44,7 @@ export function ProfileCard() {
 
   return (
     <Card className="space-y-3">
-      <Explainer title="Your name">
+      <Explainer as="h2" title="Your name">
         What this account is called. It is not printed on anything you send — drafts and
         applications use the artist database — only on the account itself.
       </Explainer>

@@ -391,6 +391,47 @@ which, rather than shipping three zeroes a screen would render as "none". A
 request counter is a write per request, which is the shape this app keeps
 declining to build, so it needs somewhere outside D1 before it can be honest.
 
+**The admin surface is a sidebar of pages, and every list on it is paged.** It
+was one column eight panels long. `#admin/<page>` names a page, and
+`frontend/src/pages/admin/sections.ts` is the only list of them and their
+names: the sidebar, the tab title and the router all read it, and a link it does
+not know opens the first page. Names say what a page holds in the owner's words,
+which is why "Pages Scout reads" became **External data sources**. Each page has
+one `h1`, a page with several parts gives each an `h2`, and the router keys the
+error boundary by page so one page that fails does not blank the rest.
+
+- **Lists page through `shared/pagination.ts`.** The sizes are a closed set (10,
+  25, 50) because a limit the browser can set to a million is a way to ask the
+  database for everything, and the size is the one preference shared across the
+  lists, kept in this browser. The small lists are fetched whole and sliced
+  (`PagedList`); the two that can be long (listings, findings) page in the
+  Worker with `limit`, `offset` and a `total` from a count of the same filter, so
+  "of 212" is true of the database and not of the slice that arrived. Findings
+  used to stop at eighty and listings at a hundred with nothing to say there was
+  more. `test/adminPages.test.ts` fails if a list stops paging.
+- **A source has a switch and a frequency.** `cadence_hours` has been a column
+  since migration 0037 and nothing could change it. It is set from a closed set
+  of five (`shared/sourceControls.ts`: every 6 hours to weekly) through the same
+  PATCH as `enabled`, because the poller is hourly and takes a few a tick, so
+  "every 20 minutes" would promise what it cannot do. A new frequency counts from
+  the last read and keeps the back-off a failing source has earned: counting from
+  the click would let the dropdown postpone a read already due, and counting from
+  nothing would forgive a dead page the week it had waited. The page says when
+  the frequencies chosen ask for more reads a day than the cron can make (3 an
+  hour), which would otherwise be silent, the queue just running late.
+- **A source that is off goes last and is drawn quietly**, and its frequency is
+  disabled with it. It is a decision already taken, not what the page is for.
+  Listings that are hidden stay where they are and are drawn quietly, because a
+  switch that moved its own row to another page would hide what you just did.
+- **A switch is for something that takes effect at once.** Reading a source and
+  showing a listing are. Opening the public survey is not: it has preconditions
+  (a contact address, saved edits) and a consequence, so it stays a button with
+  its reasons beside it.
+- **The sidebar's counts come from the queries the pages use**, under the same
+  keys, so a badge and the page it points at cannot disagree. A source the owner
+  switched off is never counted: it is a decision, and it is how a badge on a
+  dead source clears.
+
 **An invitation is a credential that grants an account.** The biggest one
 this app hands out — a passkey signs into an account that exists, this one
 brings one into being — so it gets the strictest handling. Stored hashed and
@@ -2305,7 +2346,7 @@ public host (never a Doc, Drive file or mail thread), and it is a festival,
 showcase, funding call or sync organisation. The backfill could not know who
 filed older rows, so it published only ones the artist never acted on — the
 seed's "Mainstage Invitation" is an offer, not a call, and was the example.
-Admin mode's **Public listings** shows and hides anything.
+Admin mode's **Landing page listings** page shows and hides anything.
 
 **Requesting an invitation creates nothing.** `invite_requests` holds a name,
 an address and a reason from somebody with no account. No email is sent to

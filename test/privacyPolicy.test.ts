@@ -207,7 +207,7 @@ describe('who can hand a program a token', () => {
     // What makes it true: the card is rendered for the owner alone, and the
     // route refuses everybody else, since a card that is not rendered is still
     // a URL (see test/ownerOnly.test.ts for the request-level check).
-    expect(read('frontend/src/pages/SettingsPage.tsx')).toMatch(/role === 'owner' && <AgentTokensCard \/>/)
+    expect(read('frontend/src/pages/SettingsPage.tsx')).toMatch(/owner && <AgentTokensCard/)
     expect(withoutComments(read('src/routes/agentTokens.ts'))).toMatch(
       /actor\.kind === 'user' && actor\.role !== 'owner'/,
     )

@@ -3,8 +3,9 @@ import { api, type FeedbackItem } from '../api'
 import { describeContext, feedbackKindLabel } from '../../../shared/feedback'
 import { relativeTime } from '../format'
 import { Button } from './ui/Button'
-import { Explainer } from './ui/Explainer'
+import { PagedList } from './ui/Pager'
 import { Card } from './ui/Surface'
+import { SectionHeader } from './ui/SectionHeader'
 
 /**
  * What artists sent from the feedback form, on the oversight surface.
@@ -26,12 +27,19 @@ export function FeedbackInbox() {
 
   return (
     <section className="space-y-4">
-      <header>
-        <Explainer as="h2" title="Feedback">
-          Sent from the question-mark menu. Each message carries the page it was sent from and
-          any errors in the half hour before — the same list the sender saw before sending.
-        </Explainer>
-      </header>
+      <SectionHeader
+        title="Feedback"
+        actions={
+          items.length > 0 ? (
+            <Button variant="neutral" size="sm" onClick={() => window.location.assign('/api/admin/feedback/export')}>
+              Download as spreadsheet
+            </Button>
+          ) : undefined
+        }
+      >
+        Sent from the question-mark menu. Each message carries the page it was sent from and
+        any errors in the half hour before, the same list the sender saw before sending.
+      </SectionHeader>
 
       {inbox.isLoading ? (
         <div className="h-16 bg-sunken rounded-xl animate-pulse" />
@@ -46,32 +54,69 @@ export function FeedbackInbox() {
           {unread.length === 0 ? (
             <p className="text-sm text-muted">Nothing unread.</p>
           ) : (
-            <ul className="space-y-3">
-              {unread.map((item) => (
-                <FeedbackRow
-                  key={item.id}
-                  item={item}
-                  onRead={() => markRead.mutate(item.id)}
-                  busy={markRead.isPending}
-                />
-              ))}
-            </ul>
+            <PagedList items={unread} noun="unread messages">
+              {(rows) => (
+                <ul className="space-y-3">
+                  {rows.map((item) => (
+                    <FeedbackRow
+                      key={item.id}
+                      item={item}
+                      onRead={() => markRead.mutate(item.id)}
+                      busy={markRead.isPending}
+                    />
+                  ))}
+                </ul>
+              )}
+            </PagedList>
           )}
           {read.length > 0 && (
             <details className="rounded-lg border border-line bg-surface px-4 py-3">
               <summary className="text-sm text-body cursor-pointer">
                 {read.length} read {read.length === 1 ? 'message' : 'messages'}
               </summary>
-              <ul className="mt-3 space-y-3">
-                {read.map((item) => (
-                  <FeedbackRow key={item.id} item={item} />
-                ))}
-              </ul>
+              <div className="mt-3">
+                <PagedList items={read} noun="read messages">
+                  {(rows) => (
+                    <ul className="space-y-3">
+                      {rows.map((item) => (
+                        <FeedbackRow key={item.id} item={item} />
+                      ))}
+                    </ul>
+                  )}
+                </PagedList>
+              </div>
             </details>
           )}
         </>
       )}
     </section>
+  )
+}
+
+/**
+ * What the sender saw, one line until it is wanted.
+ *
+ * The message is what the owner reads; the context is what they reach for when
+ * the message is not enough. Printed in full under every message it made each
+ * card two and a half times as tall as its text, and the inbox a page of
+ * metadata. Closed, the line still says which page it came from, which is the
+ * part that is usually enough.
+ */
+function FeedbackContextLines({ lines }: { lines: Array<{ label: string; value: string }> }) {
+  return (
+    <details className="text-xs">
+      <summary className="cursor-pointer text-muted">
+        What they saw: <span className="text-body">{lines[0]?.value ?? 'unknown page'}</span>
+      </summary>
+      <dl className="mt-2 grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5">
+        {lines.map((line) => (
+          <div key={line.label} className="contents">
+            <dt className="text-muted">{line.label}</dt>
+            <dd className="text-body whitespace-pre-line break-words">{line.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   )
 }
 
@@ -91,14 +136,7 @@ function FeedbackRow({ item, onRead, busy }: { item: FeedbackItem; onRead?: () =
       </div>
       <p className="text-sm text-body whitespace-pre-line break-words">{item.message}</p>
       {item.context ? (
-        <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-xs">
-          {describeContext(item.context).map((line) => (
-            <div key={line.label} className="contents">
-              <dt className="text-muted">{line.label}</dt>
-              <dd className="text-body whitespace-pre-line break-words">{line.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <FeedbackContextLines lines={describeContext(item.context)} />
       ) : (
         <p className="text-xs text-faint">The context that came with this could not be read.</p>
       )}

@@ -25,10 +25,12 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, like, or, sql } from 'drizzle-orm'
 import { getDb } from '../db'
 import {
+  adminChanges,
   catalogCandidates,
+  catalogSourceReads,
   catalogSources,
   feedback,
   inviteRequests,
@@ -46,8 +48,11 @@ import { issueInvite, listInvites, revokeInvite } from '../lib/invites'
 import { mailerConfigured, sendMail, senderIdentity } from '../lib/mailer'
 import { inviteEmail } from '../lib/authMail'
 import { readTenantHealth } from '../lib/tenantHealth'
-import { pollSources, readLastPoll } from '../lib/sourcePoll'
-import { sourceState } from '../../shared/catalogSources'
+import { PER_TICK, pollOne, pollSources, readLastPoll } from '../lib/sourcePoll'
+import { nextDueAt as followingRead, sourceState } from '../../shared/catalogSources'
+import { isCadence } from '../../shared/sourceControls'
+import { parsePaging } from '../../shared/pagination'
+import { describeAdminChange } from '../../shared/adminLog'
 import { MEASURED_FIELDS } from '../lib/usage'
 import { isFeedbackKind } from '../../shared/feedback'
 import { readSurveyConfig, writeSurveySettings } from '../lib/surveySettings'
@@ -58,6 +63,61 @@ import { summarise, toCsv, toRespondent, type Respondent } from '../../shared/su
 import { buildPublicResults, publishBlockers } from '../../shared/surveyPublic'
 
 const admin = new Hono<AdminEnv>()
+
+/**
+ * A line in the change log for every admin write that succeeded. After the
+ * handler, so a refused request leaves nothing; best-effort, so a log that will
+ * not write never undoes the change it describes.
+ */
+admin.use('*', async (c, next) => {
+  await next()
+  const path = new URL(c.req.url).pathname.replace(/^\/api\/admin/, '')
+  const summary = c.res.status < 400 ? describeAdminChange(c.req.method, path) : null
+  if (!summary) return
+  try {
+    await getDb(c.env.DB).insert(adminChanges).values({ at: new Date().toISOString(), summary })
+  } catch (err) {
+    console.error('admin change not logged:', err)
+  }
+})
+
+/** The change log, newest first, a screenful at a time. */
+admin.get('/changes', async (c) => {
+  const { limit, offset } = parsePaging(c.req.query('limit'), c.req.query('offset'))
+  const db = getDb(c.env.DB)
+  const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(adminChanges)
+  const rows = await db.select().from(adminChanges).orderBy(desc(adminChanges.at), desc(adminChanges.id)).limit(limit).offset(offset)
+  return c.json({ total: Number(n), items: rows })
+})
+
+/**
+ * One box over the places the owner looks things up: artists, requests,
+ * feedback, sources and listings. Five hits a group, names and labels only.
+ * It reads the platform tables this router already reads and no artist's work.
+ */
+admin.get('/search', async (c) => {
+  const q = (c.req.query('q') ?? '').replace(/[%_\\]/g, ' ').trim().slice(0, 80)
+  if (q.length < 2) return c.json({ q, groups: [] })
+  const like_ = `%${q}%`
+  const db = getDb(c.env.DB)
+  const [artists, requests, messages, sources, listings] = await Promise.all([
+    db.select({ id: tenants.id, name: tenants.displayName }).from(tenants).where(like(tenants.displayName, like_)).limit(5),
+    db.select({ id: inviteRequests.id, name: inviteRequests.name, email: inviteRequests.email }).from(inviteRequests)
+      .where(or(like(inviteRequests.name, like_), like(inviteRequests.email, like_))).orderBy(desc(inviteRequests.id)).limit(5),
+    db.select({ id: feedback.id, message: feedback.message }).from(feedback).where(like(feedback.message, like_)).orderBy(desc(feedback.id)).limit(5),
+    db.select({ id: catalogSources.id, label: catalogSources.label }).from(catalogSources).where(like(catalogSources.label, like_)).limit(5),
+    db.select({ id: opportunities.id, name: opportunities.name }).from(opportunities)
+      .where(or(like(opportunities.name, like_), like(opportunities.organizer, like_))).orderBy(desc(opportunities.id)).limit(5),
+  ])
+  const groups = [
+    { section: 'artists', label: 'Artists', hits: artists.map((a) => ({ id: String(a.id), text: a.name ?? 'Unnamed' })) },
+    { section: 'invitations', label: 'Requests to join', hits: requests.map((r) => ({ id: String(r.id), text: `${r.name} · ${r.email}` })) },
+    { section: 'feedback', label: 'Feedback', hits: messages.map((m) => ({ id: String(m.id), text: m.message.slice(0, 120) })) },
+    { section: 'sources', label: 'External data sources', hits: sources.map((s) => ({ id: String(s.id), text: s.label })) },
+    { section: 'listings', label: 'Landing page listings', hits: listings.map((l) => ({ id: String(l.id), text: l.name })) },
+  ].filter((g) => g.hits.length > 0)
+  return c.json({ q, groups })
+})
 
 /**
  * Every artist on the platform, with tenure and the latest usage sample.
@@ -202,6 +262,32 @@ admin.get('/health', async (c) => c.json(await readTenantHealth(c.env)))
  * shown before sending, not a read of their work. Capped, because this is an
  * inbox rather than an archive.
  */
+/** Every message, as a spreadsheet. A cell a stranger typed that starts like a formula is quoted. */
+admin.get('/feedback/export', async (c) => {
+  const db = getDb(c.env.DB)
+  const [rows, tenantRows] = await Promise.all([
+    db.select().from(feedback).orderBy(desc(feedback.createdAt)).limit(5000),
+    db.select().from(tenants),
+  ])
+  const names = new Map(tenantRows.map((t) => [t.id, t.displayName]))
+  const cell = (v: string | null) => {
+    const s = v ?? ''
+    const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
+    return `"${safe.replace(/"/g, '""')}"`
+  }
+  const lines = [['Sent', 'From', 'Kind', 'Read', 'Message'].map(cell).join(',')]
+  for (const r of rows) {
+    lines.push([r.createdAt, names.get(r.tenantId) ?? null, r.kind, r.readAt, r.message].map(cell).join(','))
+  }
+  return new Response(lines.join('\r\n') + '\r\n', {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="feedback.csv"',
+      'Cache-Control': 'no-store',
+    },
+  })
+})
+
 admin.get('/feedback', async (c) => {
   const db = getDb(c.env.DB)
   const [rows, tenantRows] = await Promise.all([
@@ -319,12 +405,16 @@ admin.get('/catalog/sources', async (c) => {
 
   return c.json({
     lastPoll,
+    // What the cron can read in a day, so the screen can say when the
+    // frequencies chosen ask for more than that.
+    capacityPerDay: PER_TICK * 24,
     items: sources.map((s) => ({
       id: s.id,
       label: s.label,
       kind: s.kind,
       url: s.url,
       enabled: s.enabled === 1,
+      cadenceHours: s.cadenceHours,
       addedBy: s.addedBy,
       lastOkAt: s.lastOkAt,
       lastFetchedAt: s.lastFetchedAt,
@@ -346,10 +436,24 @@ const CANDIDATE_VIEWS = {
   past: inArray(catalogCandidates.status, ['closed', 'stale']),
 } as const
 
+/**
+ * One screenful of what the sources found, with the count behind it. The list
+ * used to be cut at eighty with nothing to say there were more; `total` is what
+ * lets the pager say how many there are, and `source` narrows it to one page's
+ * findings, which is how a verdict rule that is wrong for one site gets found.
+ */
 admin.get('/catalog/candidates', async (c) => {
   const view = c.req.query('view') ?? 'calls'
   if (!(view in CANDIDATE_VIEWS)) return c.json({ error: `unknown view: ${view}` }, 400)
-  const rows = await getDb(c.env.DB)
+  const { limit, offset } = parsePaging(c.req.query('limit'), c.req.query('offset'))
+  const sourceId = Number(c.req.query('source'))
+  const where = and(
+    CANDIDATE_VIEWS[view as keyof typeof CANDIDATE_VIEWS],
+    Number.isInteger(sourceId) && sourceId > 0 ? eq(catalogCandidates.sourceId, sourceId) : undefined,
+  )
+  const db = getDb(c.env.DB)
+  const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(catalogCandidates).where(where)
+  const rows = await db
     .select({
       id: catalogCandidates.id,
       title: catalogCandidates.title,
@@ -367,10 +471,11 @@ admin.get('/catalog/candidates', async (c) => {
     })
     .from(catalogCandidates)
     .innerJoin(catalogSources, eq(catalogSources.id, catalogCandidates.sourceId))
-    .where(CANDIDATE_VIEWS[view as keyof typeof CANDIDATE_VIEWS])
+    .where(where)
     .orderBy(desc(catalogCandidates.firstSeenAt), desc(catalogCandidates.id))
-    .limit(80)
-  return c.json({ view, items: rows })
+    .limit(limit)
+    .offset(offset)
+  return c.json({ view, total: Number(n), items: rows })
 })
 
 /**
@@ -384,18 +489,70 @@ admin.post('/catalog/poll', async (c) => {
   return c.json(report)
 })
 
+/** The newest reads of one source, for the history under its row. */
+admin.get('/catalog/sources/:id/reads', async (c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) return c.json({ error: 'not found' }, 404)
+  const rows = await getDb(c.env.DB)
+    .select()
+    .from(catalogSourceReads)
+    .where(eq(catalogSourceReads.sourceId, id))
+    .orderBy(desc(catalogSourceReads.readAt), desc(catalogSourceReads.id))
+    .limit(30)
+  return c.json({ items: rows.map((r) => ({ at: r.readAt, ok: r.ok === 1, items: r.items, added: r.added, note: r.note })) })
+})
+
+/**
+ * Read one source now, whether or not it is due or switched on: the way to find
+ * out if a page works before trusting the schedule with it. It records the read
+ * like any other, so the source's state on the page is what this just found.
+ */
+admin.post('/catalog/sources/:id/poll', async (c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id)) return c.json({ error: 'not found' }, 404)
+  const [row] = await getDb(c.env.DB).select().from(catalogSources).where(eq(catalogSources.id, id))
+  if (!row) return c.json({ error: 'not found' }, 404)
+  return c.json(await pollOne(c.env, row, new Date()))
+})
+
+/**
+ * The two things the owner decides about a source: whether it is read, and how
+ * often. Either or both in one call; neither is a 400, so a request that would
+ * do nothing says so.
+ *
+ * A new frequency applies from the last read and not from now, and keeps the
+ * back-off a failing source has earned. Counting from now would let a click on
+ * the dropdown postpone a read that was already due, and counting from nothing
+ * would forgive a dead page the week it had been waiting. A source never read
+ * has no last read and stays due.
+ */
 admin.patch(
   '/catalog/sources/:id',
-  zValidator('json', z.object({ enabled: z.boolean() })),
+  zValidator(
+    'json',
+    z
+      .object({
+        enabled: z.boolean().optional(),
+        cadenceHours: z.number().int().refine(isCadence, 'not a frequency that is offered').optional(),
+      })
+      .refine((b) => b.enabled !== undefined || b.cadenceHours !== undefined, 'nothing to change'),
+  ),
   async (c) => {
     const id = Number(c.req.param('id'))
     if (!Number.isInteger(id)) return c.json({ error: 'not found' }, 404)
-    const [row] = await getDb(c.env.DB)
-      .update(catalogSources)
-      .set({ enabled: c.req.valid('json').enabled ? 1 : 0 })
-      .where(eq(catalogSources.id, id))
-      .returning({ id: catalogSources.id })
-    return row ? c.json({ ok: true }) : c.json({ error: 'not found' }, 404)
+    const body = c.req.valid('json')
+    const db = getDb(c.env.DB)
+    const [row] = await db.select().from(catalogSources).where(eq(catalogSources.id, id))
+    if (!row) return c.json({ error: 'not found' }, 404)
+
+    const patch: Partial<typeof catalogSources.$inferInsert> = {}
+    if (body.enabled !== undefined) patch.enabled = body.enabled ? 1 : 0
+    if (body.cadenceHours !== undefined && body.cadenceHours !== row.cadenceHours) {
+      patch.cadenceHours = body.cadenceHours
+      if (row.lastFetchedAt) patch.nextDueAt = followingRead(new Date(row.lastFetchedAt), body.cadenceHours, row.failures)
+    }
+    if (Object.keys(patch).length) await db.update(catalogSources).set(patch).where(eq(catalogSources.id, id))
+    return c.json({ ok: true })
   },
 )
 
@@ -405,7 +562,15 @@ admin.patch(
  * nobody — so nothing here reaches an artist's rows.
  */
 admin.get('/listings', async (c) => {
-  const rows = await getDb(c.env.DB)
+  const { limit, offset } = parsePaging(c.req.query('limit'), c.req.query('offset'))
+  // A search by name or organiser. The LIKE wildcards are blanked rather than
+  // escaped: a stray % or _ typed into a search box should match nothing it
+  // was not meant to, and nobody searches for one on purpose.
+  const q = (c.req.query('q') ?? '').replace(/[%_\\]/g, ' ').trim().slice(0, 80)
+  const where = q ? or(like(opportunities.name, `%${q}%`), like(opportunities.organizer, `%${q}%`)) : undefined
+  const db = getDb(c.env.DB)
+  const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(opportunities).where(where)
+  const rows = await db
     .select({
       id: opportunities.id,
       category: opportunities.category,
@@ -418,9 +583,11 @@ admin.get('/listings', async (c) => {
       firstSeenAt: opportunities.firstSeenAt,
     })
     .from(opportunities)
-    .orderBy(desc(opportunities.firstSeenAt))
-    .limit(100)
-  return c.json({ items: rows.map((r) => ({ ...r, public: r.public === 1 })) })
+    .where(where)
+    .orderBy(desc(opportunities.firstSeenAt), desc(opportunities.id))
+    .limit(limit)
+    .offset(offset)
+  return c.json({ total: Number(n), items: rows.map((r) => ({ ...r, public: r.public === 1 })) })
 })
 
 admin.patch('/listings/:id', zValidator('json', z.object({ public: z.boolean() })), async (c) => {
