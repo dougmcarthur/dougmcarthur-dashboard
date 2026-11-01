@@ -1,0 +1,4 @@
+# One line ending everywhere. Without this, Windows checks files out as CRLF
+# (core.autocrlf) while the CI runner uses LF, so a test that reads source and
+# matches a literal newline passes in one place and fails in the other.
+* text=auto eol=lf
