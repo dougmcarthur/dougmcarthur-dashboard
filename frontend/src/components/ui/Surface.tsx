@@ -74,6 +74,18 @@ export function Card({
 /* Label                                                                  */
 /* --------------------------------------------------------------------- */
 
+/**
+ * A page's own heading, the same everywhere. Seven pages had three treatments
+ * (`text-xl`, `text-2xl`, and one `font-bold`), so the same kind of heading
+ * changed size and weight as you moved through the app. The shell pages
+ * (Settings, admin) and the Artist page take the class so they match.
+ */
+export const PAGE_TITLE = 'text-2xl font-semibold text-ink tracking-tight'
+
+export function PageTitle({ children }: { children: ReactNode }) {
+  return <h1 className={PAGE_TITLE}>{children}</h1>
+}
+
 const CONTROL = 'input:not([type="hidden"]), select, textarea'
 
 /**

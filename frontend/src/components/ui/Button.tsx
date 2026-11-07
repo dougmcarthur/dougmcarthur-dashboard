@@ -28,10 +28,12 @@ const VARIANTS: Record<ButtonVariant, string> = {
 }
 
 const SIZES: Record<ButtonSize, string> = {
-  sm: 'text-xs px-2.5 py-1',
-  md: 'text-xs px-3 py-1.5',
+  // On a phone every size is at least 44px tall, a thumb's target. From md up
+  // they are the compact sizes a table row wants.
+  sm: 'text-xs px-2.5 py-1 max-md:min-h-11',
+  md: 'text-xs px-3 py-1.5 max-md:min-h-11',
   // For a screen a stranger reads on a phone: a tap target a thumb can hit.
-  lg: 'text-sm px-4 py-2.5',
+  lg: 'text-sm px-4 py-2.5 max-md:min-h-11',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

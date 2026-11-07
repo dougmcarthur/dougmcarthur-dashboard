@@ -928,6 +928,15 @@ checklist for what `test/uiConsistency.test.ts` enforces.
   card, controls are 44px, the next step is always visible (`.row-actions` hides it
   until hover, and a phone has none) and a Sort control stands in for the column
   headers. `test/gigsPhone.test.ts`.
+- **Page headings share one class, and controls are a fingertip on a phone.** `PAGE_TITLE`
+  (`components/ui/Surface.tsx`) is every page's `h1`, the Settings and admin shells and
+  the Artist page included. Below `md` every `Button` size, input, select, textarea, tab
+  and the deck's buttons are at least 44px tall (`max-md:min-h-11`); a text-only button
+  grows its hit area with `max-md:py-3 max-md:-my-3` so the line does not move. The
+  header's icon buttons are 40px with no gap below 360px wide, because at 320px three
+  44px buttons wrap the row and the menu then opens off the left edge. The menu names
+  the account (`Signed in as`) once a name is set, and not in admin mode, which is
+  refused the profile route. `test/phoneControls.test.ts`.
 - **A `Label` ties itself to the control after it** (the next sibling, or the first
   control inside it), so a form label names its input without an `htmlFor` at each call
   site; pass `htmlFor` when the control is elsewhere. It is a DOM effect, so

@@ -7,6 +7,7 @@ import { DataHealthRow } from '../components/DataHealthRow'
 import { OnboardingCard, useOnboardingAutostart } from '../components/OnboardingCard'
 import { OnboardingFlow, type FlowScreen } from '../components/OnboardingFlow'
 import { StartHere } from '../components/StartHere'
+import { PageTitle } from '../components/ui/Surface'
 import { useState } from 'react'
 
 export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
@@ -74,7 +75,7 @@ export function OverviewPage({ onNav }: { onNav: (p: string) => void }) {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold text-ink tracking-tight">Overview</h1>
+      <PageTitle>Overview</PageTitle>
 
       {checklist && <OnboardingCard state={checklist} onStart={setFlow} />}
       {flow && onboarding.data && (

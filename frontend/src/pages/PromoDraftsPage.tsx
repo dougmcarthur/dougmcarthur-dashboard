@@ -7,7 +7,7 @@ import { SkeletonList } from '../components/Skeleton'
 import { FILTER } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { CopyButton } from '../components/CopyButton'
-import { Banner, Card, EmptyState } from '../components/ui/Surface'
+import { Banner, Card, EmptyState, PageTitle } from '../components/ui/Surface'
 import { useConfirm } from '../components/ui/ConfirmModal'
 
 /** "2026-09" is a key, not a label. */
@@ -83,7 +83,7 @@ export function PromoDraftsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-xl font-semibold text-ink">Promo Drafts</h1>
+        <PageTitle>Promo Drafts</PageTitle>
         <div className="flex items-center gap-2">
           {statuses.length > 1 && (
             <select
@@ -167,7 +167,7 @@ export function PromoDraftsPage() {
                         })
                         if (ok) deleteMutation.mutate(draft.id)
                       }}
-                      className="w-6 h-6 p-0 flex items-center justify-center text-muted hover:text-danger-fg hover:bg-danger-bg"
+                      className="w-6 h-6 p-0 flex items-center justify-center text-muted hover:text-danger-fg hover:bg-danger-bg max-md:w-11 max-md:h-11"
                       title="Delete"
                       aria-label={`Delete ${draft.title}`}
                     >

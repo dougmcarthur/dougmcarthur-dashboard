@@ -69,6 +69,12 @@ put the stage first, cells shared with the table, 44px controls (`size="lg"` and
 `min-h-11`), and no `.row-actions` on a phone, since that class hides its buttons until
 hover. Look at it at 375px and measure `document.documentElement.scrollWidth`.
 
+**Phone tap targets come with the shared pieces.** `Button` (all sizes), `Field`, `Tabs`
+and the deck are 44px below `md` without being asked. A custom button, chip or row
+needs `max-md:min-h-11`, or `max-md:py-3 max-md:-my-3` when it is text in a line. Page
+headings are `<PageTitle>` (or `PAGE_TITLE` where an `Explainer` draws the `h1`), never
+a restated class. Check 320px as well as 375px: the header row has 9px to spare there.
+
 ## No em dash in anything a screen says
 
 A string, a template or JSX text under `frontend/src` carries none

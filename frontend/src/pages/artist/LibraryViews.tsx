@@ -59,7 +59,7 @@ export function ViewSwitch({ view, onChange }: { view: LibraryView; onChange: (v
           type="button"
           onClick={() => onChange(v.id)}
           aria-pressed={v.id === view}
-          className={`h-8 px-3 rounded-md text-sm transition-colors ${
+          className={`h-8 max-md:h-11 px-3 rounded-md text-sm transition-colors ${
             v.id === view ? 'bg-raised text-ink font-semibold shadow-inset' : 'text-muted hover:text-ink'
           }`}
         >
@@ -160,7 +160,7 @@ function Entry({ asset, onOpen, children }: { asset: ArtistAssetWithHealth; onOp
     <button
       type="button"
       onClick={onOpen}
-      className="w-full text-left rounded-lg px-2 py-1.5 -mx-2 hover:bg-sunken transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
+      className="w-full text-left rounded-lg px-2 py-1.5 max-md:py-3 -mx-2 hover:bg-sunken transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
     >
       {children}
       <span className="sr-only">{`: open ${asset.label}`}</span>

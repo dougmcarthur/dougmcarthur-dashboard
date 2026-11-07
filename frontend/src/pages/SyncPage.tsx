@@ -13,7 +13,7 @@ import { CheckAllTerms, TermsChip, TermsPanel, mayPitch } from '../components/Sy
 import { termsState } from '../../../shared/syncTerms'
 import { useSession } from '../hooks/useSession'
 import { Banner, Card, EmptyState } from '../components/ui/Surface'
-import { Caption, Label } from '../components/ui/Surface'
+import { Caption, Label, PageTitle } from '../components/ui/Surface'
 import { useConfirm } from '../components/ui/ConfirmModal'
 
 const SYNC_STATUSES: SyncStatus[] = ['draft_ready', 'pitched', 'confirmed', 'declined', 'archived']
@@ -312,7 +312,7 @@ export function SyncPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-ink">Sync Targets</h1>
+        <PageTitle>Sync Targets</PageTitle>
         <div className="flex flex-wrap gap-2 items-center">
           <Select
             filter
@@ -450,7 +450,7 @@ export function SyncPage() {
                         })
                         if (ok) deleteMutation.mutate(target.id)
                       }}
-                      className="w-6 h-6 p-0 flex items-center justify-center text-muted hover:text-danger-fg hover:bg-danger-bg"
+                      className="w-6 h-6 p-0 flex items-center justify-center text-muted hover:text-danger-fg hover:bg-danger-bg max-md:w-11 max-md:h-11"
                       title="Delete"
                       aria-label={`Delete ${target.name}`}
                     >

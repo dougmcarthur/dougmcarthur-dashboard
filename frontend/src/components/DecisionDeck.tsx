@@ -191,7 +191,7 @@ function Badge({ item }: { item: ReviewItem }) {
 function InProgressLink({ count, onNav }: { count: number; onNav: (page: string) => void }) {
   if (count === 0) return null
   return (
-    <button onClick={() => onNav('review/in_progress')} className="text-info-fg hover:underline">
+    <button onClick={() => onNav('review/in_progress')} className="text-info-fg hover:underline max-md:py-3 max-md:-my-3">
       {count} in progress →
     </button>
   )
@@ -302,7 +302,7 @@ export function DecisionDeck({
         <span className="text-xs text-muted tabular-nums space-x-3">
           <span>{position} of {total}</span>
           <InProgressLink count={inProgress} onNav={onNav} />
-          <button onClick={() => onNav('review')} className="text-info-fg hover:underline">
+          <button onClick={() => onNav('review')} className="text-info-fg hover:underline max-md:py-3 max-md:-my-3">
             show the rest →
           </button>
         </span>
@@ -361,7 +361,7 @@ export function DecisionDeck({
                 disabled={patch.isPending}
                 title={a.label}
                 aria-label={a.label}
-                className={`inline-flex items-center gap-1.5 h-9 px-3 sm:px-0 sm:w-9 justify-center rounded-lg border disabled:opacity-40 transition-colors ${
+                className={`inline-flex items-center gap-1.5 h-9 max-md:h-11 px-3 sm:px-0 sm:w-9 justify-center rounded-lg border disabled:opacity-40 transition-colors ${
                   a.tone === 'go'
                     ? 'bg-accent border-transparent text-accent-fg hover:bg-accent-hover'
                     : 'bg-transparent border-line-strong text-muted hover:bg-sunken hover:text-ink'
@@ -380,7 +380,7 @@ export function DecisionDeck({
               onClick={() => onNav(`review/${item.key}`)}
               title="Open it"
               aria-label="Open it"
-              className="inline-flex items-center gap-1.5 h-9 px-3 sm:px-0 sm:w-9 justify-center rounded-lg border border-line text-body hover:bg-sunken hover:text-ink transition-colors"
+              className="inline-flex items-center gap-1.5 h-9 max-md:h-11 px-3 sm:px-0 sm:w-9 justify-center rounded-lg border border-line text-body hover:bg-sunken hover:text-ink transition-colors"
             >
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
                    strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
@@ -397,7 +397,7 @@ export function DecisionDeck({
             <button
               onClick={() => setIndex((i) => (i + 1) % Math.max(remaining.length, 1))}
               disabled={remaining.length < 2}
-              className="ml-auto text-xs px-3 py-1.5 rounded-md text-muted hover:bg-sunken disabled:opacity-30 transition-colors"
+              className="ml-auto text-xs px-3 py-1.5 max-md:py-3 rounded-md text-muted hover:bg-sunken disabled:opacity-30 transition-colors"
             >
               Skip →
             </button>

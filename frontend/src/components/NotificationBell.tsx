@@ -85,7 +85,7 @@ export function NotificationBell({
               : 'Show the notifications panel'
             : undefined
         }
-        className={`relative p-2 rounded-md transition-colors hover:text-ink hover:bg-sunken ${
+        className={`relative p-2 max-md:p-3.5 max-[359px]:p-3 rounded-md transition-colors hover:text-ink hover:bg-sunken ${
           side.showing('notifications') ? 'text-ink bg-sunken' : 'text-muted'
         }`}
       >

@@ -14,7 +14,7 @@ import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes 
 const BASE =
   'text-sm border border-field rounded-md bg-surface text-ink ' +
   'placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-accent ' +
-  'focus:border-transparent transition disabled:opacity-40'
+  'focus:border-transparent transition disabled:opacity-40 max-md:min-h-11'
 
 /** Fills its container — forms. */
 export const FIELD = `${BASE} w-full px-2.5 py-1.5`

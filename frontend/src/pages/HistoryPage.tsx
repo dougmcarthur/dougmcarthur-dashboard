@@ -15,8 +15,9 @@ import { clockTime, dayHeading, localDay, localToday, relativeTimeInline } from 
 import { FilterChip, Icon, KindIcon } from '../components/notificationParts'
 import { StatusBadge } from '../components/StatusBadge'
 import { SkeletonList } from '../components/Skeleton'
+import { Explainer } from '../components/ui/Explainer'
 import { Button } from '../components/ui/Button'
-import { Banner, Card, EmptyState } from '../components/ui/Surface'
+import { Banner, Card, EmptyState, PAGE_TITLE } from '../components/ui/Surface'
 
 /**
  * History: the bell, expanded.
@@ -137,7 +138,7 @@ function EntryRow({
               type="button"
               onClick={toggle}
               aria-expanded={open}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-info-fg hover:text-ink transition-colors"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-info-fg hover:text-ink transition-colors max-md:py-3 max-md:-my-3"
             >
               <Icon
                 name="chevron"
@@ -292,10 +293,10 @@ export function HistoryPage({
   return (
     <div className="max-w-3xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-ink">History</h1>
-          <p className="mt-1 text-sm text-muted">Everything the app did or noticed, newest first.</p>
-        </div>
+        {/* What the page is for sits behind the info button, as everywhere else. */}
+        <Explainer as="h1" title="History" titleClassName={PAGE_TITLE}>
+          Everything the app did or noticed, newest first.
+        </Explainer>
         <Button
           variant="neutral"
           disabled={unread === 0 || markRead.isPending}
