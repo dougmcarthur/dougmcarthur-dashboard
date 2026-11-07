@@ -910,6 +910,24 @@ checklist for what `test/uiConsistency.test.ts` enforces.
   palette. The palette follows the account (`tenant_settings` `appearance.palette`, `GET`
   and `PUT /api/appearance`, refused to agent tokens, absent in admin mode); everything
   else in Appearance stays per device. `docs/themes-plan.md`.
+- **Every page but the Overview is a lazy chunk, and a tab left open across a deploy
+  reloads once.** `App.tsx` imports only `OverviewPage` statically (the first script
+  would otherwise hold every page), and `vite.config.ts` gives React and TanStack
+  chunks of their own so a deploy that touched only the app leaves them cached. Each
+  deploy replaces the whole `dist`, so a stale tab's request for a page it knew by hash
+  gets a 404, and `React.lazy` remembers a rejection (so "Try again" cannot help).
+  `reloadForStaleChunk` (`frontend/src/chunkReload.ts`) reloads once, not offline and not
+  twice within 30 seconds, so a chunk that is truly gone shows the error instead of
+  looping. `test/chunkReload.test.ts` pins the split and the rule.
+- **A `Label` ties itself to the control after it** (the next sibling, or the first
+  control inside it), so a form label names its input without an `htmlFor` at each call
+  site; pass `htmlFor` when the control is elsewhere. It is a DOM effect, so
+  `test/labelLink.test.ts` pins that it stays, not that it works: check `label.control`
+  in the running app after touching it.
+- **No em dash in anything a screen says** (a string, a template or JSX text under
+  `frontend/src`; a dash standing alone for an empty value is allowed):
+  `test/visibleDashes.test.ts`. The Worker still builds a few sentences with one
+  (notification titles, some emails), outside that test's scope.
 - **Surfaces that read as a document are static HTML**: `/privacy/` and
   `/terms-of-service/` are Vite entries (`vite.config.ts`) of plain HTML with no Worker route, so they read
   with JavaScript off and have an address a regulator or Google's OAuth review can fetch.
@@ -920,7 +938,8 @@ checklist for what `test/uiConsistency.test.ts` enforces.
 **The logged-out page shows a small sample of the catalog** (`LandingPage`, eight open
 calls from `/api/public/opportunities`, which reads only the catalog). The fee column is
 the fee as the listing stated it and nothing more: the page never says "entry fee" and
-never "Free" for a fee nobody stated. Publishing is conservative (see the catalog).
+never "Free" for a fee nobody stated, and the column is absent while no sample row states
+one (a column of dashes reads as "free"). Publishing is conservative (see the catalog).
 
 **The privacy policy's numbers are the code's.** `/privacy/` names Sun Dogs Music
 Manitoba, a sole proprietorship Doug McArthur registered on 2024-12-30 (registry number

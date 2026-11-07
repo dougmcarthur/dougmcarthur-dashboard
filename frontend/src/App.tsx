@@ -7,6 +7,7 @@ import { resolveSettingsRoute } from './pages/settings/sections'
 import { useNarrow } from './hooks/useNarrow'
 import { OverviewPage } from './pages/OverviewPage'
 import { SkeletonList } from './components/Skeleton'
+import { reloadForStaleChunk } from './chunkReload'
 import { lazy, Suspense, useEffect, type ComponentType } from 'react'
 import { AccountAppearance } from './hooks/useAppearance'
 import { notePage } from './diagnostics'
@@ -19,7 +20,17 @@ function lazyPage<K extends string, P extends object>(
   load: () => Promise<Record<K, ComponentType<P>>>,
   name: K,
 ) {
-  return lazy(() => load().then((m) => ({ default: m[name] })))
+  return lazy(() =>
+    load()
+      .then((m) => ({ default: m[name] }))
+      .catch((error: unknown) => {
+        // A tab opened before a deploy asks for chunk names that no longer
+        // exist (see chunkReload.ts). Reload once to fetch the new set, and
+        // hold the loading state still meanwhile rather than flash an error.
+        if (reloadForStaleChunk(error)) return new Promise<never>(() => {})
+        throw error
+      }),
+  )
 }
 
 const AdminPage = lazyPage(() => import('./pages/AdminPage'), 'AdminPage')
