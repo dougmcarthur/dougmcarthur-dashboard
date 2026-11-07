@@ -74,7 +74,7 @@ export function AssetForm({
 
         <div className="sm:col-span-2">
           <Label>
-            Answers the question <span className="text-muted font-normal">— what a form is asking when it asks for this</span>
+            Answers the question <span className="text-muted font-normal">(what a form is asking when it asks for this)</span>
           </Label>
           <select value={draft.questionKind} onChange={(e) => set('questionKind', e.target.value)} className={FIELD}>
             <option value="">—</option>
@@ -100,7 +100,7 @@ export function AssetForm({
 
         <div>
           <Label>
-            Review by <span className="text-muted font-normal">— blank for {meta.reviewMonths} months</span>
+            Review by <span className="text-muted font-normal">(blank for {meta.reviewMonths} months)</span>
           </Label>
           <input type="date" value={draft.reviewBy} onChange={(e) => set('reviewBy', e.target.value)} className={FIELD} />
         </div>

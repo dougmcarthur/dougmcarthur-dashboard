@@ -111,7 +111,7 @@ export function NudgeRoutingCard() {
               </div>
               <Select
                 filter
-                aria-label={`${spec.label} — where it goes`}
+                aria-label={`${spec.label}: where it goes`}
                 value={chosen}
                 disabled={patch.isPending}
                 onChange={(e) =>
@@ -178,7 +178,7 @@ export function NudgeRoutingCard() {
 
       {patch.isError ? (
         <p className="text-xs text-danger-fg">
-          That could not be saved — {(patch.error as Error).message}
+          That could not be saved: {(patch.error as Error).message}
         </p>
       ) : null}
     </Card>

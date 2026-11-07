@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Weekday } from '../api'
-import { relativeTime, shortDate } from '../format'
+import { shortDate, relativeTimeInline } from '../format'
 import { Explainer } from './ui/Explainer'
 import { Banner, Card } from './ui/Surface'
 import { Toggle } from './ui/Toggle'
@@ -83,7 +83,7 @@ export function DigestSettingsCard() {
         <Banner tone="warn" size="sm">
           {ownerView ? (
             <>
-              No email binding on this deploy — add <code>[[send_email]]</code> to wrangler.toml.
+              No email binding on this deploy. Add <code>[[send_email]]</code> to wrangler.toml.
               Everything below still previews.
             </>
           ) : (
@@ -160,7 +160,7 @@ export function DigestSettingsCard() {
             {d.schedule.nextRun && settings?.enabled && (
               <> · next {shortDate(d.schedule.nextRun)}</>
             )}
-            {d.schedule.lastSentAt && <> · last sent {relativeTime(d.schedule.lastSentAt)}</>}
+            {d.schedule.lastSentAt && <> · last sent {relativeTimeInline(d.schedule.lastSentAt)}</>}
           </p>
         </div>
       )}
@@ -236,11 +236,11 @@ export function DigestSettingsCard() {
 
           {send.isSuccess && (
             <p className="mt-2 text-xs text-success-fg">
-              {send.data.sent ? `Sent to ${send.data.to}.` : `Not sent — ${send.data.reason}.`}
+              {send.data.sent ? `Sent to ${send.data.to}.` : `Not sent: ${send.data.reason}.`}
             </p>
           )}
           {send.isError && (
-            <p className="mt-2 text-xs text-danger-fg">Send failed — {(send.error as Error).message}</p>
+            <p className="mt-2 text-xs text-danger-fg">Send failed: {(send.error as Error).message}</p>
           )}
         </div>
       )}

@@ -68,7 +68,7 @@ export function PitchDiff({
   if (!hasChanges) {
     return (
       <p className="text-xs text-muted italic">
-        Sent email matches draft exactly — no changes detected.
+        Sent email matches draft exactly. No changes detected.
       </p>
     )
   }

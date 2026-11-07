@@ -305,7 +305,7 @@ function DetailModal({
         {!row.serverReady ? (
           <Banner tone="warn" size="sm">
             Connecting is not possible on this deployment yet
-            {missing.length ? <> — {missing.join(' and ')} {missing.length > 1 ? 'are' : 'is'} not set on the server</> : null}. Nothing
+            {missing.length ? <>: {missing.join(' and ')} {missing.length > 1 ? 'are' : 'is'} not set on the server</> : null}. Nothing
             you can fix from here.
           </Banner>
         ) : null}
@@ -397,7 +397,7 @@ function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
         onClick={onOpen}
         className="group min-w-0 flex-1 flex items-center gap-1.5 text-left rounded-md
                    focus:outline-none focus:ring-2 focus:ring-accent"
-        aria-label={`${row.spec.name} — what it can reach`}
+        aria-label={`${row.spec.name}: what it can reach`}
       >
         <h3 className="text-sm font-medium text-ink">{row.spec.name}</h3>
         {/*
@@ -436,7 +436,7 @@ function Row({ row, onOpen }: { row: RowState; onOpen: () => void }) {
             type="button"
             onClick={onOpen}
             className="rounded-full transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent"
-            aria-label={`${row.spec.name} — connection details`}
+            aria-label={`${row.spec.name}: connection details`}
           >
             <StatusPill state={row.state} calm={!rowNeedsAttention(row.spec, row.state)} />
           </button>

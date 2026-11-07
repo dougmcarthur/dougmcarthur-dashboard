@@ -177,7 +177,7 @@ export function ResultsView({ results: r, contact, open = false }: { results: Pu
           <ol className="mt-4 space-y-4">
             {r.findings.map((f, i) => (
               <li key={f} className="flex gap-3">
-                <span className="w-5 shrink-0 pt-px text-base tabular-nums text-faint">{i + 1}.</span>
+                <span className="w-5 shrink-0 pt-px text-base tabular-nums text-muted">{i + 1}.</span>
                 <p className="text-base leading-relaxed text-ink">{f}</p>
               </li>
             ))}

@@ -11,7 +11,7 @@ import { PopOutButton } from '../../components/PopOut'
 import { PrefillLink } from './PrefillLink'
 
 const STATE_CHIP: Record<string, { text: string; className: string }> = {
-  empty: { text: 'No answer', className: 'border-line text-faint' },
+  empty: { text: 'No answer', className: 'border-line text-muted' },
   // The one that matters: proposed by the app, unread by you.
   suggested: { text: 'Suggested', className: 'border-line text-muted' },
   edited: { text: 'Yours', className: 'border-info-line text-info-fg' },
@@ -53,7 +53,7 @@ function FieldCard({
 
       {field.fieldType === 'file' ? (
         <p className="text-xs text-muted mt-2">
-          A file upload. Nothing can be pasted — see the materials list below.
+          A file upload. Nothing can be pasted. See the materials list below.
         </p>
       ) : (
         <>
@@ -64,7 +64,7 @@ function FieldCard({
             placeholder={
               field.questionKind
                 ? 'Nothing on file answers this yet.'
-                : 'This question matches nothing the artist database knows — write it here.'
+                : 'This question matches nothing the artist database knows. Write it here.'
             }
             onChange={(e) => setDraft(e.target.value)}
           />
@@ -154,7 +154,7 @@ function Checklist({ items }: { items: ChecklistItem[] }) {
                 <span className="text-xs text-danger-fg block">{item.problem}</span>
               ) : (
                 <span className="text-xs text-muted block">
-                  {item.candidates.length} on file — {item.candidates[0].label}
+                  {item.candidates.length} on file: {item.candidates[0].label}
                 </span>
               )}
             </span>
@@ -265,7 +265,7 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
           {data.prepNote}
           {data.prepStatus === 'blocked' && (
             <span className="block text-xs text-muted mt-1">
-              Nothing is broken — this one is filled in by hand. The materials list below still
+              Nothing is broken. This one is filled in by hand. The materials list below still
               applies.
             </span>
           )}
@@ -273,7 +273,7 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
             <span className="block text-xs text-muted mt-1">
               {/* Only the stage the nightly look covers: promising it elsewhere would be false. */}
               {gigStage(data.gig.status) === 'in_progress'
-                ? 'Nothing is wrong — it may not have opened yet. Scout looks again on its own: every day once applications open, every week until then. Or paste the form’s address above.'
+                ? 'Nothing is wrong. It may not have opened yet. Scout looks again on its own: every day once applications open, every week until then. Or paste the form’s address above.'
                 : 'It may not have opened yet. Paste the form’s address above once you have it.'}
             </span>
           )}
@@ -309,7 +309,7 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
         <div className="border border-line rounded-lg p-3 bg-surface">
           <div className="flex items-center justify-between gap-2">
             <Caption>
-              Draft email — submitted by mail
+              Draft email: submitted by mail
             </Caption>
             <CopyButton text={`${email.subject}\n\n${email.body}`} label="Copy draft" />
           </div>
@@ -323,7 +323,7 @@ export function ApplicationPanel({ gigId }: { gigId: number }) {
           <ul className="text-xs text-warn-fg mt-2 space-y-0.5">
             {email.gaps.map((g) => (
               <li key={g.marker}>
-                <span className="font-medium">{g.marker}</span> — {g.prompt}
+                <span className="font-medium">{g.marker}</span>: {g.prompt}
               </li>
             ))}
           </ul>

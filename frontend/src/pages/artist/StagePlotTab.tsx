@@ -91,7 +91,7 @@ export function StagePlotTab() {
         <Card pad="md" className="space-y-3">
           <h2 className="text-base font-semibold text-ink">Make a stage plot</h2>
           <p className="text-sm text-body max-w-prose">
-            Answer a few questions about how you perform — who’s on stage and what they play — and Scout draws a
+            Answer a few questions about how you perform, like who’s on stage and what they play, and Scout draws a
             stage plot and input list you can send to any venue or festival.
           </p>
           {(clues.members.length > 0 || clues.gear.length > 0 || clues.act) && (
@@ -232,7 +232,7 @@ function PlotView({
       <Card pad="md" className="space-y-4 break-inside-avoid">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-semibold text-ink">
-            Stage plot — {plot.performers.length === 1 ? performerName(plot.performers[0], 0) : `${plot.performers.length}-piece`}
+            Stage plot: {plot.performers.length === 1 ? performerName(plot.performers[0], 0) : `${plot.performers.length}-piece`}
           </h2>
           <p className="text-sm text-muted">
             {channelCount(lines)} channels · {mixes ? `${mixes} monitor ${mixes === 1 ? 'mix' : 'mixes'}` : 'no monitors'} ·{' '}
@@ -304,7 +304,7 @@ function PlotView({
             <Caption as="h2">Input list</Caption>
           </header>
           {lines.length === 0 ? (
-            <EmptyState>No inputs yet — edit the answers and choose what each person plays.</EmptyState>
+            <EmptyState>No inputs yet. Edit the answers and choose what each person plays.</EmptyState>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -395,7 +395,7 @@ function PlotView({
 
       <p className="text-xs text-muted print:hidden">
         Inputs are the usual choice for each instrument. If your rig is different, say so in the notes or the gear
-        list — both are printed on the plot.
+        list. Both are printed on the plot.
       </p>
     </div>
   )

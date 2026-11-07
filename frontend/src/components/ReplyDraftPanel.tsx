@@ -57,8 +57,8 @@ export function ReplyDraftPanel({ replyId }: { replyId: number }) {
                 <li key={ask.id} className="text-xs">
                   <span className="text-ink font-medium">{ask.label}</span>
                   {ask.attachment && <span className="text-warn-fg"> · attach</span>}
-                  {draft.missing.includes(ask.label) && <span className="text-faint"> · nothing on file</span>}
-                  <span className="text-faint block truncate">“{ask.evidence}”</span>
+                  {draft.missing.includes(ask.label) && <span className="text-muted"> · nothing on file</span>}
+                  <span className="text-muted block truncate">“{ask.evidence}”</span>
                 </li>
               ))}
             </ul>
@@ -72,7 +72,7 @@ export function ReplyDraftPanel({ replyId }: { replyId: number }) {
           )}
 
           <div>
-            <p className="text-xs text-faint mb-1">{draft.subject}</p>
+            <p className="text-xs text-muted mb-1">{draft.subject}</p>
             <pre className="text-xs text-body whitespace-pre-wrap font-sans bg-surface border border-line rounded p-2.5 max-h-72 overflow-y-auto">
               {draft.body}
             </pre>
@@ -93,7 +93,7 @@ export function ReplyDraftPanel({ replyId }: { replyId: number }) {
               <p className="text-xs font-semibold text-muted">They asked something this cannot place</p>
               <ul className="space-y-0.5 mt-0.5">
                 {draft.unrecognised.map((line) => (
-                  <li key={line} className="text-xs text-faint">“{line}”</li>
+                  <li key={line} className="text-xs text-muted">“{line}”</li>
                 ))}
               </ul>
             </div>

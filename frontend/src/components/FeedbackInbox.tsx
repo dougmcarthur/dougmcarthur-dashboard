@@ -138,7 +138,7 @@ function FeedbackRow({ item, onRead, busy }: { item: FeedbackItem; onRead?: () =
       {item.context ? (
         <FeedbackContextLines lines={describeContext(item.context)} />
       ) : (
-        <p className="text-xs text-faint">The context that came with this could not be read.</p>
+        <p className="text-xs text-muted">The context that came with this could not be read.</p>
       )}
     </Card>
   )

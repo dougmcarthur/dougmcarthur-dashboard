@@ -26,7 +26,7 @@ export function BarList({ bars, lead = 1, label }: { bars: PublicBar[]; lead?: n
           <li key={b.id}>
             <p className={`text-sm leading-snug ${leading ? 'font-medium text-ink' : 'text-body'}`}>{b.label}</p>
             {b.share === null ? (
-              <p className="mt-0.5 text-xs italic text-faint">Fewer than 10 artists chose this, so it is not shown.</p>
+              <p className="mt-0.5 text-xs italic text-muted">Fewer than 10 artists chose this, so it is not shown.</p>
             ) : (
               <div className="mt-1.5 flex items-center gap-3">
                 <div className="h-2.5 flex-1 border-l border-line-strong" aria-hidden="true">

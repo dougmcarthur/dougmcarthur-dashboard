@@ -198,7 +198,7 @@ export function EpkView({ page }: { page: EpkPage }) {
             <figure className="space-y-1.5">
               <img
                 src={hero.value}
-                alt={`${p.name}${hero.label ? ` — ${hero.label}` : ''}`}
+                alt={`${p.name}${hero.label ? `, ${hero.label}` : ''}`}
                 referrerPolicy="no-referrer"
                 className="w-full aspect-[4/5] object-cover rounded-2xl bg-raised"
               />
@@ -208,7 +208,7 @@ export function EpkView({ page }: { page: EpkPage }) {
           {heroQuote && (
             <figure className="break-inside-avoid">
               <blockquote className="font-serif text-lg leading-snug text-ink text-pretty">“{heroQuote.text}”</blockquote>
-              {heroQuote.source && <figcaption className="mt-3 text-sm text-muted">— {heroQuote.source}</figcaption>}
+              {heroQuote.source && <figcaption className="mt-3 text-sm text-muted">{heroQuote.source}</figcaption>}
             </figure>
           )}
         </div>
@@ -220,7 +220,7 @@ export function EpkView({ page }: { page: EpkPage }) {
             {quotes.map((q, i) => (
               <figure key={i} className="max-w-3xl break-inside-avoid">
                 <blockquote className="font-serif text-xl sm:text-2xl leading-snug text-ink text-pretty">“{q.text}”</blockquote>
-                {q.source && <figcaption className="mt-3 text-sm text-muted">— {q.source}</figcaption>}
+                {q.source && <figcaption className="mt-3 text-sm text-muted">{q.source}</figcaption>}
               </figure>
             ))}
           </div>
@@ -247,7 +247,7 @@ export function EpkView({ page }: { page: EpkPage }) {
                       <a href={v.value} target="_blank" rel="noreferrer" className="text-ink hover:text-accent transition-colors">
                         {v.label}
                       </a>
-                      <span className="hidden print:inline text-xs text-muted"> — {v.value}</span>
+                      <span className="hidden print:inline text-xs text-muted">: {v.value}</span>
                     </li>
                   ))}
                 </ul>
@@ -258,7 +258,7 @@ export function EpkView({ page }: { page: EpkPage }) {
                 <ol className="divide-y divide-line border-y border-line">
                   {epk.audio.map((a, i) => (
                     <li key={a.value} className="flex items-center gap-3 py-3">
-                      <span className="w-5 text-right text-faint text-sm tabular-nums">{i + 1}</span>
+                      <span className="w-5 text-right text-muted text-sm tabular-nums">{i + 1}</span>
                       <div className="min-w-0 flex-1">
                         <a href={a.value} target="_blank" rel="noreferrer" className="text-ink hover:text-accent transition-colors">
                           {a.label}

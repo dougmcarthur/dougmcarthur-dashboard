@@ -86,7 +86,7 @@ export function DecisionBar({
     return (
       <p className="text-xs text-muted">
         {item.kind === 'gig'
-          ? `Nothing left to decide — ${gigStageLabel(item.status).meaning.toLowerCase()}`
+          ? `Nothing left to decide: ${gigStageLabel(item.status).meaning.toLowerCase()}`
           : item.decision.rationale}
       </p>
     )

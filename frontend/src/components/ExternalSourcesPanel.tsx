@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type CatalogSourceItem, type SourceStateId } from '../api'
 import { SOURCE_CADENCES, cadenceLabel, needsAttention, orderSources, readsPerDay } from '../../../shared/sourceControls'
-import { relativeTime, shortDate } from '../format'
+import { relativeTime, shortDate, relativeTimeInline } from '../format'
 import { Button } from './ui/Button'
 import { useNote } from './ui/Explainer'
 import { Select } from './ui/Field'
@@ -125,7 +125,7 @@ export function ExternalSourcesPanel() {
           <>
             {last && (
               <span className="text-xs text-muted">
-                Last read {relativeTime(last.at)}: {last.polled} {last.polled === 1 ? 'source' : 'sources'}, {last.added} new
+                Last read {relativeTimeInline(last.at)}: {last.polled} {last.polled === 1 ? 'source' : 'sources'}, {last.added} new
               </span>
             )}
             <Button variant="neutral" size="sm" disabled={poll.isPending} onClick={() => poll.mutate()}>
@@ -294,9 +294,9 @@ function SourceRow({
           {s.counts.ignored} ignored
         </p>
         <p className="text-xs text-muted">
-          {s.lastOkAt ? `Last understood ${relativeTime(s.lastOkAt)}` : 'Never understood'}
+          {s.lastOkAt ? `Last understood ${relativeTimeInline(s.lastOkAt)}` : 'Never understood'}
           {s.newestItemAt ? ` · newest item ${shortDate(s.newestItemAt)}` : ''}
-          {s.enabled && s.nextDueAt ? ` · next read ${relativeTime(s.nextDueAt)}` : ''}
+          {s.enabled && s.nextDueAt ? ` · next read ${relativeTimeInline(s.nextDueAt)}` : ''}
         </p>
         <ReadHistory source={s} />
       </div>

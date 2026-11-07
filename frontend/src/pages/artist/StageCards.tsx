@@ -160,7 +160,7 @@ export function ChannelChip({ ch, className = 'border-ink text-ink' }: { ch: str
 }
 
 function Row({ r, view, dim }: { r: CardRow; view: PlotViewOptions; dim: boolean }) {
-  const title = view.models && r.model ? `${r.title} — ${r.model}` : r.title
+  const title = view.models && r.model ? `${r.title} (${r.model})` : r.title
   return (
     <li className={`grid grid-cols-[2.25rem,minmax(0,1fr),auto] items-center gap-2.5 py-1.5 transition-opacity ${dim ? 'opacity-30 print:opacity-100' : ''}`}>
       <Disc>{rowGlyph(r)}</Disc>
@@ -357,7 +357,7 @@ function Card({
             .filter((r) => r.kind === 'instrument' || r.kind === 'vocal')
             .map((r) => (
               <li key={r.key} className="flex items-center gap-1">
-                <Disc size="sm" title={view.models && r.model ? `${r.title} — ${r.model}` : r.title}>
+                <Disc size="sm" title={view.models && r.model ? `${r.title} (${r.model})` : r.title}>
                   {rowGlyph(r)}
                 </Disc>
                 {r.channels && <ChannelChip ch={r.channels} className={chipClass(r.connection, view.colour)} />}

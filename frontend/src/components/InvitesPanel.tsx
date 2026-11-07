@@ -249,7 +249,7 @@ function IssuedLink({
       </p>
       <p className="text-xs text-body">
         This is the only time it is shown. It is stored hashed, so nothing here can print it
-        again — if it is lost, withdraw the invitation and issue another.
+        again. If it is lost, withdraw the invitation and issue another.
       </p>
       <code className="block text-xs bg-surface text-body rounded px-2 py-1.5 break-all">{url}</code>
       <div className="flex flex-wrap gap-2">
@@ -272,7 +272,7 @@ function IssuedLink({
       </div>
       {mailError && (
         <p className="text-xs text-danger-fg">
-          The email did not go out ({mailError}). The invitation still works — copy the link and
+          The email did not go out ({mailError}). The invitation still works. Copy the link and
           send it yourself.
         </p>
       )}

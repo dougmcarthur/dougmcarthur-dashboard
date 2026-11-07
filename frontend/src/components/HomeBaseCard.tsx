@@ -90,7 +90,7 @@ export function HomeBaseCard() {
         )}
         {saved && !dirty && (
           <span className="text-xs text-muted">
-            {current ? 'Saved. Gigs are being measured from here — it takes a few minutes.' : 'Cleared.'}
+            {current ? 'Saved. Gigs are being measured from here. It takes a few minutes.' : 'Cleared.'}
           </span>
         )}
         {save.error && (

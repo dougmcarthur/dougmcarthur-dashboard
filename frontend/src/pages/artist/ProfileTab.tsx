@@ -5,7 +5,7 @@ import { EpkView } from '../../components/epk/EpkView'
 import { Button } from '../../components/ui/Button'
 import { FIELD } from '../../components/ui/Field'
 import { Card } from '../../components/ui/Surface'
-import { relativeTime, shortDate } from '../../format'
+import { shortDate, relativeTimeInline } from '../../format'
 import { WITHHELD_REASONS, type WithheldReason } from '../../../../shared/publicEpk'
 import { useConfirm } from '../../components/ui/ConfirmModal'
 
@@ -37,7 +37,7 @@ function IssuedLink({ url, onDone }: { url: string; onDone: () => void }) {
     <div className="rounded-lg border border-warn-line bg-warn-bg px-3 py-3 space-y-2">
       <p className="text-sm font-medium text-ink">Your link</p>
       <p className="text-xs text-body">
-        Shown once — Scout stores it hashed. Anyone holding it can read this page until you withdraw it.
+        Shown once. Scout stores it hashed. Anyone holding it can read this page until you withdraw it.
       </p>
       <code className="block text-xs bg-surface text-body rounded px-2 py-1.5 break-all">{url}</code>
       <div className="flex flex-wrap gap-2">
@@ -117,7 +117,7 @@ function ShareLinks({ audience }: { audience: EpkAudience }) {
                 <p className="text-sm text-ink truncate">{s.label}</p>
                 <p className="text-xs text-muted">
                   {audienceLabel(s.audience)} · made {shortDate(s.createdAt)} ·{' '}
-                  {s.lastViewedAt ? `last opened ${relativeTime(s.lastViewedAt)}` : 'not opened yet'}
+                  {s.lastViewedAt ? `last opened ${relativeTimeInline(s.lastViewedAt)}` : 'not opened yet'}
                 </p>
               </div>
               <Button
@@ -146,7 +146,7 @@ function ShareLinks({ audience }: { audience: EpkAudience }) {
           <ul className="mt-1 space-y-0.5 pl-3">
             {withdrawn.map((s) => (
               <li key={s.id}>
-                {s.label} — withdrawn {shortDate(s.revokedAt!)}
+                {s.label}, withdrawn {shortDate(s.revokedAt!)}
               </li>
             ))}
           </ul>
@@ -166,12 +166,12 @@ function pageGaps(epk: PublicEpk, audience: EpkAudience, profileWaiting: string 
   if (epk.photos.length === 0) {
     out.push(
       profileWaiting
-        ? `A press photo with the photographer credited — the page opens on it. Your ${profileWaiting} profile may have photos: connect it in Settings, read it into your library, then add each photographer.`
-        : 'A press photo with the photographer credited — the page opens on it.',
+        ? `A press photo with the photographer credited. The page opens on it. Your ${profileWaiting} profile may have photos: connect it in Settings, read it into your library, then add each photographer.`
+        : 'A press photo with the photographer credited. The page opens on it.',
     )
   }
-  if (audience !== 'sync' && epk.videos.length === 0) out.push('A live video — the first thing a programmer watches.')
-  if (audience === 'sync' && epk.audio.length === 0) out.push('Recordings — a supervisor listens before reading anything.')
+  if (audience !== 'sync' && epk.videos.length === 0) out.push('A live video: the first thing a programmer watches.')
+  if (audience === 'sync' && epk.audio.length === 0) out.push('Recordings: a supervisor listens before reading anything.')
   if (epk.bios.length === 0) out.push('A bio you have marked right.')
   return out
 }
@@ -235,7 +235,7 @@ export function ProfileTab() {
                           .map((w) => w.label)
                           .join(', ')}
                       </span>
-                      <span className="text-muted"> — {WITHHELD_REASONS[r]}</span>
+                      <span className="text-muted">: {WITHHELD_REASONS[r]}</span>
                     </li>
                   ))}
               </ul>

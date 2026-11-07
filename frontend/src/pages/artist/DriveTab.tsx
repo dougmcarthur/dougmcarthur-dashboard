@@ -61,7 +61,7 @@ export async function openDrivePicker(onPicked: (docs: Array<{ id: string; paren
     .addView(upload)
     .addView(existing)
     .enableFeature(g.Feature.MULTISELECT_ENABLED)
-    .setTitle('Add to your EPK folder — to use a folder you already have, open it and select the files')
+    .setTitle('Add to your EPK folder. To use a folder you already have, open it and select the files')
     .setCallback((res: any) => {
       if (res.action === g.Action.PICKED) {
         const docs = (res.docs ?? []).map((d: any) => ({ id: d.id, parentId: d.parentId }))
@@ -271,7 +271,7 @@ export function DriveTab({ outcome }: { outcome: string | null }) {
           <div className="rounded-lg border border-line bg-sunken p-3 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-ink">
-                {data.shared ? 'Anyone with the link can view and download.' : 'Private — only you can open it.'}
+                {data.shared ? 'Anyone with the link can view and download.' : 'Private. Only you can open it.'}
               </p>
               <div className="flex flex-wrap gap-2">
                 {data.shared && <CopyButton text={data.folderUrl} label="Copy folder link" />}

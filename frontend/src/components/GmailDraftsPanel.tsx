@@ -57,7 +57,7 @@ export function GmailDraftsPanel() {
   return (
     <Disclosure
       teaser="Put pitch drafts into Gmail"
-      hint="Drafts only — you still read and send them yourself."
+      hint="Drafts only. You still read and send them yourself."
       openLabel="Review drafts"
       title="Pitch drafts to Gmail"
       subtitle="Every target with an address and a written pitch, as a Gmail draft."
@@ -73,7 +73,7 @@ export function GmailDraftsPanel() {
     >
       {grant && !grant.configured && (
         <p className="text-xs text-warn-fg">
-          Gmail is not available on this site yet — it still needs to be set up on the
+          Gmail is not available on this site yet. It still needs to be set up on the
           server side. Nothing you can fix from here.
         </p>
       )}
@@ -137,8 +137,8 @@ export function GmailDraftsPanel() {
               <p className="text-xs font-semibold text-muted">Not drafted</p>
               <ul className="mt-0.5 space-y-0.5">
                 {plan.skipped.map((s) => (
-                  <li key={s.id} className="text-xs text-faint">
-                    {s.name} — {s.reason}
+                  <li key={s.id} className="text-xs text-muted">
+                    {s.name}: {s.reason}
                   </li>
                 ))}
               </ul>
@@ -167,14 +167,14 @@ export function GmailDraftsPanel() {
           </p>
           <p className="text-xs text-muted">
             They are in your Gmail drafts folder. Nothing has been sent, and nothing here has
-            marked any of these as pitched — do that once you actually send.
+            marked any of these as pitched. Do that once you actually send.
           </p>
           {result.failed.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-danger-fg">Failed</p>
               <ul className="mt-0.5 space-y-0.5">
                 {result.failed.map((f) => (
-                  <li key={f.id} className="text-xs text-faint">{f.name} — {f.error}</li>
+                  <li key={f.id} className="text-xs text-muted">{f.name}: {f.error}</li>
                 ))}
               </ul>
             </div>

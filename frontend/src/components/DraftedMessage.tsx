@@ -47,7 +47,7 @@ export function DraftedMessage({
   return (
     <div className="rounded-lg border border-line bg-raised px-3.5 py-3 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Caption>Drafted message{channel ? ` — to send ${channel}` : ''}</Caption>
+        <Caption>Drafted message{channel ? `: to send ${channel}` : ''}</Caption>
         {canCopy && (
           <Button variant="neutral" size="sm" onClick={copy}>
             {copied ? 'Copied' : 'Copy message'}

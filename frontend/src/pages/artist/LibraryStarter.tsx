@@ -97,7 +97,7 @@ export function LibraryStarter({
           </h2>
           <p className="text-sm text-body">
             Already have a folder in Google Drive with your bio, EPK, press photos, audio samples, or stage plot?
-            Select those files in Google’s picker — Scout reads them into your library and then helps you organise
+            Select those files in Google’s picker. Scout reads them into your library and then helps you organise
             them into a tidy, shareable EPK folder for festivals and juries.
           </p>
         </div>

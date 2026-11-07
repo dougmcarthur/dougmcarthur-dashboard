@@ -230,7 +230,7 @@ export function AppearanceSettings({ titled = true }: { /** False where the page
       */}
       <Field
         label="Explanations"
-        hint="Puts an info button beside each setting, holding a sentence about what it does. Turn it off once you have read them — nothing is lost, and turning it back on brings every one of them back."
+        hint="Puts an info button beside each setting, holding a sentence about what it does. Turn it off once you have read them. Nothing is lost, and turning it back on brings every one of them back."
       >
         <Toggle
           checked={a.showHints}

@@ -339,7 +339,7 @@ export function OnboardingFlow({
       {screen === 'done' && (
         <>
           <h1 className="text-3xl font-semibold text-ink tracking-tight">
-            {remaining.length === 0 ? 'You’re all set.' : 'Thanks — that’s everything we need to ask.'}
+            {remaining.length === 0 ? 'You’re all set.' : 'Thanks, that’s everything we need to ask.'}
           </h1>
           {remaining.length === 0 ? (
             <p className="text-lg text-body">Everything Scout needs is in place.</p>

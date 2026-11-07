@@ -51,13 +51,13 @@ export function DraftActions({ draft, note }: { draft: MailDraft; note?: string 
             </a>
           ))}
 
-        <span className="text-xs text-faint">{note ?? 'Nothing here goes out on its own.'}</span>
+        <span className="text-xs text-muted">{note ?? 'Nothing here goes out on its own.'}</span>
       </div>
 
       {tooLong.length > 0 && (
         <p className="text-xs text-muted">
           {tooLong.map((l) => l.label).join(' and ')}{' '}
-          {tooLong.length === 1 ? 'is' : 'are'} unavailable — this draft is{' '}
+          {tooLong.length === 1 ? 'is' : 'are'} unavailable. This draft is{' '}
           {tooLong[0].length.toLocaleString()} characters once encoded, past what
           {tooLong.length === 1 ? ' it' : ' they'} can carry. Copy it instead.
         </p>

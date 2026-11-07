@@ -6,7 +6,7 @@ import { api } from '../api'
 import { withConfirmation } from '../confirmIdentity'
 import { useSignOut } from '../hooks/useSignOut'
 import { Button } from './ui/Button'
-import { relativeTime, shortDate } from '../format'
+import { shortDate, relativeTimeInline } from '../format'
 import { Explainer } from './ui/Explainer'
 import { Card } from './ui/Surface'
 import { useConfirm } from './ui/ConfirmModal'
@@ -115,7 +115,7 @@ export function PasskeysCard() {
                 </p>
                 <p className="text-xs text-muted">
                   Added {shortDate(key.createdAt)}
-                  {key.lastUsedAt ? ` · last used ${relativeTime(key.lastUsedAt)}` : ' · never used'}
+                  {key.lastUsedAt ? ` · last used ${relativeTimeInline(key.lastUsedAt)}` : ' · never used'}
                   {/* Said out loud rather than left as a badge, because it is
                       the fact that decides whether you need a second one. */}
                   {key.backedUp ? ' · synced to your keychain' : ' · this device only'}
@@ -149,7 +149,7 @@ export function PasskeysCard() {
 
       <div className="pt-1 border-t border-line flex items-center justify-between gap-4">
         <p className="text-xs text-muted">
-          Signing out leaves the passkeys registered — it ends the session, not the enrolment.
+          Signing out leaves the passkeys registered. It ends the session, not the enrolment.
         </p>
         <div className="flex items-center gap-2 shrink-0">
           <Button variant="quiet" size="sm" disabled={signOut.isPending} onClick={() => signOut.mutate()}>

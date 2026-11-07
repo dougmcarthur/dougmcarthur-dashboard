@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type SurveyConfigView, type SurveyResults } from '../api'
-import { relativeTime } from '../format'
+import { relativeTimeInline } from '../format'
 import type { Estimate, RankingResult, Tally } from '../../../shared/surveyAnalysis'
 import { Button } from './ui/Button'
 import { Input } from './ui/Field'
@@ -36,7 +36,7 @@ function Count({ label, value, hint }: { label: string; value: string | number; 
     <div>
       <p className="text-xs text-muted">{label}</p>
       <p className="text-lg font-semibold text-ink">{value}</p>
-      {hint && <p className="text-xs text-faint">{hint}</p>}
+      {hint && <p className="text-xs text-muted">{hint}</p>}
     </div>
   )
 }
@@ -153,7 +153,7 @@ function SurveyAccess({ config }: { config: SurveyConfigView }) {
         <p className="text-sm font-medium text-ink">
           {config.open ? 'Open: anyone with the link can take it.' : 'Closed: nobody can start it.'}
         </p>
-        {config.changedAt && <p className="text-xs text-muted">Changed {relativeTime(config.changedAt)}.</p>}
+        {config.changedAt && <p className="text-xs text-muted">Changed {relativeTimeInline(config.changedAt)}.</p>}
       </div>
 
       {config.open && spamCheck && (
@@ -263,7 +263,7 @@ function SurveyAccess({ config }: { config: SurveyConfigView }) {
             {copied ? 'Copied' : 'Copy link'}
           </Button>
         </div>
-        <p className="text-xs text-faint break-all">{link}</p>
+        <p className="text-xs text-muted break-all">{link}</p>
       </div>
     </Card>
   )

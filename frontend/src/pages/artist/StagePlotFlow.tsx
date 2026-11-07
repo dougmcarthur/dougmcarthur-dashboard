@@ -276,7 +276,7 @@ export function StagePlotFlow({
                 ]
                   .filter(Boolean)
                   .join(', ')}
-                . You’ll see them as suggestions along the way — nothing is filled in without you.
+                . You’ll see them as suggestions along the way. Nothing is filled in without you.
               </p>
             </div>
           )}
@@ -345,7 +345,7 @@ export function StagePlotFlow({
           />
           {suggestions.length > 0 && plot.act !== 'solo' && (
             <div className="space-y-2">
-              <p className="text-sm text-muted">From your documents — click to use</p>
+              <p className="text-sm text-muted">From your documents: click to use</p>
               <div className="flex flex-wrap gap-2">
                 {suggestions.map((m) => (
                   <button

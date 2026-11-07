@@ -78,7 +78,7 @@ export function DriveImportPanel({
       hint="Read its bio, EPK, photos, audio samples and stage plot into the library, then tidy and share the folder."
       openLabel="Read the folder"
       title="From your Google Drive folder"
-      subtitle="Nothing is written until you say so, and everything added lands as never reviewed — a file in Drive is a suggestion until you check it here."
+      subtitle="Nothing is written until you say so, and everything added lands as never reviewed. A file in Drive is a suggestion until you check it here."
       loading={preview.isLoading}
       error={
         apply.isError
@@ -129,7 +129,7 @@ export function DriveImportPanel({
           <ul className="mt-1.5 space-y-0.5 pl-3">
             {data.skipped.map((s) => (
               <li key={s.heading}>
-                <span className="text-body">{s.heading}</span> — {s.reason}
+                <span className="text-body">{s.heading}</span>: {s.reason}
               </li>
             ))}
           </ul>
@@ -161,7 +161,7 @@ export function DriveImportPanel({
             <p className="text-xs text-body">
               {data.shared
                 ? 'Anyone with the link can view and download.'
-                : 'Folder is private — turn on link sharing when you are ready to hand the link out.'}
+                : 'Folder is private. Turn on link sharing when you are ready to hand the link out.'}
             </p>
             <div className="flex flex-wrap gap-2">
               {data.shared ? (

@@ -55,7 +55,7 @@ function AssociationPanel({ association, onDone }: { association: AssociationSum
       hint="Read its bio, links, videos and photos into the library."
       openLabel="Read the profile"
       title={`From your ${association.name} profile`}
-      subtitle="Nothing is written until you say so, and everything added lands as never reviewed — the profile said it, you have not checked it here."
+      subtitle="Nothing is written until you say so, and everything added lands as never reviewed. The profile said it, you have not checked it here."
       loading={preview.isLoading}
       error={apply.isError ? 'Could not add them. Nothing was written.' : null}
     >
@@ -101,7 +101,7 @@ function AssociationPanel({ association, onDone }: { association: AssociationSum
           <ul className="mt-1.5 space-y-0.5 pl-3">
             {data.skipped.map((s) => (
               <li key={s.heading}>
-                <span className="text-body">{s.heading}</span> — {s.reason}
+                <span className="text-body">{s.heading}</span>: {s.reason}
               </li>
             ))}
           </ul>

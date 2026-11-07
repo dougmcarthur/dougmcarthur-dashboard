@@ -49,7 +49,7 @@ export function SayDoChart({ data }: { data: SayDoResult }) {
           {bySay.map((r) => (
             <li key={r.id} style={{ height: ROW }} className="flex items-center justify-end gap-2.5 text-right">
               <span className={`text-[13px] leading-tight ${moved(r) ? 'font-semibold text-ink' : 'text-body'}`}>{r.label}</span>
-              <span className="w-4 shrink-0 text-xs tabular-nums text-faint">{r.say}</span>
+              <span className="w-4 shrink-0 text-xs tabular-nums text-muted">{r.say}</span>
             </li>
           ))}
         </ol>
@@ -77,7 +77,7 @@ export function SayDoChart({ data }: { data: SayDoResult }) {
         <ol className="m-0 list-none p-0" aria-label="In the order of the reasons artists gave for passing">
           {byDoing.map((r) => (
             <li key={r.id} style={{ height: ROW }} className="flex items-center gap-2.5">
-              <span className="w-4 shrink-0 text-xs tabular-nums text-faint">{r.doing}</span>
+              <span className="w-4 shrink-0 text-xs tabular-nums text-muted">{r.doing}</span>
               <span className={`text-[13px] leading-tight ${moved(r) ? 'font-semibold text-ink' : 'text-body'}`}>
                 {r.label} <span className="font-normal text-muted">{pct(r.share)}</span>
               </span>

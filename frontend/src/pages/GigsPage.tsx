@@ -300,7 +300,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
   if (error) {
     return (
       <Banner>
-        Failed to load gigs — {(error as Error).message}
+        Failed to load gigs: {(error as Error).message}
       </Banner>
     )
   }

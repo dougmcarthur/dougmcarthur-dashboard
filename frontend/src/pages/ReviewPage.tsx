@@ -69,7 +69,7 @@ const EMPTY: Partial<Record<ReviewFilter, string>> = {
   snoozed: 'Nothing is snoozed. Deferred items wait here until their date, so none of them are hidden.',
   reply: 'Nobody is waiting on a reply from you.',
   waiting: 'Nothing is out with an organiser. Anything applied to has already come back.',
-  conflict: 'No row contradicts itself — every status agrees with its note.',
+  conflict: 'No row contradicts itself: every status agrees with its note.',
   needs: 'Nothing needs a decision. Anything still open is waiting on a date, not on you.',
   in_progress: 'Nothing you said yes to is waiting to go out.',
 }
@@ -226,7 +226,7 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
   if (error) {
     return (
       <Banner>
-        Failed to load the review queue — {(error as Error).message}
+        Failed to load the review queue: {(error as Error).message}
       </Banner>
     )
   }
@@ -340,7 +340,7 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
 
       {saveError && (
         <div className="rounded-lg bg-danger-bg border border-danger-line px-4 py-2.5 text-sm text-danger-fg">
-          That change was refused — {saveError.message}
+          That change was refused: {saveError.message}
         </div>
       )}
 
