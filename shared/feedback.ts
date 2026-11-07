@@ -92,7 +92,7 @@ function sentenceCase(raw: string): string {
 /** `review` + `conflict` → "Review — Conflict". Unknown pages are humanised, never printed raw. */
 export function placeLabel(page: string, section: string | null): string {
   const name = PAGE_NAMES[page] ?? sentenceCase(page)
-  return section ? `${name} — ${sentenceCase(section)}` : name
+  return section ? `${name}: ${sentenceCase(section)}` : name
 }
 
 /** `#review/conflict?x=1` → "Review — Conflict". The query is dropped; it is where credentials arrive. */

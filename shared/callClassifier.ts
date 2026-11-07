@@ -71,7 +71,7 @@ const NEGATIVE: Array<{ test: RegExp; reason: string }> = [
   },
   {
     test: /\b(?:board (?:of directors|election|voting|nominations?|members?)|annual general meeting|agm|bylaws?|nominating committee|assemblée générale|conseil d['’]administration)\b/i,
-    reason: 'Association governance — a board, an election or an AGM.',
+    reason: 'Association governance: a board, an election or an AGM.',
   },
   {
     test: /\b(?:newsletter|e-?news|e-?bulletin|weekly (?:update|roundup)|monthly (?:update|roundup)|round-?up|digest|infolettre|fil de nouvelles|music wire)\b/i,

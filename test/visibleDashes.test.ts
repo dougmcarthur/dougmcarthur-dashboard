@@ -4,18 +4,19 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
 /**
- * No em dash in anything a screen says.
+ * No em dash in anything a person reads.
  *
  * The owner has asked for none of the habits of generated text, and em dashes
  * came back in each pass because nothing stopped the next sentence being typed
  * with one. This reads the string literals, template literals and JSX text of
- * the frontend, so a dash in a comment is fine and a dash in a banner is not.
+ * the frontend, the Worker and the shared code, so a dash in a comment is fine
+ * and a dash in a banner, an email subject or a notification is not.
  *
- * The one allowance is a dash on its own, standing for an empty value in a
- * table cell or a select. It is a mark, not punctuation.
- *
- * Scope is `frontend/src`. The Worker still builds some sentences with dashes
- * (notification titles, a few emails); widen this when those are rewritten.
+ * Two allowances. A dash on its own, standing for an empty value in a table
+ * cell or a select, is a mark and not punctuation. And a pattern that has to
+ * match a dash in somebody else's prose (a regular expression, or a string that
+ * builds one) is not a sentence: the parsers read "Deadline: Nov 20" written
+ * with a dash, and would stop reading it.
  */
 
 const DASH = '\u2014'
@@ -45,7 +46,10 @@ function visibleDashes(file: string): string[] {
     if (isText) {
       const shown = n.getText(sf)
       const aloneMark = shown.replace(/['"`\s]/g, '') === DASH
-      if (shown.includes(DASH) && !aloneMark) {
+      // A string that builds a regular expression, such as `\\s*(?:–|—|to)\\s*`.
+      // Regular expression literals are not string literals, so are not read.
+      const pattern = shown.includes('\\s')
+      if (shown.includes(DASH) && !aloneMark && !pattern) {
         const line = sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1
         found.push(`${file.split('\\').join('/')}:${line}: ${shown.replace(/\s+/g, ' ').slice(0, 90)}`)
       }
@@ -56,9 +60,9 @@ function visibleDashes(file: string): string[] {
   return found
 }
 
-describe('what the frontend says', () => {
-  it('has no em dash in a string or in JSX text, apart from a dash standing alone for an empty value', () => {
-    const offenders = files('frontend/src').flatMap(visibleDashes)
+describe('what the app says', () => {
+  it('has no em dash in a string or in JSX text, apart from an empty-value mark and a pattern', () => {
+    const offenders = ['frontend/src', 'src', 'shared'].flatMap((dir) => files(dir)).flatMap(visibleDashes)
     expect(offenders).toEqual([])
   })
 })

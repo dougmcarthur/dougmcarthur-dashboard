@@ -132,7 +132,7 @@ export function settledByAward(type: string | null | undefined): boolean {
 
 export function flagLabel(flag: GigFlag, type?: string | null): string {
   if (flag === 'reply_owed') return 'They need more'
-  return settledByAward(type) ? 'Offer — awaiting confirmation' : 'Offer — contract pending'
+  return settledByAward(type) ? 'Offer, awaiting confirmation' : 'Offer, contract pending'
 }
 
 /** What the badge says: the stage, or for a closed gig its outcome. */

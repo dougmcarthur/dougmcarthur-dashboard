@@ -129,14 +129,14 @@ describe('the owner’s view', () => {
     expect(body.lastPoll.polled).toBeGreaterThan(0)
 
     const by = (label: string) => body.items.find((s: { label: string }) => s.label === label)
-    expect(by('Music PEI — News')).toMatchObject({ state: 'working', itemCount: 10, kind: 'feed' })
-    expect(by('Music PEI — News').counts.calls).toBeGreaterThan(0)
-    expect(by('Music BC — News').state).toBe('stale')
-    expect(by('Music BC — News').note).toMatch(/months old/)
-    expect(by('Music PEI — Events').state).toBe('empty')
-    expect(by('SaskMusic — Opportunities and deadlines')).toMatchObject({ state: 'working', itemCount: 10 })
+    expect(by('Music PEI · News')).toMatchObject({ state: 'working', itemCount: 10, kind: 'feed' })
+    expect(by('Music PEI · News').counts.calls).toBeGreaterThan(0)
+    expect(by('Music BC · News').state).toBe('stale')
+    expect(by('Music BC · News').note).toMatch(/months old/)
+    expect(by('Music PEI · Events').state).toBe('empty')
+    expect(by('SaskMusic · Opportunities and deadlines')).toMatchObject({ state: 'working', itemCount: 10 })
     // The site answered 404.
-    expect(body.items.find((s: { label: string }) => /Manitoba Music — Deadlines/.test(s.label))?.state).toBe('unreachable')
+    expect(body.items.find((s: { label: string }) => /Manitoba Music · Deadlines/.test(s.label))?.state).toBe('unreachable')
   })
 
   it('never prints the name a source is filed under', async () => {
@@ -154,7 +154,7 @@ describe('the owner’s view', () => {
     const t = await polled()
     const { items } = await (await t.call('GET', '/api/admin/catalog/candidates?view=calls', 'owner')).json()
     const awards = items.find((i: { title: string }) => i.title.startsWith('Music PEI Awards 2027'))
-    expect(awards).toMatchObject({ verdict: 'opportunity', category: 'funding', source: 'Music PEI — News', reason: 'Says applications or submissions are open.' })
+    expect(awards).toMatchObject({ verdict: 'opportunity', category: 'funding', source: 'Music PEI · News', reason: 'Says applications or submissions are open.' })
     const outer = items.find((i: { title: string }) => i.title.includes('OUTER LIMITS'))
     expect(outer).toMatchObject({ deadline: '2026-10-06', placeText: 'Calgary, Alberta' })
   })
@@ -219,7 +219,7 @@ describe('how often a source is read', () => {
     for (let i = 0; i < 3; i++) await t.call('POST', '/api/admin/catalog/poll', 'owner')
     const read = async () => {
       const { items } = await (await t.call('GET', '/api/admin/catalog/sources', 'owner')).json()
-      return items.find((s: { label: string }) => s.label === 'Music PEI — News')
+      return items.find((s: { label: string }) => s.label === 'Music PEI · News')
     }
     const before = await read()
     expect(before.state).toBe('working')
@@ -244,9 +244,9 @@ describe('how often a source is read', () => {
     await t.call('POST', '/api/admin/catalog/poll', 'owner')
     await t.call('POST', '/api/admin/catalog/poll', 'owner')
     await t.call('POST', '/api/admin/catalog/poll', 'owner')
-    t.db.prepare(`UPDATE catalog_sources SET failures = 2 WHERE label LIKE 'Manitoba Music — Deadlines%'`).run()
+    t.db.prepare(`UPDATE catalog_sources SET failures = 2 WHERE label LIKE 'Manitoba Music · Deadlines%'`).run()
     const { items } = await (await t.call('GET', '/api/admin/catalog/sources', 'owner')).json()
-    const dead = items.find((s: { label: string }) => /Manitoba Music — Deadlines/.test(s.label))
+    const dead = items.find((s: { label: string }) => /Manitoba Music · Deadlines/.test(s.label))
     await t.call('PATCH', `/api/admin/catalog/sources/${dead.id}`, 'owner', { cadenceHours: 48 })
     const after = (await (await t.call('GET', '/api/admin/catalog/sources', 'owner')).json()).items.find((s: { id: number }) => s.id === dead.id)
     expect(Date.parse(after.nextDueAt) - Date.parse(after.lastFetchedAt)).toBe(48 * 2 * 3_600_000)
@@ -323,9 +323,9 @@ describe('paging what was found', () => {
   it('narrows to one source, and counts only that source', async () => {
     const t = await polled()
     const { items: sources } = await (await t.call('GET', '/api/admin/catalog/sources', 'owner')).json()
-    const pei = sources.find((s: { label: string }) => s.label === 'Music PEI — News')
+    const pei = sources.find((s: { label: string }) => s.label === 'Music PEI · News')
     const only = await (await t.call('GET', `/api/admin/catalog/candidates?view=ignored&limit=50&source=${pei.id}`, 'owner')).json()
-    expect(only.items.every((i: { source: string }) => i.source === 'Music PEI — News')).toBe(true)
+    expect(only.items.every((i: { source: string }) => i.source === 'Music PEI · News')).toBe(true)
     const every = await (await t.call('GET', '/api/admin/catalog/candidates?view=ignored&limit=50', 'owner')).json()
     expect(only.total).toBeLessThan(every.total)
     // A source id that is not a number is no filter, not an error and not an empty list.
@@ -389,7 +389,7 @@ describe('the read history', () => {
     stubNetwork()
     const t = await seeded()
     const { items } = await (await t.call('GET', '/api/admin/catalog/sources', 'owner')).json()
-    const pei = items.find((s: { label: string }) => s.label === 'Music PEI — News')
+    const pei = items.find((s: { label: string }) => s.label === 'Music PEI · News')
     for (let i = 0; i < 2; i++) await t.call('POST', `/api/admin/catalog/sources/${pei.id}/poll`, 'owner')
     const reads = await (await t.call('GET', `/api/admin/catalog/sources/${pei.id}/reads`, 'owner')).json()
     expect(reads.items).toHaveLength(2)

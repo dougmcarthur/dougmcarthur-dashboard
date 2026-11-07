@@ -952,10 +952,12 @@ checklist for what `test/uiConsistency.test.ts` enforces.
   site; pass `htmlFor` when the control is elsewhere. It is a DOM effect, so
   `test/labelLink.test.ts` pins that it stays, not that it works: check `label.control`
   in the running app after touching it.
-- **No em dash in anything a screen says** (a string, a template or JSX text under
-  `frontend/src`; a dash standing alone for an empty value is allowed):
-  `test/visibleDashes.test.ts`. The Worker still builds a few sentences with one
-  (notification titles, some emails), outside that test's scope.
+- **No em dash in anything a person reads** (a string, a template or JSX text under
+  `frontend/src`, `src` or `shared`: screens, emails, notifications, error messages;
+  a dash standing alone for an empty value is allowed, and so is a pattern that has to
+  match one in somebody else's prose, which is why the parsers keep it in their regular
+  expressions): `test/visibleDashes.test.ts`. A source's label joins its association and
+  its name with a middle dot, not a colon, so it cannot be mistaken for the registry key.
 - **Surfaces that read as a document are static HTML**: `/privacy/` and
   `/terms-of-service/` are Vite entries (`vite.config.ts`) of plain HTML with no Worker route, so they read
   with JavaScript off and have an address a regulator or Google's OAuth review can fetch.

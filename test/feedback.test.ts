@@ -22,7 +22,7 @@ const CONTEXT: FeedbackContext = {
 describe('feedback context', () => {
   it('names the page rather than printing its route id', () => {
     const [page] = describeContext(CONTEXT)
-    expect(page).toEqual({ label: 'Page', value: 'Review — Conflict' })
+    expect(page).toEqual({ label: 'Page', value: 'Review: Conflict' })
     expect(routeLabel('#runs')).toBe('History')
     expect(routeLabel('#some-new-page')).toBe('Some new page')
   })
@@ -30,7 +30,7 @@ describe('feedback context', () => {
   // A query string is where OAuth puts its code, and `#settings?google=…` is
   // where the connect round trip lands. Neither belongs in a message.
   it('drops query strings from routes and paths', () => {
-    expect(routeLabel('#settings/connections?google=connected')).toBe('Settings — Connections')
+    expect(routeLabel('#settings/connections?google=connected')).toBe('Settings: Connections')
     expect(safePath('/gmail/callback?code=4/0Asecret&state=x')).toBe('/gmail/callback')
   })
 

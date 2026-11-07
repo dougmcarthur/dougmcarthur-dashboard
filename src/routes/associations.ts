@@ -77,7 +77,7 @@ export async function readAssociation(input: string): Promise<Read> {
   if ('error' in target) return { ok: false, verdict: 'rejected', error: target.error }
   const { association } = target
   const blocked = association.automated === 'blocked'
-    ? ` ${association.name}’s site turns away automated visits, so this may keep failing — the address is right, the door is shut.`
+    ? ` ${association.name}’s site turns away automated visits, so this may keep failing. The address is right, the door is shut.`
     : ''
   try {
     const [res, home] = await Promise.all([get(target.url), get(association.home).catch(() => null)])
@@ -345,7 +345,7 @@ export async function scanProfiles(env: Env, tenant: TenantId): Promise<{ read: 
       kind: 'automation',
       tier: 'info',
       title: scanTitle(association.name, outcome.fresh),
-      body: 'Read them into your library from the Artist page — nothing is added until you do.',
+      body: 'Read them into your library from the Artist page. Nothing is added until you do.',
       href: '#artist/library',
       action: 'Review',
       // The same items are never announced twice anyway; this only stops a

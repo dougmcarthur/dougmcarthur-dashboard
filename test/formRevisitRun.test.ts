@@ -84,7 +84,7 @@ const FORM: PrepOutcome = {
 }
 const NOTHING = (url: string): PrepOutcome => ({
   status: 'not_found',
-  note: `${NO_FORM_NOTE} — the application may open later, be a PDF, or be submitted by email.`,
+  note: `${NO_FORM_NOTE} The application may open later, be a PDF, or be submitted by email.`,
   title: null,
   fields: [],
   url,
@@ -119,7 +119,7 @@ describe('the nightly look at forms', () => {
       expect.objectContaining({
         tenant_id: OWNER,
         tier: 'info',
-        title: 'Canmore Folk Festival 2027: the application form is open — 2 fields read',
+        title: 'Canmore Folk Festival 2027: the application form is open, 2 fields read',
         href: '#gigs/1',
         dedupe_key: 'form-read:1',
       }),

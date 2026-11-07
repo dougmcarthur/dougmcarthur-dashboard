@@ -125,7 +125,7 @@ describe('a read', () => {
     expect(awards).toMatchObject({ verdict: 'opportunity', category: 'funding', status: 'new' })
     expect(awards.reason).toBe('Says applications or submissions are open.')
     expect(rows.find((r) => r.title.includes('Hiring'))).toMatchObject({ verdict: 'not_opportunity', status: 'ignored' })
-    expect(report.results.find((r) => r.source.includes('Music PEI — News'))).toMatchObject({ ok: true, items: 10, added: 10 })
+    expect(report.results.find((r) => r.source.includes('Music PEI · News'))).toMatchObject({ ok: true, items: 10, added: 10 })
   })
 
   it('files a listing page’s entries with the deadline the page gave', async () => {
@@ -174,7 +174,7 @@ describe('an unchanged source costs nothing', () => {
     const second = w.net.asked(PEI_FEED)[1]
     expect(second.headers['If-None-Match']).toBe('"pei-1"')
     expect(second.headers['If-Modified-Since']).toBe('Thu, 20 Aug 2026 18:00:00 GMT')
-    expect(report.results.find((r) => r.source.includes('Music PEI — News'))).toMatchObject({ ok: true, added: 0, note: 'Unchanged.' })
+    expect(report.results.find((r) => r.source.includes('Music PEI · News'))).toMatchObject({ ok: true, added: 0, note: 'Unchanged.' })
     expect(w.candidates(`s.url = '${PEI_FEED}'`)).toEqual(before)
     expect(w.source(PEI_FEED)).toMatchObject({ last_status: 304, failures: 0, last_item_count: 10 })
   })
@@ -185,7 +185,7 @@ describe('an unchanged source costs nothing', () => {
     const before = w.candidates(`s.url = '${PEI_FEED}'`)
 
     const report = await pollSources(w.env, { now: later(25), limit: 100, fetchImpl: w.net.fetchImpl })
-    expect(report.results.find((r) => r.source.includes('Music PEI — News'))?.note).toBe('Unchanged.')
+    expect(report.results.find((r) => r.source.includes('Music PEI · News'))?.note).toBe('Unchanged.')
     // `last_seen_at` did not move, because nothing was looked at.
     expect(w.candidates(`s.url = '${PEI_FEED}'`)).toEqual(before)
   })
@@ -285,7 +285,7 @@ describe('one source never costs another its read', () => {
     })
     const report = await pollSources(w.env, { now: NOW, limit: 100, fetchImpl: w.net.fetchImpl })
     expect(report.results.find((r) => r.source.includes('Music Yukon'))).toMatchObject({ ok: false, note: 'socket hang up' })
-    expect(report.results.find((r) => r.source.includes('Music PEI — News'))).toMatchObject({ ok: true, added: 10 })
+    expect(report.results.find((r) => r.source.includes('Music PEI · News'))).toMatchObject({ ok: true, added: 10 })
     expect(w.candidates(`s.url = '${PEI_FEED}'`)).toHaveLength(10)
   })
 

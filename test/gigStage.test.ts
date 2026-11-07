@@ -63,8 +63,8 @@ describe('an offer is a flag, not an outcome', () => {
   it('keeps an invited gig Applied, and says the contract is what is pending', () => {
     expect(gigStage('invited')).toBe('applied')
     expect(gigFlag('invited')).toBe('offer_pending')
-    expect(flagLabel('offer_pending', 'Festival')).toBe('Offer — contract pending')
-    expect(flagLabel('offer_pending', 'Grant')).toBe('Offer — awaiting confirmation')
+    expect(flagLabel('offer_pending', 'Festival')).toBe('Offer, contract pending')
+    expect(flagLabel('offer_pending', 'Grant')).toBe('Offer, awaiting confirmation')
   })
 
   it('makes a signed contract the only way to Accepted', () => {

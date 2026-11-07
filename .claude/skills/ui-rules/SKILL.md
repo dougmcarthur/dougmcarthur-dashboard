@@ -82,12 +82,14 @@ needs `max-md:min-h-11`, or `max-md:py-3 max-md:-my-3` when it is text in a line
 headings are `<PageTitle>` (or `PAGE_TITLE` where an `Explainer` draws the `h1`), never
 a restated class. Check 320px as well as 375px: the header row has 9px to spare there.
 
-## No em dash in anything a screen says
+## No em dash in anything a person reads
 
-A string, a template or JSX text under `frontend/src` carries none
-(`test/visibleDashes.test.ts`). Write two sentences, a colon or a comma. A dash on
-its own, standing for an empty value in a cell or a select, is fine. Comments are
-free to use them.
+A string, a template or JSX text under `frontend/src`, `src` or `shared` carries none
+(`test/visibleDashes.test.ts`), so an email subject or a notification title is covered
+as well as a screen. Write two sentences, a colon or a comma. A dash on its own,
+standing for an empty value in a cell or a select, is fine, and so is the character
+inside a regular expression that reads somebody else's prose. Comments are free to use
+them.
 
 ## Explanation is tucked behind an info icon, always
 

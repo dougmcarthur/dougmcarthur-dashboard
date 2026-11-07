@@ -68,7 +68,7 @@ describe('which gigs are looked at', () => {
 
   it('still goes back to a "blocked" row that really meant "no form yet"', () => {
     // Stored before `not_found` existed: the same fact, spelled as a wall.
-    const legacy = gig({ prepStatus: 'blocked', prepNote: `${NO_FORM_NOTE} — the application may open later.`, prepCheckedAt: `${day(-9)}T08:00:00Z` })
+    const legacy = gig({ prepStatus: 'blocked', prepNote: `${NO_FORM_NOTE} The application may open later.`, prepCheckedAt: `${day(-9)}T08:00:00Z` })
     expect(formRevisit(legacy, TODAY).due).toBe(true)
   })
 
@@ -143,7 +143,7 @@ describe('the status a stored row means', () => {
   })
 
   it('reads the old "blocked, no form" row as not found, and a real wall as blocked', () => {
-    expect(prepStateOf('blocked', `${NO_FORM_NOTE} — the application may open later.`)).toBe('not_found')
+    expect(prepStateOf('blocked', `${NO_FORM_NOTE} The application may open later.`)).toBe('not_found')
     expect(prepStateOf('blocked', 'The application form is behind a login.')).toBe('blocked')
     expect(prepStateOf('blocked', null)).toBe('blocked')
     expect(prepStateOf('ready', `${NO_FORM_NOTE}.`)).toBe('ready')
@@ -155,7 +155,7 @@ describe('what the artist is told', () => {
 
   it('says so when the form turns up, with its size and what to do next', () => {
     const n = revisitNotice({ gig: g, before: 'not_found', after: { status: 'ready', fields: 27, note: null }, today: TODAY })!
-    expect(n.title).toBe('Canmore Folk Festival 2027: the application form is open — 27 fields read')
+    expect(n.title).toBe('Canmore Folk Festival 2027: the application form is open, 27 fields read')
     expect(n.body).toMatch(/nothing is sent/i)
     expect(n.tier).toBe('info')
     expect(n.dedupeKey).toBe('form-read:7')

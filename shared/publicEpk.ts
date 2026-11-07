@@ -55,10 +55,10 @@ const PUBLIC_DOCUMENT_KINDS = new Set(['tech_requirements', 'epk'])
 export type WithheldReason = 'unreviewed' | 'no_credit' | 'private' | 'style_guide' | 'other_audience'
 
 export const WITHHELD_REASONS: Record<WithheldReason, string> = {
-  unreviewed: 'not reviewed yet — mark it right in your library to publish it',
+  unreviewed: 'not reviewed yet, so mark it right in your library to publish it',
   no_credit: 'a photo with no photographer credit',
-  private: 'kept private — contact details, fees and paperwork stay off the public page',
-  style_guide: 'from your writing style guide — notes on how to write, not about you',
+  private: 'kept private: contact details, fees and paperwork stay off the public page',
+  style_guide: 'from your writing style guide: notes on how to write, not about you',
   other_audience: 'only on the version for the audience it is meant for',
 }
 

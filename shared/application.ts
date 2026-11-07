@@ -145,7 +145,7 @@ function lengthProblem(answer: string, maxLength: number | null): FieldProblem |
   if (!maxLength || answer.length <= maxLength) return null
   return {
     id: 'over_length',
-    message: `${answer.length} characters against a ${maxLength}-character limit — this will be cut off on paste.`,
+    message: `${answer.length} characters against a ${maxLength}-character limit. This will be cut off on paste.`,
     severity: 'danger',
   }
 }
@@ -231,7 +231,7 @@ function prepareField(
   if (field.fieldType === 'file') {
     problems.push({
       id: 'upload',
-      message: 'A file upload — nothing can be pasted here. See the materials list.',
+      message: 'A file upload. Nothing can be pasted here. See the materials list.',
       severity: 'info',
     })
   }
@@ -244,7 +244,7 @@ function prepareField(
       id: field.required ? 'no_answer' : 'unmatched',
       message: field.questionKind
         ? 'Nothing on file answers this yet.'
-        : 'This question does not match anything the artist database knows — it needs you.',
+        : 'This question does not match anything the artist database knows. It needs you.',
       severity: field.required ? 'danger' : 'warn',
     })
   }
@@ -255,7 +255,7 @@ function prepareField(
   if (answer && kind?.reuse === 'adapt' && state === 'suggested') {
     problems.push({
       id: 'retarget',
-      message: `Written for another application — rewrite it for this one before sending.`,
+      message: `Written for another application. Rewrite it for this one before sending.`,
       severity: 'warn',
     })
   }
@@ -346,7 +346,7 @@ export function materialsChecklist(
 
       let problem: string | null = null
       if (!kind) {
-        problem = 'Not sure what this wants — check the form.'
+        problem = 'Not sure what this wants. Check the form.'
       } else if (candidates.length === 0) {
         problem = 'Nothing of this kind is on file.'
       } else if (candidates.every((c) => c.health.problem)) {

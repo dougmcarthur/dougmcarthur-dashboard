@@ -34,7 +34,7 @@ travel.put(
       return c.json({ error: `OpenStreetMap does not know "${place}". Try the town and province, like "Winnipeg, MB".` }, 422)
     }
     if (found.outcome === 'failed') {
-      return c.json({ error: 'The map lookup did not answer just now. Nothing was changed — try again in a minute.' }, 502)
+      return c.json({ error: 'The map lookup did not answer just now. Nothing was changed. Try again in a minute.' }, 502)
     }
     await writeHome(c.env, tenant, { place, ...found.value })
 

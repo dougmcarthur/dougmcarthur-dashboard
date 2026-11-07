@@ -282,7 +282,7 @@ function legaliseGig(status: string, preferred: DecisionAction[]): DecisionActio
 const GIG_ACTIONS: Record<string, DecisionAction[]> = {
   sent_check: [
     { label: 'It went out', intent: 'confirm_sent', tone: 'go' },
-    { label: 'Not sent — reopen', intent: 'reopen', tone: 'no' },
+    { label: 'Not sent, reopen', intent: 'reopen', tone: 'no' },
   ],
   spend: [
     { label: 'Approve the spend', intent: 'approve', tone: 'go' },
@@ -371,7 +371,7 @@ export function promoMoves(status: string): PromoMove[] {
 
 const SYNC_SENT_CHECK: [DecisionAction, DecisionAction] = [
   { label: 'It went out', intent: 'confirm_sent', tone: 'go' },
-  { label: 'Not sent — reopen', intent: 'reopen', tone: 'no' },
+  { label: 'Not sent, reopen', intent: 'reopen', tone: 'no' },
 ]
 
 const SYNC_PITCH: [DecisionAction, DecisionAction] = [
@@ -434,7 +434,7 @@ export function decisionFor(item: DecisionInput): Decision {
       // No buttons, deliberately. The gig pipeline has no reverse gear —
       // `submitted` cannot walk back to `shortlisted`, because undoing a
       // transition is an edit, not a move (see shared/gigStatus.ts). The card
-      // used to offer "Not sent — reopen" anyway, and it returned a 400 every
+      // used to offer "Not sent, reopen" anyway, and it returned a 400 every
       // time. Naming the contradiction and sending you to the row is the only
       // thing here that is true.
       return {
@@ -442,7 +442,7 @@ export function decisionFor(item: DecisionInput): Decision {
         rationale:
           `Marked ${gigStageLabel(status).label.toLowerCase()} in the tracker, but the note says it was never ` +
           `actually sent.${extra} One of the two is wrong, and fixing it is an edit rather ` +
-          `than a decision — open it and correct whichever side is.`,
+          `than a decision. Open it and correct whichever side is.`,
         actions: [],
       }
     }
@@ -473,7 +473,7 @@ export function decisionFor(item: DecisionInput): Decision {
           rationale:
             'A US date, and nobody has said whether it is a showcase or a paid booking. ' +
             'Showcase enters as a business visitor and costs nothing; paid needs a P-2, about ' +
-            '$800 and ninety days — and there is not ninety days here. Say which it is in ' +
+            '$800 and ninety days, and there is not ninety days here. Say which it is in ' +
             'Edit details, then decide.',
           actions: [],
         }
@@ -495,9 +495,9 @@ export function decisionFor(item: DecisionInput): Decision {
           badge: 'Offer',
           rationale: award
             ? 'They made an offer. It is not accepted until the award is confirmed in writing, ' +
-              'so confirm it here once it is — and turning it down is you withdrawing, not them declining.'
+              'so confirm it here once it is. Turning it down is you withdrawing, not them declining.'
             : 'They made an offer. It is not accepted until the contract is signed, so record it ' +
-              'here once it is — and turning it down is you withdrawing, not them declining.',
+              'here once it is. Turning it down is you withdrawing, not them declining.',
           actions: gigActions(
             kind,
             status,
@@ -528,7 +528,7 @@ export function decisionFor(item: DecisionInput): Decision {
         badge: 'No reply',
         rationale:
           `${sent} ${exact ? '' : 'about '}${days} days ago and nothing has come back. ` +
-          `Chasing is an email rather than a button — send one and snooze this, or write ` +
+          `Chasing is an email rather than a button. Send one and snooze this, or write ` +
           `it off if the answer was never coming.`,
         actions: gigActions(kind, status, GIG_ACTIONS.give_up),
       }

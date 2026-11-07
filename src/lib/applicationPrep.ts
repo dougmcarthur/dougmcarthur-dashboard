@@ -150,7 +150,7 @@ async function followApplyLink(
       .join(', ')
     return {
       ...blocked,
-      note: `${blocked.note} It links to more than one possible form — ${names} — so add the address of the artist one by hand.`,
+      note: `${blocked.note} It links to more than one possible form (${names}), so add the address of the artist one by hand.`,
     }
   }
 

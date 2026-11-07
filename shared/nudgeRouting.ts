@@ -269,7 +269,7 @@ export function planNudges(row: NudgeRow, prefs: NudgePreferences): PlannedNudge
   add(
     'opens',
     applying && row.opensAt ? addDays(row.opensAt, prefs.openingLeadDays) : null,
-    `Start the application — ${row.name}`,
+    `Start the application: ${row.name}`,
     0,
   )
 
@@ -278,11 +278,11 @@ export function planNudges(row: NudgeRow, prefs: NudgePreferences): PlannedNudge
   add(
     'deadline',
     applying ? row.deadline : null,
-    `Apply by — ${row.name}`,
+    `Apply by: ${row.name}`,
     7 * 24 * 60,
   )
 
-  add('reply', row.replyDueOn, `Reply — ${row.name}`, 0)
+  add('reply', row.replyDueOn, `Reply: ${row.name}`, 0)
 
   // No prefix. This one is the show, and it is the only entry that is not a
   // chore with a date attached.

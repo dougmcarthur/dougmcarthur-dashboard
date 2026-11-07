@@ -28,7 +28,7 @@ describe('subjectFor', () => {
   })
 
   it('reaches the inbox with the product name in front', () => {
-    expect(render(digest({ focus: [line(1, 'A')] })).subject).toBe('Sun Dogs Music Scout — 1 to act on this week')
+    expect(render(digest({ focus: [line(1, 'A')] })).subject).toBe('Sun Dogs Music Scout: 1 to act on this week')
   })
 })
 

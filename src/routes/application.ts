@@ -171,7 +171,7 @@ application.post('/prepare', zValidator('json', PrepareSchema), async (c) => {
     return c.json(
       {
         error:
-          'No form address for this one. Add the URL of the application form — the listing link is often an announcement rather than the form.',
+          'No form address for this one. Add the URL of the application form. The listing link is often an announcement rather than the form.',
       },
       400,
     )

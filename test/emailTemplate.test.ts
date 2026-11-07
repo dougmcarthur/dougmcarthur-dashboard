@@ -56,7 +56,7 @@ const visibleText = (html: string) =>
 
 describe.each(ALL)('%s — who it is from and why it came', (_name, render) => {
   it('puts the product name, not "Scout" alone, at the front of the subject', () => {
-    expect(render().subject.startsWith(`${PRODUCT_NAME} — `)).toBe(true)
+    expect(render().subject.startsWith(`${PRODUCT_NAME}: `)).toBe(true)
   })
 
   it('identifies the sender with a name, a mailing address and a web address, in both bodies', () => {

@@ -103,10 +103,10 @@ export function composeApplicationEmail(input: {
 
   const who = artistName ?? '[artist name]'
   if (!artistName) {
-    gaps.push({ marker: '[artist name]', prompt: 'No artist name on file — add one to the artist database.' })
+    gaps.push({ marker: '[artist name]', prompt: 'No artist name on file. Add one to the artist database.' })
   }
 
-  const subject = `${gig.type ? `${titleCase(gig.type)} submission` : 'Submission'} — ${who} — ${gig.name}`
+  const subject = `${gig.type ? `${titleCase(gig.type)} submission` : 'Submission'}: ${who}, ${gig.name}`
 
   const greeting = gig.organizer ? `Hello ${gig.organizer},` : 'Hello,'
 
@@ -116,7 +116,7 @@ export function composeApplicationEmail(input: {
   if (!oneLiner) {
     gaps.push({
       marker: '[one line]',
-      prompt: 'No one-line description on file. Add one to the artist database — every application asks for it.',
+      prompt: 'No one-line description on file. Add one to the artist database. Every application asks for it.',
     })
   }
 
@@ -131,18 +131,18 @@ export function composeApplicationEmail(input: {
     greeting,
     oneLiner ? opening : `${opening} [one line]`,
     why.marker,
-    bio ?? '[bio — nothing on file]',
+    bio ?? '[bio: nothing on file]',
     facts || null,
     links.length ? `Links\n${links.map((l) => `  ${l}`).join('\n')}` : null,
     gig.url ? `Listing: ${gig.url}` : null,
     'Thank you for your time.',
-    [contactName, email, phone].filter(Boolean).join('\n') || '[contact details — nothing on file]',
+    [contactName, email, phone].filter(Boolean).join('\n') || '[contact details: nothing on file]',
   ].filter((p): p is string => Boolean(p))
 
-  if (!bio) gaps.push({ marker: '[bio — nothing on file]', prompt: 'No bio on file at any length.' })
+  if (!bio) gaps.push({ marker: '[bio: nothing on file]', prompt: 'No bio on file at any length.' })
   if (!contactName && !email) {
     gaps.push({
-      marker: '[contact details — nothing on file]',
+      marker: '[contact details: nothing on file]',
       prompt: 'No contact name, email or phone on file. An application nobody can answer is not an application.',
     })
   }
