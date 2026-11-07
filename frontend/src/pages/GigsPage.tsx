@@ -10,7 +10,8 @@ import {
   type ColumnFiltersState,
   type SortingState,
 } from '@tanstack/react-table'
-import { api, type GigOpportunity } from '../api'
+import { api, type GigOpportunity, type GigStatus } from '../api'
+import { usePhone } from '../hooks/usePhone'
 import { humanise } from '../../../shared/humanise'
 import { GIG_STAGES, GIG_STAGE_META, type GigStage } from '../../../shared/gigStage'
 import { inlineGigMoves } from '../../../shared/decisionCopy'
@@ -18,7 +19,7 @@ import { parseDeadline } from '../../../shared/reviewParse'
 import { localToday, shortDate } from '../format'
 import { StatusBadge } from '../components/StatusBadge'
 import { Chevron } from '../components/Chevron'
-import { SkeletonTable } from '../components/Skeleton'
+import { SkeletonList, SkeletonTable } from '../components/Skeleton'
 import { Select, Input } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { CreateGigForm } from './gigs/CreateGigForm'
@@ -32,16 +33,8 @@ import { useConfirm } from '../components/ui/ConfirmModal'
 
 const col = createColumnHelper<GigOpportunity>()
 
-/**
- * The name column, pinned to the left edge below `md` while the rest of the
- * table scrolls under it. The rule on its right edge is a shadow rather than a
- * border so it does not change the column's width.
- */
-const PINNED_CELL = 'max-md:sticky max-md:left-0 max-md:z-10 max-md:shadow-[1px_0_0_rgb(var(--c-line))]'
-
-/** An expanded row's `bg-info-bg/40`, laid over the pinned cell's opaque surface. */
-const PINNED_TINT =
-  'max-md:[background-image:linear-gradient(rgb(var(--c-info-bg)/0.4),rgb(var(--c-info-bg)/0.4))]'
+/** The columns the phone's sort control offers; the table sorts by any header. */
+const PHONE_SORTS = ['name', 'deadline']
 
 const TYPE_COLORS: Record<string, string> = {
   festival: 'bg-cat-violet-bg text-cat-violet-fg',
@@ -73,6 +66,109 @@ function FitScore({ score }: { score: number | null }) {
   )
 }
 
+// ── Cells, shared by the table and the phone list ─────────────────────────────
+//
+// One renderer each, so the two layouts cannot say different things about the
+// same gig: a phone list that wrote its own deadline would be the place a
+// recovered date lost its prose.
+
+/** The deadline as the table shows it, and as a phone card does. */
+function DeadlineCell({ gig, today }: { gig: GigOpportunity; today: string }) {
+  // Most rows hold prose here, not a date — "None — rolling artist roster
+  // intake" — and a Date built from prose is Invalid Date, whose
+  // countdown is NaN and never urgent. `parseDeadline` goes through `splitDeadline`
+  // and counts against the `today` this render was handed.
+  const d = parseDeadline(gig.deadline, { note: gig.deadlineNote, opensAt: gig.opensAt, today })
+  // No closing date, but the window's opening is known — the fixture's
+  // "applications open in three weeks" row. An em-dash there reads as
+  // "nothing known", which is the one thing it is not.
+  if (!d.raw && !d.note) {
+    return d.opensAt
+      ? <span className="text-xs text-muted whitespace-nowrap">Opens {shortDate(d.opensAt)}</span>
+      : <span className="text-faint">—</span>
+  }
+  // Where a date was recovered from prose the prose stays beside it,
+  // exactly as the Review pane does: the recovery is a reading, and
+  // "Nov 20" alone claims a certainty the column does not have.
+  const prose = d.exact ? d.note : (d.raw ?? d.note)
+  if (!d.date) {
+    return <span className="max-w-56 text-xs text-muted line-clamp-2" title={prose ?? undefined}>{prose}</span>
+  }
+  const days = d.daysUntil ?? -1
+  const urgent = days >= 0 && days <= 14
+  return (
+    <div className="max-w-56">
+      <span className={`whitespace-nowrap ${urgent ? 'text-cat-orange-fg font-medium' : 'text-body'}`}>
+        {shortDate(d.date)}
+        {urgent && days <= 7 && (
+          <span className="ml-1 text-xs text-cat-orange-fg">({days === 0 ? 'today' : `${days}d`})</span>
+        )}
+      </span>
+      {prose && <span className="text-xs text-muted line-clamp-2" title={prose}>{prose}</span>}
+    </div>
+  )
+}
+
+/**
+ * The fee as the table shows it.
+ *
+ * `paid` used to be a column of its own and is a word on this one now.
+ * It was filled on two rows of thirty-four, so it spent a column's width
+ * drawing an em-dash thirty-two times to say "Paid" twice — and the row
+ * whose fee is "Travel bursary available (amount unclear)" reads as one
+ * piece of prose rather than as prose in one cell and a pill in another.
+ */
+function FeeCell({ gig }: { gig: GigOpportunity }) {
+  const amt = gig.feeAmount
+  const paid = gig.paid ? <span className="text-success-fg"> · paid</span> : null
+  if (amt == null && !gig.fee) return <span className="text-faint">—</span>
+  if (amt != null) {
+    return <span>{gig.feeCurrency ?? 'USD'} {amt.toLocaleString()}{paid}</span>
+  }
+  return <span className="text-muted text-xs">{gig.fee}{paid}</span>
+}
+
+/**
+ * The obvious next step for a gig, as buttons.
+ *
+ * Asked of the pipeline, never listed here. This cell used to hardcode
+ * Will apply / Pass on a discovered row and Applied on a shortlisted one
+ * — legal today, but a claim about legality nothing checked, and the
+ * Review bar's fixed four went wrong exactly that way. `inlineGigMoves`
+ * keeps it to the obvious next step; every other legal move is in
+ * the expanded row's picker.
+ *
+ * `whitespace-nowrap` because in the table the header is empty and the column
+ * is the first squeezed: "Will apply" broke onto two lines, and its Pass
+ * stretched beside it to a 44px pill in a row of 26px ones. On a phone the
+ * buttons are the large size, a tap target a thumb can hit.
+ */
+function GigActions({
+  gig,
+  disabled,
+  onMove,
+  phone = false,
+}: {
+  gig: GigOpportunity
+  disabled: boolean
+  onMove: (to: GigStatus) => void
+  phone?: boolean
+}) {
+  return (
+    // On a phone there is no hover to reveal them, and a list that hid its
+    // buttons until a pointer arrived would show a narrow desktop window none.
+    <div className={phone ? 'flex gap-2 whitespace-nowrap' : 'row-actions flex gap-1 justify-end whitespace-nowrap'}>
+      {inlineGigMoves(gig.status, gig.type).map(({ to, tone, label, meaning }) => (
+        <Button key={to} variant={tone === 'go' ? 'good' : 'neutral'} size={phone ? 'lg' : 'sm'}
+          className={phone ? 'min-h-11' : ''} disabled={disabled} title={meaning}
+          onClick={() => onMove(to)}>
+          {label}
+        </Button>
+      ))}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 /**
@@ -82,6 +178,7 @@ function FitScore({ score }: { score: number | null }) {
  */
 export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }) {
   const qc = useQueryClient()
+  const phone = usePhone()
   const { confirm, ConfirmDialog } = useConfirm()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -162,6 +259,35 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
   const showOrganizer = filled((r) => Boolean(r.organizer))
   const showFit = filled((r) => r.genreFitScore != null)
 
+  /** The panel under an open gig, the same on a phone as in the table. */
+  const detail = (gig: GigOpportunity) =>
+    editingId === gig.id ? (
+      <EditGigPanel
+        gig={gig}
+        onSave={(body) => patchMutation.mutate({ id: gig.id, body })}
+        onCancel={() => setEditingId(null)}
+        isSaving={isPatching}
+      />
+    ) : (
+      <GigDetail
+        gig={gig}
+        onEdit={() => setEditingId(gig.id)}
+        onStatusChange={(status) => patchMutation.mutate({ id: gig.id, body: { status } })}
+        onDelete={async () => {
+          const ok = await confirm({
+            title: `Delete "${gig.name}"?`,
+            description: 'This removes the opportunity and any saved application answers.',
+            destructive: true,
+          })
+          if (ok) {
+            deleteMutation.mutate(gig.id)
+          }
+        }}
+        isPatching={isPatching}
+        today={today}
+      />
+    )
+
   const columns = [
     col.accessor('name', {
       header: 'Name',
@@ -190,60 +316,11 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
       : []),
     col.accessor('deadline', {
       header: 'Deadline',
-      // Most rows hold prose here, not a date — "None — rolling artist roster
-      // intake" — and a Date built from prose is Invalid Date, whose
-      // countdown is NaN and never urgent. `parseDeadline` goes through `splitDeadline`
-      // and counts against the `today` this render was handed.
-      cell: (info) => {
-        const row = info.row.original
-        const d = parseDeadline(info.getValue(), { note: row.deadlineNote, opensAt: row.opensAt, today })
-        // No closing date, but the window's opening is known — the fixture's
-        // "applications open in three weeks" row. An em-dash there reads as
-        // "nothing known", which is the one thing it is not.
-        if (!d.raw && !d.note) {
-          return d.opensAt
-            ? <span className="text-xs text-muted whitespace-nowrap">Opens {shortDate(d.opensAt)}</span>
-            : <span className="text-faint">—</span>
-        }
-        // Where a date was recovered from prose the prose stays beside it,
-        // exactly as the Review pane does: the recovery is a reading, and
-        // "Nov 20" alone claims a certainty the column does not have.
-        const prose = d.exact ? d.note : (d.raw ?? d.note)
-        if (!d.date) {
-          return <span className="max-w-56 text-xs text-muted line-clamp-2" title={prose ?? undefined}>{prose}</span>
-        }
-        const days = d.daysUntil ?? -1
-        const urgent = days >= 0 && days <= 14
-        return (
-          <div className="max-w-56">
-            <span className={`whitespace-nowrap ${urgent ? 'text-cat-orange-fg font-medium' : 'text-body'}`}>
-              {shortDate(d.date)}
-              {urgent && days <= 7 && (
-                <span className="ml-1 text-xs text-cat-orange-fg">({days === 0 ? 'today' : `${days}d`})</span>
-              )}
-            </span>
-            {prose && <span className="text-xs text-muted line-clamp-2" title={prose}>{prose}</span>}
-          </div>
-        )
-      },
+      cell: (info) => <DeadlineCell gig={info.row.original} today={today} />,
     }),
     col.accessor('feeAmount', {
       header: 'Fee',
-      // `paid` used to be a column of its own and is a word on this one now.
-      // It was filled on two rows of thirty-four, so it spent a column's width
-      // drawing an em-dash thirty-two times to say "Paid" twice — and the row
-      // whose fee is "Travel bursary available (amount unclear)" reads as one
-      // piece of prose rather than as prose in one cell and a pill in another.
-      cell: (info) => {
-        const amt = info.getValue()
-        const row = info.row.original
-        const paid = row.paid ? <span className="text-success-fg"> · paid</span> : null
-        if (amt == null && !row.fee) return <span className="text-faint">—</span>
-        if (amt != null) {
-          return <span>{row.feeCurrency ?? 'USD'} {amt.toLocaleString()}{paid}</span>
-        }
-        return <span className="text-muted text-xs">{row.fee}{paid}</span>
-      },
+      cell: (info) => <FeeCell gig={info.row.original} />,
     }),
     ...(showFit
       ? [
@@ -260,29 +337,10 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
     col.display({
       id: 'actions',
       header: '',
-      // Asked of the pipeline, never listed here. This cell used to hardcode
-      // Will apply / Pass on a discovered row and Applied on a shortlisted one
-      // — legal today, but a claim about legality nothing checked, and the
-      // Review bar's fixed four went wrong exactly that way. `inlineGigMoves`
-      // keeps the cell to the obvious next step; every other legal move is in
-      // the expanded row's picker.
-      cell: (info) => {
-        const row = info.row.original
-        // `whitespace-nowrap` because the header is empty and the column is
-        // the first squeezed: "Will apply" broke onto two lines, and its Pass
-        // stretched beside it to a 44px pill in a row of 26px ones.
-        return (
-          <div className="row-actions flex gap-1 justify-end whitespace-nowrap">
-            {inlineGigMoves(row.status, row.type).map(({ to, tone, label, meaning }) => (
-              <Button key={to} variant={tone === 'go' ? 'good' : 'neutral'} size="sm" disabled={isPatching}
-                title={meaning}
-                onClick={() => patchMutation.mutate({ id: row.id, body: { status: to } })}>
-                {label}
-              </Button>
-            ))}
-          </div>
-        )
-      },
+      cell: (info) => (
+        <GigActions gig={info.row.original} disabled={isPatching}
+          onMove={(to) => patchMutation.mutate({ id: info.row.original.id, body: { status: to } })} />
+      ),
     }),
   ]
 
@@ -313,6 +371,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
           <Select
             filter
             aria-label="Filter by stage"
+            className="max-md:min-h-11"
             value={stageFilter}
             onChange={(e) => setStageFilter(e.target.value as GigStage | '')}
           >
@@ -323,15 +382,30 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
               </option>
             ))}
           </Select>
+          {/* A phone has no column headers to tap, which is how the table sorts. */}
+          {phone && (
+            <Select
+              filter
+              aria-label="Sort gigs"
+              className="min-h-11"
+              value={PHONE_SORTS.includes(sorting[0]?.id ?? '') ? sorting[0].id : ''}
+              onChange={(e) => setSorting(e.target.value ? [{ id: e.target.value, desc: false }] : [])}
+            >
+              <option value="">Default order</option>
+              <option value="name">Name</option>
+              <option value="deadline">Deadline</option>
+            </Select>
+          )}
           <Input
             aria-label="Search gigs by name"
             placeholder="Search by name…"
             value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
             onChange={(e) => table.getColumn('name')?.setFilterValue(e.target.value)}
-            className="w-44"
+            className="w-44 max-md:min-h-11"
           />
           <Button
             variant={showCreate ? 'neutral' : 'primary'}
+            className="max-md:min-h-11"
             onClick={() => { setShowCreate((v) => !v) }}
           >
             {showCreate ? 'Cancel' : '+ New gig'}
@@ -342,28 +416,88 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
       {showCreate && <CreateGigForm onDone={() => setShowCreate(false)} />}
 
       {isLoading ? (
-        <SkeletonTable rows={6} cols={8} />
+        phone ? <SkeletonList rows={6} /> : <SkeletonTable rows={6} cols={8} />
+      ) : phone ? (
+        /*
+          On a phone the table is twice the width of the screen, and the stage,
+          which is what a row is for, sat past the right edge with the buttons.
+          So it is a list: the name and the stage on top, then what the table
+          had as columns, then the next step as a button a thumb can hit. The
+          cells are the table's own (`DeadlineCell`, `FeeCell`, `GigActions`),
+          and the open panel is the same one.
+        */
+        <Card pad="none" clip>
+          <ul className="divide-y divide-line">
+            {table.getRowModel().rows.map((row) => {
+              const gig = row.original
+              const open = expanded.has(gig.id)
+              const hasMoves = inlineGigMoves(gig.status, gig.type).length > 0
+              return (
+                <li key={row.id} className={open ? 'bg-info-bg/40' : ''}>
+                  <div className="px-4 py-3 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(gig.id)}
+                      aria-expanded={open}
+                      className="flex w-full min-h-11 items-center gap-2 text-left font-medium text-ink hover:text-info-fg transition-colors"
+                    >
+                      <Chevron open={open} />
+                      <span className="min-w-0 flex-1">{gig.name}</span>
+                    </button>
+                    <div className="pl-6 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                      <StatusBadge status={gig.status} kind="gig" gigType={gig.type} />
+                      <TypeChip type={gig.type} />
+                    </div>
+                    <dl className="pl-6 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm text-body">
+                      <div className="flex items-baseline gap-2">
+                        <dt className="text-xs text-muted">Deadline</dt>
+                        <dd><DeadlineCell gig={gig} today={today} /></dd>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <dt className="text-xs text-muted">Fee</dt>
+                        <dd><FeeCell gig={gig} /></dd>
+                      </div>
+                      {showOrganizer && gig.organizer && (
+                        <div className="flex items-baseline gap-2">
+                          <dt className="text-xs text-muted">Organizer</dt>
+                          <dd>{gig.organizer}</dd>
+                        </div>
+                      )}
+                      {showFit && gig.genreFitScore != null && (
+                        <div className="flex items-center gap-2">
+                          <dt className="text-xs text-muted">Fit</dt>
+                          <dd><FitScore score={gig.genreFitScore} /></dd>
+                        </div>
+                      )}
+                    </dl>
+                    {hasMoves && (
+                      <div className="pl-6">
+                        <GigActions phone gig={gig} disabled={isPatching}
+                          onMove={(to) => patchMutation.mutate({ id: gig.id, body: { status: to } })} />
+                      </div>
+                    )}
+                  </div>
+                  {open && <div className="px-4 pb-5 pt-1">{detail(gig)}</div>}
+                </li>
+              )
+            })}
+            {table.getRowModel().rows.length === 0 && (
+              <li className="px-4 py-12 text-center text-muted text-sm">No gigs match the current filters.</li>
+            )}
+          </ul>
+        </Card>
       ) : (
         <Card pad="none" clip>
-          {/*
-            On a phone this table is twice the width of the screen, and it stays
-            a table — scrolling sideways — with two things pinned so it reads:
-            the name, so a status three columns over still says whose it is,
-            and the expanded detail, which was the table's full width and ran
-            every line of prose 390px off the glass. `container-type` is what
-            lets the detail size itself to the visible width as `100cqw`
-            without restating the page gutters at each breakpoint.
-          */}
-          <div className="overflow-x-auto [container-type:inline-size]">
+          {/* From a tablet up. The sideways scroll is only for the widths between
+              the table's own minimum and the screen: below 768px it is the list above. */}
+          <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-sunken border-b border-line">
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id}>
-                  {hg.headers.map((header, i) => (
+                  {hg.headers.map((header) => (
                     <th key={header.id} onClick={header.column.getToggleSortingHandler()}
-                      className={`px-4 py-2.5 text-left ${CAPTION_CLASS} select-none cursor-pointer whitespace-nowrap hover:text-body transition-colors ${
-                        i === 0 ? PINNED_CELL + ' max-md:bg-sunken' : ''
-                      }`}>
+                      className={`px-4 py-2.5 text-left ${CAPTION_CLASS} select-none cursor-pointer whitespace-nowrap hover:text-body transition-colors`}>
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       <span className="ml-1 text-faint">
                         {header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : ''}
@@ -377,15 +511,8 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
               {table.getRowModel().rows.map((row) => (
                 <Fragment key={row.id}>
                   <tr className={`group transition-colors ${expanded.has(row.original.id) ? 'bg-info-bg/40' : 'hover:bg-sunken'}`}>
-                    {row.getVisibleCells().map((cell, i) => (
-                      <td key={cell.id} className={`px-4 py-3 text-body ${
-                        // Pinned, so it needs a background of its own or the
-                        // columns scroll through it; an expanded row's tint
-                        // is laid over it as a gradient to match the row.
-                        i === 0
-                          ? `${PINNED_CELL} max-md:bg-surface ${expanded.has(row.original.id) ? PINNED_TINT : ''}`
-                          : ''
-                      }`}>
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-4 py-3 text-body">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
@@ -393,33 +520,8 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
                   {expanded.has(row.original.id) && (
                     <tr>
                       <td colSpan={columns.length} className="p-0 bg-info-bg/40 border-b border-info-line">
-                        <div className="px-6 pb-5 pt-3 max-md:px-4 max-md:sticky max-md:left-0 max-md:w-[100cqw]">
-                        {editingId === row.original.id ? (
-                          <EditGigPanel
-                            gig={row.original}
-                            onSave={(body) => patchMutation.mutate({ id: row.original.id, body })}
-                            onCancel={() => setEditingId(null)}
-                            isSaving={isPatching}
-                          />
-                        ) : (
-                          <GigDetail
-                            gig={row.original}
-                            onEdit={() => setEditingId(row.original.id)}
-                            onStatusChange={(status) => patchMutation.mutate({ id: row.original.id, body: { status } })}
-                            onDelete={async () => {
-                              const ok = await confirm({
-                                title: `Delete "${row.original.name}"?`,
-                                description: 'This removes the opportunity and any saved application answers.',
-                                destructive: true,
-                              })
-                              if (ok) {
-                                deleteMutation.mutate(row.original.id)
-                              }
-                            }}
-                            isPatching={isPatching}
-                            today={today}
-                          />
-                        )}
+                        <div className="px-6 pb-5 pt-3">
+                          {detail(row.original)}
                         </div>
                       </td>
                     </tr>
