@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, type ReactNode } from 'react'
 
 /**
  * The shapes that were being spelled out by hand, over and over.
@@ -74,10 +74,19 @@ export function Card({
 /* Label                                                                  */
 /* --------------------------------------------------------------------- */
 
+const CONTROL = 'input:not([type="hidden"]), select, textarea'
+
 /**
  * The form label, and the most repeated string in the app by a factor of
  * eight. `Field` exported the input, the textarea and the select and left the
  * thing sitting above them to be typed out every time.
+ *
+ * Without `htmlFor` it ties itself to the control that follows it: the next
+ * sibling when that is a control, otherwise the first control inside it (a
+ * wrapper that fixes a width). Sixty-odd labels sat above their input with no
+ * link, so a screen reader announced an unnamed box and a click on the label
+ * focused nothing. Pass `htmlFor` when the control is somewhere else; a label
+ * that finds no control stays as it was.
  */
 export function Label({
   children,
@@ -88,8 +97,26 @@ export function Label({
   htmlFor?: string
   className?: string
 }) {
+  const ref = useRef<HTMLLabelElement>(null)
+  const generated = useId()
+
+  // No dependency list: the control after a label can change between renders
+  // (a form that swaps a field), and the work is one selector.
+  useLayoutEffect(() => {
+    const label = ref.current
+    if (!label || htmlFor) return
+    const next = label.nextElementSibling
+    const control = next?.matches(CONTROL) ? next : next?.querySelector(CONTROL)
+    if (!control) {
+      label.removeAttribute('for')
+      return
+    }
+    if (!control.id) control.id = generated
+    label.htmlFor = control.id
+  })
+
   return (
-    <label htmlFor={htmlFor} className={`block text-xs font-medium text-muted mb-1 ${className}`}>
+    <label ref={ref} htmlFor={htmlFor} className={`block text-xs font-medium text-muted mb-1 ${className}`}>
       {children}
     </label>
   )

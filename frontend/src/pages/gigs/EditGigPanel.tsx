@@ -167,7 +167,7 @@ export function EditGigPanel({
           <input type="date" value={draft.performanceStart} onChange={(e) => set('performanceStart', e.target.value)} className={FIELD} />
         </div>
         <div>
-          <Label>Last day <span className="text-faint font-normal">— if it runs more than one</span></Label>
+          <Label>Last day <span className="text-muted font-normal">(if it runs more than one)</span></Label>
           <input type="date" value={draft.performanceEnd} onChange={(e) => set('performanceEnd', e.target.value)} className={FIELD} />
         </div>
         {dateProblem && (
@@ -216,7 +216,7 @@ export function EditGigPanel({
         </div>
         <div>
           <Label>
-            Nights away <span className="text-muted font-normal">— 0 if you sleep at home</span>
+            Nights away <span className="text-muted font-normal">(0 if you sleep at home)</span>
           </Label>
           <input
             type="number" min={0} value={draft.nights}
@@ -252,7 +252,7 @@ export function EditGigPanel({
         </div>
         <div>
           <Label>
-            Stipend <span className="text-muted font-normal">— CAD</span>
+            Stipend <span className="text-muted font-normal">(CAD)</span>
           </Label>
           <input
             type="number" min={0} value={draft.stipendAmount}
@@ -261,7 +261,7 @@ export function EditGigPanel({
         </div>
         <div>
           <Label>
-            Guarantee <span className="text-muted font-normal">— CAD</span>
+            Guarantee <span className="text-muted font-normal">(CAD)</span>
           </Label>
           <input
             type="number" min={0} value={draft.guaranteeAmount}

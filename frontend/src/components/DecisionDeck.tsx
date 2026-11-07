@@ -320,7 +320,7 @@ export function DecisionDeck({
           <div className="flex items-center gap-2 mb-1.5">
             <Badge item={item} />
             <KindTag kind={item.kind} />
-            <span className="ml-auto text-xs text-faint tabular-nums">
+            <span className="ml-auto text-xs text-muted tabular-nums">
               {remaining.length} left
             </span>
           </div>

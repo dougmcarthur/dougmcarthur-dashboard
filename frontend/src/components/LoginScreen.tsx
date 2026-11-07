@@ -195,7 +195,7 @@ export function LoginScreen({ session, onSignedIn }: { session: SessionState; on
 
         {/* For somebody who arrived here and has no account: the page that
             says what this is, and how to ask for an invitation. */}
-        <a href="#welcome" className="block text-xs text-faint hover:text-ink transition-colors">
+        <a href="#welcome" className="block text-xs text-muted hover:text-ink transition-colors">
           New here? What is Sun Dogs Music Scout?
         </a>
 

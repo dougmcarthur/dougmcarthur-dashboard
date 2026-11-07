@@ -91,7 +91,7 @@ export function ForestPlot({ values }: { values: PublicValue[] }) {
 
         <div className={`${columns} mt-1`} aria-hidden="true">
           <span />
-          <div className="relative h-4 text-[11px] text-faint tabular-nums">
+          <div className="relative h-4 text-[11px] text-muted tabular-nums">
             {ticks.map((t) => (
               // The plot is about a hundred pixels wide on a phone, so only every other tick is named there (zero always is).
               <span key={t} className={`absolute -translate-x-1/2 ${Math.round(t / step) % 2 === 0 ? '' : 'hidden sm:inline'}`} style={{ left: `${at(t)}%` }}>
@@ -158,7 +158,7 @@ export function RatioTile({ ratio, noun }: { ratio: PublicRatio; noun: string })
             style={{ left: `${at(ratio.value)}%` }}
           />
         </div>
-        <div className="relative mt-1 h-4 text-[11px] tabular-nums text-faint" aria-hidden="true">
+        <div className="relative mt-1 h-4 text-[11px] tabular-nums text-muted" aria-hidden="true">
           <span className="absolute left-0">$0</span>
           <span className="absolute -translate-x-1/2 whitespace-nowrap text-muted" style={{ left: `${at(1)}%` }}>
             a dollar is a dollar

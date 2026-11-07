@@ -94,7 +94,7 @@ export function RankingChart({ rows }: { rows: PublicFactor[] }) {
 
       <div className={`mt-1 ${GRID}`} aria-hidden="true">
         <span className="hidden sm:block" />
-        <div className="relative col-span-2 h-5 text-[11px] tabular-nums text-faint sm:col-span-1">
+        <div className="relative col-span-2 h-5 text-[11px] tabular-nums text-muted sm:col-span-1">
           {ticks.map((t) => (
             <span key={t} className="absolute -translate-x-1/2" style={{ left: `${at(t)}%` }}>
               {points(t)}

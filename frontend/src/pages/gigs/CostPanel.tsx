@@ -222,7 +222,7 @@ export function CostPanel({ gig, today }: { gig: GigOpportunity; today: string }
             {lead.short
               ? lead.certain
                 ? `Not enough time for the P-2: ${lead.daysAvailable} days, and it needs ${lead.requirement.leadTimeDays}.`
-                : `A US date ${lead.daysAvailable} days out — showcase or paid?`
+                : `A US date ${lead.daysAvailable} days out: showcase or paid?`
               : `${lead.daysAvailable} days for the paperwork. Enough.`}
           </p>
           <p className="text-xs mt-0.5 opacity-90">

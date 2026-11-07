@@ -68,7 +68,7 @@ function ResultRow({
             className="w-full flex items-center justify-between px-4 py-2 text-xs text-muted hover:bg-sunken transition-colors"
           >
             <span className="font-medium">
-              {showDiff ? '▾' : '▸'} Draft vs sent — {showDiff ? 'hide diff' : 'show diff'}
+              {showDiff ? '▾' : '▸'} Draft vs sent: {showDiff ? 'hide diff' : 'show diff'}
             </span>
             {!showDiff && (
               <span className="text-muted">see what you changed</span>
@@ -107,7 +107,7 @@ function ResultRow({
                   </div>
                   {learnChoice === 'learn' && (
                     <p className="text-xs text-success-fg">
-                      Draft will be replaced with what you actually sent — future pitches inherit this style.
+                      Draft will be replaced with what you actually sent. Future pitches inherit this style.
                     </p>
                   )}
                 </div>
@@ -194,7 +194,7 @@ export function ReconcilePanel({ onClose }: { onClose: () => void }) {
       {/* Panel header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-line">
         <Explainer as="h2" title="Gmail Reconciliation">
-          Check sent mail against sync targets — update statuses and learn from your edits.
+          Check sent mail against sync targets. Update statuses and learn from your edits.
         </Explainer>
         <button onClick={onClose} className="text-muted hover:text-body text-lg leading-none">×</button>
       </div>

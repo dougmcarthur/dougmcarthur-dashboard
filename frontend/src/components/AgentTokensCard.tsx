@@ -4,7 +4,7 @@ import { api, type AgentTokenSummary, type IssuedAgentToken } from '../api'
 import { withConfirmation } from '../confirmIdentity'
 import { Button } from './ui/Button'
 import { FIELD } from './ui/Field'
-import { relativeTime, shortDate } from '../format'
+import { shortDate, relativeTimeInline } from '../format'
 import { Explainer } from './ui/Explainer'
 import { Banner, Card } from './ui/Surface'
 import { useConfirm } from './ui/ConfirmModal'
@@ -196,7 +196,7 @@ function IssuedToken({ issued, onDone }: { issued: IssuedAgentToken; onDone: () 
       <p className="text-sm font-medium text-ink">Token for {issued.label}</p>
       <p className="text-xs text-body">
         This is the only time it is shown. It is stored hashed, so nothing here can print it
-        again — if it is lost, revoke it and issue another.
+        again. If it is lost, revoke it and issue another.
       </p>
       <code className="block text-xs bg-surface text-body rounded px-2 py-1.5 break-all">
         {issued.token}
@@ -246,7 +246,7 @@ function TokenRow({
           {token.revokedAt
             ? ` · revoked ${shortDate(token.revokedAt)}`
             : token.lastUsedAt
-              ? ` · last used ${relativeTime(token.lastUsedAt)}`
+              ? ` · last used ${relativeTimeInline(token.lastUsedAt)}`
               : ' · never used'}
         </p>
       </div>

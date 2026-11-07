@@ -58,7 +58,7 @@ export function FeedbackModal({ open, onClose }: { open: boolean; onClose: () =>
       {send.isSuccess ? (
         <div className="space-y-3">
           <p className="text-sm text-body">
-            Thanks — it arrived. If it needs an answer, you will hear back at the address on your
+            Thanks, it arrived. If it needs an answer, you will hear back at the address on your
             account.
           </p>
           <Button variant="neutral" onClick={onClose}>
@@ -116,7 +116,7 @@ export function FeedbackModal({ open, onClose }: { open: boolean; onClose: () =>
                 ))}
               </dl>
               <p className="mt-2 text-xs text-muted">
-                Nothing else — not what is on the page, and nothing about your gigs or drafts.
+                Nothing else: not what is on the page, and nothing about your gigs or drafts.
               </p>
             </details>
           )}

@@ -102,7 +102,7 @@ function Card({
       <div className="mt-2.5 space-y-1 text-xs">
         {reply.matchAmbiguous ? (
           <p className="text-warn-fg">
-            Two applications match this equally well — say which one.
+            Two applications match this equally well. Say which one.
           </p>
         ) : top ? (
           (() => {
@@ -138,7 +138,7 @@ function Card({
                 title={
                   <p className={tone}>
                     <span className="font-medium">{STRENGTH_LABELS[strength]}</span>
-                    {' — '}
+                    {': '}
                     {strengthNote(strength, top)}
                   </p>
                 }
@@ -167,7 +167,7 @@ function Card({
         <label className="flex min-w-0 max-w-full items-center gap-1.5 text-xs text-muted">
           About
           <Select filter className="min-w-0 max-w-full" value={chosen} disabled={busy} onChange={(e) => setChosen(e.target.value === '' ? '' : Number(e.target.value))}>
-            <option value="">— pick an application —</option>
+            <option value="">Pick an application</option>
             {gigs.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
@@ -178,7 +178,7 @@ function Card({
 
         {canApply && (
           <Button variant="primary" disabled={busy} onClick={() => onAccept(gigId!, proposed)}>
-            Yes — {move?.label.toLowerCase()}
+            Yes, {move?.label.toLowerCase()}
           </Button>
         )}
         <Button variant="good" disabled={busy || gigId === null} onClick={() => onAccept(gigId!, null)}>

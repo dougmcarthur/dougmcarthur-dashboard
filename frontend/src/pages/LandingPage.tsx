@@ -57,9 +57,6 @@ export function LandingPage({ onSignIn }: { onSignIn: () => void }) {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-16">
         <section className="space-y-5 max-w-3xl">
-          <p className="inline-flex items-center rounded-full border border-line-strong px-3 py-1 text-xs font-medium text-muted">
-            Invite-only, while we test it
-          </p>
           <h1 className="text-4xl sm:text-5xl font-semibold text-ink tracking-tight leading-tight">
             Sun Dogs Music Scout finds the gigs, grants and sync calls worth your time.
           </h1>
@@ -90,6 +87,7 @@ export function LandingPage({ onSignIn }: { onSignIn: () => void }) {
               See an example
             </a>
           </div>
+          <p className="text-sm text-muted">Invite-only while we test it.</p>
         </section>
 
         <section aria-labelledby="what" className="space-y-6">
@@ -175,6 +173,10 @@ function SamplePreview() {
   const listings = useQuery({ queryKey: ['public', 'opportunities'], queryFn: api.publicSite.opportunities })
   const rows = listings.data?.sample ?? []
   const asOf = listings.data?.asOf ?? ''
+  // A column no row has filled is a column of dashes. The sample is a few
+  // listings and most state no fee, so the column appears only when one does
+  // (the Gigs table does the same).
+  const showFee = rows.some((o) => o.feeAmount !== null)
 
   return (
     <section id="found" aria-labelledby="found-title" className="space-y-6 scroll-mt-6">
@@ -239,7 +241,7 @@ function SamplePreview() {
               <tr className="text-left text-xs text-muted border-b border-line">
                 <th scope="col" className="px-4 py-2 font-medium">Opportunity</th>
                 <th scope="col" className="px-3 py-2 font-medium">Category</th>
-                <th scope="col" className="px-3 py-2 font-medium">Fee</th>
+                {showFee && <th scope="col" className="px-3 py-2 font-medium">Fee</th>}
                 <th scope="col" className="px-4 py-2 font-medium text-right">Closes</th>
               </tr>
             </thead>
@@ -256,7 +258,7 @@ function SamplePreview() {
                     <td className="px-3 py-2.5 align-top">
                       <CategoryPill category={o.category} />
                     </td>
-                    <td className="px-3 py-2.5 align-top text-body whitespace-nowrap">{feeText(o)}</td>
+                    {showFee && <td className="px-3 py-2.5 align-top text-body whitespace-nowrap">{feeText(o)}</td>}
                     <td className={`px-4 py-2.5 align-top text-right ${closes.note ? 'text-xs text-muted' : 'text-body whitespace-nowrap'}`}>
                       <span className="inline-block max-w-[12rem] truncate align-top" title={closes.text}>
                         {closes.text}

@@ -223,7 +223,7 @@ function SyncDetail({ target, onEdit }: { target: SyncTarget; onEdit: () => void
             <DraftActions
               draft={{
                 to: target.contactEmail,
-                subject: `Sync licensing — ${target.name}`,
+                subject: `Sync licensing: ${target.name}`,
                 body: target.pitchDraft,
               }}
               note={
@@ -302,7 +302,7 @@ export function SyncPage() {
   if (error) {
     return (
       <Banner>
-        Failed to load sync targets — {(error as Error).message}
+        Failed to load sync targets: {(error as Error).message}
       </Banner>
     )
   }

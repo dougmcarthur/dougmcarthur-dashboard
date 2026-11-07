@@ -50,7 +50,7 @@ export function SourcePanel({ onDone }: { onDone: () => void }) {
       hint="Read them into the library rather than typing it twice."
       openLabel="Read the documents"
       title="From the reference documents"
-      subtitle="Nothing is written until you say so, and everything added lands as never reviewed — a document said it, you have not."
+      subtitle="Nothing is written until you say so, and everything added lands as never reviewed. A document said it, you have not."
       loading={preview.isLoading}
       error={apply.isError ? 'Could not add them. Nothing was written.' : null}
     >
@@ -105,7 +105,7 @@ export function SourcePanel({ onDone }: { onDone: () => void }) {
           <ul className="mt-1.5 space-y-0.5 pl-3">
             {data.skipped.map((s) => (
               <li key={s.heading}>
-                <span className="text-body">{s.heading}</span> — {s.reason}
+                <span className="text-body">{s.heading}</span>: {s.reason}
               </li>
             ))}
           </ul>

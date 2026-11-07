@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
-import { relativeTime } from '../format'
+import { relativeTimeInline } from '../format'
 import { Button } from './ui/Button'
 import { Disclosure } from './ui/Disclosure'
 import { Banner } from './ui/Surface'
@@ -59,7 +59,7 @@ export function SurveyPublish({
   const since = published && s?.preview ? s.preview.n - published.n : null
 
   const teaser = published
-    ? `Published ${relativeTime(published.publishedAt)}, from ${published.n} artists.`
+    ? `Published ${relativeTimeInline(published.publishedAt)}, from ${published.n} artists.`
     : 'Not published. The results page says the results have not been posted yet.'
   const hint = published?.outOfDate
     ? since && since > 0

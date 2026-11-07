@@ -64,17 +64,17 @@ export function GoogleConsentModal({
             <h3 className="text-xs font-semibold text-ink">Calendar, Tasks and Drive</h3>
             <ul className="space-y-1.5 text-xs text-body">
               <li>
-                <span className="font-medium text-ink">Calendar</span> — makes one calendar,
+                <span className="font-medium text-ink">Calendar</span>: makes one calendar,
                 called Sun Dogs Music Scout, for shows you have confirmed. It cannot see your other
                 calendars.
               </li>
               <li>
-                <span className="font-medium text-ink">Tasks</span> — adds deadlines and replies
+                <span className="font-medium text-ink">Tasks</span>: adds deadlines and replies
                 you owe to one task list. Google’s permission covers your other lists too; Scout
                 only uses its own.
               </li>
               <li>
-                <span className="font-medium text-ink">Drive</span> — one folder for your EPK, and
+                <span className="font-medium text-ink">Drive</span>: one folder for your EPK, and
                 files you pick for it. It cannot see anything else in your Drive.
               </li>
             </ul>
@@ -82,7 +82,7 @@ export function GoogleConsentModal({
         ) : null}
 
         <div className="space-y-2 rounded-lg border border-warn-line bg-warn-bg px-3.5 py-3">
-          <h3 className="text-xs font-semibold text-warn-fg">Gmail — optional, and worth reading first</h3>
+          <h3 className="text-xs font-semibold text-warn-fg">Gmail: optional, and worth reading first</h3>
           <dl className="space-y-2 text-xs text-body">
             <div>
               <dt className="font-medium text-ink">What it is for</dt>

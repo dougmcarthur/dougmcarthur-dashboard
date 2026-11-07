@@ -23,7 +23,7 @@ export function PublicEpkPage({ token }: { token: string }) {
 
   const name = data ? epkProfile(data.epk, data.name).name : null
   useEffect(() => {
-    if (name) document.title = `${name} — EPK`
+    if (name) document.title = `${name} · EPK`
   }, [name])
 
   if (isLoading) return <div className="min-h-screen bg-canvas" />

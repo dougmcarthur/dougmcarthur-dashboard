@@ -69,7 +69,7 @@ export function Detail({
     ...parsed.blockers.map((b) => ({ text: b })),
     ...parsed.draftedFields
       .filter((f) => f.needsArtist)
-      .map((f) => ({ text: f.label ? `${f.label} — ${f.value}` : f.value })),
+      .map((f) => ({ text: f.label ? `${f.label}: ${f.value}` : f.value })),
   ]
 
   // The submission note is often the same sentence the blocker parser already
@@ -126,7 +126,7 @@ export function Detail({
       // phase before migration 0010 there is no send date, so this counts from
       // the last time the row changed — which can only under-report. Saying so
       // is cheaper than a number you have to go and verify.
-      note: silence.exact ? null : 'Counted from the last change to the row — the send date was never recorded',
+      note: silence.exact ? null : 'Counted from the last change to the row, and the send date was never recorded',
       value: (
         <>
           {silence.exact ? '' : 'about '}
@@ -268,7 +268,7 @@ export function Detail({
 
       {item.snooze.wokenByChange && (
         <p className="mt-3 text-xs text-warn-fg leading-relaxed">
-          Snoozed until {shortDate(item.snooze.until!)}, but it changed afterwards — so it came
+          Snoozed until {shortDate(item.snooze.until!)}, but it changed afterwards, so it came
           back early rather than sitting on a decision made about different facts.
         </p>
       )}

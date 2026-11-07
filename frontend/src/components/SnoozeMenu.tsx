@@ -109,7 +109,7 @@ export function SnoozeMenu({
 
           {options.length === 0 && (
             <p className="px-3 py-2 text-xs text-muted leading-relaxed">
-              Nothing useful to defer to — this is due too soon for a snooze to
+              Nothing useful to defer to. This is due too soon for a snooze to
               bring it back in time.
             </p>
           )}

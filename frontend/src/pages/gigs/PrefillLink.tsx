@@ -36,7 +36,7 @@ export function PrefillLink({ formUrl, fields }: { formUrl: string | null; field
         ) : null}
         <p className="text-xs text-muted">
           {link.href
-            ? `${link.included.length} ${link.included.length === 1 ? 'answer goes' : 'answers go'} in. Check them on the form before you send it — nothing leaves from here.`
+            ? `${link.included.length} ${link.included.length === 1 ? 'answer goes' : 'answers go'} in. Check them on the form before you send it. Nothing leaves from here.`
             : 'Nothing can go in a pre-filled link yet.'}
         </p>
       </div>
@@ -45,14 +45,14 @@ export function PrefillLink({ formUrl, fields }: { formUrl: string | null; field
         <ul className="text-xs text-muted space-y-0.5">
           {link.skipped.map((s) => (
             <li key={s.label}>
-              <span className="text-body">{s.label}</span> — {SKIP_REASONS[s.reason]}
+              <span className="text-body">{s.label}</span>: {SKIP_REASONS[s.reason]}
             </li>
           ))}
         </ul>
       )}
 
       {link.href && (
-        <p className="text-xs text-faint">
+        <p className="text-xs text-muted">
           The answers travel in the link itself, so they end up in your browser history. Don&rsquo;t
           share the link.
         </p>

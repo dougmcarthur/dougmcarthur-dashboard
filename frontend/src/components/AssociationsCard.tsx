@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type AssociationIdentity, type AssociationSummary } from '../api'
 import { Button, buttonClass } from './ui/Button'
 import { FIELD } from './ui/Field'
-import { relativeTime } from '../format'
+import { relativeTimeInline } from '../format'
 import { Explainer } from './ui/Explainer'
 import { Card } from './ui/Surface'
 import { useConfirm } from './ui/ConfirmModal'
@@ -99,7 +99,7 @@ export function AssociationsCard() {
               <p className="text-sm text-body">
                 <span className="text-ink font-medium">{a.name}</span>
                 {a.profileName && <> · {a.profileName}</>}
-                {a.checkedAt && <span className="text-muted"> · read {relativeTime(a.checkedAt)}</span>}
+                {a.checkedAt && <span className="text-muted"> · read {relativeTimeInline(a.checkedAt)}</span>}
               </p>
               {a.status !== 'working' && a.statusNote && <p className="text-xs text-danger-fg">Last read failed: {a.statusNote}</p>}
               <div className="flex flex-wrap gap-2">
@@ -150,7 +150,7 @@ export function AssociationsCard() {
           {scan.data && (
             <p className="text-xs text-body">
               {scan.data.announced > 0
-                ? `${scan.data.announced} new — see the bell.`
+                ? `${scan.data.announced} new. See the bell.`
                 : scan.data.read > 0
                   ? 'Nothing new since the last read.'
                   : 'Could not read the profile just now; the reason is shown above.'}
@@ -197,7 +197,7 @@ export function AssociationsCard() {
               <ul className="mt-1.5 space-y-0.5 pl-3">
                 {directory.map((d) => (
                   <li key={d.id}>
-                    <span className="text-body">{d.name}</span> ({d.region}) —{' '}
+                    <span className="text-body">{d.name}</span> ({d.region}):{' '}
                     {d.profiles ? d.note ?? 'member profiles' : d.note ?? 'no public profiles'}
                   </li>
                 ))}

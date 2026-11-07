@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type ConnectorSummary } from '../api'
 import { Button } from './ui/Button'
 import { FIELD } from './ui/Field'
-import { relativeTime } from '../format'
+import { relativeTimeInline } from '../format'
 import { Explainer } from './ui/Explainer'
 import { Card } from './ui/Surface'
 import { useConfirm } from './ui/ConfirmModal'
@@ -99,7 +99,7 @@ export function BandsintownCard() {
         <div className="space-y-2">
           <p className="text-sm text-body">
             Reading shows for <span className="text-ink font-medium">{current.account}</span>
-            {current.checkedAt && <span className="text-muted"> · checked {relativeTime(current.checkedAt)}</span>}
+            {current.checkedAt && <span className="text-muted"> · checked {relativeTimeInline(current.checkedAt)}</span>}
           </p>
           {current.statusNote && current.status !== 'working' && (
             <p className={`text-xs ${current.status === 'rejected' ? 'text-danger-fg' : 'text-warn-fg'}`}>Bandsintown said: {current.statusNote}</p>

@@ -192,14 +192,14 @@ export function HelpPage() {
           <div id="workflow" className="pt-3 border-t border-line space-y-3">
             <h3 className="text-sm font-semibold text-ink">How an opportunity moves</h3>
             <p>
-              Every opportunity is in one of four stages. <strong>New</strong> — decide whether to
-              apply. <strong>In progress</strong> — you said yes and are preparing it.{' '}
-              <strong>Applied</strong> — it went out and you are waiting; if they ask for more, or make
-              an offer, it is flagged so the ball is visibly back with you. <strong>Closed</strong> —
+              Every opportunity is in one of four stages. <strong>New</strong>: decide whether to
+              apply. <strong>In progress</strong>: you said yes and are preparing it.{' '}
+              <strong>Applied</strong>: it went out and you are waiting; if they ask for more, or make
+              an offer, it is flagged so the ball is visibly back with you. <strong>Closed</strong>:
               accepted, not selected, passed, missed or withdrawn.
             </p>
             <p>
-              An offer is not a booking. Nothing reaches your calendar until it is accepted — a signed
+              An offer is not a booking. Nothing reaches your calendar until it is accepted: a signed
               contract, or a written confirmation for a grant.
             </p>
             <p>
@@ -217,16 +217,16 @@ export function HelpPage() {
           <div className="space-y-2">
             <h2 className="text-base font-semibold text-ink">Connecting Google</h2>
             <p>
-              One button in Settings connects Calendar, Tasks, Drive and — only if you choose —
+              One button in Settings connects Calendar, Tasks, Drive and, only if you choose,
               Gmail drafts. Scout explains each permission before Google asks, and you can connect
               without Gmail.
             </p>
             <ul className="list-disc pl-5 space-y-1 text-xs text-muted">
-              <li><strong>Calendar</strong> — Scout makes its own calendar and can only touch that one.</li>
-              <li><strong>Tasks</strong> — deadlines and replies you owe become tasks on one list.</li>
-              <li><strong>Drive</strong> — Scout sees only the folder it creates and files you pick.</li>
+              <li><strong>Calendar</strong>: Scout makes its own calendar and can only touch that one.</li>
+              <li><strong>Tasks</strong>: deadlines and replies you owe become tasks on one list.</li>
+              <li><strong>Drive</strong>: Scout sees only the folder it creates and files you pick.</li>
               <li>
-                <strong>Gmail</strong> — puts drafts in your drafts folder. Google&rsquo;s permission
+                <strong>Gmail</strong>: puts drafts in your drafts folder. Google&rsquo;s permission
                 would also allow sending; Scout has no code that sends.
               </li>
             </ul>
@@ -235,14 +235,14 @@ export function HelpPage() {
           <div className="pt-3 border-t border-line space-y-2">
             <h3 className="text-sm font-semibold text-ink">Signing in</h3>
             <p>
-              Scout uses passkeys — Touch ID, Face ID, your screen lock or a password manager — rather
+              Scout uses passkeys (Touch ID, Face ID, your screen lock or a password manager) rather
               than passwords. Add a second one on another device from Settings → Account, so losing a
               phone is not a problem.
             </p>
             <p>
               If you lose every passkey, the sign-in screen can email a setup code to the address on
               your account. The code only adds a new passkey; it is never a login on its own. A few
-              actions — adding or removing a passkey, issuing an agent token — ask for your passkey
+              actions (adding or removing a passkey, issuing an agent token) ask for your passkey
               again, because they change who can get into your account.
             </p>
           </div>

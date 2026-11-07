@@ -2,22 +2,45 @@ import { Layout } from './components/Layout'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useHashRoute } from './hooks/useHashRoute'
 import { useSession } from './hooks/useSession'
-import { AdminPage } from './pages/AdminPage'
 import { resolveAdminRoute } from './pages/admin/sections'
 import { resolveSettingsRoute } from './pages/settings/sections'
 import { useNarrow } from './hooks/useNarrow'
 import { OverviewPage } from './pages/OverviewPage'
-import { ReviewPage } from './pages/ReviewPage'
-import { GigsPage } from './pages/GigsPage'
-import { ArtistPage } from './pages/ArtistPage'
-import { SyncPage } from './pages/SyncPage'
-import { PromoDraftsPage } from './pages/PromoDraftsPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { HistoryPage } from './pages/HistoryPage'
-import { HelpPage } from './pages/HelpPage'
-import { useEffect } from 'react'
+import { SkeletonList } from './components/Skeleton'
+import { lazy, Suspense, useEffect, type ComponentType } from 'react'
 import { AccountAppearance } from './hooks/useAppearance'
 import { notePage } from './diagnostics'
+
+// Every page but the Overview is its own chunk. The Overview is where a
+// signed-in person lands, so it ships with the shell; the rest (admin and
+// Settings alone are most of the code) load when they are first opened. It
+// was one 950 kB script that every sign-in parsed before drawing anything.
+function lazyPage<K extends string, P extends object>(
+  load: () => Promise<Record<K, ComponentType<P>>>,
+  name: K,
+) {
+  return lazy(() => load().then((m) => ({ default: m[name] })))
+}
+
+const AdminPage = lazyPage(() => import('./pages/AdminPage'), 'AdminPage')
+const ReviewPage = lazyPage(() => import('./pages/ReviewPage'), 'ReviewPage')
+const GigsPage = lazyPage(() => import('./pages/GigsPage'), 'GigsPage')
+const ArtistPage = lazyPage(() => import('./pages/ArtistPage'), 'ArtistPage')
+const SyncPage = lazyPage(() => import('./pages/SyncPage'), 'SyncPage')
+const PromoDraftsPage = lazyPage(() => import('./pages/PromoDraftsPage'), 'PromoDraftsPage')
+const SettingsPage = lazyPage(() => import('./pages/SettingsPage'), 'SettingsPage')
+const HistoryPage = lazyPage(() => import('./pages/HistoryPage'), 'HistoryPage')
+const HelpPage = lazyPage(() => import('./pages/HelpPage'), 'HelpPage')
+
+/** What stands in for a page while its chunk arrives. */
+function PageLoading() {
+  return (
+    <div className="space-y-6 animate-pulse" aria-busy="true">
+      <div className="h-7 bg-sunken rounded w-40" />
+      <SkeletonList rows={4} />
+    </div>
+  )
+}
 
 export default function App() {
   const [page, navigate, arg] = useHashRoute('overview')
@@ -51,7 +74,9 @@ export default function App() {
         {/* Keyed by page, so one page that fails does not leave every other
             page in the sidebar showing the same error until a reload. */}
         <ErrorBoundary key={section ?? 'list'} label="Page error">
-          <AdminPage section={section} />
+          <Suspense fallback={<PageLoading />}>
+            <AdminPage section={section} />
+          </Suspense>
         </ErrorBoundary>
       </Layout>
     )
@@ -67,17 +92,19 @@ export default function App() {
     <Layout page={page === 'settings' && settingsSection ? `settings/${settingsSection}` : page} onNav={navigate}>
       <AccountAppearance />
       <ErrorBoundary key={routeKey} label="Page error">
-        {page === 'overview' && <OverviewPage onNav={navigate} />}
-        {page === 'review' && <ReviewPage initialFilter={arg} />}
-        {page === 'gigs' && <GigsPage initialOpen={arg} />}
-        {page === 'artist' && <ArtistPage initialTab={arg} />}
-        {page === 'shows' && <ArtistPage initialTab="checklists" />}
-        {page === 'epk' && <ArtistPage initialTab="profile" />}
-        {page === 'sync' && <SyncPage />}
-        {page === 'promo' && <PromoDraftsPage />}
-        {page === 'runs' && <HistoryPage key={arg ?? ''} initialKind={arg} onNav={navigate} />}
-        {page === 'settings' && <SettingsPage section={settingsSection} />}
-        {page === 'help' && <HelpPage />}
+        <Suspense fallback={<PageLoading />}>
+          {page === 'overview' && <OverviewPage onNav={navigate} />}
+          {page === 'review' && <ReviewPage initialFilter={arg} />}
+          {page === 'gigs' && <GigsPage initialOpen={arg} />}
+          {page === 'artist' && <ArtistPage initialTab={arg} />}
+          {page === 'shows' && <ArtistPage initialTab="checklists" />}
+          {page === 'epk' && <ArtistPage initialTab="profile" />}
+          {page === 'sync' && <SyncPage />}
+          {page === 'promo' && <PromoDraftsPage />}
+          {page === 'runs' && <HistoryPage key={arg ?? ''} initialKind={arg} onNav={navigate} />}
+          {page === 'settings' && <SettingsPage section={settingsSection} />}
+          {page === 'help' && <HelpPage />}
+        </Suspense>
       </ErrorBoundary>
     </Layout>
   )

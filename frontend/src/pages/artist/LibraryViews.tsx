@@ -163,7 +163,7 @@ function Entry({ asset, onOpen, children }: { asset: ArtistAssetWithHealth; onOp
       className="w-full text-left rounded-lg px-2 py-1.5 -mx-2 hover:bg-sunken transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
     >
       {children}
-      <span className="sr-only">{` — open ${asset.label}`}</span>
+      <span className="sr-only">{`: open ${asset.label}`}</span>
     </button>
   )
 }
@@ -378,7 +378,7 @@ export function ProfileView({
         <aside className="space-y-6 min-w-0" aria-label="Facts and documents">
           <ProfileSection title="Facts">
             {facts.length === 0 ? (
-              <p className="text-sm text-muted">No facts yet — hometown, line-up, set length.</p>
+              <p className="text-sm text-muted">No facts yet: hometown, line-up, set length.</p>
             ) : (
               <dl className="space-y-1">
                 {facts.map((f) => (
