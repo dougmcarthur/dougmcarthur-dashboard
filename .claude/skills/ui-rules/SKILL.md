@@ -100,9 +100,11 @@ it. The owner asked for this by name (it was a sentence in the admin-mode pill,
 and the sentence was most of the header), so apply it to anything new without
 being asked.
 
-One exception is decided but not built: a one-line hint under a page title on a
-first visit, dismissed once to collapse behind the icon for that account. Until
-that exists, apply the rule as written.
+One exception, built: a one-line hint under a main page's title on a first visit,
+dismissed once with *Got it* and then behind the icon, for that account. A page in the
+main navigation takes it with `<PageHeading page="…" title="…" />` and a line in
+`shared/pageHints.ts` (and the route's schema); anywhere else the rule applies as
+written.
 
 - **`Explainer`** (`components/ui/Explainer.tsx`) is the way. Its `title` is the
   heading or the label, its children are the note, and it draws the icon beside

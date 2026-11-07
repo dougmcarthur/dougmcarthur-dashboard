@@ -879,9 +879,14 @@ checklist for what `test/uiConsistency.test.ts` enforces.
   admin-mode pill carried a whole sentence. What stays visible is what a person needs in
   order to act: labels, counts, statuses, errors, and the line beside a button saying
   what pressing it will do. `showHints` hides every icon, so a note never holds the only
-  copy of a warning. A one-line hint under a page title on a first visit, dismissed once
-  to collapse behind the icon for that account, is decided but not built (see the last
-  section); until it is, nothing explanatory shows by default.
+  copy of a warning. The one exception is the first-visit line under a page's title
+  (`PageHeading`, `shared/pageHints.ts`): shown outright once, with a *Got it* button, then
+  the note behind the title's icon for good. Dismissal is kept per account
+  (`tenant_settings` `hints.dismissed`, `GET /api/page-hints` and `POST
+  /api/page-hints/dismiss`, refused to agent tokens), so a line put away on a phone stays
+  away on a laptop. Switching explanations off hides it as it hides every icon, and
+  nothing shows until the account's answer has arrived. Only the seven pages in the main
+  navigation have one. `test/pageHints.test.ts`.
 - **Buttons and inputs come from `components/ui/`.** `Button` takes a variant named for
   meaning (`primary`, `neutral`, `quiet`, `good`, `danger`, `info`); `Field` exports
   `FIELD` and `FILTER`; `SectionHeader`, `SidebarShell`, `Pager`/`PagedList`, `Toggle`
@@ -1064,5 +1069,4 @@ and not invented; questionnaire and method are in `docs/artist-survey-questionna
 - **No hiding survey factors** by who the respondent is, and **no model-matching per
   artist** without notice and consent (the privacy policy promises it; the plan is
   `docs/matching-gaps.md`).
-- **Decided, not built yet:** the first-visit hint described under Frontend conventions
-  (decided 2026-10-31). Top versus left navigation on a desktop is still open.
+- **Still open:** top versus left navigation on a desktop.

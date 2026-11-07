@@ -32,6 +32,7 @@ import admin from './routes/admin'
 import profile from './routes/profile'
 import onboarding from './routes/onboarding'
 import appearance from './routes/appearance'
+import pageHints from './routes/pageHints'
 import feedbackRoute from './routes/feedback'
 import stagePlotRoute from './routes/stagePlot'
 import documentReadings from './routes/documentReadings'
@@ -219,6 +220,7 @@ app.route('/api/agent-tokens', agentTokens)
 app.route('/api/profile', profile)
 app.route('/api/onboarding', onboarding)
 app.route('/api/appearance', appearance)
+app.route('/api/page-hints', pageHints)
 app.route('/api/feedback', feedbackRoute)
 app.route('/api/stage-plot', stagePlotRoute)
 app.route('/api/document-readings', documentReadings)

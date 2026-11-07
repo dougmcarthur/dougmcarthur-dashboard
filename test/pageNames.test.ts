@@ -14,6 +14,7 @@ import { pageLabel } from '../frontend/src/hooks/usePageAnnouncement'
 
 const PAGES: Array<[id: string, file: string]> = [
   ['overview', 'frontend/src/pages/OverviewPage.tsx'],
+  ['artist', 'frontend/src/pages/ArtistPage.tsx'],
   ['review', 'frontend/src/pages/ReviewPage.tsx'],
   ['gigs', 'frontend/src/pages/GigsPage.tsx'],
   ['sync', 'frontend/src/pages/SyncPage.tsx'],
@@ -26,14 +27,12 @@ describe('page headings match the navigation', () => {
   for (const [id, file] of PAGES) {
     it(`${id} is headed with the name the tab and the navigation use`, () => {
       const src = readFileSync(file, 'utf8')
-      const heading = src.match(/<PageTitle>([^<]+)<\/PageTitle>/)?.[1] ?? src.match(/<Explainer as="h1" title="([^"]+)"/)?.[1]
+      // A page with a first-visit line is a `PageHeading`; Help has none.
+      const heading =
+        src.match(/<PageHeading page="[a-z]+" title="([^"]+)"/)?.[1] ?? src.match(/<PageTitle>([^<]+)<\/PageTitle>/)?.[1]
       expect(heading, file).toBe(pageLabel(id))
     })
   }
-
-  it('is the same on the Artist page, which draws its heading through an Explainer', () => {
-    expect(readFileSync('frontend/src/pages/ArtistPage.tsx', 'utf8')).toContain(`<Explainer as="h1" title="${pageLabel('artist')}"`)
-  })
 
   it('has the phone\'s tab bar and the laptop\'s header saying the same words', () => {
     const layout = readFileSync('frontend/src/components/Layout.tsx', 'utf8')

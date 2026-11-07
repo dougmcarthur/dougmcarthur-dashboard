@@ -200,7 +200,9 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
   const toggleTheme = () => set({ theme: resolved === 'dark' ? 'light' : 'dark' })
 
   const linkClass = (id: string, mobile = false) =>
-    `px-3.5 ${mobile ? 'py-2 max-md:py-3' : 'py-1.5'} rounded-md text-sm font-medium transition-colors ${
+    // The header's links are tighter below 1024px: at 768px the brand, six links and four
+    // icons are 55px more than the row, and the icons wrapped onto a second line.
+    `px-3.5 ${mobile ? 'py-2 max-md:py-3' : 'py-1.5 max-lg:px-2'} rounded-md text-sm font-medium transition-colors ${
       here === id ? 'bg-raised text-ink shadow-inset' : 'text-muted hover:text-ink hover:bg-sunken'
     }`
 

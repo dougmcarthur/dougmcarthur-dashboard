@@ -13,7 +13,8 @@ import { CheckAllTerms, TermsChip, TermsPanel, mayPitch } from '../components/Sy
 import { termsState } from '../../../shared/syncTerms'
 import { useSession } from '../hooks/useSession'
 import { Banner, Card, EmptyState } from '../components/ui/Surface'
-import { Caption, Label, PageTitle } from '../components/ui/Surface'
+import { Caption, Label } from '../components/ui/Surface'
+import { PageHeading } from '../components/PageHeading'
 import { useConfirm } from '../components/ui/ConfirmModal'
 
 const SYNC_STATUSES: SyncStatus[] = ['draft_ready', 'pitched', 'confirmed', 'declined', 'archived']
@@ -312,7 +313,7 @@ export function SyncPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageTitle>Sync</PageTitle>
+        <PageHeading page="sync" title="Sync" />
         <div className="flex flex-wrap gap-2 items-center">
           <Select
             filter

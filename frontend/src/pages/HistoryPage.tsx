@@ -15,9 +15,9 @@ import { clockTime, dayHeading, localDay, localToday, relativeTimeInline } from 
 import { FilterChip, Icon, KindIcon } from '../components/notificationParts'
 import { StatusBadge } from '../components/StatusBadge'
 import { SkeletonList } from '../components/Skeleton'
-import { Explainer } from '../components/ui/Explainer'
+import { PageHeading } from '../components/PageHeading'
 import { Button } from '../components/ui/Button'
-import { Banner, Card, EmptyState, PAGE_TITLE } from '../components/ui/Surface'
+import { Banner, Card, EmptyState } from '../components/ui/Surface'
 
 /**
  * History: the bell, expanded.
@@ -293,10 +293,8 @@ export function HistoryPage({
   return (
     <div className="max-w-3xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
-        {/* What the page is for sits behind the info button, as everywhere else. */}
-        <Explainer as="h1" title="History" titleClassName={PAGE_TITLE}>
-          Everything the app did or noticed, newest first.
-        </Explainer>
+        {/* What the page is for: the first-visit line, then the info button. */}
+        <PageHeading page="runs" title="History" />
         <Button
           variant="neutral"
           disabled={unread === 0 || markRead.isPending}

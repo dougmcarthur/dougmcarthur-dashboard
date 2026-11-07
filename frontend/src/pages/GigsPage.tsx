@@ -25,7 +25,8 @@ import { Button } from '../components/ui/Button'
 import { CreateGigForm } from './gigs/CreateGigForm'
 import { EditGigPanel } from './gigs/EditGigPanel'
 import { GigDetail } from './gigs/GigDetail'
-import { Banner, CAPTION_CLASS, Card, PageTitle } from '../components/ui/Surface'
+import { Banner, CAPTION_CLASS, Card } from '../components/ui/Surface'
+import { PageHeading } from '../components/PageHeading'
 import { useConfirm } from '../components/ui/ConfirmModal'
 
 // The pipeline order, from shared/gigStatus.ts, so the picker and the Worker
@@ -370,7 +371,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageTitle>Gigs</PageTitle>
+        <PageHeading page="gigs" title="Gigs" />
         <div className="flex flex-wrap gap-2 items-center">
           <Select
             filter
