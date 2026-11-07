@@ -89,7 +89,7 @@ export function InfoToggle({
       // `-bg-hover` twin to change.
       className={`shrink-0 rounded-full transition-colors hover:text-body
                   focus:outline-none focus:ring-2 focus:ring-accent
-                  p-1.5 -m-1.5
+                  p-1.5 -m-1.5 max-md:p-[15px] max-md:-m-[15px]
                   ${open ? 'text-body' : 'text-faint'} ${className}`}
     >
       <InfoGlyph />

@@ -236,7 +236,7 @@ export function ProfileView({
                   type="button"
                   onClick={() => onOpen(a)}
                   title={firstLine(a.value)}
-                  className="min-w-0 max-w-full truncate hover:text-ink transition-colors text-left"
+                  className="min-w-0 max-w-full truncate hover:text-ink transition-colors text-left max-md:py-3 max-md:-my-3"
                 >
                   {firstLine(a.value)}
                 </button>
@@ -250,7 +250,7 @@ export function ProfileView({
                   key={l.id}
                   type="button"
                   onClick={() => onOpen(l)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-line-strong px-3 py-1 text-xs text-body hover:bg-sunken hover:text-ink transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line-strong px-3 py-1 max-md:min-h-11 text-xs text-body hover:bg-sunken hover:text-ink transition-colors"
                 >
                   <Mark asset={l} />
                   {l.label}
@@ -284,7 +284,7 @@ export function ProfileView({
                         key={b.id}
                         type="button"
                         onClick={() => onOpen(b)}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-xs text-muted hover:text-ink hover:bg-sunken transition-colors"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 max-md:min-h-11 text-xs text-muted hover:text-ink hover:bg-sunken transition-colors"
                       >
                         <Mark asset={b} />
                         {b.label}

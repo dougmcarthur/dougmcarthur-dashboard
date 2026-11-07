@@ -120,7 +120,7 @@ describe('the pinned panel', () => {
   })
 
   it('sits beside the page rather than over it, and the page may shrink', () => {
-    expect(layout).toMatch(/className="shell min-w-0/)
+    expect(layout).toMatch(/className={?`?"?shell min-w-0/)
     expect(dock).toContain('sticky')
   })
 
