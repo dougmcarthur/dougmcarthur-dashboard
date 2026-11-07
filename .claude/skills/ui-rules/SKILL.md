@@ -63,6 +63,12 @@ page with `lazyPage(() => import('./pages/X'), 'X')`, never a static import
 (`test/chunkReload.test.ts` fails on one). A failed chunk load after a deploy
 reloads once through `reloadForStaleChunk`.
 
+**A table that cannot fit a phone becomes a list, not a sideways scroll.** Gigs is the
+model: `usePhone()` (under 768px, decided in script so one layout mounts), cards that
+put the stage first, cells shared with the table, 44px controls (`size="lg"` and
+`min-h-11`), and no `.row-actions` on a phone, since that class hides its buttons until
+hover. Look at it at 375px and measure `document.documentElement.scrollWidth`.
+
 ## No em dash in anything a screen says
 
 A string, a template or JSX text under `frontend/src` carries none

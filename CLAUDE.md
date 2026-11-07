@@ -919,6 +919,15 @@ checklist for what `test/uiConsistency.test.ts` enforces.
   `reloadForStaleChunk` (`frontend/src/chunkReload.ts`) reloads once, not offline and not
   twice within 30 seconds, so a chunk that is truly gone shows the error instead of
   looping. `test/chunkReload.test.ts` pins the split and the rule.
+- **Gigs is a table from 768px and a list of cards below it.** A row exists to show its
+  stage, and a table twice the width of a phone puts the stage and the buttons off the
+  edge. `usePhone` (`max-width: 767.98px`) decides in script so only one layout mounts
+  (both mounted would hold every open panel twice). The two share `DeadlineCell`,
+  `FeeCell`, `GigActions` and the open panel, so a recovered date keeps its prose and
+  the next step comes from `inlineGigMoves` in either. On a phone the stage is on every
+  card, controls are 44px, the next step is always visible (`.row-actions` hides it
+  until hover, and a phone has none) and a Sort control stands in for the column
+  headers. `test/gigsPhone.test.ts`.
 - **A `Label` ties itself to the control after it** (the next sibling, or the first
   control inside it), so a form label names its input without an `htmlFor` at each call
   site; pass `htmlFor` when the control is elsewhere. It is a DOM effect, so
