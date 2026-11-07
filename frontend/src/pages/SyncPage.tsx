@@ -312,7 +312,7 @@ export function SyncPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageTitle>Sync Targets</PageTitle>
+        <PageTitle>Sync</PageTitle>
         <div className="flex flex-wrap gap-2 items-center">
           <Select
             filter

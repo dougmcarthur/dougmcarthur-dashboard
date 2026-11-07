@@ -83,7 +83,7 @@ export function PromoDraftsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <PageTitle>Promo Drafts</PageTitle>
+        <PageTitle>Promo</PageTitle>
         <div className="flex items-center gap-2">
           {statuses.length > 1 && (
             <select
