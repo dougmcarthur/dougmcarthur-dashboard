@@ -48,12 +48,12 @@ export interface PrefillField {
 export type SkipReason = 'unread' | 'over_length' | 'upload' | 'not_an_option' | 'not_a_date' | 'too_long_for_link' | 'no_field_id'
 
 export const SKIP_REASONS: Record<SkipReason, string> = {
-  unread: 'a suggestion nobody has read — approve it to include it',
+  unread: 'a suggestion nobody has read, so approve it to include it',
   over_length: 'longer than the form allows',
-  upload: 'a file — attach it on the form',
+  upload: 'a file, so attach it on the form',
   not_an_option: 'not one of the choices the form offers',
   not_a_date: 'not a date the form can take',
-  too_long_for_link: 'would make the link too long — paste this one',
+  too_long_for_link: 'would make the link too long, so paste this one',
   no_field_id: 'the form did not give this question an id',
 }
 

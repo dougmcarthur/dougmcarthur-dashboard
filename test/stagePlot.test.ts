@@ -30,8 +30,8 @@ describe('inputList', () => {
   it('patches drums first and vocals last, as a console is laid out', () => {
     const lines = inputList(band())
     expect(lines[0].label).toBe('Kick')
-    expect(lines.at(-1)?.label).toBe('BV — Jen')
-    expect(lines.at(-2)?.label).toBe('Lead vox — Sam')
+    expect(lines.at(-1)?.label).toBe('BV: Jen')
+    expect(lines.at(-2)?.label).toBe('Lead vox: Sam')
   })
 
   it('gives a stereo source two channels', () => {
@@ -54,7 +54,7 @@ describe('inputList', () => {
   it('names somebody nobody named, rather than leaving a blank on the strip', () => {
     const plot = emptyPlot('duo', 2, '')
     plot.performers[1].vocals = 'backing'
-    expect(inputList(plot).map((l) => l.label)).toContain('BV — Performer 2')
+    expect(inputList(plot).map((l) => l.label)).toContain('BV: Performer 2')
   })
 })
 

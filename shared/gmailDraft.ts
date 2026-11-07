@@ -101,7 +101,7 @@ export interface DraftPlan {
 
 /** The subject a pitch goes out under, in one place so the plan and the write agree. */
 export function subjectFor(name: string): string {
-  return `Sync licensing — ${name}`
+  return `Sync licensing: ${name}`
 }
 
 /**

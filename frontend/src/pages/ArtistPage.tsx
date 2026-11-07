@@ -20,8 +20,8 @@ import { DriveImportPanel } from './artist/DriveImportPanel'
 import { LibraryStarter } from './artist/LibraryStarter'
 import { SourcePanel } from './artist/SourcePanel'
 import { AssociationPanels } from './artist/AssociationPanel'
-import { Explainer } from '../components/ui/Explainer'
-import { Caption, Card, PAGE_TITLE } from '../components/ui/Surface'
+import { Caption, Card } from '../components/ui/Surface'
+import { PageHeading } from '../components/PageHeading'
 import { Modal } from '../components/ui/Modal'
 import { StagePlotTab } from './artist/StagePlotTab'
 import {
@@ -142,9 +142,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
-          <Explainer as="h1" title="Artist" titleClassName={PAGE_TITLE}>
-            Everything a programmer could ask for, so no application starts from a blank page.
-          </Explainer>
+          <PageHeading page="artist" title="Artist" />
         </div>
         <div className="flex items-center gap-2">
           <select

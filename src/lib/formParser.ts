@@ -490,7 +490,7 @@ export function parseHtmlForm(html: string, url: string): ParsedForm {
       title,
       source: 'html',
       loginRequired: false,
-      blockedReason: `${host} renders its form with JavaScript — the fields aren’t in the page source.`,
+      blockedReason: `${host} renders its form with JavaScript, so the fields aren’t in the page source.`,
       blockedKind: 'javascript',
       fields: [],
     }
@@ -600,7 +600,7 @@ export function parseHtmlForm(html: string, url: string): ParsedForm {
       title,
       source: 'html',
       loginRequired: false,
-      blockedReason: `${NO_FORM_NOTE} — the application may open later, be a PDF, or be submitted by email.`,
+      blockedReason: `${NO_FORM_NOTE} The application may open later, be a PDF, or be submitted by email.`,
       blockedKind: 'no-fields',
       fields: [],
     }

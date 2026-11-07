@@ -173,7 +173,7 @@ export function assetHealth(asset: ArtistAsset, today: string): AssetHealth {
  */
 function missingPiece(asset: ArtistAsset): string | null {
   const meta = assetKindMeta(asset.kind)
-  if (!asset.value) return 'No value — this is an empty entry.'
+  if (!asset.value) return 'No value. This is an empty entry.'
   if (meta.needsCredit && !asset.credit) return 'No photographer credit, which most press use requires.'
   if (meta.isLink && !/^https?:\/\//i.test(asset.value)) return 'Not a usable link.'
   return null

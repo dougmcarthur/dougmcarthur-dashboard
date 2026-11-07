@@ -1,4 +1,5 @@
 import type { CredentialHealth } from '../../shared/credentialHealth'
+import type { HintPage } from '../../shared/pageHints'
 import type { FeedbackContext, FeedbackKind } from '../../shared/feedback'
 import type { GenreId, GoalId, Goals, OnboardingStep, Profile, ReachId, RegionId } from '../../shared/onboarding'
 import type { StagePlot } from '../../shared/stagePlot'
@@ -1171,6 +1172,12 @@ export const api = {
     read: () => apiFetch<{ palette: PaletteId | null }>('/appearance'),
     save: (palette: PaletteId | null) =>
       apiFetch<{ palette: PaletteId | null }>('/appearance', { method: 'PUT', body: JSON.stringify({ palette }) }),
+  },
+  /** Which pages' first-visit lines this account has put away. */
+  pageHints: {
+    read: () => apiFetch<{ dismissed: HintPage[] }>('/page-hints'),
+    dismiss: (page: HintPage) =>
+      apiFetch<{ dismissed: HintPage[] }>('/page-hints/dismiss', { method: 'POST', body: JSON.stringify({ page }) }),
   },
   /** What to call this artist. One field, set by them, read by oversight. */
   onboarding: {

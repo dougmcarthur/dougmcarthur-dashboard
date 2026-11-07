@@ -77,7 +77,7 @@ export function setupCodeEmail(input: {
   return renderEmail(
     {
       subject: 'Your passkey setup code',
-      preheader: `Expires in ${ttlMinutes} minutes. Don't share it — whoever enters it can add a passkey.`,
+      preheader: `Expires in ${ttlMinutes} minutes. Don't share it. Whoever enters it can add a passkey.`,
       heading: 'Your passkey setup code',
       body,
       text,

@@ -7,7 +7,8 @@ import { SkeletonList } from '../components/Skeleton'
 import { FILTER } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 import { CopyButton } from '../components/CopyButton'
-import { Banner, Card, EmptyState, PageTitle } from '../components/ui/Surface'
+import { Banner, Card, EmptyState } from '../components/ui/Surface'
+import { PageHeading } from '../components/PageHeading'
 import { useConfirm } from '../components/ui/ConfirmModal'
 
 /** "2026-09" is a key, not a label. */
@@ -83,7 +84,7 @@ export function PromoDraftsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <PageTitle>Promo Drafts</PageTitle>
+        <PageHeading page="promo" title="Promo" />
         <div className="flex items-center gap-2">
           {statuses.length > 1 && (
             <select

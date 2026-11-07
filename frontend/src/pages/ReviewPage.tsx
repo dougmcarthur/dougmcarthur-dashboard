@@ -6,7 +6,8 @@ import type { ReviewFilter } from '../../../shared/reviewQueue'
 import { QueueRow } from './review/QueueRow'
 import { Detail } from './review/Detail'
 import { ReplyInbox } from '../components/ReplyInbox'
-import { Banner, PageTitle } from '../components/ui/Surface'
+import { Banner } from '../components/ui/Surface'
+import { PageHeading } from '../components/PageHeading'
 import { Select } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 
@@ -234,7 +235,7 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
   return (
     <div className="space-y-4">
       <div className="flex items-baseline justify-between gap-4">
-        <PageTitle>Review</PageTitle>
+        <PageHeading page="review" title="Review" />
         <p className="text-xs text-muted">
           {/* Snoozed items are excluded from `all`, so "n of all" would count
               the shown item against a total it is not part of. */}

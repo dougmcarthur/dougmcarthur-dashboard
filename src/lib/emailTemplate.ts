@@ -48,7 +48,7 @@ export const PRODUCT_NAME = 'Sun Dogs Music Scout'
 export const HOUSE_MARK = 'Sun Dogs Music'
 
 export function subjectLine(subject: string): string {
-  return `${PRODUCT_NAME} — ${subject}`
+  return `${PRODUCT_NAME}: ${subject}`
 }
 
 export const escapeHtml = (s: string) =>

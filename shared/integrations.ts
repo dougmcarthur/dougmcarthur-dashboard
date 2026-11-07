@@ -85,7 +85,7 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       'Add, change and remove events on that one calendar.',
     ],
     cannot: [
-      'Read the rest of your calendar — Google does not give it the permission, so this holds even if the code is wrong.',
+      'Read the rest of your calendar. Google does not give it the permission, so this holds even if the code is wrong.',
       'Touch an event it did not create.',
     ],
     breaks: 'Booked shows go nowhere near your calendar.',
@@ -99,7 +99,7 @@ export const INTEGRATIONS: IntegrationSpec[] = [
     // nothing about which of the artist's calendars Scout touches, and the
     // screen has to say that before the consent rather than after it.
     access: [
-      'See, create, change and delete events on every calendar you own — not only the ones Scout made.',
+      'See, create, change and delete events on every calendar you own. Not only the ones Scout made.',
       'Write Scout entries into your main calendar, which is the reason to turn it on.',
     ],
     // Deliberately empty. There is no guarantee to make here, and inventing a
@@ -123,7 +123,7 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       // The `gmail.compose` disclosure again, because it is the same trade.
       // Google offers read-only or everything and nothing in between, so the
       // limit above is kept by this code rather than by the permission.
-      'Read and change every other task list you have — Google includes that in the same permission. Scout never does: it only ever names the one list it made.',
+      'Read and change every other task list you have. Google includes that in the same permission. Scout never does: it only ever names the one list it made.',
     ],
     cannot: [],
     breaks: 'Deadlines and replies you owe are only visible inside Scout.',
@@ -139,7 +139,7 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       // for creating a draft also permits sending, so the limit here is this
       // code rather than the permission — and a permission that protects less
       // than the reader assumes is the thing to write down.
-      'Send mail — Google includes that in the same permission. Scout never does: there is no send call in it, and a test fails if a Send button ever appears.',
+      'Send mail. Google includes that in the same permission. Scout never does: there is no send call in it, and a test fails if a Send button ever appears.',
     ],
     cannot: [],
     breaks: 'Pitches have to be copied into a compose window by hand.',
@@ -154,7 +154,7 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       'Open files you pick for it in Google’s own file picker, and copy them into that folder.',
     ],
     cannot: [
-      'See anything else in your Drive — Google does not give it the permission, so this holds even if the code is wrong.',
+      'See anything else in your Drive. Google does not give it the permission, so this holds even if the code is wrong.',
     ],
     breaks: 'EPK files have to be attached by hand each time somebody asks.',
   },
@@ -164,7 +164,7 @@ export const INTEGRATIONS: IntegrationSpec[] = [
     purpose: 'Reads replies from organisers so they can be matched to the right gig.',
     kind: 'secret',
     access: ['Read mail in the mailbox the server credential belongs to.'],
-    cannot: ['Send, delete or change anything — the credential is read-only.'],
+    cannot: ['Send, delete or change anything. The credential is read-only.'],
     breaks: 'Organiser replies are never noticed, and sent pitches are never reconciled.',
     ownerOnly: true,
   },
@@ -177,8 +177,8 @@ export const INTEGRATIONS: IntegrationSpec[] = [
       'Send the digest to the owner, a setup code to an address already on an account, and an invitation to the address it was issued to.',
     ],
     cannot: [
-      'Mail anybody else — every send is checked against the addresses on file before it goes. That check is in this code, so it is tested rather than guaranteed by Cloudflare.',
-      'Send from any address but the two it is configured with — that limit is enforced by Cloudflare.',
+      'Mail anybody else. Every send is checked against the addresses on file before it goes. That check is in this code, so it is tested rather than guaranteed by Cloudflare.',
+      'Send from any address but the two it is configured with. That limit is enforced by Cloudflare.',
     ],
     breaks: 'No digest, and no way back in if you lose every passkey.',
     ownerOnly: true,
@@ -299,7 +299,7 @@ export function connectNotice(query: URLSearchParams): ConnectNotice | null {
       case 'state_mismatch':
         return {
           tone: 'warn',
-          lines: ['That connection expired or was started in another tab. Nothing was connected — try again.'],
+          lines: ['That connection expired or was started in another tab. Nothing was connected. Try again.'],
         }
       case 'failed':
         return {

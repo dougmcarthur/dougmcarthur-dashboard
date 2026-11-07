@@ -327,8 +327,8 @@ describe('the submission email', () => {
     const draft = composeApplicationEmail({ gig, assets: [library[0]] })
     expect(draft.missing).toContain('Artist bio')
     expect(draft.missing).toContain('One-line description')
-    expect(draft.body).toContain('[bio — nothing on file]')
-    expect(draft.gaps.map((g) => g.marker)).toContain('[contact details — nothing on file]')
+    expect(draft.body).toContain('[bio: nothing on file]')
+    expect(draft.gaps.map((g) => g.marker)).toContain('[contact details: nothing on file]')
   })
 
   it('lower-cases a one-liner into the sentence, but not an acronym', () => {

@@ -225,7 +225,7 @@ auth.post('/login/verify', zValidator('json', assertion), async (c) => {
 
   const body = c.req.valid('json')
   const expected = await consumeChallenge(c.env, { id: body.ceremony, purpose: 'authentication' })
-  if (!expected) return c.json({ error: 'this sign-in expired — try again' }, 400)
+  if (!expected) return c.json({ error: 'this sign-in expired, try again' }, 400)
 
   const response = body.response as unknown as AuthenticationResponseJSON
   const db = getDb(c.env.DB)
@@ -403,7 +403,7 @@ auth.post('/join/verify', zValidator('json', joinAttestation), async (c) => {
   if (found.state !== 'valid') return c.json({ error: INVITE_REFUSALS[found.state] }, 410)
 
   const expected = await consumeChallenge(c.env, { id: body.ceremony, purpose: 'registration' })
-  if (!expected) return c.json({ error: 'this setup expired — start again' }, 400)
+  if (!expected) return c.json({ error: 'this setup expired, start again' }, 400)
 
   let verification
   try {
@@ -572,7 +572,7 @@ auth.post('/elevate/verify', zValidator('json', assertion), async (c) => {
 
   const body = c.req.valid('json')
   const expected = await consumeChallenge(c.env, { id: body.ceremony, purpose: 'elevation' })
-  if (!expected) return c.json({ error: 'that took too long — try again' }, 400)
+  if (!expected) return c.json({ error: 'that took too long, try again' }, 400)
 
   const response = body.response as unknown as AuthenticationResponseJSON
   const db = getDb(c.env.DB)
@@ -598,9 +598,9 @@ auth.post('/elevate/verify', zValidator('json', assertion), async (c) => {
       },
     })
   } catch {
-    return c.json({ error: 'that did not check out — try again' }, 401)
+    return c.json({ error: 'that did not check out, try again' }, 401)
   }
-  if (!verification.verified) return c.json({ error: 'that did not check out — try again' }, 401)
+  if (!verification.verified) return c.json({ error: 'that did not check out, try again' }, 401)
 
   const now = new Date()
   await elevateSession(c.env, session.id, now)
@@ -746,7 +746,7 @@ auth.post('/register/verify', zValidator('json', attestation), async (c) => {
   }
 
   const expected = await consumeChallenge(c.env, { id: body.ceremony, purpose: 'registration' })
-  if (!expected) return c.json({ error: 'this setup expired — start again' }, 400)
+  if (!expected) return c.json({ error: 'this setup expired, start again' }, 400)
 
   let verification
   try {
@@ -901,10 +901,10 @@ async function authoriseEnrolment(
 
   switch (check.reason) {
     case 'locked':
-      return { ok: false, error: 'too many wrong codes — request a new one', status: 429 }
+      return { ok: false, error: 'too many wrong codes, request a new one', status: 429 }
     case 'expired':
     case 'none':
-      return { ok: false, error: 'that code has expired — request a new one', status: 403 }
+      return { ok: false, error: 'that code has expired, request a new one', status: 403 }
     case 'used':
       return { ok: false, error: 'that code has already been used', status: 403 }
     default:

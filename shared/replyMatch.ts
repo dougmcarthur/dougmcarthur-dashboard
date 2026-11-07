@@ -170,7 +170,7 @@ function rarityNote(name: NameMatch): string {
   const band = name.rarity?.band
   const where = name.where
   if (band === 'everywhere' || band === 'common') {
-    return `"${name.matched}" in the ${where} — a word that appears all over this mailbox.`
+    return `"${name.matched}" in the ${where}, a word that appears all over this mailbox.`
   }
   if (band === 'uncommon') return `"${name.matched}" in the ${where}, which is fairly distinctive.`
   if (band === 'rare') return `"${name.matched}" in the ${where}, which is rare in this mailbox.`

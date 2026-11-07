@@ -59,7 +59,7 @@ const RequestSchema = z.object({
 
 site.post('/invite-requests', zValidator('json', RequestSchema), async (c) => {
   const body = c.req.valid('json')
-  const accepted = { ok: true, message: 'Thanks — your request is in. We’ll reply by email.' }
+  const accepted = { ok: true, message: 'Thanks, your request is in. We’ll reply by email.' }
 
   // A bot gets the same answer as a person, so it learns nothing to adapt to.
   if (body.website) return c.json(accepted)
@@ -87,7 +87,7 @@ site.post('/invite-requests', zValidator('json', RequestSchema), async (c) => {
       .get(),
   ])
   if ((mine?.n ?? 0) >= INVITE_REQUEST_LIMITS.perSenderPerDay) {
-    return c.json({ error: 'We already have your request — we’ll be in touch.' }, 429)
+    return c.json({ error: 'We already have your request. We’ll be in touch.' }, 429)
   }
   if ((everyone?.n ?? 0) >= INVITE_REQUEST_LIMITS.perDay) {
     return c.json({ error: 'We’ve had a lot of requests today. Please try again tomorrow.' }, 429)

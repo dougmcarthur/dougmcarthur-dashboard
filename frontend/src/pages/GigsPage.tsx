@@ -11,7 +11,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { api, type GigOpportunity, type GigStatus } from '../api'
-import { usePhone } from '../hooks/usePhone'
+import { useNarrow } from '../hooks/useNarrow'
 import { humanise } from '../../../shared/humanise'
 import { GIG_STAGES, GIG_STAGE_META, type GigStage } from '../../../shared/gigStage'
 import { inlineGigMoves } from '../../../shared/decisionCopy'
@@ -25,7 +25,8 @@ import { Button } from '../components/ui/Button'
 import { CreateGigForm } from './gigs/CreateGigForm'
 import { EditGigPanel } from './gigs/EditGigPanel'
 import { GigDetail } from './gigs/GigDetail'
-import { Banner, CAPTION_CLASS, Card, PageTitle } from '../components/ui/Surface'
+import { Banner, CAPTION_CLASS, Card } from '../components/ui/Surface'
+import { PageHeading } from '../components/PageHeading'
 import { useConfirm } from '../components/ui/ConfirmModal'
 
 // The pipeline order, from shared/gigStatus.ts, so the picker and the Worker
@@ -33,8 +34,8 @@ import { useConfirm } from '../components/ui/ConfirmModal'
 
 const col = createColumnHelper<GigOpportunity>()
 
-/** The columns the phone's sort control offers; the table sorts by any header. */
-const PHONE_SORTS = ['name', 'deadline']
+/** The columns the list's sort control offers; the table sorts by any header. */
+const LIST_SORTS = ['name', 'deadline']
 
 const TYPE_COLORS: Record<string, string> = {
   festival: 'bg-cat-violet-bg text-cat-violet-fg',
@@ -66,13 +67,13 @@ function FitScore({ score }: { score: number | null }) {
   )
 }
 
-// ── Cells, shared by the table and the phone list ─────────────────────────────
+// ── Cells, shared by the table and the list ──────────────────────────────────
 //
 // One renderer each, so the two layouts cannot say different things about the
-// same gig: a phone list that wrote its own deadline would be the place a
+// same gig: a list that wrote its own deadline would be the place a
 // recovered date lost its prose.
 
-/** The deadline as the table shows it, and as a phone card does. */
+/** The deadline as the table shows it, and as a card does. */
 function DeadlineCell({ gig, today }: { gig: GigOpportunity; today: string }) {
   // Most rows hold prose here, not a date — "None — rolling artist roster
   // intake" — and a Date built from prose is Invalid Date, whose
@@ -149,20 +150,20 @@ function GigActions({
   gig,
   disabled,
   onMove,
-  phone = false,
+  card = false,
 }: {
   gig: GigOpportunity
   disabled: boolean
   onMove: (to: GigStatus) => void
-  phone?: boolean
+  card?: boolean
 }) {
   return (
-    // On a phone there is no hover to reveal them, and a list that hid its
+    // A touch screen has no hover to reveal them, and a list that hid its
     // buttons until a pointer arrived would show a narrow desktop window none.
-    <div className={phone ? 'flex gap-2 whitespace-nowrap' : 'row-actions flex gap-1 justify-end whitespace-nowrap'}>
+    <div className={card ? 'flex gap-2 whitespace-nowrap' : 'row-actions flex gap-1 justify-end whitespace-nowrap'}>
       {inlineGigMoves(gig.status, gig.type).map(({ to, tone, label, meaning }) => (
-        <Button key={to} variant={tone === 'go' ? 'good' : 'neutral'} size={phone ? 'lg' : 'sm'}
-          className={phone ? 'min-h-11' : ''} disabled={disabled} title={meaning}
+        <Button key={to} variant={tone === 'go' ? 'good' : 'neutral'} size={card ? 'lg' : 'sm'}
+          className={card ? 'min-h-11' : ''} disabled={disabled} title={meaning}
           onClick={() => onMove(to)}>
           {label}
         </Button>
@@ -180,7 +181,9 @@ function GigActions({
  */
 export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }) {
   const qc = useQueryClient()
-  const phone = usePhone()
+  // A list below the width at which the table fits (1024px: its six columns
+  // need about 830px beside the page's gutters), a table from there up.
+  const asList = useNarrow()
   const { confirm, ConfirmDialog } = useConfirm()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -261,7 +264,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
   const showOrganizer = filled((r) => Boolean(r.organizer))
   const showFit = filled((r) => r.genreFitScore != null)
 
-  /** The panel under an open gig, the same on a phone as in the table. */
+  /** The panel under an open gig, the same in the list as in the table. */
   const detail = (gig: GigOpportunity) =>
     editingId === gig.id ? (
       <EditGigPanel
@@ -368,7 +371,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageTitle>Gig Opportunities</PageTitle>
+        <PageHeading page="gigs" title="Gigs" />
         <div className="flex flex-wrap gap-2 items-center">
           <Select
             filter
@@ -384,13 +387,13 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
               </option>
             ))}
           </Select>
-          {/* A phone has no column headers to tap, which is how the table sorts. */}
-          {phone && (
+          {/* The list has no column headers to tap, which is how the table sorts. */}
+          {asList && (
             <Select
               filter
               aria-label="Sort gigs"
               className="min-h-11"
-              value={PHONE_SORTS.includes(sorting[0]?.id ?? '') ? sorting[0].id : ''}
+              value={LIST_SORTS.includes(sorting[0]?.id ?? '') ? sorting[0].id : ''}
               onChange={(e) => setSorting(e.target.value ? [{ id: e.target.value, desc: false }] : [])}
             >
               <option value="">Default order</option>
@@ -418,12 +421,13 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
       {showCreate && <CreateGigForm onDone={() => setShowCreate(false)} />}
 
       {isLoading ? (
-        phone ? <SkeletonList rows={6} /> : <SkeletonTable rows={6} cols={8} />
-      ) : phone ? (
+        asList ? <SkeletonList rows={6} /> : <SkeletonTable rows={6} cols={8} />
+      ) : asList ? (
         /*
-          On a phone the table is twice the width of the screen, and the stage,
-          which is what a row is for, sat past the right edge with the buttons.
-          So it is a list: the name and the stage on top, then what the table
+          Below 1024px the table does not fit: on a phone it was twice the width
+          of the screen, and on a tablet in portrait it still scrolled sideways
+          with the buttons cut off. The stage, which is what a row is for, sat
+          past the right edge. So it is a list: the name and the stage on top, then what the table
           had as columns, then the next step as a button a thumb can hit. The
           cells are the table's own (`DeadlineCell`, `FeeCell`, `GigActions`),
           and the open panel is the same one.
@@ -474,7 +478,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
                     </dl>
                     {hasMoves && (
                       <div className="pl-6">
-                        <GigActions phone gig={gig} disabled={isPatching}
+                        <GigActions card gig={gig} disabled={isPatching}
                           onMove={(to) => patchMutation.mutate({ id: gig.id, body: { status: to } })} />
                       </div>
                     )}
@@ -490,8 +494,8 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
         </Card>
       ) : (
         <Card pad="none" clip>
-          {/* From a tablet up. The sideways scroll is only for the widths between
-              the table's own minimum and the screen: below 768px it is the list above. */}
+          {/* From 1024px, where its columns fit beside the page. Narrower it is the
+              list above, so this never scrolls sideways. */}
           <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-sunken border-b border-line">

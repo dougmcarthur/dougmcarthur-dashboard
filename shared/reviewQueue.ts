@@ -298,7 +298,7 @@ function flagsFor(
         id: 'visa_risk',
         label: lead.certain
           ? `P-2 needs ${lead.requirement.leadTimeDays} days; ${lead.daysAvailable} available`
-          : `US date, ${lead.daysAvailable} days out — showcase or paid?`,
+          : `US date, ${lead.daysAvailable} days out: showcase or paid?`,
         severity: lead.certain ? 'danger' : 'warn',
         kind: 'warning',
       })
@@ -319,7 +319,7 @@ function flagsFor(
     const invited = normaliseGigStatus(status) === 'invited'
     flags.push({
       id: 'reply_due',
-      label: invited ? 'Offer — contract pending' : 'They need more',
+      label: invited ? 'Offer, contract pending' : 'They need more',
       severity: invited ? 'warn' : 'danger',
       kind: 'warning',
     })

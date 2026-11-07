@@ -382,7 +382,7 @@ export async function exchangeCode(
     // Google only returns one when it is a fresh consent. The connect URL
     // sends `prompt=consent` for exactly this reason; without a refresh token
     // the grant lasts an hour and then silently stops working.
-    throw new Error('Google returned no refresh token — re-consent is required')
+    throw new Error('Google returned no refresh token, so re-consent is required')
   }
   return { refreshToken: json.refresh_token, accessToken: json.access_token, scopes: json.scope }
 }

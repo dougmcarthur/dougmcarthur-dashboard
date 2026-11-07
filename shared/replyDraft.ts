@@ -188,7 +188,7 @@ export interface ReplyDraft {
 const NOTHING_RECOGNISED: DraftGap = {
   marker: '[what they asked for]',
   prompt:
-    'Nothing in this reply matched something the library can answer. Read it and write the answer yourself — the sentence it was read from is quoted below.',
+    'Nothing in this reply matched something the library can answer. Read it and write the answer yourself. The sentence it was read from is quoted below.',
 }
 
 function answerFor(assets: ArtistAsset[], questionKind: string, length: number | null): string | null {
@@ -259,7 +259,7 @@ export function composeReplyDraft(input: {
     `Thanks for getting back to me${about}. Here is what you asked for.`,
     ...lines,
     attachments.length
-      ? `Attached: ${attachments.join(', ')}.\n[attach them before sending — nothing is attached to a draft]`
+      ? `Attached: ${attachments.join(', ')}.\n[attach them before sending: nothing is attached to a draft]`
       : null,
     'Let me know if you need anything else.',
     '[sign off]',
@@ -269,7 +269,7 @@ export function composeReplyDraft(input: {
 
   if (attachments.length) {
     gaps.push({
-      marker: '[attach them before sending — nothing is attached to a draft]',
+      marker: '[attach them before sending: nothing is attached to a draft]',
       prompt: `${attachments.length === 1 ? 'One file' : `${attachments.length} files`} to attach: ${attachments.join(', ')}. This app has no copy of any of them.`,
     })
   }

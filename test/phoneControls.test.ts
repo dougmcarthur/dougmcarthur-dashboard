@@ -33,19 +33,21 @@ describe('page headings', () => {
     for (const file of PAGES) {
       const src = read(file)
       expect(src, file).not.toMatch(/<h1 className=/)
-      expect(src, file).toMatch(/<PageTitle>|PAGE_TITLE/)
+      expect(src, file).toMatch(/<PageTitle>|<PageHeading /)
     }
   })
 
   it('is the heading of the shells and the Artist page too', () => {
     expect(read('frontend/src/components/ui/SidebarShell.tsx')).toContain('<PageTitle>{title}</PageTitle>')
     expect(read('frontend/src/components/ui/SectionHeader.tsx')).toContain('titleClassName={PAGE_TITLE}')
-    expect(read('frontend/src/pages/ArtistPage.tsx')).toContain('titleClassName={PAGE_TITLE}')
+    expect(read('frontend/src/pages/ArtistPage.tsx')).toContain('<PageHeading page="artist"')
+    // The heading that carries a page's first-visit line is the same class.
+    expect(read('frontend/src/components/PageHeading.tsx').match(/PAGE_TITLE/g)?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('keeps what a page is for behind the info button, the History page included', () => {
     const history = read('frontend/src/pages/HistoryPage.tsx')
-    expect(history).toContain('<Explainer as="h1" title="History"')
+    expect(history).toContain('<PageHeading page="runs" title="History"')
     expect(history).not.toMatch(/<p[^>]*>Everything the app did/)
   })
 })

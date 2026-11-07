@@ -879,9 +879,14 @@ checklist for what `test/uiConsistency.test.ts` enforces.
   admin-mode pill carried a whole sentence. What stays visible is what a person needs in
   order to act: labels, counts, statuses, errors, and the line beside a button saying
   what pressing it will do. `showHints` hides every icon, so a note never holds the only
-  copy of a warning. A one-line hint under a page title on a first visit, dismissed once
-  to collapse behind the icon for that account, is decided but not built (see the last
-  section); until it is, nothing explanatory shows by default.
+  copy of a warning. The one exception is the first-visit line under a page's title
+  (`PageHeading`, `shared/pageHints.ts`): shown outright once, with a *Got it* button, then
+  the note behind the title's icon for good. Dismissal is kept per account
+  (`tenant_settings` `hints.dismissed`, `GET /api/page-hints` and `POST
+  /api/page-hints/dismiss`, refused to agent tokens), so a line put away on a phone stays
+  away on a laptop. Switching explanations off hides it as it hides every icon, and
+  nothing shows until the account's answer has arrived. Only the seven pages in the main
+  navigation have one. `test/pageHints.test.ts`.
 - **Buttons and inputs come from `components/ui/`.** `Button` takes a variant named for
   meaning (`primary`, `neutral`, `quiet`, `good`, `danger`, `info`); `Field` exports
   `FIELD` and `FILTER`; `SectionHeader`, `SidebarShell`, `Pager`/`PagedList`, `Toggle`
@@ -919,15 +924,18 @@ checklist for what `test/uiConsistency.test.ts` enforces.
   `reloadForStaleChunk` (`frontend/src/chunkReload.ts`) reloads once, not offline and not
   twice within 30 seconds, so a chunk that is truly gone shows the error instead of
   looping. `test/chunkReload.test.ts` pins the split and the rule.
-- **Gigs is a table from 768px and a list of cards below it.** A row exists to show its
-  stage, and a table twice the width of a phone puts the stage and the buttons off the
-  edge. `usePhone` (`max-width: 767.98px`) decides in script so only one layout mounts
-  (both mounted would hold every open panel twice). The two share `DeadlineCell`,
-  `FeeCell`, `GigActions` and the open panel, so a recovered date keeps its prose and
-  the next step comes from `inlineGigMoves` in either. On a phone the stage is on every
-  card, controls are 44px, the next step is always visible (`.row-actions` hides it
-  until hover, and a phone has none) and a Sort control stands in for the column
-  headers. `test/gigsPhone.test.ts`.
+- **Gigs is a table from 1024px and a list of cards below it.** A row exists to show its
+  stage, and a table that does not fit puts the stage and the buttons off the edge (twice
+  the screen on a phone, still scrolling sideways in a tablet held upright). `useNarrow`
+  decides in script so only one layout mounts (both mounted would hold every open panel
+  twice). The two share `DeadlineCell`, `FeeCell`, `GigActions` and the open panel, so a
+  recovered date keeps its prose and the next step comes from `inlineGigMoves` in either.
+  In the list the stage is on every card, controls are 44px, the next step is always
+  visible (`.row-actions` hides it until hover, and a touch screen has none) and a Sort
+  control stands in for the column headers. `test/gigsPhone.test.ts`.
+- **A page is called one thing**: the heading, the tab, the navigation and the phone
+  tab bar say Gigs, Sync, Promo and the rest in the same words (`test/pageNames.test.ts`).
+  The short names win because a phone tab has fifty pixels to say them in.
 - **On a phone the navigation is a bottom tab bar** (`PhoneTabBar`): Overview, Review,
   Gigs, Artist and Sync, and a More tab opening a sheet with Promo, Settings, History,
   Answers at hand, Help, Send feedback, the account name and Sign out. Below `md` only,
@@ -949,10 +957,12 @@ checklist for what `test/uiConsistency.test.ts` enforces.
   site; pass `htmlFor` when the control is elsewhere. It is a DOM effect, so
   `test/labelLink.test.ts` pins that it stays, not that it works: check `label.control`
   in the running app after touching it.
-- **No em dash in anything a screen says** (a string, a template or JSX text under
-  `frontend/src`; a dash standing alone for an empty value is allowed):
-  `test/visibleDashes.test.ts`. The Worker still builds a few sentences with one
-  (notification titles, some emails), outside that test's scope.
+- **No em dash in anything a person reads** (a string, a template or JSX text under
+  `frontend/src`, `src` or `shared`: screens, emails, notifications, error messages;
+  a dash standing alone for an empty value is allowed, and so is a pattern that has to
+  match one in somebody else's prose, which is why the parsers keep it in their regular
+  expressions): `test/visibleDashes.test.ts`. A source's label joins its association and
+  its name with a middle dot, not a colon, so it cannot be mistaken for the registry key.
 - **Surfaces that read as a document are static HTML**: `/privacy/` and
   `/terms-of-service/` are Vite entries (`vite.config.ts`) of plain HTML with no Worker route, so they read
   with JavaScript off and have an address a regulator or Google's OAuth review can fetch.
@@ -1059,5 +1069,4 @@ and not invented; questionnaire and method are in `docs/artist-survey-questionna
 - **No hiding survey factors** by who the respondent is, and **no model-matching per
   artist** without notice and consent (the privacy policy promises it; the plan is
   `docs/matching-gaps.md`).
-- **Decided, not built yet:** the first-visit hint described under Frontend conventions
-  (decided 2026-10-31). Top versus left navigation on a desktop is still open.
+- **Still open:** top versus left navigation on a desktop.

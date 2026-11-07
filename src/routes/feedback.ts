@@ -76,7 +76,7 @@ feedback.post('/', zValidator('json', FeedbackSchema), async (c) => {
     .where(and(eq(feedbackTable.tenantId, tenant), gte(feedbackTable.createdAt, since)))
     .get()
   if ((recent?.count ?? 0) >= FEEDBACK_PER_HOUR) {
-    return c.json({ error: 'That is a lot of feedback in one hour — try again a little later.' }, 429)
+    return c.json({ error: 'That is a lot of feedback in one hour. Try again a little later.' }, 429)
   }
 
   const { kind, message, context } = c.req.valid('json')
@@ -101,7 +101,7 @@ feedback.post('/', zValidator('json', FeedbackSchema), async (c) => {
     await recordEvent(c.env, owner, {
       kind: 'feedback',
       tier: kind === 'broken' ? 'attention' : 'info',
-      title: `${feedbackKindLabel(kind)} — from ${who}`,
+      title: `${feedbackKindLabel(kind)} from ${who}`,
       body: message.length > 200 ? `${message.slice(0, 199)}…` : message,
       href: '#settings/admin',
       action: 'Read it in admin mode',

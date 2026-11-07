@@ -76,7 +76,7 @@ export function profileUrl(input: string): { url: string; slug: string } | { err
   }
   if (!m) {
     return {
-      error: 'That is a Manitoba Music page, but not a profile. Open your profile and copy the address from there — it has /profiles/view in it.',
+      error: 'That is a Manitoba Music page, but not a profile. Open your profile and copy the address from there. It has /profiles/view in it.',
     }
   }
   return { url: `https://${MM_HOST}/profiles/view,${m[1]}/${m[2].toLowerCase()}`, slug: m[2].toLowerCase() }
@@ -364,16 +364,16 @@ export function proposalsFrom(
     proposals.push({
       kind: 'photo', label: 'Press photo', value: p, questionKind: null, variant: null,
       source: src(`photo:${key}`),
-      notes: `${note} ${origin.name} does not say who took it — add the photographer's credit before using it.`,
+      notes: `${note} ${origin.name} does not say who took it. Add the photographer's credit before using it.`,
     })
   }
 
   skipped.push({ heading: 'Contact', reason: `phone and email are left on ${origin.name}, not copied into Scout` })
   if (profile.shows.length) {
-    skipped.push({ heading: 'Shows', reason: `${profile.shows.length} listed — shows come from Bandsintown, so these are not filed twice` })
+    skipped.push({ heading: 'Shows', reason: `${profile.shows.length} listed. Shows come from Bandsintown, so these are not filed twice` })
   }
   if (profile.news.length) {
-    skipped.push({ heading: 'News', reason: `${profile.news.length} articles mention you — worth a line in a bio, but Scout does not write one for you` })
+    skipped.push({ heading: 'News', reason: `${profile.news.length} articles mention you, worth a line in a bio, but Scout does not write one for you` })
   }
 
   return { proposals, skipped }

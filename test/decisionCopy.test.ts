@@ -59,7 +59,7 @@ describe('decision copy — the sentence names the decision', () => {
     expect(item.decision.rationale).toContain('Marked applied in the tracker')
     // No buttons. A conflict only arises once a gig claims to be sent, and the
     // pipeline has no route back from `submitted` — the old pair offered
-    // "Not sent — reopen", which the PATCH route refused every single time.
+    // "Not sent, reopen", which the PATCH route refused every single time.
     expect(item.decision.rationale).toMatch(/an edit rather than a decision/)
     expect(item.decision.actions).toEqual([])
   })
@@ -71,7 +71,7 @@ describe('decision copy — the sentence names the decision', () => {
         fitNotes: undefined, notes: 'Submission status: NOT submitted.',
       })],
     })
-    expect(item.decision.actions.map((a) => a.label)).toEqual(['It went out', 'Not sent — reopen'])
+    expect(item.decision.actions.map((a) => a.label)).toEqual(['It went out', 'Not sent, reopen'])
   })
 
   it('states the cost and that approving is approving the spend', () => {

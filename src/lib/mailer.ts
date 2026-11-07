@@ -91,7 +91,7 @@ export async function addressBook(env: Env, now = new Date(), tenant?: TenantId)
 export async function sendMail(env: Env, mail: Mail): Promise<{ messageId?: string }> {
   const binding = env.EMAIL
   if (!binding) {
-    throw new Error('email binding not configured — add [[send_email]] to wrangler.toml')
+    throw new Error('email binding not configured. Add [[send_email]] to wrangler.toml')
   }
   // The boundary. See shared/recipients.ts for why each audience has its own
   // list, and why this is the only place the binding is called.

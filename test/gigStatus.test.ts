@@ -193,8 +193,8 @@ describe('what goes on a calendar and what goes in a task list', () => {
     const patch = await sync(row({ status: 'shortlisted' }))
     expect(created('calendar')).toEqual([])
     expect(created('tasks').map((c) => c.summary)).toEqual([
-      'Start the application — Winnipeg Folk Festival',
-      'Apply by — Winnipeg Folk Festival',
+      'Start the application: Winnipeg Folk Festival',
+      'Apply by: Winnipeg Folk Festival',
     ])
     expect(patch.opensTaskId).toBeTruthy()
     expect(patch.deadlineTaskId).toBeTruthy()
@@ -218,8 +218,8 @@ describe('what goes on a calendar and what goes in a task list', () => {
     const patch = await sync(row({ status: 'shortlisted' }), ALL_CALENDAR)
     expect(created('tasks')).toEqual([])
     expect(created('calendar').map((c) => c.summary)).toEqual([
-      'Start the application — Winnipeg Folk Festival',
-      'Apply by — Winnipeg Folk Festival',
+      'Start the application: Winnipeg Folk Festival',
+      'Apply by: Winnipeg Folk Festival',
     ])
     expect(patch.showEventId).toBeUndefined()
   })
@@ -229,7 +229,7 @@ describe('what goes on a calendar and what goes in a task list', () => {
     // deadline is indistinguishable from a booked gig on a phone.
     const patch = await sync(row({ status: 'shortlisted' }), ALL_CALENDAR)
     expect(patch.showEventId).toBeUndefined()
-    expect(created('calendar').every((c) => /^(Start the application|Apply by) — /.test(c.summary!))).toBe(true)
+    expect(created('calendar').every((c) => /^(Start the application|Apply by): /.test(c.summary!))).toBe(true)
   })
 
   it('writes the show only once an agreement exists, and only to a calendar', async () => {
@@ -252,7 +252,7 @@ describe('what goes on a calendar and what goes in a task list', () => {
     // an appointment, it is a thing already waiting on you.
     const patch = await sync(row({ status: 'info_requested' }))
     expect(patch.replyTaskId).toBeTruthy()
-    const reply = created('tasks').find((c) => c.summary?.startsWith('Reply —'))
+    const reply = created('tasks').find((c) => c.summary?.startsWith('Reply:'))
     expect(reply?.date).toBe(TODAY)
   })
 
@@ -262,7 +262,7 @@ describe('what goes on a calendar and what goes in a task list', () => {
     // exactly the right shape for "this should have been chased weeks ago".
     const patch = await sync(row({ status: 'submitted', submittedAt: '2026-06-01T00:00:00Z' }))
     expect(patch.replyTaskId).toBeTruthy()
-    expect(created('tasks').find((c) => c.summary?.startsWith('Reply —'))?.date).toBe('2026-07-16')
+    expect(created('tasks').find((c) => c.summary?.startsWith('Reply:'))?.date).toBe('2026-07-16')
   })
 
   it('says nothing about an application that is merely waiting', async () => {

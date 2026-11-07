@@ -32,6 +32,7 @@ import admin from './routes/admin'
 import profile from './routes/profile'
 import onboarding from './routes/onboarding'
 import appearance from './routes/appearance'
+import pageHints from './routes/pageHints'
 import feedbackRoute from './routes/feedback'
 import stagePlotRoute from './routes/stagePlot'
 import documentReadings from './routes/documentReadings'
@@ -219,6 +220,7 @@ app.route('/api/agent-tokens', agentTokens)
 app.route('/api/profile', profile)
 app.route('/api/onboarding', onboarding)
 app.route('/api/appearance', appearance)
+app.route('/api/page-hints', pageHints)
 app.route('/api/feedback', feedbackRoute)
 app.route('/api/stage-plot', stagePlotRoute)
 app.route('/api/document-readings', documentReadings)
@@ -303,11 +305,11 @@ async function runDigest(env: Env, tenant: TenantId): Promise<void> {
   const settings = await readAccountDigest(env, tenant)
   if (!settings.enabled) return
   if (!mailerConfigured(env)) {
-    console.error('digest: enabled but no email binding — nothing sent')
+    console.error('digest: enabled but no email binding, nothing sent')
     return
   }
   if (!settings.recipient) {
-    console.error('digest: enabled but no recipient is set — nothing sent')
+    console.error('digest: enabled but no recipient is set, nothing sent')
     return
   }
 
@@ -360,7 +362,7 @@ async function runDigest(env: Env, tenant: TenantId): Promise<void> {
   await recordEvent(env, tenant, {
     kind: 'digest',
     tier: 'info',
-    title: `Weekly digest sent — ${built.focus.length} to act on`,
+    title: `Weekly digest sent: ${built.focus.length} to act on`,
     body: subject,
     href: '#review/needs',
     action: 'Open queue',
@@ -497,7 +499,7 @@ async function runHousekeeping(env: Env, tenants: TenantId[]): Promise<void> {
       const run = await revisitForms(env, tenant, today)
       if (run.read) {
         console.log(
-          `form revisit for ${tenant}: ${run.read} read of ${run.due} due — ${run.opened} opened, ` +
+          `form revisit for ${tenant}: ${run.read} read of ${run.due} due, ${run.opened} opened, ` +
             `${run.needsYou} need you, ${run.stillMissing} not found`,
         )
       }

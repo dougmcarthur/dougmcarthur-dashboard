@@ -146,7 +146,7 @@ export function revisitNotice(input: {
   if (after.status === 'ready' && before !== 'ready') {
     return {
       tier: 'info',
-      title: `${gig.name}: the application form is open — ${after.fields} fields read`,
+      title: `${gig.name}: the application form is open, ${after.fields} fields read`,
       body: 'Answers are staged from your artist database. Read each one before you copy it out; nothing is sent.',
       dedupeKey: `form-read:${gig.id}`,
     }
@@ -168,7 +168,7 @@ export function revisitNotice(input: {
       return {
         tier: 'attention',
         title: `${gig.name}: applications opened ${monthDay(opens)}, and Scout still cannot find the form`,
-        body: `${after.note ?? ''} If you have the form’s address, paste it into the gig’s application panel — otherwise Scout keeps looking.`.trim(),
+        body: `${after.note ?? ''} If you have the form’s address, paste it into the gig’s application panel. Otherwise Scout keeps looking.`.trim(),
         dedupeKey: `form-missing:${gig.id}`,
       }
     }

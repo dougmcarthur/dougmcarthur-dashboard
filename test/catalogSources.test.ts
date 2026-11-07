@@ -41,16 +41,16 @@ describe('the seeded registry', () => {
 
   it('says a source in words and keeps the key out of sight', () => {
     for (const s of seeds) {
-      expect(s.label, s.key).toMatch(/ — /)
+      expect(s.label, s.key).toMatch(/ · /)
       expect(s.label, s.key).not.toContain(':')
     }
-    expect(seeds.find((s) => s.association === 'musicbc' && s.kind === 'feed')?.label).toBe('Music BC — News')
+    expect(seeds.find((s) => s.association === 'musicbc' && s.kind === 'feed')?.label).toBe('Music BC · News')
   })
 
   it('knows which pages are lists of calls', () => {
-    expect(isCallsPage('SaskMusic — Opportunities and deadlines')).toBe(true)
-    expect(isCallsPage('Music PEI — Opportunities and submissions')).toBe(true)
-    expect(isCallsPage('Music BC — News')).toBe(false)
+    expect(isCallsPage('SaskMusic · Opportunities and deadlines')).toBe(true)
+    expect(isCallsPage('Music PEI · Opportunities and submissions')).toBe(true)
+    expect(isCallsPage('Music BC · News')).toBe(false)
   })
 })
 

@@ -63,6 +63,12 @@ describe('the bar', () => {
     expect(layout).toContain("admin ? 'relative' : 'relative max-md:hidden'")
   })
 
+  it('leaves the laptop header on one row at 768px, where the bar gives way to it', () => {
+    // The brand, six links and four icons are 55px more than a 768px row unless
+    // the links are tighter, and the icons wrapped onto a second line.
+    expect(layout).toContain("'py-1.5 max-lg:px-2'")
+  })
+
   it('makes every tab a fingertip tall and names the current page', () => {
     expect(bar).toContain('min-h-14')
     expect(bar.match(/aria-current=\{here === /g)?.length).toBeGreaterThanOrEqual(2)

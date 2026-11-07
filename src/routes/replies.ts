@@ -342,7 +342,7 @@ export async function runReplyScan(
       title: stored === 1 ? 'One reply found in your mail' : `${stored} replies found in your mail`,
       body: decisive.length
         ? decisive.map((f) => `${f.gigName ?? 'Unmatched'}: ${REPLY_CLASS_LABELS[f.classification as keyof typeof REPLY_CLASS_LABELS]}`).join(' · ')
-        : 'Acknowledgements only — nothing needs a decision.',
+        : 'Acknowledgements only. Nothing needs a decision.',
       href: '#review/mail',
       action: 'Read them',
       dedupeKey: `replies:${now.slice(0, 13)}`,
@@ -470,7 +470,7 @@ replies.post('/:id/accept', zValidator('json', AcceptSchema), async (c) => {
 
   const gigId = body.gigId ?? row.gigId
   if (!gigId) {
-    return c.json({ error: 'Nothing matched this reply — say which application it is about.' }, 400)
+    return c.json({ error: 'Nothing matched this reply. Say which application it is about.' }, 400)
   }
 
   // Scoped, and this one matters more than most: `gigId` can come straight

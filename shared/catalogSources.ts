@@ -66,7 +66,7 @@ export function seedSources(): SeedSource[] {
       key: `${a.id}:${slug(s.label)}`,
       association: a.id,
       region: a.region,
-      label: `${a.name} — ${s.label}`,
+      label: `${a.name} · ${s.label}`,
       url: s.url,
       kind: s.kind,
     })),

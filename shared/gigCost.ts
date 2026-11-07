@@ -318,7 +318,7 @@ export function visaFor(input: { country: Country | null; performanceKind: Perfo
       kind: 'unknown',
       cost: null,
       leadTimeDays: 0,
-      reason: 'Outside Canada and the US. Only the US rule is encoded here — check this one by hand.',
+      reason: 'Outside Canada and the US. Only the US rule is encoded here. Check this one by hand.',
     }
   }
   if (performanceKind === 'showcase') {

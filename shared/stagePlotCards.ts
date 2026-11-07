@@ -96,7 +96,7 @@ export function cardRows(plot: StagePlot, lines: InputLine[], p: Performer, mixN
     const span = channels?.match(/^(\d+)–(\d+)$/)
     const count = span ? Number(span[2]) - Number(span[1]) + 1 : 1
     const parts = [
-      spec.inputs.length > 1 ? `${count} channels` : first.source.replace(/^Mic — /, ''),
+      spec.inputs.length > 1 ? `${count} channels` : first.source.replace(/^Mic(?:: | — )/, ''),
       stereo && spec.inputs.length === 1 ? 'stereo' : null,
       spec.inputs.some((i) => i.phantom) ? '48V' : null,
     ].filter(Boolean)

@@ -197,7 +197,7 @@ export function classifyReply(body: string): Classification {
       const when = sentence.match(SILENCE_DEADLINE)
       notes.push(
         when
-          ? `Silence is the answer here: "${sentence}" — so treat ${when[0].replace(/^by\s+/i, '')} as the date it becomes a no.`
+          ? `Silence is the answer here: "${sentence}", so treat ${when[0].replace(/^by\s+/i, '')} as the date it becomes a no.`
           : `Silence is the answer here: "${sentence}"`,
       )
       // The sentence still counts, but as the acknowledgement it is.
@@ -238,7 +238,7 @@ export function classifyReply(body: string): Classification {
   if (!clear) {
     notes.push(
       `Reads as both ${REPLY_CLASS_LABELS[best.kind].toLowerCase()} and ` +
-        `${REPLY_CLASS_LABELS[runnerUp.kind].toLowerCase()} — worth reading yourself.`,
+        `${REPLY_CLASS_LABELS[runnerUp.kind].toLowerCase()}, worth reading yourself.`,
     )
   }
 

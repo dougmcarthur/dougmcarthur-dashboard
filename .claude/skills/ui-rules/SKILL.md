@@ -63,11 +63,12 @@ page with `lazyPage(() => import('./pages/X'), 'X')`, never a static import
 (`test/chunkReload.test.ts` fails on one). A failed chunk load after a deploy
 reloads once through `reloadForStaleChunk`.
 
-**A table that cannot fit a phone becomes a list, not a sideways scroll.** Gigs is the
-model: `usePhone()` (under 768px, decided in script so one layout mounts), cards that
+**A table that does not fit becomes a list, not a sideways scroll.** Gigs is the
+model: `useNarrow()` (under 1024px, decided in script so one layout mounts), cards that
 put the stage first, cells shared with the table, 44px controls (`size="lg"` and
-`min-h-11`), and no `.row-actions` on a phone, since that class hides its buttons until
-hover. Look at it at 375px and measure `document.documentElement.scrollWidth`.
+`min-h-11`), and no `.row-actions` in the list, since that class hides its buttons until
+hover. Look at it at 375px and at 768px, and measure `document.documentElement.scrollWidth`.
+A page heading is the nav label (`test/pageNames.test.ts`).
 
 **Adding a page to the navigation means adding it twice.** The header's `NAV_LINKS`
 is the laptop's; a phone has `PhoneTabBar` (five tabs and a More sheet) and no header
@@ -81,12 +82,14 @@ needs `max-md:min-h-11`, or `max-md:py-3 max-md:-my-3` when it is text in a line
 headings are `<PageTitle>` (or `PAGE_TITLE` where an `Explainer` draws the `h1`), never
 a restated class. Check 320px as well as 375px: the header row has 9px to spare there.
 
-## No em dash in anything a screen says
+## No em dash in anything a person reads
 
-A string, a template or JSX text under `frontend/src` carries none
-(`test/visibleDashes.test.ts`). Write two sentences, a colon or a comma. A dash on
-its own, standing for an empty value in a cell or a select, is fine. Comments are
-free to use them.
+A string, a template or JSX text under `frontend/src`, `src` or `shared` carries none
+(`test/visibleDashes.test.ts`), so an email subject or a notification title is covered
+as well as a screen. Write two sentences, a colon or a comma. A dash on its own,
+standing for an empty value in a cell or a select, is fine, and so is the character
+inside a regular expression that reads somebody else's prose. Comments are free to use
+them.
 
 ## Explanation is tucked behind an info icon, always
 
@@ -97,9 +100,11 @@ it. The owner asked for this by name (it was a sentence in the admin-mode pill,
 and the sentence was most of the header), so apply it to anything new without
 being asked.
 
-One exception is decided but not built: a one-line hint under a page title on a
-first visit, dismissed once to collapse behind the icon for that account. Until
-that exists, apply the rule as written.
+One exception, built: a one-line hint under a main page's title on a first visit,
+dismissed once with *Got it* and then behind the icon, for that account. A page in the
+main navigation takes it with `<PageHeading page="…" title="…" />` and a line in
+`shared/pageHints.ts` (and the route's schema); anywhere else the rule applies as
+written.
 
 - **`Explainer`** (`components/ui/Explainer.tsx`) is the way. Its `title` is the
   heading or the label, its children are the note, and it draws the icon beside

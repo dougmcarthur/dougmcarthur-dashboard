@@ -126,7 +126,7 @@ const ROWS: Row[] = [
   ['Nous embauchons : coordonnateur de programmes', 'not_opportunity'],
   ['Music•Musique NB - Music Wire 🧸 Fil de nouvelles (9 sept 2026)', 'not_opportunity'],
 
-  // --- Music BC: a whole newsletter per item --------------------------------
+  // --- Music BC · a whole newsletter per item --------------------------------
   ['E-News 02/20/25: Apply Now for Jumpstart Grants | 2025 JUNO Nominees & Events | WCMA Submissions', 'not_opportunity'],
 ]
 
