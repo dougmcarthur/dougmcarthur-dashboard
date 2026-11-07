@@ -69,6 +69,12 @@ put the stage first, cells shared with the table, 44px controls (`size="lg"` and
 `min-h-11`), and no `.row-actions` on a phone, since that class hides its buttons until
 hover. Look at it at 375px and measure `document.documentElement.scrollWidth`.
 
+**Adding a page to the navigation means adding it twice.** The header's `NAV_LINKS`
+is the laptop's; a phone has `PhoneTabBar` (five tabs and a More sheet) and no header
+menu. A page in one and not the other cannot be opened on a phone
+(`test/phoneTabBar.test.ts`). Leave `main`'s bottom padding alone: the bar is fixed
+over the foot of the screen.
+
 **Phone tap targets come with the shared pieces.** `Button` (all sizes), `Field`, `Tabs`
 and the deck are 44px below `md` without being asked. A custom button, chip or row
 needs `max-md:min-h-11`, or `max-md:py-3 max-md:-my-3` when it is text in a line. Page

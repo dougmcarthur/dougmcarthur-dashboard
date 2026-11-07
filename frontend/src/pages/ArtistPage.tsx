@@ -199,7 +199,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
                   type="button"
                   onClick={() => setFreshness(freshness === 'overdue' ? '' : 'overdue')}
                   aria-pressed={freshness === 'overdue'}
-                  className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                  className={`px-3 py-1.5 max-md:py-3 rounded-lg border transition-colors ${
                     freshness === 'overdue'
                       ? 'border-danger-line bg-danger-fg text-surface'
                       : 'border-danger-line bg-danger-bg text-danger-fg hover:border-danger-fg'
@@ -213,7 +213,7 @@ export function ArtistPage({ initialTab = null }: { initialTab?: string | null }
                   type="button"
                   onClick={() => setFreshness(freshness === 'unreviewed' ? '' : 'unreviewed')}
                   aria-pressed={freshness === 'unreviewed'}
-                  className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                  className={`px-3 py-1.5 max-md:py-3 rounded-lg border transition-colors ${
                     freshness === 'unreviewed'
                       ? 'border-line-strong bg-ink text-surface'
                       : 'border-line bg-surface text-muted hover:border-line-strong'

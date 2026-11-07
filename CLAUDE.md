@@ -928,6 +928,13 @@ checklist for what `test/uiConsistency.test.ts` enforces.
   card, controls are 44px, the next step is always visible (`.row-actions` hides it
   until hover, and a phone has none) and a Sort control stands in for the column
   headers. `test/gigsPhone.test.ts`.
+- **On a phone the navigation is a bottom tab bar** (`PhoneTabBar`): Overview, Review,
+  Gigs, Artist and Sync, and a More tab opening a sheet with Promo, Settings, History,
+  Answers at hand, Help, Send feedback, the account name and Sign out. Below `md` only,
+  not in admin mode (which has its own pages), and the header's menu button is hidden
+  there outside admin mode, since the sheet holds what it did. `main` leaves room under
+  its last line. A page added to the laptop's navigation and not to the bar or the sheet
+  cannot be opened on a phone, so `test/phoneTabBar.test.ts` fails on one.
 - **Page headings share one class, and controls are a fingertip on a phone.** `PAGE_TITLE`
   (`components/ui/Surface.tsx`) is every page's `h1`, the Settings and admin shells and
   the Artist page included. Below `md` every `Button` size, input, select, textarea, tab
@@ -1052,7 +1059,5 @@ and not invented; questionnaire and method are in `docs/artist-survey-questionna
 - **No hiding survey factors** by who the respondent is, and **no model-matching per
   artist** without notice and consent (the privacy policy promises it; the plan is
   `docs/matching-gaps.md`).
-- **Decided, not built yet:** on a phone the main navigation becomes a bottom tab bar
-  (Overview, Review, Gigs, Artist, Sync, the rest under More; today it is a menu, and
-  top versus left navigation on a desktop is still open), and the first-visit hint
-  described under Frontend conventions. Both were decided on 2026-10-31.
+- **Decided, not built yet:** the first-visit hint described under Frontend conventions
+  (decided 2026-10-31). Top versus left navigation on a desktop is still open.

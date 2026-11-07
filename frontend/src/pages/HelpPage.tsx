@@ -75,35 +75,35 @@ export function HelpPage() {
           <button
             type="button"
             onClick={() => scrollTo('canadian-artists')}
-            className="text-xs px-2.5 py-1 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
+            className="text-xs px-2.5 py-1 max-md:min-h-11 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
           >
             Canadian artists
           </button>
           <button
             type="button"
             onClick={() => scrollTo('the-screens')}
-            className="text-xs px-2.5 py-1 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
+            className="text-xs px-2.5 py-1 max-md:min-h-11 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
           >
             The screens
           </button>
           <button
             type="button"
             onClick={() => scrollTo('workflow')}
-            className="text-xs px-2.5 py-1 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
+            className="text-xs px-2.5 py-1 max-md:min-h-11 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
           >
             Workflow & rules
           </button>
           <button
             type="button"
             onClick={() => scrollTo('connections-and-security')}
-            className="text-xs px-2.5 py-1 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
+            className="text-xs px-2.5 py-1 max-md:min-h-11 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
           >
             Connections & display
           </button>
           <button
             type="button"
             onClick={() => scrollTo('privacy-and-terms')}
-            className="text-xs px-2.5 py-1 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
+            className="text-xs px-2.5 py-1 max-md:min-h-11 rounded-md bg-raised border border-line text-muted hover:text-ink hover:bg-hover transition-colors"
           >
             Privacy & terms
           </button>

@@ -82,7 +82,7 @@ export function SnoozeMenu({
         aria-expanded={open}
         title="Snooze"
         aria-label="Snooze"
-        className="grid place-items-center h-9 w-9 rounded-lg border border-line text-body hover:bg-sunken hover:text-ink disabled:opacity-40 transition-colors"
+        className="grid place-items-center h-9 w-9 max-md:h-11 max-md:w-11 rounded-lg border border-line text-body hover:bg-sunken hover:text-ink disabled:opacity-40 transition-colors"
       >
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
              strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">

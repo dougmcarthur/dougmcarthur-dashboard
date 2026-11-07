@@ -12,6 +12,7 @@ import { useSidePanel } from '../hooks/useSidePanel'
 import { useSignOut } from '../hooks/useSignOut'
 import { HelpMenu } from './HelpMenu'
 import { FeedbackModal } from './FeedbackModal'
+import { PhoneTabBar } from './PhoneTabBar'
 import { Button } from './ui/Button'
 import { useNote } from './ui/Explainer'
 
@@ -230,7 +231,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 min-h-14 py-2">
             <a
               href={admin ? '#admin' : '#overview'}
-              className="font-semibold text-ink text-sm tracking-tight hover:text-body transition-colors shrink-0"
+              className="font-semibold text-ink text-sm tracking-tight hover:text-body transition-colors shrink-0 max-md:inline-block max-md:py-3 max-md:-my-3"
             >
               Sun Dogs Music Scout
             </a>
@@ -294,7 +295,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
               {/* In admin mode too, where Sign out is all it holds: every page
                   in the list is refused there, and the only other way out was
                   to leave admin mode first. */}
-              <div className="relative" ref={menuRef}>
+              <div className={admin ? 'relative' : 'relative max-md:hidden'} ref={menuRef}>
                 <button
                   type="button"
                   onClick={() => setMenuOpen((o) => !o)}
@@ -320,20 +321,6 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                     )}
                     {!admin && (
                       <>
-                        {/* Below md the main destinations have nowhere else to go. */}
-                        <span className="md:hidden">
-                          {NAV_LINKS.map((l) => (
-                            <a
-                              key={l.id}
-                              href={`#${l.id}`}
-                              aria-current={here === l.id ? 'page' : undefined}
-                              className={`block ${linkClass(l.id, true)}`}
-                            >
-                              {l.label}
-                            </a>
-                          ))}
-                          <hr className="border-line my-1" />
-                        </span>
                         {MORE_LINKS.map((l) => (
                           <a
                             key={l.id}
@@ -356,28 +343,6 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                             Answers at hand
                           </button>
                         )}
-                        {/* The header's question mark, for a phone, where the
-                            header has no room for it. */}
-                        <span className="sm:hidden">
-                          <hr className="border-line my-1" />
-                          <a
-                            href="#help"
-                            aria-current={here === 'help' ? 'page' : undefined}
-                            className={`block ${linkClass('help', true)}`}
-                          >
-                            Help
-                          </a>
-                          <button
-                            type="button"
-                            className={`block w-full text-left ${linkClass('feedback', true)}`}
-                            onClick={() => {
-                              setMenuOpen(false)
-                              setFeedbackOpen(true)
-                            }}
-                          >
-                            Send feedback
-                          </button>
-                        </span>
                         <hr className="border-line my-1" />
                       </>
                     )}
@@ -415,7 +380,10 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
           id="main"
           ref={mainRef}
           tabIndex={-1}
-          className="shell min-w-0 px-4 sm:px-6 lg:px-8 py-8 lg:py-10 focus:outline-none"
+          className={`shell min-w-0 px-4 sm:px-6 lg:px-8 py-8 lg:py-10 focus:outline-none ${
+            // Room under the last line for the tab bar that sits over the foot of the screen.
+            admin ? '' : 'max-md:pb-[calc(5.5rem+env(safe-area-inset-bottom))]'
+          }`}
         >
           {children}
         </main>
@@ -426,6 +394,16 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
         )}
       </div>
 
+      {admin ? null : (
+        <PhoneTabBar
+          here={here}
+          accountName={accountName}
+          offerAnswers={!side.wide}
+          onAnswers={() => setAnswersOpen(true)}
+          onFeedback={() => setFeedbackOpen(true)}
+          signOut={signOut}
+        />
+      )}
       {admin ? null : <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />}
       {!admin && answersOpen && !side.wide && <AnswersDialog onClose={closeAnswers} onNav={onNav} />}
     </div>

@@ -22,10 +22,14 @@ describe('signing out', () => {
     const menu = layout.slice(layout.indexOf('id="mobile-nav"'))
     const nav = menu.slice(0, menu.indexOf('</nav>'))
     // Every page in the menu sits behind `!admin`; Sign out sits outside it.
+    // The main destinations are the phone tab bar's now, which admin mode
+    // does not render, and the header's button is hidden on a phone only
+    // outside admin mode, where it is the one way to sign out.
     const gated = nav.slice(nav.indexOf('{!admin && ('), nav.indexOf('Sign out'))
-    expect(gated).toContain('NAV_LINKS.map')
     expect(gated).toContain('MORE_LINKS.map')
     expect(gated).toContain('</>')
+    expect(layout).toContain("admin ? 'relative' : 'relative max-md:hidden'")
+    expect(layout).toMatch(/\{admin \? null : \(\s*<PhoneTabBar/)
   })
 
   it('is one mutation, shared, and does not claim to confirm', () => {
