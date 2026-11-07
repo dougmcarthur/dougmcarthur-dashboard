@@ -206,7 +206,7 @@ export function FilterChip({
       aria-pressed={active}
       aria-label={children ? undefined : `${label}, ${count}`}
       title={children ? undefined : label}
-      className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-lg border text-xs font-semibold
+      className={`inline-flex items-center gap-1.5 h-7 max-md:h-10 px-2 max-md:px-3 rounded-lg border text-xs font-semibold
                   transition-colors whitespace-nowrap disabled:opacity-40 ${
                     active
                       ? 'bg-accent text-accent-fg border-accent'
@@ -244,7 +244,7 @@ export function IconButton({
       onClick={onClick}
       title={label}
       aria-label={label}
-      className={`grid place-items-center h-7 w-7 shrink-0 rounded-md text-muted hover:text-ink hover:bg-sunken transition-colors ${className}`}
+      className={`grid place-items-center h-7 w-7 max-md:h-11 max-md:w-11 shrink-0 rounded-md text-muted hover:text-ink hover:bg-sunken transition-colors ${className}`}
     >
       <Icon name={icon} className="h-4 w-4" />
     </button>

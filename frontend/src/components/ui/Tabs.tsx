@@ -31,7 +31,7 @@ export function Tabs<T extends string>({
             role="tab"
             aria-selected={active === tab.id}
             onClick={() => onSelect(tab.id)}
-            className={`px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+            className={`px-3.5 py-2 max-md:py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
               active === tab.id ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'
             }`}
           >

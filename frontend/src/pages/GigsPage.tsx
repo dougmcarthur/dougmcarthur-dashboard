@@ -25,7 +25,7 @@ import { Button } from '../components/ui/Button'
 import { CreateGigForm } from './gigs/CreateGigForm'
 import { EditGigPanel } from './gigs/EditGigPanel'
 import { GigDetail } from './gigs/GigDetail'
-import { Banner, CAPTION_CLASS, Card } from '../components/ui/Surface'
+import { Banner, CAPTION_CLASS, Card, PageTitle } from '../components/ui/Surface'
 import { useConfirm } from '../components/ui/ConfirmModal'
 
 // The pipeline order, from shared/gigStatus.ts, so the picker and the Worker
@@ -120,7 +120,9 @@ function DeadlineCell({ gig, today }: { gig: GigOpportunity; today: string }) {
  */
 function FeeCell({ gig }: { gig: GigOpportunity }) {
   const amt = gig.feeAmount
-  const paid = gig.paid ? <span className="text-success-fg"> · paid</span> : null
+  // "USD 1,200 · paid" read as a fee that has been paid, and a guarantee as an
+  // entry fee. The flag means the gig pays artists, so it says that.
+  const paid = gig.paid ? <span className="text-success-fg"> · pays artists</span> : null
   if (amt == null && !gig.fee) return <span className="text-faint">—</span>
   if (amt != null) {
     return <span>{gig.feeCurrency ?? 'USD'} {amt.toLocaleString()}{paid}</span>
@@ -366,7 +368,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-ink">Gig Opportunities</h1>
+        <PageTitle>Gig Opportunities</PageTitle>
         <div className="flex flex-wrap gap-2 items-center">
           <Select
             filter
@@ -499,7 +501,7 @@ export function GigsPage({ initialOpen = null }: { initialOpen?: string | null }
                     <th key={header.id} onClick={header.column.getToggleSortingHandler()}
                       className={`px-4 py-2.5 text-left ${CAPTION_CLASS} select-none cursor-pointer whitespace-nowrap hover:text-body transition-colors`}>
                       {flexRender(header.column.columnDef.header, header.getContext())}
-                      <span className="ml-1 text-faint">
+                      <span className="ml-1 text-muted">
                         {header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : ''}
                       </span>
                     </th>

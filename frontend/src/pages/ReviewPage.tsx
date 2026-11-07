@@ -6,7 +6,7 @@ import type { ReviewFilter } from '../../../shared/reviewQueue'
 import { QueueRow } from './review/QueueRow'
 import { Detail } from './review/Detail'
 import { ReplyInbox } from '../components/ReplyInbox'
-import { Banner } from '../components/ui/Surface'
+import { Banner, PageTitle } from '../components/ui/Surface'
 import { Select } from '../components/ui/Field'
 import { Button } from '../components/ui/Button'
 
@@ -234,7 +234,7 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
   return (
     <div className="space-y-4">
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="text-xl font-semibold text-ink">Review</h1>
+        <PageTitle>Review</PageTitle>
         <p className="text-xs text-muted">
           {/* Snoozed items are excluded from `all`, so "n of all" would count
               the shown item against a total it is not part of. */}
@@ -278,7 +278,7 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
         <button
           title="Organisers’ replies Scout found in your mail and has not filed yet."
           onClick={() => setMailOpen(true)}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`rounded-md px-3 py-1.5 max-md:py-2.5 text-sm font-medium transition-colors ${
             mailOpen ? 'bg-accent text-accent-fg' : 'bg-surface border border-line text-body hover:bg-sunken'
           }`}
         >
@@ -300,7 +300,7 @@ export function ReviewPage({ initialFilter }: { initialFilter?: string | null })
                 setMailOpen(false)
                 setFilter(f.id)
               }}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`rounded-md px-3 py-1.5 max-md:py-2.5 text-sm font-medium transition-colors ${
                 active ? 'bg-accent text-accent-fg' : 'bg-surface border border-line text-body hover:bg-sunken'
               }`}
             >

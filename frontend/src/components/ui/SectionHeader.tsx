@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Explainer } from './Explainer'
+import { PAGE_TITLE } from './Surface'
 
 /**
  * The top of an admin page: its name, what it is for behind the info button,
@@ -22,7 +23,7 @@ export function SectionHeader({
 }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-      <Explainer as="h1" title={title} titleClassName="text-xl font-semibold text-ink tracking-tight">
+      <Explainer as="h1" title={title} titleClassName={PAGE_TITLE}>
         {children}
       </Explainer>
       {actions && <div className="flex flex-wrap items-center gap-x-4 gap-y-2">{actions}</div>}

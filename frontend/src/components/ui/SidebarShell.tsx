@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { useNarrow } from '../../hooks/useNarrow'
-import { Caption, Card } from './Surface'
+import { Caption, Card, PageTitle } from './Surface'
 
 /**
  * A list of pages and the page, laid out for the screen it is on.
@@ -107,7 +107,7 @@ export function SidebarShell<T extends string>({
     if (current === null) {
       return (
         <nav aria-label={label} className="space-y-6">
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">{title}</h1>
+          <PageTitle>{title}</PageTitle>
           {top}
           {groups.map((group) => (
             <div key={group.label} role="group" aria-label={group.label} className="space-y-1.5">

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { api } from '../api'
 import { useAppearance } from '../hooks/useAppearance'
 import { usePageAnnouncement } from '../hooks/usePageAnnouncement'
@@ -190,11 +190,16 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
   }, [menuOpen])
 
   const signOut = useSignOut()
+  // Whose account this is, for the menu. Not asked in admin mode, where the
+  // profile route is refused, and absent while no name has been set: a menu
+  // that says "Signed in as" and then a guess is worse than saying nothing.
+  const profile = useQuery({ queryKey: ['profile'], queryFn: api.profile.read, enabled: !admin })
+  const accountName = admin ? null : profile.data?.displayName?.trim() || null
 
   const toggleTheme = () => set({ theme: resolved === 'dark' ? 'light' : 'dark' })
 
   const linkClass = (id: string, mobile = false) =>
-    `px-3.5 ${mobile ? 'py-2' : 'py-1.5'} rounded-md text-sm font-medium transition-colors ${
+    `px-3.5 ${mobile ? 'py-2 max-md:py-3' : 'py-1.5'} rounded-md text-sm font-medium transition-colors ${
       here === id ? 'bg-raised text-ink shadow-inset' : 'text-muted hover:text-ink hover:bg-sunken'
     }`
 
@@ -247,7 +252,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
             </nav>
             )}
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 max-[359px]:gap-0">
               {admin ? null : <NotificationBell onNav={onNav} side={side} />}
               {/* Only where the column can open. Narrower than that the header has
                   no room for another icon (at 320px it has three pixels to
@@ -260,7 +265,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                   aria-controls="side-panel"
                   aria-label="Answers at hand"
                   title={side.showing('answers') ? 'Hide your answers' : 'Show the answers a form asks for'}
-                  className={`p-2 rounded-md transition-colors hover:text-ink hover:bg-sunken ${
+                  className={`p-2 max-md:p-3.5 max-[359px]:p-3 rounded-md transition-colors hover:text-ink hover:bg-sunken ${
                     side.showing('answers') ? 'text-ink bg-sunken' : 'text-muted'
                   }`}
                 >
@@ -281,7 +286,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                     ? `Following your system (${resolved})`
                     : `${resolved[0].toUpperCase()}${resolved.slice(1)} theme`
                 }
-                className="p-2 rounded-md text-muted hover:text-ink hover:bg-sunken transition-colors"
+                className="p-2 max-md:p-3.5 max-[359px]:p-3 rounded-md text-muted hover:text-ink hover:bg-sunken transition-colors"
               >
                 <ThemeIcon dark={resolved === 'dark'} />
               </button>
@@ -296,7 +301,7 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                   aria-expanded={menuOpen}
                   aria-controls="mobile-nav"
                   aria-label="Menu"
-                  className="p-2 rounded-md text-muted hover:text-ink hover:bg-sunken transition-colors"
+                  className="p-2 max-md:p-3.5 max-[359px]:p-3 rounded-md text-muted hover:text-ink hover:bg-sunken transition-colors"
                 >
                   <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
                     <path d="M3 5h14M3 10h14M3 15h14" strokeLinecap="round" />
@@ -308,6 +313,11 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
                     aria-label="More"
                     className="absolute right-0 top-full mt-2 w-52 z-40 rounded-xl border border-line bg-surface shadow-pop p-1"
                   >
+                    {accountName && (
+                      <p className="px-3 pt-2 pb-2 mb-1 text-xs text-muted border-b border-line truncate" title={accountName}>
+                        Signed in as <span className="text-body">{accountName}</span>
+                      </p>
+                    )}
                     {!admin && (
                       <>
                         {/* Below md the main destinations have nowhere else to go. */}

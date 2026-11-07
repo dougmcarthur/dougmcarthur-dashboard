@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
-import { Caption, Card } from '../components/ui/Surface'
+import { Caption, Card, PageTitle } from '../components/ui/Surface'
 import { Button } from '../components/ui/Button'
 import { OnboardingCard } from '../components/OnboardingCard'
 import { OnboardingFlow, type FlowScreen } from '../components/OnboardingFlow'
@@ -54,7 +54,7 @@ export function HelpPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <header className="space-y-3">
-        <h1 className="text-2xl font-semibold text-ink tracking-tight">Help</h1>
+        <PageTitle>Help</PageTitle>
         <p className="text-sm text-body leading-relaxed">
           Scout finds opportunities for independent Canadian musicians: festivals, showcases,
           grants, sync briefs. It helps you decide which are worth it, drafts the paperwork from
