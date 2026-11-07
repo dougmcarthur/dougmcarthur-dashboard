@@ -52,6 +52,24 @@ writes across many rows uses it. A third hand-rolled copy fails the guard, and
 so does calling a write endpoint without reading its preview endpoint first: a
 bulk write you cannot look at first is one you find out about afterwards.
 
+**`Label`** (`ui/Surface.tsx`) ties itself to the control that follows it, as the
+next sibling or the first control inside it, so write `<Label>Name</Label>` directly
+above the input and it is named. Pass `htmlFor` when the control is elsewhere. It
+is a DOM effect with no test that renders it: after touching it, check
+`label.control` on a real form.
+
+**Pages are lazy chunks.** `App.tsx` imports only the Overview statically; add a
+page with `lazyPage(() => import('./pages/X'), 'X')`, never a static import
+(`test/chunkReload.test.ts` fails on one). A failed chunk load after a deploy
+reloads once through `reloadForStaleChunk`.
+
+## No em dash in anything a screen says
+
+A string, a template or JSX text under `frontend/src` carries none
+(`test/visibleDashes.test.ts`). Write two sentences, a colon or a comma. A dash on
+its own, standing for an empty value in a cell or a select, is fine. Comments are
+free to use them.
+
 ## Explanation is tucked behind an info icon, always
 
 A sentence that says what a screen is for, how something works or what a setting

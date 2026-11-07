@@ -29,6 +29,18 @@ export default defineConfig({
         privacy: page('./frontend/privacy/index.html'),
         terms: page('./frontend/terms-of-service/index.html'),
       },
+      output: {
+        // The libraries change when a dependency does, not on every deploy, so
+        // they get names of their own: a browser keeps them across the deploys
+        // that only touched the app, and the first script stays under Vite's
+        // 500 kB warning without raising it.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (/node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react'
+          if (id.includes('@tanstack')) return 'tanstack'
+          return undefined
+        },
+      },
     },
   },
   server: {
