@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '../ui/Button'
+import { BrandMark } from '../ui/BrandMark'
 
 /**
  * The full-screen, one-question-at-a-time shell, driven from the keyboard.
@@ -140,7 +141,10 @@ export function FlowShell({
       </div>
 
       <div className="flex items-center justify-between px-4 sm:px-8 py-3 shrink-0">
-        <p className="text-sm font-semibold text-ink">Sun Dogs Music Scout</p>
+        <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <BrandMark className="size-6" />
+          Sun Dogs Music Scout
+        </p>
         <Button variant="quiet" size="sm" onClick={onClose}>
           {closeLabel} <Kbd>Esc</Kbd>
         </Button>

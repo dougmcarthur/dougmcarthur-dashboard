@@ -3,6 +3,7 @@ import { startRegistration } from '@simplewebauthn/browser'
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser'
 import { api, type JoinCheck } from '../api'
 import { Button } from './ui/Button'
+import { BrandMark } from './ui/BrandMark'
 import { Card } from './ui/Surface'
 
 /**
@@ -73,6 +74,7 @@ export function JoinScreen({ token, onJoined }: { token: string; onJoined: () =>
     <div className="min-h-screen bg-canvas flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-1">
+          <BrandMark className="block size-14 mb-3" />
           <h1 className="text-2xl font-semibold text-ink tracking-tight">Sun Dogs Music Scout</h1>
           <p className="text-sm text-muted">
             {refusal

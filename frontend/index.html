@@ -24,6 +24,12 @@
         root.dataset.palette = p
       } catch (e) {}
     </script>
+    <!-- The tab icon: the logo. The .ico is for browsers that ask for /favicon.ico
+         whatever the page says; the SVG is what the rest draw; iOS takes the
+         opaque square. All from frontend/public, built by scripts/og/render.mjs. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Sun Dogs Music Scout</title>
     <meta
       name="description"

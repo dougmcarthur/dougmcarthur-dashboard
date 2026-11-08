@@ -63,6 +63,8 @@ export const SUN_DOGS = {
       'cat-rose-line': '214 203 170', // #D6CBAA
       'cat-rose-fg': '81 97 92', // #51615C
       'scrim': '29 42 38', // #1D2A26
+      'mark': '254 159 25', // #FE9F19, the logo's orange, in both modes
+      'mark-fg': '63 20 30', // #3F141E, its plum
     },
     highContrast: {
       'line': '150 139 106', // #968B6A
@@ -129,6 +131,8 @@ export const SUN_DOGS = {
       'cat-rose-line': '40 43 38', // #282B26
       'cat-rose-fg': '138 144 131', // #8A9083
       'scrim': '0 0 0', // #000000
+      'mark': '254 159 25', // #FE9F19, the logo's orange, in both modes
+      'mark-fg': '63 20 30', // #3F141E, its plum
     },
     highContrast: {
       'line': '74 83 71', // #4A5347

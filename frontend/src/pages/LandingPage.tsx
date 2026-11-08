@@ -4,6 +4,7 @@ import { api } from '../api'
 import { type PublicCategory, type PublicOpportunity } from '../../../shared/opportunityCatalog'
 import { INVITE_REQUEST_LIMITS, UNHANDLED_RETENTION_DAYS } from '../../../shared/inviteRequests'
 import { Button } from '../components/ui/Button'
+import { BrandMark } from '../components/ui/BrandMark'
 import { FIELD } from '../components/ui/Field'
 import { Card, Label } from '../components/ui/Surface'
 
@@ -48,7 +49,10 @@ export function LandingPage({ onSignIn }: { onSignIn: () => void }) {
     <div className="min-h-screen bg-canvas">
       <header className="border-b border-line">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-          <p className="font-semibold text-ink text-sm tracking-tight">Sun Dogs Music Scout</p>
+          <p className="flex items-center gap-2 font-semibold text-ink text-sm tracking-tight">
+            <BrandMark className="size-7" />
+            Sun Dogs Music Scout
+          </p>
           <Button variant="neutral" onClick={onSignIn}>
             Sign in
           </Button>

@@ -55,6 +55,8 @@
   --c-cat-rose-line: 214 203 170;
   --c-cat-rose-fg: 81 97 92;
   --c-scrim: 29 42 38;
+  --c-mark: 254 159 25;
+  --c-mark-fg: 63 20 30;
 
   --shadow-card: 0 1px 2px rgba(29,42,38,.07);
   --shadow-raised: 0 2px 4px rgba(29,42,38,.06), 0 10px 26px -10px rgba(29,42,38,.17);
@@ -123,6 +125,8 @@
   --c-cat-rose-line: 40 43 38;
   --c-cat-rose-fg: 138 144 131;
   --c-scrim: 0 0 0;
+  --c-mark: 254 159 25;
+  --c-mark-fg: 63 20 30;
 
   --shadow-card: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5);
   --shadow-raised: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px -6px rgba(0,0,0,.7);
@@ -211,6 +215,8 @@
   --c-cat-rose-line: 208 215 204;
   --c-cat-rose-fg: 82 91 79;
   --c-scrim: 26 34 22;
+  --c-mark: 43 99 92;
+  --c-mark-fg: 248 251 246;
 
   --shadow-card: 0 1px 2px rgba(26,34,22,.07);
   --shadow-raised: 0 2px 4px rgba(26,34,22,.06), 0 10px 26px -10px rgba(26,34,22,.17);
@@ -277,6 +283,8 @@
   --c-cat-rose-line: 44 47 42;
   --c-cat-rose-fg: 149 159 145;
   --c-scrim: 0 0 0;
+  --c-mark: 152 209 200;
+  --c-mark-fg: 21 23 19;
 
   --shadow-card: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5);
   --shadow-raised: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px -6px rgba(0,0,0,.7);
@@ -345,6 +353,8 @@
   --c-cat-rose-line: 219 211 202;
   --c-cat-rose-fg: 78 92 83;
   --c-scrim: 21 35 27;
+  --c-mark: 35 116 77;
+  --c-mark-fg: 253 249 246;
 
   --shadow-card: 0 1px 2px rgba(21,35,27,.07);
   --shadow-raised: 0 2px 4px rgba(21,35,27,.06), 0 10px 26px -10px rgba(21,35,27,.17);
@@ -411,6 +421,8 @@
   --c-cat-rose-line: 49 45 41;
   --c-cat-rose-fg: 144 160 150;
   --c-scrim: 0 0 0;
+  --c-mark: 138 216 172;
+  --c-mark-fg: 24 21 18;
 
   --shadow-card: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5);
   --shadow-raised: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px -6px rgba(0,0,0,.7);
@@ -479,6 +491,8 @@
   --c-cat-rose-line: 210 215 196;
   --c-cat-rose-fg: 81 91 80;
   --c-scrim: 24 34 23;
+  --c-mark: 58 115 53;
+  --c-mark-fg: 249 251 243;
 
   --shadow-card: 0 1px 2px rgba(24,34,23,.07);
   --shadow-raised: 0 2px 4px rgba(24,34,23,.06), 0 10px 26px -10px rgba(24,34,23,.17);
@@ -545,6 +559,8 @@
   --c-cat-rose-line: 45 47 38;
   --c-cat-rose-fg: 148 159 146;
   --c-scrim: 0 0 0;
+  --c-mark: 155 215 148;
+  --c-mark-fg: 21 23 16;
 
   --shadow-card: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5);
   --shadow-raised: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px -6px rgba(0,0,0,.7);
@@ -613,6 +629,8 @@
   --c-cat-rose-line: 128 128 128;
   --c-cat-rose-fg: 74 74 74;
   --c-scrim: 31 31 31;
+  --c-mark: 3 66 99;
+  --c-mark-fg: 250 250 250;
 
   --shadow-card: 0 1px 2px rgba(31,31,31,.07);
   --shadow-raised: 0 2px 4px rgba(31,31,31,.06), 0 10px 26px -10px rgba(31,31,31,.17);
@@ -670,6 +688,8 @@
   --c-cat-rose-line: 99 99 99;
   --c-cat-rose-fg: 174 174 174;
   --c-scrim: 0 0 0;
+  --c-mark: 128 199 248;
+  --c-mark-fg: 22 22 22;
 
   --shadow-card: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5);
   --shadow-raised: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px -6px rgba(0,0,0,.7);
@@ -729,6 +749,8 @@
   --c-cat-rose-line: 213 212 207;
   --c-cat-rose-fg: 70 74 84;
   --c-scrim: 27 31 41;
+  --c-mark: 8 74 137;
+  --c-mark-fg: 251 250 248;
 
   --shadow-card: 0 1px 2px rgba(27,31,41,.07);
   --shadow-raised: 0 2px 4px rgba(27,31,41,.06), 0 10px 26px -10px rgba(27,31,41,.17);
@@ -795,6 +817,8 @@
   --c-cat-rose-line: 46 46 43;
   --c-cat-rose-fg: 168 174 186;
   --c-scrim: 0 0 0;
+  --c-mark: 136 172 251;
+  --c-mark-fg: 22 22 20;
 
   --shadow-card: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5);
   --shadow-raised: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px -6px rgba(0,0,0,.7);
@@ -863,6 +887,8 @@
   --c-cat-rose-line: 212 212 212;
   --c-cat-rose-fg: 72 72 72;
   --c-scrim: 31 31 31;
+  --c-mark: 61 61 61;
+  --c-mark-fg: 250 250 250;
 
   --shadow-card: 0 1px 2px rgba(31,31,31,.07);
   --shadow-raised: 0 2px 4px rgba(31,31,31,.06), 0 10px 26px -10px rgba(31,31,31,.17);
@@ -929,6 +955,8 @@
   --c-cat-rose-line: 46 46 46;
   --c-cat-rose-fg: 174 174 174;
   --c-scrim: 0 0 0;
+  --c-mark: 177 177 177;
+  --c-mark-fg: 22 22 22;
 
   --shadow-card: 0 1px 0 rgba(255,255,255,.03) inset, 0 2px 8px rgba(0,0,0,.5);
   --shadow-raised: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px -6px rgba(0,0,0,.7);
@@ -997,6 +1025,8 @@
   --c-cat-rose-line: 223 210 194;
   --c-cat-rose-fg: 88 77 71;
   --c-scrim: 57 46 39;
+  --c-mark: 27 90 67;
+  --c-mark-fg: 228 223 216;
 
   --shadow-card: 0 1px 2px rgba(57,46,39,.05);
   --shadow-raised: 0 2px 4px rgba(57,46,39,.04), 0 10px 26px -10px rgba(57,46,39,.12);
@@ -1063,6 +1093,8 @@
   --c-cat-rose-line: 51 45 37;
   --c-cat-rose-fg: 168 156 148;
   --c-scrim: 0 0 0;
+  --c-mark: 132 163 116;
+  --c-mark-fg: 26 21 16;
 
   --shadow-card: 0 2px 8px rgba(0,0,0,.35);
   --shadow-raised: 0 6px 20px -6px rgba(0,0,0,.5);
@@ -1134,6 +1166,8 @@
     --c-cat-rose-line: 214 203 170;
     --c-cat-rose-fg: 81 97 92;
     --c-scrim: 29 42 38;
+    --c-mark: 254 159 25;
+    --c-mark-fg: 63 20 30;
 
     --shadow-card: 0 1px 2px rgba(29,42,38,.07);
     --shadow-raised: 0 2px 4px rgba(29,42,38,.06), 0 10px 26px -10px rgba(29,42,38,.17);

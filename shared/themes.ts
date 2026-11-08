@@ -33,6 +33,9 @@ export const THEME_TOKENS = [
   'cat-orange-bg', 'cat-orange-line', 'cat-orange-fg',
   'cat-rose-bg', 'cat-rose-line', 'cat-rose-fg',
   'scrim',
+  // The logo's tile and the silhouette on it. Sun Dogs keeps the brand's orange and
+  // plum; every other theme draws the mark in its own accent (see `withMark`).
+  'mark', 'mark-fg',
 ] as const
 export type ThemeToken = (typeof THEME_TOKENS)[number]
 
@@ -119,9 +122,22 @@ function modes(data: { light: ThemeModeData; dark: ThemeModeData }): Record<Them
   return { light: data.light, dark: data.dark }
 }
 
+type DerivedMode = Omit<ThemeModeData, 'tokens'> & { tokens: Readonly<Record<Exclude<ThemeToken, 'mark' | 'mark-fg'>, string>> }
+
+/**
+ * A derived theme draws the logo in its own accent: the tile is the accent and the
+ * silhouette is the text colour that sits on it, the pair every theme already holds
+ * to its contrast floor, so the mark is as legible as a primary button under every
+ * theme, mode and contrast setting without a number of its own to maintain.
+ */
+function withMark(data: DerivedMode): ThemeModeData {
+  return { ...data, tokens: { ...data.tokens, mark: data.tokens.accent, 'mark-fg': data.tokens['accent-fg'] } }
+}
+
 export const THEMES: readonly Theme[] = PALETTE_IDS.map((id): Theme => {
-  const data = id === 'sun-dogs' ? SUN_DOGS : DERIVED_THEME_DATA[id]
-  return { id, ...META[id], modes: modes(data) }
+  if (id === 'sun-dogs') return { id, ...META[id], modes: modes(SUN_DOGS) }
+  const derived = DERIVED_THEME_DATA[id]
+  return { id, ...META[id], modes: modes({ light: withMark(derived.light), dark: withMark(derived.dark) }) }
 })
 
 /** A theme by id; anything unknown is the default, never an error. */
