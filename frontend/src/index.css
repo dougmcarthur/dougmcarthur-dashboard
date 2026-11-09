@@ -163,6 +163,46 @@
     }
   }
 
+  /*
+   * The logo, as a tile that wears the chosen theme. The tile is `mark` and the
+   * dog is `mark-fg` painted through the silhouette (`logo-mark.svg`), so it
+   * recolours with the palette, the mode and Higher contrast like any other
+   * token. Sun Dogs keeps the brand's orange and plum; every other theme uses its
+   * accent pair, which is already held to the contrast of a primary button.
+   *
+   * It is a class and not an <img> so the static privacy and terms pages draw the
+   * same tile (their test forbids <img>, the cheapest way to promise nothing loads
+   * from elsewhere) and it is decorative wherever it appears: the words beside it
+   * name the product. Size it with the call site's own utilities (`size-7`). The
+   * radius matches the tab icon (TILE_RADIUS in shared/brandMark.ts). The dog runs
+   * off the tile's left and bottom edges, so the overlay takes the tile's rounding.
+   * Forced colours would turn both fills to the page ground and lose the dog, so
+   * the authored pair is kept there: it is two colours with a fixed contrast.
+   */
+  .brand-mark {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    border-radius: 18.5%;
+    background-color: rgb(var(--c-mark));
+    /* The dog runs off the tile's edges in `mark-fg`, and in a theme where that is
+       close to the page ground (a cream dog on a cream page) the edge it shares with
+       the page would vanish and the tile would look cut. A hairline in the theme's own
+       rule colour keeps the whole tile in view whatever the pair. */
+    box-shadow: 0 0 0 1px rgb(var(--c-line-strong));
+    forced-color-adjust: none;
+  }
+  .brand-mark::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-color: rgb(var(--c-mark-fg));
+    -webkit-mask: url('/logo-mark.svg') center / cover no-repeat;
+    mask: url('/logo-mark.svg') center / cover no-repeat;
+    forced-color-adjust: none;
+  }
+
   .skip-link {
     position: absolute;
     left: 0.75rem;

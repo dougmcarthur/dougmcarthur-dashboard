@@ -14,6 +14,7 @@
  * interface responds without a single component subscribing to the theme.
  */
 
+import { tabIconSvg } from '../../shared/brandMark'
 import { DEFAULT_PALETTE, HIGH_CONTRAST_PALETTE, isPaletteId, type PaletteId } from '../../shared/themes'
 
 /** Light or dark. Named `theme` for the settings already saved under that key; the colour theme is `palette`. */
@@ -211,6 +212,7 @@ export function applyAppearance(a: Appearance): void {
   root.style.setProperty('--font-ui', fontStack(a))
   root.style.setProperty('--shell-width', WIDTHS[a.width])
   syncThemeColor(root)
+  syncTabIcon(root)
 }
 
 /**
@@ -228,4 +230,29 @@ function syncThemeColor(root: HTMLElement): void {
     document.head.appendChild(meta)
   }
   meta.content = `rgb(${channels.split(/\s+/).join(',')})`
+}
+
+/**
+ * The tab icon wears the theme too: the logo in the chosen palette's `mark`
+ * pair, the same colours the tile in the page uses, so a person who picked
+ * Pebble sees a Pebble dog in the tab and not the brand's orange one. Written
+ * as a data address onto the SVG icon link, since an icon file cannot read the
+ * page's variables. The files in `public/` stay the brand's own pair: they are
+ * what a browser shows before this runs, what an .ico or an iOS home screen can
+ * show at all, and what the default theme resolves to anyway.
+ */
+function syncTabIcon(root: HTMLElement): void {
+  const style = getComputedStyle(root)
+  const ground = style.getPropertyValue('--c-mark').trim()
+  const ink = style.getPropertyValue('--c-mark-fg').trim()
+  if (!ground || !ink) return
+  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"][type="image/svg+xml"]')
+  if (!link) {
+    link = document.createElement('link')
+    link.rel = 'icon'
+    link.type = 'image/svg+xml'
+    document.head.appendChild(link)
+  }
+  const colour = (channels: string) => `rgb(${channels.split(/\s+/).join(',')})`
+  link.href = `data:image/svg+xml,${encodeURIComponent(tabIconSvg(colour(ground), colour(ink)))}`
 }

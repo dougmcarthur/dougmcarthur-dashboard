@@ -15,7 +15,13 @@ enforces on a dilution theory, including against unrelated trades). "Music Scout
 avoided because in the trade it means an A&R person scouting *talent*. Email
 subjects and the From name lead with the product name; respondent-facing survey
 text names Sun Dogs Music and no product. The header, the landing page, the sign-in
-title and the welcome screens all carry the whole name in one weight.
+title and the welcome screens all carry the whole name in one weight, with the logo
+(the dog, `shared/brandMark.ts`) beside it as `BrandMark` and never in its place. The
+logo wears the chosen colour theme: Sun Dogs keeps its orange and plum, every other
+theme draws it in its accent pair (the `mark` and `mark-fg` tokens), and the tab icon
+follows (`syncTabIcon`). The files in `frontend/public/` and the link-preview card are
+the brand's own colours, written by `scripts/og/render.mjs` (`test/brandMark.test.ts`,
+`test/openGraph.test.ts`).
 
 **Names that look stale are not.** The D1 database is still `dougmcarthur-music-hq`
 (a rename is a data migration) and the Worker is `sun-dogs-scout`. The repository,

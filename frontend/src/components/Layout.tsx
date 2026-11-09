@@ -4,6 +4,7 @@ import { api } from '../api'
 import { useAppearance } from '../hooks/useAppearance'
 import { usePageAnnouncement } from '../hooks/usePageAnnouncement'
 import { NotificationBell } from './NotificationBell'
+import { BrandMark } from './ui/BrandMark'
 import { SideDock } from './SidePanel'
 import { AnswersDialog } from './AnswersPanel'
 import { PopOutProvider } from './PopOut'
@@ -233,8 +234,9 @@ function LayoutFrame({ children, page, onNav, admin = false }: LayoutProps) {
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 min-h-14 py-2">
             <a
               href={admin ? '#admin' : '#overview'}
-              className="font-semibold text-ink text-sm tracking-tight hover:text-body transition-colors shrink-0 max-md:inline-block max-md:py-3 max-md:-my-3"
+              className="inline-flex items-center gap-2 font-semibold text-ink text-sm tracking-tight hover:text-body transition-colors shrink-0 max-md:py-3 max-md:-my-3"
             >
+              <BrandMark className="size-7" />
               Sun Dogs Music Scout
             </a>
 

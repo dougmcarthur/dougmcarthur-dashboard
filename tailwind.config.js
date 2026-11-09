@@ -64,6 +64,8 @@ export default {
         'accent-fg': 'rgb(var(--c-accent-fg) / <alpha-value>)',
         'accent-soft': 'rgb(var(--c-accent-soft) / <alpha-value>)',
         scrim: 'rgb(var(--c-scrim) / <alpha-value>)',
+        mark: 'rgb(var(--c-mark) / <alpha-value>)',
+        'mark-fg': 'rgb(var(--c-mark-fg) / <alpha-value>)',
         'danger-bg': 'rgb(var(--c-danger-bg) / <alpha-value>)',
         'danger-bg-hover': 'rgb(var(--c-danger-bg-hover) / <alpha-value>)',
         'danger-line': 'rgb(var(--c-danger-line) / <alpha-value>)',

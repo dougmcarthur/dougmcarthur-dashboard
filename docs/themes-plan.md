@@ -18,9 +18,16 @@ record of what was built, with what is still to do at the end.
 ## What a theme is, and is not
 
 A theme is a set of colour tokens for the light mode and another for the dark
-mode: 48 colour tokens and four shadows each, plus an optional set of six that
+mode: 50 colour tokens and four shadows each, plus an optional set of six that
 "Higher contrast" strengthens. It is not a typeface, a density or a layout: text
 size, typeface, width, contrast, motion and links stay their own settings.
+
+The logo is drawn in two of those tokens, `mark` (the tile) and `mark-fg` (the dog).
+Sun Dogs sets them to the brand's orange and plum; every other theme gets its own
+`accent` and `accent-fg`, the pair that already carries a primary button's text, so
+the mark is as legible as a button under every theme, mode and contrast setting
+(`test/brandMark.test.ts` holds each to 4.5:1). The browser tab's icon is drawn from
+the same two tokens on every palette change.
 
 The stage plot's connection colours (`conn-*`) are the exception to "a theme
 sets every colour": they are the same in every theme, because telling a DI from
@@ -184,7 +191,7 @@ Two standards, both enforced by tests (`test/themes.test.ts`,
 
 **Strict, for the default and the accessible themes.**
 
-- Every theme defines all 48 themed tokens in both modes, as valid channels, and
+- Every theme defines all 50 themed tokens in both modes, as valid channels, and
   none defines a `conn-*`.
 - Sun Dogs: text 4.5:1 on every ground and on its own fill, field edges 3:1, and
   green, ochre and clay at least ΔE 15 apart for deuteranopia and protanopia.

@@ -1,0 +1,95 @@
+<!doctype html>
+<!--
+  Source of frontend/public/og-image.png, the preview card shown when a link to
+  Sun Dogs Music Scout is shared (the Open Graph tags in frontend/index.html).
+
+  Rendered at 1200x630 by `node scripts/og/render.mjs`, which needs Playwright
+  (not a dependency of this repository) and `npm ci` for the self-hosted fonts.
+  Edit this file and re-render; the PNG is committed because a link preview is
+  fetched from the deployed site, not built there.
+
+  The dog is frontend/public/logo.svg (the logo with its traced outline smoothed into curves),
+  at the left edge so its body bleeds off the card as it does in the square mark. Everything that matters
+  sits inside the middle 1200x600, since some networks crop to 2:1.
+-->
+<html lang="en-CA">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      @font-face {
+        font-family: 'Bricolage';
+        src: url('../../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-standard-normal.woff2') format('woff2');
+        font-weight: 200 800;
+        font-stretch: 75% 100%;
+      }
+      @font-face {
+        font-family: 'Public Sans';
+        src: url('../../node_modules/@fontsource-variable/public-sans/files/public-sans-latin-wght-normal.woff2') format('woff2');
+        font-weight: 100 900;
+      }
+      html, body { margin: 0; }
+      .card {
+        position: relative;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #fe9f19;
+        color: #3f141e;
+      }
+      .dog {
+        position: absolute;
+        left: 0;
+        bottom: -10px;
+        width: 650px;
+        height: 650px;
+      }
+      .copy {
+        position: absolute;
+        left: 650px;
+        right: 70px;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      h1 {
+        margin: 0;
+        font-family: 'Bricolage', sans-serif;
+        font-weight: 700;
+        font-stretch: 90%;
+        font-size: 92px;
+        line-height: 0.98;
+        letter-spacing: -0.022em;
+      }
+      p {
+        margin: 34px 0 0;
+        font-family: 'Public Sans', sans-serif;
+        font-weight: 500;
+        font-size: 31px;
+        line-height: 1.32;
+        max-width: 470px;
+        text-wrap: balance;
+      }
+      .host {
+        position: absolute;
+        right: 70px;
+        bottom: 46px;
+        margin: 0;
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <img class="dog" src="../../frontend/public/logo.svg" alt="" />
+      <div class="copy">
+        <h1>Sun Dogs<br />Music Scout</h1>
+        <p>Gigs, grants and sync calls for independent Canadian musicians.</p>
+      </div>
+      <p class="host">scout.sundogsmusic.ca</p>
+    </div>
+  </body>
+</html>

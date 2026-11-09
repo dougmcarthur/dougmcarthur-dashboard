@@ -24,10 +24,49 @@
         root.dataset.palette = p
       } catch (e) {}
     </script>
+    <!-- The tab icon: the logo. The .ico is for browsers that ask for /favicon.ico
+         whatever the page says; the SVG is what the rest draw; iOS takes the
+         opaque square. All from frontend/public, built by scripts/og/render.mjs. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Sun Dogs Music Scout</title>
     <meta
       name="description"
       content="Sun Dogs Music Scout finds festivals, showcases, grants and sync calls for independent Canadian musicians, helps you decide which are worth it, and drafts the paperwork."
+    />
+    <link rel="canonical" href="https://scout.sundogsmusic.ca/" />
+
+    <!-- The preview a shared link unfolds into. The image is frontend/public/og-image.png
+         (source: scripts/og/og-image.html) and has to be an absolute address, because
+         a crawler reads this page without knowing where it came from. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Sun Dogs Music Scout" />
+    <meta property="og:title" content="Sun Dogs Music Scout" />
+    <meta
+      property="og:description"
+      content="Finds festivals, showcases, grants and sync calls for independent Canadian musicians, helps you decide which are worth it, and drafts the paperwork."
+    />
+    <meta property="og:url" content="https://scout.sundogsmusic.ca/" />
+    <meta property="og:locale" content="en_CA" />
+    <meta property="og:image" content="https://scout.sundogsmusic.ca/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="The silhouette of a dog in profile in dark plum on orange, beside the words Sun Dogs Music Scout."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Sun Dogs Music Scout" />
+    <meta
+      name="twitter:description"
+      content="Finds festivals, showcases, grants and sync calls for independent Canadian musicians, helps you decide which are worth it, and drafts the paperwork."
+    />
+    <meta name="twitter:image" content="https://scout.sundogsmusic.ca/og-image.png" />
+    <meta
+      name="twitter:image:alt"
+      content="The silhouette of a dog in profile in dark plum on orange, beside the words Sun Dogs Music Scout."
     />
   </head>
   <body>
