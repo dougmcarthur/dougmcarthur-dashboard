@@ -10,6 +10,7 @@ import { CopyButton } from '../components/CopyButton'
 import { Banner, Card, EmptyState } from '../components/ui/Surface'
 import { PageHeading } from '../components/PageHeading'
 import { useConfirm } from '../components/ui/ConfirmModal'
+import { titleLabel } from '../../../shared/humanise'
 
 /** "2026-09" is a key, not a label. */
 function monthLabel(m: string): string {
@@ -128,6 +129,8 @@ export function PromoDraftsPage() {
         <Card pad="none" divided>
           {visible.map((draft) => {
             const isOpen = expanded.has(draft.id)
+            // An agent may name a draft like a file (`august-show-run-social`).
+            const label = titleLabel(draft.title)
             return (
               <div key={draft.id}>
                 <div
@@ -138,7 +141,7 @@ export function PromoDraftsPage() {
                 >
                   <Chevron open={isOpen} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-ink truncate">{draft.title}</p>
+                    <p className="text-sm font-medium text-ink truncate">{label}</p>
                     <p className="text-xs text-muted mt-0.5">{monthLabel(draft.month)}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -162,7 +165,7 @@ export function PromoDraftsPage() {
                       onClick={async (e) => {
                         e.stopPropagation()
                         const ok = await confirm({
-                          title: `Delete "${draft.title}"?`,
+                          title: `Delete "${label}"?`,
                           description: 'This promo draft will be permanently deleted.',
                           destructive: true,
                         })
@@ -170,7 +173,7 @@ export function PromoDraftsPage() {
                       }}
                       className="w-6 h-6 p-0 flex items-center justify-center text-muted hover:text-danger-fg hover:bg-danger-bg max-md:w-11 max-md:h-11"
                       title="Delete"
-                      aria-label={`Delete ${draft.title}`}
+                      aria-label={`Delete ${label}`}
                     >
                       ×
                     </Button>
@@ -192,7 +195,7 @@ export function PromoDraftsPage() {
                           <span>Longer format (caption / email)</span>
                         )}
                       </div>
-                      <CopyButton text={draft.content} label={`Copy ${draft.title}`}>
+                      <CopyButton text={draft.content} label={`Copy ${label}`}>
                         Copy draft
                       </CopyButton>
                     </div>

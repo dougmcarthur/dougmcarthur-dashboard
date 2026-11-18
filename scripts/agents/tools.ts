@@ -214,7 +214,10 @@ export const TOOL_SPECS = {
       type: 'object',
       properties: {
         month: { type: 'string', description: 'YYYY-MM the draft is for' },
-        title: { type: 'string' },
+        title: {
+          type: 'string',
+          description: 'A short title in plain words, as a person would write it. Not a file name or slug.',
+        },
         content: { type: 'string' },
       },
       required: ['month', 'title', 'content'],

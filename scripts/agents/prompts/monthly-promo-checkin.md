@@ -62,7 +62,9 @@ news yet.
 
 File a small number of promo drafts — typically three — tied to what is
 genuinely happening: an upcoming show, a release, a milestone, a season. Set
-`month` to the month they are for.
+`month` to the month they are for. Give each a short title in plain words, such
+as "Winter show roundup", never a file name like `show-run-social`:
+the artist reads it on a list.
 
 Ground every draft in something real from the data you read. If the month is
 quiet and there is nothing to announce, file fewer drafts, or none, and say so

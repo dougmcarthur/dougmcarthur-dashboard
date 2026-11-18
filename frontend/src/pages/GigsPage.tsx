@@ -121,9 +121,11 @@ function DeadlineCell({ gig, today }: { gig: GigOpportunity; today: string }) {
  */
 function FeeCell({ gig }: { gig: GigOpportunity }) {
   const amt = gig.feeAmount
-  // "USD 1,200 · paid" read as a fee that has been paid, and a guarantee as an
-  // entry fee. The flag means the gig pays artists, so it says that.
-  const paid = gig.paid ? <span className="text-success-fg"> · pays artists</span> : null
+  // `paid` is what the artist pays to be considered (the edit form says "Costs
+  // money to enter"). An earlier label said the opposite, that the gig pays the
+  // artist, and green made a cost read as good news, so the flag says what it
+  // means in the muted colour.
+  const paid = gig.paid ? <span className="text-muted"> · costs to enter</span> : null
   if (amt == null && !gig.fee) return <span className="text-faint">—</span>
   if (amt != null) {
     return <span>{gig.feeCurrency ?? 'USD'} {amt.toLocaleString()}{paid}</span>

@@ -28,6 +28,7 @@ import { visaLead } from './gigCost'
 import { withStoredColumns } from './noteColumns'
 import { settleWindowProse, windowState } from './windowProse'
 import { focusOfItem, type Focus, type ItemFocus } from './artistFocus'
+import { titleLabel } from './humanise'
 import { pitchGate, termsOf } from './syncTerms'
 import {
   parseNote,
@@ -477,7 +478,7 @@ function promoItem(row: PromoDraft): Omit<ReviewItem, 'decision' | 'focus'> {
     kind: 'promo',
     silence: null,
     id: row.id,
-    title: row.title,
+    title: titleLabel(row.title),
     subtitle: row.month,
     status: row.status,
     url: null,
