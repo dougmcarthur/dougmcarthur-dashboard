@@ -71,7 +71,8 @@ These recur in every area below. They are stated once here and not repeated.
   and the Worker re-plans rather than trusting ids from a stale screen.
 - **Screens name things and never print identifiers.** `taskLabel` (`shared/taskLabels.ts`) renders an
   agent's `task_id`, table names go through `tableLabel`, the set of agents is not
-  closed so anything unknown is humanised. The exception is the integration cards,
+  closed so anything unknown is humanised, and a promo title an agent wrote as a slug
+  goes through `titleLabel`. The exception is the integration cards,
   where the variable name is the actionable fact, and only to the owner: an artist
   cannot set a Worker secret, so they read a plain sentence instead.
 
@@ -703,7 +704,9 @@ the calendar until Accepted. `archived` shows as Closed with no outcome.
   decided from the range, never a midpoint: *Income*, *Investment* or *Could pay its
   way*. The words are chosen: a showcase that does not break even is spending on being
   heard, so `test/gigCost.test.ts` fails if a word of loss returns. No pay recorded is
-  not zero pay. `docs/gig-pipeline-plan.md` §7.
+  not zero pay. **`paid` means the artist pays to be considered** (the edit form says
+  "Costs money to enter", the fee cell says "costs to enter"); it is never "the gig pays
+  artists" (`test/agentLabels.test.ts`). `docs/gig-pipeline-plan.md` §7.
 - **The note parser moved to write time; it did not go away.** The agents write prose
   from outside this repo, so extraction has to keep happening. `shared/noteColumns.ts`
   stores six facts (`submission_state`, `blocked_on`, `submission_method`,

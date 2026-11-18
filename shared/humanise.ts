@@ -22,3 +22,19 @@ export function humanise(raw: string | null | undefined, empty = ''): string {
   if (!words) return empty
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
+
+/** One run of letters and digits joined by hyphens or underscores, with no space. */
+const SLUG = /^[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+$/
+
+/**
+ * A title an agent wrote, as a person reads it.
+ *
+ * The research agents name what they file, and some of them name it like a
+ * file: `august-show-run-social`. A title with a space in it was written for a
+ * person and is left exactly as written; only a whole value that is one slug
+ * goes through `humanise`. A single plain word is not a slug either.
+ */
+export function titleLabel(raw: string | null | undefined): string {
+  const title = (raw ?? '').trim()
+  return SLUG.test(title) ? humanise(title) : title
+}
